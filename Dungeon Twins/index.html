@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Chained Roguelike 2D - Modular POO</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div id="ui-bar">
+        <div class="hud-item" id="hud-floor">CALABOUÇO: ANDAR 1</div>
+        <div class="hud-item" id="hud-p1" style="color: #ffd166;">P1 (Amarelo): ❤️❤️❤️</div>
+        <div class="hud-item" id="hud-p2" style="color: #6bb4db;">P2 (Azul): ❤️❤️❤️</div>
+        <div>
+            <button class="btn" id="btn-weapon">ARMA: LASER</button>
+            <button class="btn" id="btn-restart" style="background:#ff8906; border-color:#c26400;">REINICIAR</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <div id="instructions">
+        [P1 Amarelo]: WASD | [P2 Azul]: SETAS | Estrutura modular em POO!
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
