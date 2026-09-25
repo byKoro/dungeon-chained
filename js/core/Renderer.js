@@ -26,7 +26,7 @@ export class Renderer {
         // Câmera com Zoom centralizado
         this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
         this.ctx.scale(this.zoom, this.zoom);
-        this.ctx.translate(-this.canvas.width / 2, -canvas.height / 2);
+        this.ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
     }
 
     endFrame() {

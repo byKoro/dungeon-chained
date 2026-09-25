@@ -1,7 +1,7 @@
 import { Entity } from './Entity.js';
 
 export class Player extends Entity {
-    constructor(x, y, color, controls, spriteImg, name) {
+    constructor(x, y, color, controls, spriteImg, name, spriteConfig = null) {
         super(x, y, 16);
         this.color = color;
         this.controls = controls; // ['up', 'down', 'left', 'right']
@@ -11,6 +11,12 @@ export class Player extends Entity {
         this.lives = 3;
         this.invulnerableTimer = 0;
         this.hurtTimer = 0;
+
+        // Configuração do sprite.
+        // Spritesheet animado (P1): { animated:true, frameCount, cellSize, crop, drawSize }
+        // Sprite único legado (P2):  { animated:false, drawSize }
+        this.sprite = spriteConfig || { animated: false, drawSize: 46 };
+        this.walkFrame = 0;   // acumulador contínuo do ciclo de andar
     }
 
     handleInput(input) {
@@ -50,6 +56,14 @@ export class Player extends Entity {
         this.handleInput(input);
         super.update();
 
+        // Avança o ciclo de caminhada proporcional à velocidade real
+        if (this.speedMag > 0.2) {
+            this.walkFrame += this.speedMag * 0.18;
+        } else {
+            // Volta suavemente para a pose parada (frame 0)
+            this.walkFrame = 0;
+        }
+
         // Limites da arena
         this.x = Math.max(bounds.minX + this.hitRadius, Math.min(bounds.maxX - this.hitRadius, this.x));
         this.y = Math.max(bounds.minY + this.hitRadius, Math.min(bounds.maxY - this.hitRadius, this.y));
@@ -71,26 +85,49 @@ export class Player extends Entity {
 
         if (this.facingLeft) ctx.scale(-1, 1);
 
-        // Bobbing & Swaying orgânico
-        let bobY = 0;
+        // Swaying orgânico bem sutil (o bobbing vertical já vem do próprio spritesheet)
         let swayAngle = 0;
         if (this.speedMag > 0.1) {
-            bobY = -Math.abs(Math.sin(this.animTimer)) * 3.5;
-            swayAngle = Math.cos(this.animTimer * 0.5) * 0.09;
+            swayAngle = Math.cos(this.animTimer * 0.5) * 0.02;
         }
-
-        ctx.translate(0, bobY);
         ctx.rotate(swayAngle);
 
-        // Fatiamento e renderização do elmo
-        if (this.img && this.img.complete) {
-            const drawW = 36, drawH = 46;
-            const halfH = this.img.naturalHeight / 2;
-            // Base
-            ctx.drawImage(this.img, 0, halfH, this.img.naturalWidth, halfH, -drawW / 2, 0, drawW, drawH / 2);
-            // Topo (com micro-bobbing)
-            const headDip = this.speedMag > 0.1 ? Math.sin(this.animTimer) * 0.8 : 0;
-            ctx.drawImage(this.img, 0, 0, this.img.naturalWidth, halfH, -drawW / 2, -drawH / 2 + headDip, drawW, drawH / 2);
+        // Renderização do sprite
+        if (this.img && this.img.complete && this.img.naturalWidth > 0) {
+            const s = this.sprite;
+
+            if (s.animated) {
+                // Spritesheet de caminhada (ex.: 8 frames de 100x100)
+                // Frame 0 = parado; frames 1..(frameCount-1) = ciclo de andar
+                let frame = 0;
+                if (this.speedMag > 0.2) {
+                    frame = 1 + (Math.floor(this.walkFrame) % (s.frameCount - 1));
+                }
+
+                const cell = s.cellSize;             // tamanho da célula (ex.: 100)
+                // Janela de recorte JUSTA em volta do boneco (bounding box + margem)
+                const cw = s.cropW, ch = s.cropH;
+                const srcX = frame * cell + s.cropX;
+                const srcY = s.cropY;
+
+                // Escala uniforme pela altura desejada, preservando a proporção do boneco
+                const scale = s.drawHeight / ch;
+                const drawW = cw * scale;
+                const drawH = ch * scale;
+
+                ctx.drawImage(
+                    this.img,
+                    srcX, srcY, cw, ch,
+                    -drawW / 2, -drawH / 2, drawW, drawH
+                );
+            } else {
+                // Sprite único legado, fatiado em topo/base com micro-bobbing
+                const drawW = 36, drawH = 46;
+                const halfH = this.img.naturalHeight / 2;
+                ctx.drawImage(this.img, 0, halfH, this.img.naturalWidth, halfH, -drawW / 2, 0, drawW, drawH / 2);
+                const headDip = this.speedMag > 0.1 ? Math.sin(this.animTimer) * 0.8 : 0;
+                ctx.drawImage(this.img, 0, 0, this.img.naturalWidth, halfH, -drawW / 2, -drawH / 2 + headDip, drawW, drawH / 2);
+            }
         }
 
         // Tint vermelho de dano

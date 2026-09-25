@@ -23,7 +23,7 @@ const imgP1 = new Image();
 imgP1.src = "assets/player_01.png";
 
 const imgP2 = new Image();
-imgP2.src = "assets/npc_knight_green.png";
+imgP2.src = "assets/player_02.png";
 
 const enemySheet = new Image();
 enemySheet.src = "assets/Dungeon_Character.png";
@@ -56,8 +56,22 @@ const arenaBounds = {
 function initLevel(resetAll = false) {
     if (resetAll) {
         floor = 1;
-        p1 = new Player(470, 360, "#ffd166", ["w", "s", "a", "d"], imgP1, "Amarelo");
-        p2 = new Player(530, 360, "#6bb4db", ["arrowup", "arrowdown", "arrowleft", "arrowright"], imgP2, "Azul");
+        p1 = new Player(470, 360, "#ffd166", ["w", "s", "a", "d"], imgP1, "Amarelo", {
+            animated: true,
+            frameCount: 8,   // 800 / 100
+            cellSize: 100,   // cada frame é 100x100
+            // Recorte JUSTO em volta do boneco (bbox medida: x 44-57, y 39-56) + 2px de margem
+            cropX: 42, cropY: 37, cropW: 18, cropH: 22,
+            drawHeight: 73   // altura de exibição na arena (30% maior que 56)
+        });
+        p2 = new Player(530, 360, "#6bb4db", ["arrowup", "arrowdown", "arrowleft", "arrowright"], imgP2, "Azul", {
+            animated: true,
+            frameCount: 8,   // 800 / 100
+            cellSize: 100,   // cada frame é 100x100
+            // Recorte JUSTO em volta do boneco (bbox medida: x 41-57, y 37-57) + 2px de margem
+            cropX: 39, cropY: 35, cropW: 21, cropH: 25,
+            drawHeight: 73   // mesma altura de exibição do P1 (30% maior que 56)
+        });
         particleSystem.clear();
     } else {
         p1.x = 470; p1.y = 360; p1.vx = 0; p1.vy = 0;
