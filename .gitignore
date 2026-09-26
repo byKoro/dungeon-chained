@@ -1,0 +1,32 @@
+# =========================================================
+#  dungeon-chained — versionar apenas os recursos do jogo
+#  (assets/, css/, js/, index.html)
+#  Tudo o mais abaixo é ignorado.
+# =========================================================
+
+# --- Dependências / npm (não usadas pelo jogo em runtime) ---
+node_modules/
+package.json
+package-lock.json
+
+# --- Ferramentas de agente / IA ---
+.agents/
+.claude/
+agent/
+skills-lock.json
+
+# --- Ambientes de editor / IDE ---
+.vscode/
+.idea/
+*.code-workspace
+
+# --- Sistema operacional ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# --- Logs e temporários ---
+*.log
+*.tmp
+*.bak

@@ -11,12 +11,58 @@ export class Player extends Entity {
         this.lives = 3;
         this.invulnerableTimer = 0;
         this.hurtTimer = 0;
+        this.hurtDuration = 30;    // duração do balanço/pose de impacto (frames)
+        this.scaredTimer = 0;      // após o dano, anda "assustado" por um tempo
+        this.scaredDuration = 120; // ~2s a 60fps
 
         // Configuração do sprite.
-        // Spritesheet animado (P1): { animated:true, frameCount, cellSize, crop, drawSize }
-        // Sprite único legado (P2):  { animated:false, drawSize }
+        // Spritesheet animado (P1): {
+        //   animated:true, frameCount, cellSize, cropX/Y/W/H, drawHeight,
+        //   hurt:   { img, frameCount, hurtFrame, cellSize, cropX/Y/W/H },  // pose de impacto
+        //   scared: { img, frameCount, cellSize, cropX/Y/W/H }             // andar assustado
+        // }
+        // Sprite único legado (P2): { animated:false, drawSize }
         this.sprite = spriteConfig || { animated: false, drawSize: 46 };
-        this.walkFrame = 0;   // acumulador contínuo do ciclo de andar
+        this.walkFrame = 0;   // acumulador contínuo do ciclo de andar (compartilhado entre walks)
+
+    }
+
+    // Seleciona a folha e o frame corretos conforme o estado atual do player.
+    // Prioridade: impacto (hurt) > assustado (scared) > caminhada normal (walk).
+    // Todos os ciclos de caminhada compartilham this.walkFrame, então a troca
+    // entre "andar assustado" e "andar normal" fica perfeitamente sincronizada.
+    resolveSprite() {
+        const s = this.sprite;
+
+        const hasSheet = (cfg) => cfg && cfg.img && cfg.img.complete && cfg.img.naturalWidth > 0;
+
+        // Índice do frame de caminhada atual (0 = parado; 1..frameCount-1 = passos)
+        const walkFrameIndex = () => {
+            if (this.speedMag <= 0.2) return 0;
+            return 1 + (Math.floor(this.walkFrame) % (s.frameCount - 1));
+        };
+
+        // Monta o descritor de recorte a partir de uma config de folha
+        const build = (img, cfg, frame) => ({
+            sheet: img,
+            cell: cfg.cellSize,
+            cropX: cfg.cropX, cropY: cfg.cropY, cropW: cfg.cropW, cropH: cfg.cropH,
+            frame
+        });
+
+        // 1) Impacto: pose fixa de dano
+        if (this.hurtTimer > 0 && hasSheet(s.hurt)) {
+            const frame = Math.min(s.hurt.hurtFrame, s.hurt.frameCount - 1);
+            return build(s.hurt.img, s.hurt, frame);
+        }
+
+        // 2) Assustado: mesmo ciclo de andar, porém na folha "scared"
+        if (this.scaredTimer > 0 && hasSheet(s.scared)) {
+            return build(s.scared.img, s.scared, walkFrameIndex());
+        }
+
+        // 3) Caminhada normal (folha principal, this.img)
+        return build(this.img, s, walkFrameIndex());
     }
 
     handleInput(input) {
@@ -41,7 +87,8 @@ export class Player extends Entity {
         
         this.lives--;
         this.invulnerableTimer = 65;
-        this.hurtTimer = 30;
+        this.hurtTimer = this.hurtDuration;
+        this.scaredTimer = this.scaredDuration;
 
         const pushAngle = Math.atan2(this.y - sourceY, this.x - sourceX);
         this.vx += Math.cos(pushAngle) * 16;
@@ -52,6 +99,7 @@ export class Player extends Entity {
     update(input, bounds) {
         if (this.invulnerableTimer > 0) this.invulnerableTimer--;
         if (this.hurtTimer > 0) this.hurtTimer--;
+        if (this.scaredTimer > 0) this.scaredTimer--;
 
         this.handleInput(input);
         super.update();
@@ -77,10 +125,12 @@ export class Player extends Entity {
 
         ctx.translate(this.x, this.y);
 
-        // Tremor de dano
+        // Balanço BRUSCO ao receber dano (mais forte no impacto, decaindo com o tempo)
         if (this.hurtTimer > 0) {
-            ctx.translate((Math.random() - 0.5) * 8, 0);
-            ctx.rotate((Math.random() - 0.5) * 0.3);
+            const intensity = this.hurtTimer / this.hurtDuration; // 1 -> 0
+            const shake = 16 * intensity;
+            ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake * 0.5);
+            ctx.rotate((Math.random() - 0.5) * 0.55 * intensity);
         }
 
         if (this.facingLeft) ctx.scale(-1, 1);
@@ -97,18 +147,11 @@ export class Player extends Entity {
             const s = this.sprite;
 
             if (s.animated) {
-                // Spritesheet de caminhada (ex.: 8 frames de 100x100)
-                // Frame 0 = parado; frames 1..(frameCount-1) = ciclo de andar
-                let frame = 0;
-                if (this.speedMag > 0.2) {
-                    frame = 1 + (Math.floor(this.walkFrame) % (s.frameCount - 1));
-                }
-
-                const cell = s.cellSize;             // tamanho da célula (ex.: 100)
-                // Janela de recorte JUSTA em volta do boneco (bounding box + margem)
-                const cw = s.cropW, ch = s.cropH;
-                const srcX = frame * cell + s.cropX;
-                const srcY = s.cropY;
+                // Escolhe folha + frame conforme o estado (impacto/assustado/normal)
+                const sp = this.resolveSprite();
+                const cw = sp.cropW, ch = sp.cropH;
+                const srcX = sp.frame * sp.cell + sp.cropX;
+                const srcY = sp.cropY;
 
                 // Escala uniforme pela altura desejada, preservando a proporção do boneco
                 const scale = s.drawHeight / ch;
@@ -116,7 +159,7 @@ export class Player extends Entity {
                 const drawH = ch * scale;
 
                 ctx.drawImage(
-                    this.img,
+                    sp.sheet,
                     srcX, srcY, cw, ch,
                     -drawW / 2, -drawH / 2, drawW, drawH
                 );
@@ -128,13 +171,6 @@ export class Player extends Entity {
                 const headDip = this.speedMag > 0.1 ? Math.sin(this.animTimer) * 0.8 : 0;
                 ctx.drawImage(this.img, 0, 0, this.img.naturalWidth, halfH, -drawW / 2, -drawH / 2 + headDip, drawW, drawH / 2);
             }
-        }
-
-        // Tint vermelho de dano
-        if (this.hurtTimer > 0) {
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.fillStyle = `rgba(255, 30, 30, ${Math.min(0.85, this.hurtTimer / 25)})`;
-            ctx.fillRect(-50, -50, 100, 100);
         }
 
         ctx.restore();

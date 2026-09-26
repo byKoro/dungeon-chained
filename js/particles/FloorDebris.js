@@ -12,6 +12,9 @@ export class FloorDebris {
     }
 
     update(players, bounds) {
+        // Sangue não tem física: apenas fica fixo no chão onde assentou.
+        if (this.isBlood) return;
+
         players.forEach(p => {
             const pSpeed = Math.hypot(p.vx, p.vy);
             if (pSpeed > 0.4) {
@@ -21,7 +24,7 @@ export class FloorDebris {
                 const kickRadius = p.hitRadius + 6;
 
                 if (dist < kickRadius && dist > 0) {
-                    const kickStrength = pSpeed * (this.isBlood ? 0.45 : 0.85);
+                    const kickStrength = pSpeed * 0.85;
                     const kickAngle = Math.atan2(p.vy, p.vx) + (Math.random() - 0.5) * 0.9;
 
                     this.vx += Math.cos(kickAngle) * kickStrength;
