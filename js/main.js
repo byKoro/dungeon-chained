@@ -1,6 +1,7 @@
 import { InputHandler } from './core/InputHandler.js';
 import { Physics } from './core/Physics.js';
 import { Renderer } from './core/Renderer.js';
+import { Chain } from './core/Chain.js';
 import { Player } from './entities/Player.js';
 import { MeleeEnemy } from './entities/MeleeEnemy.js';
 import { LaserWeapon } from './weapons/LaserWeapon.js';
@@ -122,8 +123,18 @@ const renderer = new Renderer(canvas, ctx);
 const bloodCanvas = new BloodCanvas(canvas.width, canvas.height, BLOOD_COLORS);
 const particleSystem = new ParticleSystem(bloodCanvas);
 
-const weapons = [new LaserWeapon(), new SawWeapon()];
-let currentWeaponIndex = 0;
+// A corrente une os jogadores e porta a arma ativa. Ajuste os "dials" da
+// mecânica (tensão, ruptura, reconexão) aqui.
+const chain = new Chain([new LaserWeapon(), new SawWeapon()], {
+    rest: 130,
+    stiffness: 0.02,
+    breakDistance: 240,
+    strainDistance: 165,
+    strainLimit: 30,
+    reconnectDistance: 110,
+    snapImpulse: 12,
+    playerSafeZone: 46
+});
 
 let floor = 1;
 let gameOver = false;
@@ -136,6 +147,12 @@ const MAX_FOOTPRINTS = 60;
 const BLOOD_STEPS = 6; // quantos passos ensanguentados após pisar em sangue
 let boxes = [];
 let trapdoor = { x: 880, y: 360, size: 54, open: false };
+
+// --- Estado da corrente/arma ---
+// A corrente segura os jogadores com tensão elástica. Se insistirem em se
+// separar além do limite de ruptura, ela ARREBENTA (empurrão elástico em
+// direções opostas) e os jogadores ficam DESARMADOS. Ao se reaproximarem, a
+// corrente/arma reconecta automaticamente. (Lógica na classe Chain.)
 
 const arenaBounds = {
     minX: 140, maxX: canvas.width - 140,
@@ -187,6 +204,9 @@ function initLevel(resetAll = false) {
     }
     gameOver = false;
 
+    // Corrente começa conectada a cada fase
+    chain.reset();
+
     // Gerar Caixas
     boxes = [];
     const boxCount = 3 + Math.floor(Math.random() * 3);
@@ -228,11 +248,19 @@ function updateHud() {
     hudFloor.innerText = `CALABOUÇO: ANDAR ${floor}`;
     hudP1.innerText = `P1 (Amarelo): ${"❤️".repeat(Math.max(0, p1.lives))}`;
     hudP2.innerText = `P2 (Azul): ${"❤️".repeat(Math.max(0, p2.lives))}`;
+
+    // Indica no botão quando a corrente arrebentou (jogadores desarmados)
+    if (chain.isConnected) {
+        btnWeapon.innerText = `ARMA: ${chain.name}`;
+        btnWeapon.style.background = chain.name === "SERRAS" ? "#ff5470" : "#e53170";
+    } else {
+        btnWeapon.innerText = "ARMA QUEBRADA! APROXIMEM-SE";
+        btnWeapon.style.background = "#555";
+    }
 }
 
 btnWeapon.addEventListener("click", () => {
-    currentWeaponIndex = (currentWeaponIndex + 1) % weapons.length;
-    const w = weapons[currentWeaponIndex];
+    const w = chain.cycleWeapon();
     btnWeapon.innerText = `ARMA: ${w.name}`;
     btnWeapon.style.background = w.name === "SERRAS" ? "#ff5470" : "#e53170";
 });
@@ -309,8 +337,6 @@ function handleStep(player) {
 
 // Loop Principal
 function gameLoop() {
-    const currentWeapon = weapons[currentWeaponIndex];
-
     if (!gameOver) {
         // Atualiza Entidades
         p1.update(input, arenaBounds);
@@ -326,8 +352,11 @@ function gameLoop() {
         handleStep(p1);
         handleStep(p2);
 
-        // Física da corrente
-        Physics.applyChainConstraint(p1, p2);
+        // Corrente: tensão, ruptura e reconexão (lógica encapsulada em Chain)
+        chain.update(p1, p2, {
+            onSnap: () => renderer.triggerShake(9),
+            onReconnect: () => renderer.triggerShake(4)
+        });
 
         // Colisões com caixas
         Physics.resolveBoxCollisions(p1, boxes);
@@ -362,28 +391,13 @@ function gameLoop() {
             e.y = Math.max(arenaBounds.minY + e.hitRadius, Math.min(arenaBounds.maxY - e.hitRadius, e.y));
         });
 
-        // Arma ativa
-        currentWeapon.update();
-
-        // Colisão da Arma com Inimigos (Morte instantânea)
-        // Zona morta: a corrente só mata no MIOLO. Perto do corpo de cada player há uma
-        // folga onde o inimigo consegue encostar e causar dano (senão nada dá dano).
-        const PLAYER_SAFE_ZONE = 46; // raio em volta de cada player onde a arma NÃO mata
-        for (let i = enemies.length - 1; i >= 0; i--) {
-            const enemy = enemies[i];
-            const d = Physics.distToSegment(enemy.x, enemy.y, p1.x, p1.y, p2.x, p2.y);
-            const dP1 = Math.hypot(enemy.x - p1.x, enemy.y - p1.y);
-            const dP2 = Math.hypot(enemy.x - p2.x, enemy.y - p2.y);
-            const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
-
-            if (enemy.state !== "dying" && !nearPlayer
-                && d < currentWeapon.hitThreshold + enemy.hitRadius) {
-                // Não explode na hora: entra na travada + flash branco (hit stop).
-                // A explosão em gibs acontece quando esse estado termina.
-                enemy.startDying();
-                renderer.triggerShake(4);
-            }
-        }
+        // Golpe da corrente nos inimigos (só quando conectada). Ao atingir,
+        // o inimigo entra na travada + flash branco (hit stop) antes de virar
+        // gibs. A explosão em si acontece quando esse estado termina, abaixo.
+        chain.applyToEnemies(p1, p2, enemies, (enemy) => {
+            enemy.startDying();
+            renderer.triggerShake(4);
+        });
 
         // Converte em gibs os inimigos que terminaram a travada de morte.
         for (let i = enemies.length - 1; i >= 0; i--) {
@@ -464,8 +478,8 @@ function gameLoop() {
     renderer.drawRoundShadow(p2.x, p2.y, 14, p2Bounce);
     enemies.forEach(e => renderer.drawRoundShadow(e.x, e.y, 13, 0));
 
-    // 4. Arma / Corrente
-    currentWeapon.draw(ctx, p1, p2);
+    // 4. Arma / Corrente (só desenha quando conectada — Chain cuida disso)
+    chain.draw(ctx, p1, p2);
 
     // 5. Entidades vivas com ordenação por profundidade (y-sort): quem está
     //    mais "atrás" (menor y) é desenhado primeiro, então quem está à frente
