@@ -11,7 +11,7 @@
  * redor, todos com cores amostradas de assets/particles/blood.png.
  */
 export class BloodCanvas {
-    constructor(width, height, textureImg) {
+    constructor(width, height, palette = null) {
         this.width = width;
         this.height = height;
 
@@ -21,47 +21,69 @@ export class BloodCanvas {
         this.ctx = this.canvas.getContext("2d");
         this.ctx.imageSmoothingEnabled = false;
 
-        // Paleta amostrada da textura (preenchida quando a imagem carregar)
-        this.palette = [
-            "#830623", "#a30808", "#c60f0e", "#960e11", "#7a0404"
-        ];
-        this.textureImg = textureImg || null;
-        if (this.textureImg) {
-            if (this.textureImg.complete && this.textureImg.naturalWidth > 0) {
-                this._extractPalette();
-            } else {
-                this.textureImg.addEventListener("load", () => this._extractPalette());
-            }
-        }
-    }
+        // Paleta de cores do sangue (controlada externamente). Fallback padrão.
+        this.palette = (palette && palette.length)
+            ? palette
+            : ["#830623", "#a30808", "#c60f0e", "#960e11", "#7a0404"];
 
-    _extractPalette() {
-        try {
-            const t = document.createElement("canvas");
-            t.width = this.textureImg.naturalWidth;
-            t.height = this.textureImg.naturalHeight;
-            const tctx = t.getContext("2d");
-            tctx.drawImage(this.textureImg, 0, 0);
-            const { data } = tctx.getImageData(0, 0, t.width, t.height);
-            const cols = [];
-            for (let i = 0; i < data.length; i += 4) {
-                const a = data[i + 3];
-                if (a > 10) {
-                    cols.push(`rgb(${data[i]}, ${data[i + 1]}, ${data[i + 2]})`);
-                }
-            }
-            if (cols.length) this.palette = cols;
-        } catch (e) {
-            // Se a leitura falhar (ex.: canvas "tainted"), mantém a paleta padrão.
-        }
+        // Zonas de sangue "molhado" (círculos) registradas em código, para
+        // detectar passos sem ler pixels (getImageData é custoso). As PEGADAS
+        // de sangue NÃO registram zonas — assim o jogador não re-detecta as
+        // próprias pegadas (evita o efeito de "espalhar infinito").
+        this.zones = [];
     }
 
     clear() {
         this.ctx.clearRect(0, 0, this.width, this.height);
+        this.zones = [];
+    }
+
+    // Registra uma zona de sangue "molhado" (círculo) para detecção de passos.
+    addZone(x, y, radius) {
+        this.zones.push({ x, y, r: radius });
+        // Teto simples para não crescer indefinidamente
+        if (this.zones.length > 200) this.zones.shift();
     }
 
     _color() {
         return this.palette[(Math.random() * this.palette.length) | 0];
+    }
+
+    // Verifica (por geometria, sem ler pixels) se (x,y) está sobre uma zona de
+    // sangue molhado. Rápido: só distância a círculos registrados.
+    isBloodZone(x, y) {
+        for (let i = 0; i < this.zones.length; i++) {
+            const z = this.zones[i];
+            const dx = x - z.x, dy = y - z.y;
+            if (dx * dx + dy * dy <= z.r * z.r) return true;
+        }
+        return false;
+    }
+
+    // Carimba uma pegada de sangue pixelada (fixa) no buffer, orientada por
+    // 'angle' (direção do passo). 'intensity' 0..1 controla o tamanho/opacidade
+    // (vai diminuindo a cada passo até "secar").
+    stampFootprint(x, y, angle, intensity = 1) {
+        const ctx = this.ctx;
+        const px = 2;
+        const len = (2.5 + 2 * intensity); // comprimento da pegada (menor)
+        const wid = (1.5 + 1 * intensity); // largura (menor)
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.globalAlpha = 0.5 + 0.5 * intensity;
+        // Elipse pixelada simples (sola do pé)
+        for (let yy = -wid; yy <= wid; yy += px) {
+            for (let xx = -len; xx <= len; xx += px) {
+                const nx = xx / len, ny = yy / wid;
+                if (nx * nx + ny * ny <= 1 && Math.random() < 0.85) {
+                    ctx.fillStyle = this._color();
+                    ctx.fillRect(Math.round(xx), Math.round(yy), px, px);
+                }
+            }
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
     }
 
     /**
@@ -128,6 +150,8 @@ export class BloodCanvas {
         const ry = (4 + Math.random() * 5) * scale;
         this.stampBlob(x, y, rx, ry, px, 0.9);
         this.stampSpecks(x, y, (18 + Math.random() * 14) * scale, 8 + ((Math.random() * 8) | 0), px);
+        // Zona molhada (para pegadas): raio aproximado da mancha central
+        this.addZone(x, y, Math.max(rx, ry) + 3);
     }
 
     /**
@@ -146,6 +170,8 @@ export class BloodCanvas {
         }
         // Respingos ao redor da poça
         this.stampSpecks(x, y, 40 * scale, 20 + ((Math.random() * 16) | 0), px);
+        // Zona molhada da poça (maior)
+        this.addZone(x, y, 26 * scale);
     }
 
     /**

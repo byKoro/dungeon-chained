@@ -7,6 +7,7 @@ import { LaserWeapon } from './weapons/LaserWeapon.js';
 import { SawWeapon } from './weapons/SawWeapon.js';
 import { ParticleSystem } from './particles/ParticleSystem.js';
 import { BloodCanvas } from './particles/BloodCanvas.js';
+import { Footprint } from './particles/Footprint.js';
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -39,9 +40,16 @@ imgDemon.src = "assets/enemies/demon.png";
 const imgBloodMonster = new Image();
 imgBloodMonster.src = "assets/enemies/blood_monster.png";
 
-// Textura usada como paleta para o sangue procedural
-const imgBlood = new Image();
-imgBlood.src = "assets/particles/blood.png";
+// ---- Cores do sangue (edite aqui para mudar o tom do sangue no jogo) ----
+const BLOOD_COLORS = [
+    "#5c0210",
+    "#7a0404",
+    "#960e11",
+    "#a30808",
+    "#c60f0e"
+];
+
+
 
 // ---- Controle das manchas de sangue nos fragmentos de corpo (gibs) ----
 const BLOOD_STAIN_CONFIG = {
@@ -111,7 +119,7 @@ function randomMeleeConfig() {
 // Instâncias Principais
 const input = new InputHandler();
 const renderer = new Renderer(canvas, ctx);
-const bloodCanvas = new BloodCanvas(canvas.width, canvas.height, imgBlood);
+const bloodCanvas = new BloodCanvas(canvas.width, canvas.height, BLOOD_COLORS);
 const particleSystem = new ParticleSystem(bloodCanvas);
 
 const weapons = [new LaserWeapon(), new SawWeapon()];
@@ -123,6 +131,9 @@ let p1, p2;
 let enemies = [];
 let gibs = [];      // fragmentos de corpos ATIVOS (arrastáveis pela física)
 const MAX_ACTIVE_GIBS = 90; // teto para o pico simultâneo (o resto vai pro chão)
+let footprints = []; // pegadas normais (com fade)
+const MAX_FOOTPRINTS = 60;
+const BLOOD_STEPS = 6; // quantos passos ensanguentados após pisar em sangue
 let boxes = [];
 let trapdoor = { x: 880, y: 360, size: 54, open: false };
 
@@ -191,6 +202,7 @@ function initLevel(resetAll = false) {
     // Gerar Inimigos melee (tipo sorteado entre as configs disponíveis)
     enemies = [];
     gibs = [];
+    footprints = [];
     const count = 4 + floor * 2;
     for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2;
@@ -229,6 +241,72 @@ btnRestart.addEventListener("click", () => {
     initLevel(true);
 });
 
+// Solta a poeira procedural aos pés do jogador, atrás dele em relação à
+// direção da corrida (lado contrário ao movimento).
+function spawnRunSmoke(player) {
+    const mag = Math.hypot(player.vx, player.vy) || 1;
+    const dirX = player.vx / mag;
+    const dirY = player.vy / mag;
+    const behind = 12;   // distância atrás do jogador
+    const footY = 15;    // desloca para os pés
+    const x = player.x - dirX * behind;
+    const y = player.y + footY - dirY * behind * 0.4;
+    particleSystem.triggerDust(x, y, dirX, dirY, 11);
+}
+
+// Poeira leve e contínua enquanto o jogador anda (bem menos intensa que o
+// arranque). Emite poucas partículas em intervalos, proporcional à velocidade.
+function spawnWalkDust(player) {
+    if (player.walkDustCooldown === undefined) player.walkDustCooldown = 0;
+    if (player.walkDustCooldown > 0) player.walkDustCooldown--;
+
+    // Só quando realmente em movimento
+    if (player.speedMag < player.speed * 0.25) return;
+    if (player.walkDustCooldown > 0) return;
+
+    const mag = Math.hypot(player.vx, player.vy) || 1;
+    const dirX = player.vx / mag;
+    const dirY = player.vy / mag;
+    const behind = 11;
+    const footY = 15;
+    const x = player.x - dirX * behind;
+    const y = player.y + footY - dirY * behind * 0.4;
+
+    // Pouca poeira por emissão
+    particleSystem.triggerDust(x, y, dirX, dirY, 2);
+
+    // Intervalo entre emissões: mais rápido quanto mais veloz o jogador
+    const fast = player.speedMag > player.speed * 0.6;
+    player.walkDustCooldown = fast ? 7 : 12;
+}
+
+// Processa um passo do jogador: se ele está com "pé ensanguentado" ou pisou
+// em sangue, deixa uma pegada de SANGUE fixa (carimbada, permanente) que vai
+// secando a cada passo. Caso contrário, uma pegada normal com fade.
+function handleStep(player) {
+    if (!player.justStepped) return;
+
+    const x = player.stepX, y = player.stepY, ang = player.stepAngle;
+
+    // Pisou numa zona de sangue molhado? Recarrega os passos ensanguentados.
+    // (Usa geometria, não leitura de pixel. Pegadas de sangue não criam zonas,
+    //  então o jogador não re-detecta as próprias pegadas.)
+    if (bloodCanvas.isBloodZone(x, y)) {
+        player.bloodStepsLeft = BLOOD_STEPS;
+    }
+
+    if (player.bloodStepsLeft > 0) {
+        // Pegada de sangue fixa; intensidade cai a cada passo (vai secando)
+        const intensity = player.bloodStepsLeft / BLOOD_STEPS;
+        bloodCanvas.stampFootprint(x, y, ang, intensity);
+        player.bloodStepsLeft--;
+    } else {
+        // Pegada normal com fade
+        footprints.push(new Footprint(x, y, ang));
+        if (footprints.length > MAX_FOOTPRINTS) footprints.shift();
+    }
+}
+
 // Loop Principal
 function gameLoop() {
     const currentWeapon = weapons[currentWeaponIndex];
@@ -237,6 +315,16 @@ function gameLoop() {
         // Atualiza Entidades
         p1.update(input, arenaBounds);
         p2.update(input, arenaBounds);
+
+        // Poeira: baforada forte ao arrancar + poeira leve contínua ao andar.
+        if (p1.justStartedRunning) spawnRunSmoke(p1);
+        if (p2.justStartedRunning) spawnRunSmoke(p2);
+        spawnWalkDust(p1);
+        spawnWalkDust(p2);
+
+        // Pegadas (normais com fade; de sangue quando pisa em sangue)
+        handleStep(p1);
+        handleStep(p2);
 
         // Física da corrente
         Physics.applyChainConstraint(p1, p2);
@@ -259,11 +347,11 @@ function gameLoop() {
         // Colisão/empurrão entre TODAS as entidades (players + inimigos).
         // Vertical rígido (não sobem em cima), horizontal com folga elástica.
         // Algumas iterações estabilizam empilhamentos de vários inimigos.
-        // A lista 'gibs' só contém fragmentos ainda ativos (os assentados já
-        // foram carimbados no chão e removidos), então todos entram na física.
+        // Empurrão entre players e inimigos. Os gibs agora voam para fora da
+        // tela (não colidem), então não entram na física.
         // Inimigos em "dying" ficam travados (fora da física de empurrão).
         const liveEnemies = enemies.filter(e => e.state !== "dying");
-        const allEntities = [p1, p2, ...liveEnemies, ...gibs];
+        const allEntities = [p1, p2, ...liveEnemies];
         for (let it = 0; it < 3; it++) {
             Physics.resolveEntityCollisions(allEntities);
         }
@@ -301,33 +389,32 @@ function gameLoop() {
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             if (enemy.readyToGib) {
-                // Sangue respingando + poça no chão + corpo picotado em gibs.
+                // Sangue respingando + poça no chão + corpo estilhaçado em
+                // quadrados que voam para fora da tela.
                 particleSystem.triggerBlood(enemy.x, enemy.y, 26, 1.35);
                 particleSystem.triggerBloodPool(enemy.x, enemy.y);
                 gibs.push(...enemy.explodeIntoGibs());
 
-                // Teto de segurança: se passar do limite de gibs ativos,
-                // carimba os mais antigos no chão e os remove do loop.
-                while (gibs.length > MAX_ACTIVE_GIBS) {
-                    const old = gibs.shift();
-                    bloodCanvas.stampGib(old);
-                }
+                // Teto de segurança: descarta os mais antigos se exceder.
+                while (gibs.length > MAX_ACTIVE_GIBS) gibs.shift();
 
                 enemies.splice(i, 1);
                 renderer.triggerShake(7);
             }
         }
 
-        // Atualiza os fragmentos de corpo. Quando um gib assenta, ele é
-        // "carimbado" de vez no buffer de sangue e REMOVIDO da lista ativa,
-        // saindo do loop de update/draw/física (grande ganho de FPS).
+        // Atualiza os fragmentos de corpo (quadrados voando). Remove os que
+        // saíram da tela.
         for (let i = gibs.length - 1; i >= 0; i--) {
             const g = gibs[i];
             g.update(arenaBounds);
-            if (g.settled) {
-                bloodCanvas.stampGib(g);
-                gibs.splice(i, 1);
-            }
+            if (g.done) gibs.splice(i, 1);
+        }
+
+        // Atualiza pegadas normais (fade) e remove as que sumiram
+        for (let i = footprints.length - 1; i >= 0; i--) {
+            footprints[i].update();
+            if (footprints[i].done) footprints.splice(i, 1);
         }
 
         if (enemies.length === 0) {
@@ -361,11 +448,14 @@ function gameLoop() {
     // 1. Cenário
     renderer.drawDungeon(boxes, trapdoor);
 
-    // 2. Detritos e Sangue no chão
+    // 2. Detritos e Sangue no chão (inclui as pegadas de sangue carimbadas)
     particleSystem.drawFloor(ctx);
 
-    // 2b. Fragmentos de corpo no chão (por baixo de tudo que está vivo)
-    gibs.forEach(g => g.draw(ctx));
+    // 2a. Pegadas normais (com fade), sobre o chão
+    footprints.forEach(f => f.draw(ctx));
+
+    // 2c. Poeira de corrida (aos pés, sob as entidades)
+    particleSystem.drawSmoke(ctx);
 
     // 3. Sombras circulares (só das entidades vivas)
     const p1Bounce = p1.speedMag > 0.15 ? Math.abs(Math.sin(p1.animTimer)) : 0;
@@ -383,7 +473,8 @@ function gameLoop() {
     const drawables = [p1, p2, ...enemies].sort((a, b) => a.y - b.y);
     drawables.forEach(e => e.draw(ctx));
 
-    // 6. Partículas no ar
+    // 6. Estilhaços do corpo voando + partículas no ar (por cima de tudo)
+    gibs.forEach(g => g.draw(ctx));
     particleSystem.drawAir(ctx);
 
     renderer.endFrame();

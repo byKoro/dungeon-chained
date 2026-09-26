@@ -1,4 +1,5 @@
 import { FloorDebris } from './FloorDebris.js';
+import { DustPuff } from './DustPuff.js';
 
 class AirParticle {
     constructor(x, y, color, isBlood = false, spread = 1) {
@@ -63,13 +64,28 @@ export class ParticleSystem {
     constructor(bloodCanvas = null) {
         this.airParticles = [];
         this.floorDebris = [];
+        this.smoke = [];                // baforadas de fumaça (poeira de corrida)
         this.bloodCanvas = bloodCanvas; // buffer offscreen do sangue de chão
     }
 
     clear() {
         this.airParticles = [];
         this.floorDebris = [];
+        this.smoke = [];
         if (this.bloodCanvas) this.bloodCanvas.clear();
+    }
+
+    // Poeira de corrida PROCEDURAL: gera um conjunto de partículas de poeira
+    // lançadas no sentido contrário à corrida. (dirX, dirY) = direção da corrida.
+    triggerDust(x, y, dirX, dirY, amount = 10) {
+        // pequeno jitter proporcional (não infla emissões pequenas de andar)
+        const n = amount + ((Math.random() * Math.max(1, amount * 0.3)) | 0);
+        for (let i = 0; i < n; i++) {
+            // pequena dispersão na origem para não sair tudo do mesmo ponto
+            const ox = (Math.random() - 0.5) * 8;
+            const oy = (Math.random() - 0.5) * 6;
+            this.smoke.push(new DustPuff(x + ox, y + oy, dirX, dirY));
+        }
     }
 
     // Jato de sangue focado (sem pedaços/ossos). Usado ao matar inimigos e
@@ -122,6 +138,12 @@ export class ParticleSystem {
                 this.airParticles.splice(i, 1);
             }
         }
+
+        // Atualiza baforadas de fumaça e remove as que terminaram
+        for (let i = this.smoke.length - 1; i >= 0; i--) {
+            this.smoke[i].update();
+            if (this.smoke[i].done) this.smoke.splice(i, 1);
+        }
     }
 
     drawFloor(ctx) {
@@ -129,6 +151,13 @@ export class ParticleSystem {
         if (this.bloodCanvas) this.bloodCanvas.draw(ctx);
         for (let i = 0; i < this.floorDebris.length; i++) {
             this.floorDebris[i].draw(ctx);
+        }
+    }
+
+    // Fumaça (poeira de corrida): desenhada na camada de chão, sob as entidades.
+    drawSmoke(ctx) {
+        for (let i = 0; i < this.smoke.length; i++) {
+            this.smoke[i].draw(ctx);
         }
     }
 

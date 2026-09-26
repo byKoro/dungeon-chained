@@ -25,6 +25,20 @@ export class Player extends Entity {
         this.sprite = spriteConfig || { animated: false, drawSize: 46 };
         this.walkFrame = 0;   // acumulador contínuo do ciclo de andar (compartilhado entre walks)
 
+        // --- Estado de animação suavizada ---
+        this.bobPhase = 0;    // fase contínua do balanço ao andar
+        this.tilt = 0;        // inclinação lateral suavizada (rad), segue o vx
+
+        // Detecção de "arranque" (transição parado -> correndo)
+        this.wasRunning = false;
+        this.justStartedRunning = false; // true só no frame em que arranca
+
+        // Sistema de passos/pegadas
+        this.stepDist = 0;        // distância acumulada desde o último passo
+        this.stepSide = 1;        // alterna 1/-1 (pé direito/esquerdo)
+        this.justStepped = false; // true só no frame em que dá um passo
+        this.stepX = 0; this.stepY = 0; this.stepAngle = 0;
+        this.bloodStepsLeft = 0;  // passos ensanguentados restantes (ao pisar em sangue)
     }
 
     // Seleciona a folha e o frame corretos conforme o estado atual do player.
@@ -112,6 +126,54 @@ export class Player extends Entity {
             this.walkFrame = 0;
         }
 
+        // Balanço suave que acompanha a velocidade (frequência e amplitude
+        // proporcionais ao quão rápido o personagem se move). Sem tranco:
+        // a fase avança continuamente, sem depender de troca de estado.
+        this.bobPhase += 0.12 + this.speedMag * 0.06;
+
+        // Tilt lateral: inclina na direção do movimento horizontal, suavizado.
+        // Alvo proporcional a vx; aproximação exponencial evita solavancos.
+        const tiltTarget = Math.max(-1, Math.min(1, this.vx / this.speed)) * 0.16;
+        this.tilt += (tiltTarget - this.tilt) * 0.15;
+
+        // Direção instantânea (flip imediato). Usa um limiar para não ficar
+        // trocando de lado por causa de micro-velocidade ao parar.
+        if (this.vx < -0.15) this.facingLeft = true;
+        else if (this.vx > 0.15) this.facingLeft = false;
+
+        // Detecção de arranque: transição de "parado/lento" para "correndo".
+        // Histerese (limiares diferentes) evita disparos repetidos ao oscilar.
+        const running = this.speedMag > this.speed * 0.55;
+        this.justStartedRunning = running && !this.wasRunning;
+        if (running) this.wasRunning = true;
+        else if (this.speedMag < this.speed * 0.35) this.wasRunning = false;
+
+        // --- Passos / pegadas ---
+        // Acumula a distância percorrida; a cada trecho, "pisa" alternando o pé.
+        this.justStepped = false;
+        const STEP_LENGTH = 20; // pixels por passo
+        if (this.speedMag > 0.25) {
+            this.stepDist += this.speedMag;
+            if (this.stepDist >= STEP_LENGTH) {
+                this.stepDist = 0;
+                this.stepSide *= -1;
+
+                const mag = this.speedMag || 1;
+                const dirX = this.vx / mag;
+                const dirY = this.vy / mag;
+                // Perpendicular à direção, para deslocar o pé para a lateral
+                const perpX = -dirY, perpY = dirX;
+                const sideOffset = 5 * this.stepSide;
+
+                this.stepX = this.x + perpX * sideOffset;
+                this.stepY = this.y + 15 + perpY * sideOffset; // aos pés
+                this.stepAngle = Math.atan2(dirY, dirX);
+                this.justStepped = true;
+            }
+        } else {
+            this.stepDist = 0;
+        }
+
         // Limites da arena
         this.x = Math.max(bounds.minX + this.hitRadius, Math.min(bounds.maxX - this.hitRadius, this.x));
         this.y = Math.max(bounds.minY + this.hitRadius, Math.min(bounds.maxY - this.hitRadius, this.y));
@@ -133,14 +195,18 @@ export class Player extends Entity {
             ctx.rotate((Math.random() - 0.5) * 0.55 * intensity);
         }
 
-        if (this.facingLeft) ctx.scale(-1, 1);
+        // Balanço suave ao andar (amplitude segue a velocidade) + leve bob vertical.
+        // Nada de tremor brusco: tudo interpolado e proporcional ao movimento.
+        const moveAmount = Math.min(1, this.speedMag / this.speed);
+        const bobAngle = Math.sin(this.bobPhase) * 0.03 * moveAmount;
+        const bobY = Math.abs(Math.sin(this.bobPhase)) * 2.2 * moveAmount;
+        ctx.translate(0, -bobY);
 
-        // Swaying orgânico bem sutil (o bobbing vertical já vem do próprio spritesheet)
-        let swayAngle = 0;
-        if (this.speedMag > 0.1) {
-            swayAngle = Math.cos(this.animTimer * 0.5) * 0.02;
-        }
-        ctx.rotate(swayAngle);
+        // Inclinação lateral (tilt) na direção do movimento
+        ctx.rotate(this.tilt + bobAngle);
+
+        // Flip instantâneo (sem animação de giro)
+        if (this.facingLeft) ctx.scale(-1, 1);
 
         // Renderização do sprite
         if (this.img && this.img.complete && this.img.naturalWidth > 0) {

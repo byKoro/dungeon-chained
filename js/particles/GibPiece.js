@@ -1,11 +1,9 @@
 /**
- * Fragmento de corpo (gib) gerado quando um inimigo é ferido/morto.
+ * Fragmento de corpo (gib) gerado quando um inimigo morre.
  *
- * É um recorte aleatório do sprite do inimigo que cai no chão e pode ser
- * ARRASTADO pela física de empurrão das entidades (tem pushVx/pushVy e
- * hitRadius, então participa de Physics.resolveEntityCollisions).
- *
- * Escurece gradualmente depois de assentar, como o cadáver fazia antes.
+ * O corpo se estilhaça em vários QUADRADOS (recortes do sprite) que são
+ * lançados com força para fora e VOAM PARA FORA DA TELA, girando. Não assentam
+ * nem ficam no chão: são removidos assim que saem dos limites visíveis.
  */
 export class GibPiece {
     constructor(x, y, sheet, srcX, srcY, srcW, srcH, drawW, drawH) {
@@ -18,84 +16,46 @@ export class GibPiece {
         this.srcY = srcY;
         this.srcW = srcW;
         this.srcH = srcH;
-        this.drawW = drawW;
-        this.drawH = drawH;
 
-        // Raio de colisão aproximado (para ser empurrável/arrastável)
-        this.hitRadius = Math.max(5, Math.min(drawW, drawH) * 0.4);
+        // Desenha como QUADRADO (usa o maior lado para ficar quadradinho)
+        const side = Math.max(drawW, drawH);
+        this.drawW = side;
+        this.drawH = side;
 
-        // Canal de empurrão (mesmo esquema do MeleeEnemy)
-        this.pushVx = 0;
-        this.pushVy = 0;
+        // Estilhaço: espalha um pouco na horizontal e é lançado para cima; a
+        // gravidade puxa e os pedaços CAEM para fora pela parte de baixo da tela.
+        this.vx = (Math.random() - 0.5) * 6;
+        this.vy = -(3 + Math.random() * 5); // impulso inicial para cima
+        this.gravity = 0.45;
 
-        // Espalhamento inicial ao se partir
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2.5 + Math.random() * 4.5;
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-        // Atrito menor => desliza mais fácil (mais arrastável)
-        this.friction = 0.90;
+        // Rotação animada (gira enquanto voa/cai)
+        this.angle = Math.random() * Math.PI * 2;
+        this.spin = (Math.random() - 0.5) * 0.4;
 
-        // Janela em que o corpo ainda pode ser ARRASTADO pela física. Depois
-        // disso ele "assenta" no chão e passa a ignorar empurrões, integrando
-        // ao ambiente. Curta pois há muitos fragmentos (~2.5s a 60fps).
-        this.dragTimer = 150;
-        this.settled = false;
+        this.done = false;
 
-        // Leve rotação estática para variedade visual
-        this.angle = (Math.random() - 0.5) * 0.9;
-
-        // Escurecimento progressivo
-        this.settleTimer = 0;
-
-        // Manchas de sangue permanentes leves sobre o pedaço (definidas via
-        // stainWith, para usar a paleta da textura)
+        // Manchas de sangue leves sobre o pedaço (opcional)
         this.stains = null;
     }
 
-    // Preenchido pelo main.js com o componente BloodStains já populado.
     setStains(stains) {
         this.stains = stains;
     }
 
-    // Depois que assenta, empurrões não têm mais efeito.
-    canBeDragged() {
-        return !this.settled;
-    }
-
     update(bounds) {
-        // Enquanto pode ser arrastado, aplica o empurrão da física.
-        if (!this.settled) {
-            this.x += this.pushVx;
-            this.y += this.pushVy;
-            this.dragTimer--;
-            if (this.dragTimer <= 0) this.settled = true;
-        } else {
-            // Assentado: descarta qualquer empurrão residual
-            this.pushVx = 0;
-            this.pushVy = 0;
-        }
-
-        // Movimento do espalhamento inicial (sempre decai)
+        this.vy += this.gravity;   // gravidade puxa para baixo
         this.x += this.vx;
         this.y += this.vy;
-        this.vx *= this.friction;
-        this.vy *= this.friction;
-        this.pushVx *= 0.88;
-        this.pushVy *= 0.88;
+        this.angle += this.spin;
 
-        if (Math.abs(this.vx) < 0.03) this.vx = 0;
-        if (Math.abs(this.vy) < 0.03) this.vy = 0;
-        if (Math.abs(this.pushVx) < 0.01) this.pushVx = 0;
-        if (Math.abs(this.pushVy) < 0.01) this.pushVy = 0;
-
-        // Limites da arena
+        // Removido ao sair da área visível (principalmente caindo por baixo).
         if (bounds) {
-            this.x = Math.max(bounds.minX, Math.min(bounds.maxX, this.x));
-            this.y = Math.max(bounds.minY, Math.min(bounds.maxY, this.y));
+            const margin = 80;
+            if (this.y > bounds.maxY + margin ||
+                this.x < bounds.minX - margin || this.x > bounds.maxX + margin) {
+                this.done = true;
+            }
         }
-
-        this.settleTimer++;
     }
 
     draw(ctx) {
@@ -105,17 +65,12 @@ export class GibPiece {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
 
-        // Desenha o pedaço do sprite (sem ctx.filter, que é caro). O
-        // escurecimento é aplicado só no carimbo final do BloodCanvas, quando o
-        // gib é aposentado — enquanto ativo ele vive pouco, então dispensamos o
-        // custo de escurecer em tempo real.
         ctx.drawImage(
             this.sheet,
             this.srcX, this.srcY, this.srcW, this.srcH,
             -this.drawW / 2, -this.drawH / 2, this.drawW, this.drawH
         );
 
-        // Manchas de sangue sobre o pedaço (integra ao chão ensanguentado)
         if (this.stains) this.stains.draw(ctx, 1);
 
         ctx.restore();
