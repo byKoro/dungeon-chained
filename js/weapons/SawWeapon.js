@@ -2,7 +2,7 @@ import { Weapon } from './Weapon.js';
 
 export class SawWeapon extends Weapon {
     constructor() {
-        super("SERRAS", 30);
+        super("SERRAS", 14);
         this.angle = 0;
     }
 
@@ -10,8 +10,26 @@ export class SawWeapon extends Weapon {
         this.angle += 0.2;
     }
 
-    draw(ctx, p1, p2) {
+    getSawPositions(p1, p2) {
         const numSaws = 5;
+        return Array.from({ length: numSaws }, (_, index) => {
+            const i = index + 1;
+            const t = i / (numSaws + 1);
+            return {
+                x: p1.x + (p2.x - p1.x) * t,
+                y: p1.y + (p2.y - p1.y) * t,
+                radius: i % 2 === 0 ? 14 : 11
+            };
+        });
+    }
+
+    hitsTarget(target, p1, p2) {
+        return this.getSawPositions(p1, p2).some(saw =>
+            Math.hypot(target.x - saw.x, target.y - saw.y) < saw.radius + (target.hitRadius ?? 0)
+        );
+    }
+
+    draw(ctx, p1, p2) {
         ctx.save();
         ctx.strokeStyle = "#8d99ae";
         ctx.lineWidth = 4;
@@ -20,15 +38,10 @@ export class SawWeapon extends Weapon {
         ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
 
-        for (let i = 1; i <= numSaws; i++) {
-            const t = i / (numSaws + 1);
-            const sx = p1.x + (p2.x - p1.x) * t;
-            const sy = p1.y + (p2.y - p1.y) * t;
-            const radius = (i % 2 === 0) ? 14 : 11;
-
+        this.getSawPositions(p1, p2).forEach(({ x, y, radius }, index) => {
             ctx.save();
-            ctx.translate(sx, sy);
-            ctx.rotate(this.angle * (i % 2 === 0 ? 1 : -1));
+            ctx.translate(x, y);
+            ctx.rotate(this.angle * (index % 2 === 1 ? 1 : -1));
 
             ctx.fillStyle = "#ff5470";
             ctx.beginPath();
@@ -42,7 +55,7 @@ export class SawWeapon extends Weapon {
             ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.restore();
-        }
+        });
         ctx.restore();
     }
 }
