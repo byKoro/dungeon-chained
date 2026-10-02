@@ -15,11 +15,13 @@ import { SpawnSystem } from './systems/SpawnSystem.js';
 import { ParticleEffects } from './systems/ParticleEffects.js';
 import { CombatSystem } from './combat/CombatSystem.js';
 import { RoomManager } from './rooms/RoomManager.js';
+import { PostProcessor } from './systems/PostProcessor.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
-    DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE
+    DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
+    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES
 } from './config/GameConfig.js';
 
 /**
@@ -55,6 +57,12 @@ export class Game {
         // Subsistemas de render / mundo
         this.renderer = new Renderer(canvas, this.ctx);
         this.renderer.setTileset(new Tileset(this.assets.tileset, 16, 10));
+        // Informa o tamanho do tile no mundo para a quantização do zoom
+        // (mantém a grade de tiles alinhada ao pixel de tela — tiles fixos).
+        this.renderer.setTileWorldSize(TILE);
+
+        // Pós-processamento de tela (vinheta de masmorra).
+        this.postProcessor = new PostProcessor(canvas, this.ctx);
 
         // Sangue cobre o mundo inteiro
         this.bloodCanvas = new BloodCanvas(WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL);
@@ -343,6 +351,42 @@ export class Game {
 
         ctx.restore(); // fim do clip da sala
         renderer.endFrame();
+
+        // Pós-processamento em espaço de tela (iluminação + vinheta), sobre a
+        // cena mas por baixo dos overlays de UI/transição/game over.
+        // Registra uma luz na posição (de tela) de cada jogador. O raio em
+        // mundo (PLAYER_LIGHT_RADIUS) é convertido para tela pelo zoom.
+        for (const p of [this.p1, this.p2]) {
+            const s = renderer.worldToScreen(p.x, p.y);
+            // pixel de arte do cenário na tela ~= (TILE/16) * zoom. Escalamos
+            // por LIGHT_PIXEL_SCALE (config) para a elipse de luz ficar chunky.
+            const lightPixel = Math.max(2, Math.round((TILE / 16) * s.zoom * LIGHT_PIXEL_SCALE));
+            this.postProcessor.addLight(s.x, s.y, PLAYER_LIGHT_RADIUS * s.zoom, lightPixel);
+        }
+
+        // Luzes das TOCHAS de parede (pontos de luz naturais do cenário). Cada
+        // tocha registrada em tiles.torches vira uma luz suave na sua posição.
+        if (TORCHES.enabled && tiles.torches && tiles.torches.length) {
+            const tl = TORCHES.light;
+            for (const t of tiles.torches) {
+                // Centro do tile da tocha no mundo + deslocamento para o lado de
+                // DENTRO da sala, onde a chama de fato ilumina:
+                //   N  -> empurra para baixo (offsetY)
+                //   W  -> empurra para a direita (offsetX)
+                //   E  -> empurra para a esquerda (-offsetX)
+                let wx = rect.x + t.col * TILE + TILE / 2;
+                let wy = rect.y + t.row * TILE + TILE / 2;
+                if (t.side === "N") wy += tl.offsetY;
+                else if (t.side === "W") wx += tl.offsetX;
+                else if (t.side === "E") wx -= tl.offsetX;
+
+                const s = renderer.worldToScreen(wx, wy);
+                const px = Math.max(2, Math.round((TILE / 16) * s.zoom * tl.pixelScale));
+                this.postProcessor.addLight(s.x, s.y, tl.radius * s.zoom, px, tl.flatten, tl);
+            }
+        }
+
+        this.postProcessor.draw();
 
         this._renderOverlays();
     }

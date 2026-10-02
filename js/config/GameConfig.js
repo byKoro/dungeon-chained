@@ -21,7 +21,11 @@ export const WORLD_H = GRID_ROWS * ROOM_ROWS * TILE;
 export const ROOM_COUNT = 8;   // quantas salas gerar por andar
 
 // ---- Sangue / partículas ----
-export const BLOOD_COLORS = ["#5c0210", "#7a0404", "#960e11", "#a30808", "#c60f0e"];
+// Tons de vinho/bordô profundos e dessaturados. São compostos sobre o piso em
+// "multiply" (ver BloodCanvas.draw), então aparecem mais escuros ainda na tela:
+// a ideia é que o sangue TINJA o chão e pareça fazer parte do cenário, em vez
+// do vermelho saturado que "flutuava" por cima.
+export const BLOOD_COLORS = ["#4a0612", "#5c0a18", "#6e0f1c", "#480810", "#3a0510"];
 // 1 pixel de sangue = 1 pixel de tile (TILE / tamanho do tile fonte 16px).
 export const BLOOD_PIXEL = TILE / 16;
 export const BLOOD_STAIN_CONFIG = {
@@ -56,3 +60,113 @@ export const PLAYER_SAFE_ZONE = 46;
 
 // ---- Fundo ----
 export const BACKGROUND_TILE = 78; // tile que preenche o vazio fora da sala
+
+// ---- Iluminação / Pós-processamento ----
+// Raio (em px de MUNDO) do halo de luz que cada jogador carrega. É convertido
+// para px de tela pelo zoom na hora de desenhar (ver Game._render).
+export const PLAYER_LIGHT_RADIUS = 260;
+
+// Fator que define o tamanho do "pixel" chunky da elipse de luz. O pixel de
+// arte na tela é (TILE/16) * zoom; multiplicamos por este fator para blocos
+// mais grossos/visíveis. Maior = elipse mais "pixelona".
+export const LIGHT_PIXEL_SCALE = 1.5;
+
+/**
+ * TORCHES — tochas de parede (pontos de luz naturais do cenário).
+ * O tile `index` é desenhado na parede NORTE das salas e emite uma luz suave.
+ * Totalmente configurável aqui.
+ */
+export const TORCHES = {
+    enabled: true,
+    index: 90,          // tile da tocha da parede NORTE (topo)
+    sideIndex: 91,      // tile da tocha das paredes LATERAIS (esq/dir)
+    minPerWall: 2,      // mínimo de tochas por parede
+    maxPerWall: 4,      // máximo de tochas por parede
+    marginTiles: 2,     // afasta das quinas (não cola nos cantos)
+    minGap: 2,          // distância mínima (em tiles) entre duas tochas
+    onlyCombatRooms: true, // só em salas de combate (não em corredores)
+
+    // Tochas laterais: ficam no PISO à frente da parede lateral (coluna interna
+    // adjacente). O tile 91 é desenhado encaixado na parede ESQUERDA por padrão;
+    // na parede DIREITA ele é espelhado horizontalmente (flip).
+    sides: {
+        enabled: true,
+        left: true,     // gerar tochas na parede esquerda
+        right: true     // gerar tochas na parede direita
+    },
+
+    // ---- Luz emitida por cada tocha ----
+    light: {
+        radius: 150,            // raio da luz (px de MUNDO) — menor que a do jogador
+        flatten: 0.95,          // quase circular (a tocha ilumina ao redor)
+        pixelScale: 1.2,        // blocos pixelados da luz da tocha
+        // Deslocamento (px de MUNDO) do ponto de luz em relação ao centro do
+        // tile da tocha. Para tochas do NORTE, offsetY empurra a luz para baixo
+        // (para dentro da sala). Para LATERAIS, offsetX empurra a luz para o
+        // lado de dentro (sinal ajustado conforme esquerda/direita).
+        offsetY: 26,
+        offsetX: 22,
+        color: "255, 190, 110", // âmbar um pouco mais quente/alaranjado que o jogador
+
+        // Flicker próprio das tochas (mais sutil e lento que fogo agitado).
+        flickerSpeed: 0.1,
+        flickerBase: 0.94,
+        flickerSine: 0.045,
+        flickerNoise: 0.03,
+
+        // Perfil radial suave (bordas difusas, como a luz do jogador).
+        falloff: [
+            { offset: 0.0, alpha: 0.85 },
+            { offset: 0.3, alpha: 0.5 },
+            { offset: 0.55, alpha: 0.28 },
+            { offset: 0.78, alpha: 0.1 },
+            { offset: 1.0, alpha: 0.0 }
+        ]
+    }
+};
+
+/**
+ * POST_PROCESSING — todos os parâmetros de ajuste fino do PostProcessor.
+ * Centralizado aqui para calibrar o visual sem abrir o código do sistema.
+ */
+export const POST_PROCESSING = {
+    enabled: true,
+
+    // ---- Vinheta (escurecimento radial das bordas) ----
+    vignette: {
+        enabled: true,
+        innerRadius: 0.55,   // 0 = escurece do centro; 1 = só nos cantos
+        strength: 0.7,       // opacidade máxima nas bordas
+        color: "8, 5, 12",   // RGB do escurecimento (tom de masmorra)
+        midStop: 0.7,        // posição do stop intermediário do gradiente
+        midAlphaFactor: 0.45 // alpha no stop intermediário = strength * isto
+    },
+
+    // ---- Iluminação dinâmica (ambiente escuro + halos de luz) ----
+    lighting: {
+        enabled: true,
+        ambient: "26, 22, 34",       // cor do ambiente escuro (menor = + sombrio)
+        lightColor: "255, 220, 150", // cor da luz (âmbar quente de tocha)
+        flatten: 1,               // achatamento vertical da elipse (1 = círculo)
+
+        // Flicker (tremulação da chama)
+        flickerSpeed: 0.005,          // avanço da fase por frame
+        flickerBase: 0.5,           // multiplicador base do raio/intensidade
+        flickerSine: 0.05,           // amplitude da oscilação senoidal
+        flickerNoise: 0.03,          // amplitude do ruído aleatório
+
+        // Perfil radial da luz (color stops do gradiente antes do pixelado).
+        // offset 0..1 = distância do centro; alpha 0..1 = intensidade.
+        // Decaimento LONGO e gradual: a luz começa a diminuir já perto do
+        // centro e se dissolve suavemente até o zero, sem um "anel" marcado na
+        // borda. Mais stops de alpha baixo espalham a transição por todo o raio.
+        falloff: [
+            { offset: 0.0, alpha: 1.0 },
+            { offset: 0.25, alpha: 0.6 },
+            { offset: 0.45, alpha: 0.35 },
+            { offset: 0.65, alpha: 0.17 },
+            { offset: 0.82, alpha: 0.07 },
+            { offset: 1.0, alpha: 0.0 }
+        ]
+    }
+};

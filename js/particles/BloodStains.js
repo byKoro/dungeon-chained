@@ -26,7 +26,7 @@ export class BloodStains {
         if (palette && palette.length) {
             return palette[(Math.random() * palette.length) | 0];
         }
-        const fallback = ["#830623", "#a30808", "#c60f0e", "#7a0404"];
+        const fallback = ["#4a0612", "#5c0a18", "#6e0f1c", "#480810"];
         return fallback[(Math.random() * fallback.length) | 0];
     }
 

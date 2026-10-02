@@ -33,6 +33,15 @@ export class Player extends Entity {
         this.wasRunning = false;
         this.justStartedRunning = false; // true só no frame em que arranca
 
+        // --- Escorregada ao parar (freada brusca) ---
+        // Quando o jogador solta o input vindo de uma corrida, ele não trava na
+        // hora: desliza um pouquinho e desacelera mais devagar por alguns frames.
+        this.slideTimer = 0;             // frames restantes de deslize
+        this.slideDuration = 10;         // ~0.17s de escorregada
+        this.justStopped = false;        // true só no frame em que a freada começa
+        this.stopDirX = 0; this.stopDirY = 0; // direção do movimento ao frear
+        this.stopSpeed = 0;              // velocidade no instante da freada
+
         // Sistema de passos/pegadas
         this.stepDist = 0;        // distância acumulada desde o último passo
         this.stepSide = 1;        // alterna 1/-1 (pé direito/esquerdo)
@@ -92,8 +101,22 @@ export class Player extends Entity {
             moveY *= 0.7071;
         }
 
-        this.vx = this.vx * 0.76 + moveX * this.speed * 0.24;
-        this.vy = this.vy * 0.76 + moveY * this.speed * 0.24;
+        const hasInput = moveX !== 0 || moveY !== 0;
+
+        if (hasInput) {
+            // Acelera na direção do input (comportamento normal).
+            this.vx = this.vx * 0.76 + moveX * this.speed * 0.24;
+            this.vy = this.vy * 0.76 + moveY * this.speed * 0.24;
+            this.slideTimer = 0;
+        } else {
+            // Sem input: em vez de travar (fator 0.76), DESLIZA. Durante a janela
+            // de deslize a desaceleração é mais suave (0.90), dando aquela
+            // escorregadinha; depois volta a frear firme para parar de vez.
+            const decel = this.slideTimer > 0 ? 0.90 : 0.76;
+            this.vx *= decel;
+            this.vy *= decel;
+            if (this.slideTimer > 0) this.slideTimer--;
+        }
     }
 
     takeDamage(sourceX, sourceY) {
@@ -145,6 +168,19 @@ export class Player extends Entity {
         // Histerese (limiares diferentes) evita disparos repetidos ao oscilar.
         const running = this.speedMag > this.speed * 0.55;
         this.justStartedRunning = running && !this.wasRunning;
+
+        // Detecção de freada: estava correndo e agora desacelerou abaixo do
+        // limiar. Dispara a escorregada + o evento para as partículas de freada.
+        this.justStopped = false;
+        if (this.wasRunning && !running && this.speedMag > this.speed * 0.2) {
+            this.justStopped = true;
+            this.slideTimer = this.slideDuration;
+            const mag = this.speedMag || 1;
+            this.stopDirX = this.vx / mag;
+            this.stopDirY = this.vy / mag;
+            this.stopSpeed = this.speedMag;
+        }
+
         if (running) this.wasRunning = true;
         else if (this.speedMag < this.speed * 0.35) this.wasRunning = false;
 

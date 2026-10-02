@@ -17,6 +17,8 @@
  *   Props:                49,59(rochas) 77(caveira) 68(ossos) 65(teia peq) 64(teia grande)
  */
 
+import { TORCHES } from '../config/GameConfig.js';
+
 const FLOOR_VARIANTS = [6, 7, 8, 9, 16, 17, 18, 19, 26, 27, 28, 29];
 const PROPS = [49, 59, 77, 68, 65, 64];
 
@@ -44,10 +46,12 @@ export class RoomTiles {
         this.rows = rows;
         this.doors = doors || {};
         this.rng = makeRng(seed);
+        this._decorate = decorate;
 
         this.floor = [];       // matriz de índices do piso/parede
         this.props = [];        // [{ col, row, index }]
         this.doorCells = [];    // [{ col, row, index }] células de porta (p/ estado fechado)
+        this.torches = [];      // [{ col, row }] tochas na parede norte (pontos de luz)
         this._build(decorate);
     }
 
@@ -68,7 +72,107 @@ export class RoomTiles {
         // Abre os vãos de porta no meio de cada lado com porta
         this._openDoors(last, bottom);
 
-        if (decorate) this._scatterProps(last, bottom);
+        if (decorate) {
+            this._scatterProps(last, bottom);
+            this._placeTorches(last, bottom);
+        }
+    }
+
+    /**
+     * Sorteia de minPerWall a maxPerWall posições DISTINTAS de uma lista de
+     * candidatos (determinístico pela seed), respeitando o gap mínimo entre
+     * elas. Usado para distribuir tochas em qualquer parede.
+     */
+    _chooseTorchSlots(candidates, minGap) {
+        if (candidates.length === 0) return [];
+        const span = TORCHES.maxPerWall - TORCHES.minPerWall + 1;
+        const count = TORCHES.minPerWall + ((this.rng() * span) | 0);
+
+        const shuffled = candidates.slice();
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = (this.rng() * (i + 1)) | 0;
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        const chosen = [];
+        for (const v of shuffled) {
+            if (chosen.length >= count) break;
+            if (chosen.every(ch => Math.abs(ch - v) >= minGap)) chosen.push(v);
+        }
+        chosen.sort((a, b) => a - b);
+        return chosen;
+    }
+
+    /**
+     * Coloca tochas nas paredes NORTE e LATERAIS (esq/dir), em posições
+     * variadas (determinísticas pela seed), evitando quinas e os vãos de porta.
+     * As tochas vão em this.props (desenhadas SOBRE o cenário, sem removê-lo) e
+     * em this.torches (para o Game emitir luz; cada uma guarda o lado).
+     */
+    _placeTorches(last, bottom) {
+        if (!TORCHES.enabled) return;
+        if (TORCHES.onlyCombatRooms && !this._decorate) return;
+
+        this._placeNorthTorches(last);
+        if (TORCHES.sides && TORCHES.sides.enabled) this._placeSideTorches(last, bottom);
+    }
+
+    // Parede NORTE (fileira r=0): tile TORCHES.index colado na parede.
+    _placeNorthTorches(last) {
+        const margin = TORCHES.marginTiles;
+        const minGap = Math.max(1, TORCHES.minGap);
+
+        const midC = (this.cols / 2) | 0;
+        const doorCols = this.doors.N ? new Set([midC - 1, midC]) : new Set();
+        const candidates = [];
+        for (let c = margin; c <= last - margin; c++) {
+            if (!doorCols.has(c)) candidates.push(c);
+        }
+
+        for (const c of this._chooseTorchSlots(candidates, minGap)) {
+            // Prop desenhado SOBRE a parede norte (não substitui o tile).
+            this.props.push({ col: c, row: 0, index: TORCHES.index });
+            this.torches.push({ col: c, row: 0, side: "N" });
+        }
+    }
+
+    /**
+     * Paredes LATERAIS: tile TORCHES.sideIndex no PISO à frente da parede
+     * (coluna interna adjacente — 1 à esquerda, last-1 à direita). Evita as
+     * quinas (linhas de topo/base) e o vão da porta lateral. Na parede DIREITA
+     * o tile é espelhado (flip), pois o 91 encaixa na esquerda por padrão.
+     */
+    _placeSideTorches(last, bottom) {
+        const margin = TORCHES.marginTiles;
+        const minGap = Math.max(1, TORCHES.minGap);
+        const midR = (this.rows / 2) | 0;
+
+        // Linhas candidatas: entre as margens (afasta das quinas) e fora do vão
+        // da porta lateral. O eixo vertical é curto (salas são mais baixas que
+        // largas), então usamos a própria margem sem folga extra.
+        const buildRowCandidates = (hasDoor) => {
+            const doorRows = hasDoor ? new Set([midR - 1, midR]) : new Set();
+            const rows = [];
+            for (let r = margin; r <= bottom - margin; r++) {
+                if (!doorRows.has(r)) rows.push(r);
+            }
+            return rows;
+        };
+
+        if (TORCHES.sides.left) {
+            const col = 1; // piso logo à frente da parede esquerda (coluna 0)
+            for (const r of this._chooseTorchSlots(buildRowCandidates(this.doors.W), minGap)) {
+                this.props.push({ col, row: r, index: TORCHES.sideIndex, flip: false });
+                this.torches.push({ col, row: r, side: "W" });
+            }
+        }
+        if (TORCHES.sides.right) {
+            const col = last - 1; // piso logo à frente da parede direita
+            for (const r of this._chooseTorchSlots(buildRowCandidates(this.doors.E), minGap)) {
+                // Espelhado: o tile 91 encaixa na esquerda por padrão.
+                this.props.push({ col, row: r, index: TORCHES.sideIndex, flip: true });
+                this.torches.push({ col, row: r, side: "E" });
+            }
+        }
     }
 
     // Escolhe o tile de parede/piso para (c,r) conforme a posição na moldura.

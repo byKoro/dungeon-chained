@@ -26,9 +26,19 @@ export class BloodCanvas {
         this.ctx.imageSmoothingEnabled = false;
 
         // Paleta de cores do sangue (controlada externamente). Fallback padrão.
+        // Tons de vinho/bordô profundos e dessaturados: ao serem compostos em
+        // "multiply" sobre o piso escuro, tingem o chão sem "flutuar" por cima.
         this.palette = (palette && palette.length)
             ? palette
-            : ["#830623", "#a30808", "#c60f0e", "#960e11", "#7a0404"];
+            : ["#4a0612", "#5c0a18", "#6e0f1c", "#480810", "#3a0510"];
+
+        // Como o buffer de sangue é composto sobre a cena. "multiply" faz o
+        // sangue MULTIPLICAR a cor do piso embaixo (escurece/tinge) em vez de
+        // cobri-lo opaco, integrando a mancha ao cenário. "source-over" (normal)
+        // volta ao comportamento antigo.
+        this.blendMode = "multiply";
+        // Opacidade global do buffer na composição (reforça o assentamento).
+        this.drawAlpha = 0.9;
 
         // Zonas de sangue "molhado" (círculos) registradas em código, para
         // detectar passos sem ler pixels (getImageData é custoso). As PEGADAS
@@ -73,19 +83,33 @@ export class BloodCanvas {
     stampFootprint(x, y, angle, intensity = 1) {
         const ctx = this.ctx;
         const px = this.px;
-        const len = px * (2 + Math.round(2 * intensity)); // em pixels de arte
-        const wid = px * (1 + Math.round(1 * intensity));
+        const len = px * (2 + Math.round(2 * intensity)); // semi-eixo maior (px de arte)
+        const wid = px * (1 + Math.round(1 * intensity)); // semi-eixo menor
+
+        // IMPORTANTE: não rotacionamos o canvas. Se rotacionássemos, cada bloco
+        // de 1px sairia inclinado e o nearest-neighbor espalharia os pixels na
+        // diagonal (visual serrilhado). Em vez disso, varremos a grade de
+        // pixels de sangue SEMPRE alinhada aos eixos (blocos retos) e aplicamos
+        // a orientação da pegada só no TESTE da elipse, girando os offsets por
+        // -angle no cálculo. Resultado: pixels retos, pegada orientada.
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+
+        // Caixa de varredura: o maior semi-eixo cobre qualquer orientação.
+        const reach = Math.max(len, wid);
+        const cx = this._snap(x), cy = this._snap(y);
+
         ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
         ctx.globalAlpha = 0.5 + 0.5 * intensity;
-        // Elipse pixelada (sola do pé), blocos alinhados à grade
-        for (let yy = -wid; yy <= wid; yy += px) {
-            for (let xx = -len; xx <= len; xx += px) {
-                const nx = xx / len, ny = yy / wid;
+        for (let gy = -reach; gy <= reach; gy += px) {
+            for (let gx = -reach; gx <= reach; gx += px) {
+                // Projeta o offset (eixo-alinhado) no referencial da pegada.
+                const lx = gx * cos + gy * sin;   // eixo longo (direção do passo)
+                const ly = -gx * sin + gy * cos;  // eixo curto (lateral)
+                const nx = lx / len, ny = ly / wid;
                 if (nx * nx + ny * ny <= 1 && Math.random() < 0.85) {
                     ctx.fillStyle = this._color();
-                    ctx.fillRect(this._snap(xx), this._snap(yy), px, px);
+                    // Blocos sempre alinhados à grade do buffer -> pixels retos.
+                    ctx.fillRect(cx + this._snap(gx), cy + this._snap(gy), px, px);
                 }
             }
         }
@@ -203,6 +227,15 @@ export class BloodCanvas {
     }
 
     draw(ctx) {
+        // Compor em "multiply" faz o sangue tingir o piso (parte do chão), em
+        // vez de ser um decalque opaco por cima. Salvamos/restauramos para não
+        // vazar o blend mode para o resto da renderização.
+        const prevOp = ctx.globalCompositeOperation;
+        const prevAlpha = ctx.globalAlpha;
+        ctx.globalCompositeOperation = this.blendMode;
+        ctx.globalAlpha = this.drawAlpha;
         ctx.drawImage(this.canvas, 0, 0);
+        ctx.globalCompositeOperation = prevOp;
+        ctx.globalAlpha = prevAlpha;
     }
 }

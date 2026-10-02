@@ -17,15 +17,16 @@ export class Tileset {
     }
 
     // Desenha o tile de índice 'index' cobrindo o retângulo (dx,dy,dw,dh) do mundo.
-    // A câmera já cai em pixel inteiro de tela (ver Renderer.beginFrame), então
-    // mantemos as coordenadas de mundo exatas e só estendemos levemente a
-    // largura/altura (overlap) para fechar qualquer costura residual entre tiles.
+    // A câmera cai em pixel inteiro de tela E com escala quantizada (ver
+    // Renderer.beginFrame / _quantizeZoom), de modo que cada tile ocupa um nº
+    // inteiro de pixels e as bordas de tiles vizinhos coincidem exatamente.
+    // Por isso NÃO precisamos de overlap fracionário (que, com nearest-neighbor,
+    // podia ele próprio deslocar levemente a grade). Desenhamos 1:1.
     draw(ctx, index, dx, dy, dw, dh) {
         if (!this.ready) return;
         const t = this.tileSize;
         const sx = (index % this.cols) * t;
         const sy = ((index / this.cols) | 0) * t;
-        const overlap = 0.5;
-        ctx.drawImage(this.img, sx, sy, t, t, dx, dy, dw + overlap, dh + overlap);
+        ctx.drawImage(this.img, sx, sy, t, t, dx, dy, dw, dh);
     }
 }

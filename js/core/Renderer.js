@@ -5,9 +5,33 @@ export class Renderer {
         this.zoom = 1.50;         // zoom atual (animado)
         this.screenShake = 0;
 
+        // Tamanho do tile em px de MUNDO. Usado para quantizar o zoom de modo
+        // que a grade de tiles sempre caia em pixels inteiros de tela. Definido
+        // por setTileWorldSize(); default seguro até lá.
+        this.tileWorldSize = 64;
+
         // Câmera: ponto do MUNDO que fica no centro da tela.
         this.camX = canvas.width / 2;
         this.camY = canvas.height / 2;
+    }
+
+    // Informa o tamanho do tile no mundo (px) para a quantização do zoom.
+    setTileWorldSize(px) {
+        if (px > 0) this.tileWorldSize = px;
+    }
+
+    /**
+     * Quantiza o zoom para que um tile (tileWorldSize px de mundo) ocupe um
+     * número INTEIRO de pixels de tela. Isso trava a grade de rasterização:
+     * sem fração acumulando entre tiles, as costuras de 1px desaparecem e o
+     * cenário fica fixo mesmo com a câmera em zoom-fit arbitrário.
+     */
+    _quantizeZoom(zoom) {
+        const t = this.tileWorldSize;
+        if (!t) return zoom;
+        // nº inteiro de px de tela por tile (>= 1), arredondado do zoom desejado.
+        const tilePxOnScreen = Math.max(1, Math.round(t * zoom));
+        return tilePxOnScreen / t;
     }
 
     triggerShake(amount = 14) {
@@ -22,7 +46,13 @@ export class Renderer {
     updateCamera(t) {
         this.camX += (t.x - this.camX) * 0.12;
         this.camY += (t.y - this.camY) * 0.12;
-        if (t.zoom) this.zoom += (t.zoom - this.zoom) * 0.08;
+        if (t.zoom) {
+            this.zoom += (t.zoom - this.zoom) * 0.08;
+            // Snap no alvo quando já está perto: evita a interpolação ficar
+            // eternamente a frações de distância, o que mantinha a escala
+            // mudando de leve a cada frame (tiles "respirando" no início).
+            if (Math.abs(t.zoom - this.zoom) < 0.001) this.zoom = t.zoom;
+        }
 
         // Clamp: mantém a câmera dentro dos limites da sala (não revela o vazio
         // fora dela). Só clampa no eixo se a sala for maior que a viewport.
@@ -51,6 +81,17 @@ export class Renderer {
         };
     }
 
+    // Converte um ponto de MUNDO (px) para coordenadas de TELA, usando o mesmo
+    // zoom quantizado e a mesma translação arredondada do beginFrame (sem o
+    // shake). Útil para desenhar overlays em espaço de tela alinhados a
+    // entidades do mundo — p.ex. o mapa de luz do PostProcessor.
+    worldToScreen(wx, wy) {
+        const z = this._quantizeZoom(this.zoom);
+        const tx = Math.round(this.canvas.width / 2 - this.camX * z);
+        const ty = Math.round(this.canvas.height / 2 - this.camY * z);
+        return { x: wx * z + tx, y: wy * z + ty, zoom: z };
+    }
+
     beginFrame() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
@@ -66,12 +107,19 @@ export class Renderer {
 
         // Câmera via setTransform: um ponto de mundo (wx,wy) vai para a tela em
         //   screen = wx*zoom + tx   (idem para y)
-        // Arredondamos tx/ty (translação final em TELA) para pixel inteiro,
-        // estabilizando o grid de rasterização e eliminando as costuras finas
-        // entre tiles que aparecem ao mover a câmera (sub-pixel seam).
-        const tx = Math.round(this.canvas.width / 2 - this.camX * this.zoom + shakeX);
-        const ty = Math.round(this.canvas.height / 2 - this.camY * this.zoom + shakeY);
-        this.ctx.setTransform(this.zoom, 0, 0, this.zoom, tx, ty);
+        //
+        // Para pixel art estável precisamos de DUAS coisas:
+        //  1) a ESCALA aplicada precisa manter a grade de tiles alinhada ao
+        //     pixel de tela. Como cada tile tem `tilePx` px de mundo, quantizamos
+        //     o zoom para que `tilePx * zoom` caia num nº inteiro de pixels de
+        //     tela. Sem isso, com zoom fracionário o nearest-neighbor arredonda
+        //     bordas de tiles vizinhos para lados diferentes (costura de 1px que
+        //     não some nunca);
+        //  2) a TRANSLAÇÃO final em tela cai em pixel inteiro (como já fazíamos).
+        const renderZoom = this._quantizeZoom(this.zoom);
+        const tx = Math.round(this.canvas.width / 2 - this.camX * renderZoom + shakeX);
+        const ty = Math.round(this.canvas.height / 2 - this.camY * renderZoom + shakeY);
+        this.ctx.setTransform(renderZoom, 0, 0, renderZoom, tx, ty);
     }
 
     endFrame() {
@@ -159,7 +207,17 @@ export class Renderer {
         for (const p of tiles.props) {
             const dx = rect.x + p.col * tile;
             const dy = rect.y + p.row * tile;
-            this.tileset.draw(c, p.index, dx, dy, tile, tile);
+            if (p.flip) {
+                // Espelha horizontalmente em torno do centro do tile (p.ex. a
+                // tocha lateral da parede direita, que reusa o tile da esquerda).
+                c.save();
+                c.translate(dx + tile, dy);
+                c.scale(-1, 1);
+                this.tileset.draw(c, p.index, 0, 0, tile, tile);
+                c.restore();
+            } else {
+                this.tileset.draw(c, p.index, dx, dy, tile, tile);
+            }
         }
 
         if (!doorsOpen && tiles.doorCells) {

@@ -4,6 +4,12 @@ import { DustPuff } from './DustPuff.js';
 // 1 "pixel" de sangue no mundo (= 1 pixel de tile: tile 16px desenhado a 64px).
 const BLOOD_PX = 4;
 
+// Paleta do sangue VOANDO no ar (respingo no impacto). Diferente do sangue seco
+// do chão (que é composto em "multiply"), estas partículas são desenhadas sobre
+// a cena em modo normal, então usamos tons de bordô médios/dessaturados: dão
+// "vida" ao impacto sem o vermelho berrante que destoava do cenário escuro.
+const AIR_BLOOD_COLORS = ["#5c0a18", "#6e0f1c", "#7d1420", "#4a0612", "#640d1a"];
+
 class AirParticle {
     constructor(x, y, color, isBlood = false, spread = 1) {
         this.x = x;
@@ -98,7 +104,7 @@ export class ParticleSystem {
     // ao player receber dano. 'amount' controla a intensidade; as gotas saltam
     // e assentam espalhadas e aleatórias pelo chão.
     triggerBlood(x, y, amount = 20, spread = 1) {
-        const bloodColors = ["#4a0000", "#7a0404", "#a30808", "#c91818", "#d90429"];
+        const bloodColors = AIR_BLOOD_COLORS;
         const count = amount + Math.floor(Math.random() * (amount * 0.5));
         for (let i = 0; i < count; i++) {
             const c = bloodColors[Math.floor(Math.random() * bloodColors.length)];
@@ -113,7 +119,7 @@ export class ParticleSystem {
     }
 
     triggerExplosion(x, y, isSkeleton) {
-        const bloodColors = ["#4a0000", "#7a0404", "#a30808", "#c91818", "#d90429"];
+        const bloodColors = AIR_BLOOD_COLORS;
         const boneColors = isSkeleton 
             ? ["#ffffff", "#e5e5e5", "#b8b8b8", "#595959"] 
             : ["#48cae4", "#0096c7", "#023e8a", "#e0fbfc"];

@@ -48,6 +48,21 @@ export class ParticleEffects {
         player.walkDustCooldown = player.speedMag > player.speed * 0.6 ? 7 : 12;
     }
 
+    // Rajada de poeira ao frear bruscamente: sai contra o sentido do movimento
+    // (os pés derrapando no chão). A quantidade acompanha a força da freada.
+    spawnBrakeDust(player) {
+        // Direção do movimento no instante da freada (capturada no Player).
+        const dirX = player.stopDirX, dirY = player.stopDirY;
+        // Origem aos pés, levemente atrás do jogador no sentido do movimento.
+        const x = player.x - dirX * 10;
+        const y = player.y + 15 - dirY * 10 * 0.4;
+        // Intensidade proporcional à velocidade da freada (freada mais forte,
+        // mais poeira). A poeira é lançada no sentido CONTRÁRIO ao movimento.
+        const strength = Math.min(1, player.stopSpeed / player.speed);
+        const amount = 6 + Math.round(strength * 10);
+        this.particleSystem.triggerDust(x, y, -dirX, -dirY, amount);
+    }
+
     // Carimba uma pegada quando o jogador dá um passo (sangue se pisou em sangue).
     handleStep(player) {
         if (!player.justStepped) return;
@@ -66,6 +81,7 @@ export class ParticleEffects {
     // Processa todos os efeitos de pé de um jogador num frame.
     processPlayer(player) {
         if (player.justStartedRunning) this.spawnRunSmoke(player);
+        if (player.justStopped) this.spawnBrakeDust(player);
         this.spawnWalkDust(player);
         this.handleStep(player);
     }
