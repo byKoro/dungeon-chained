@@ -35,6 +35,11 @@ const imgDemon = new Image();
 imgDemon.src = "assets/enemies/demon.png";
 const imgBloodMonster = new Image();
 imgBloodMonster.src = "assets/enemies/blood_monster.png";
+const assetBase = "assets/2D Pixel Dungeon Asset Pack/items and trap_animation";
+const spikeFrames = [1, 2, 3, 4].map(n => {
+    const img = new Image(); img.src = `${assetBase}/peaks/peaks_${n}.png`; return img;
+});
+const arrowImage = new Image(); arrowImage.src = `${assetBase}/arrow/Just_arrow.png`;
 
 // ---- Cores do sangue ----
 const BLOOD_COLORS = ["#5c0210", "#7a0404", "#960e11", "#a30808", "#c60f0e"];
@@ -104,6 +109,14 @@ const BLOOD_STEPS = 6;
 // Estado das salas: por chave, guarda os inimigos/caixas gerados e se limpa.
 // A sala só é "de combate" quando é room (corredores são livres).
 let roomStates = new Map();
+let challengeTraps = [];
+let challengeArrows = [];
+let trapClock = 0;
+let arrowClock = 0;
+const TILE = 40;
+const CHALLENGE = { minX: 70, maxX: 1030, minY: 70, maxY: 610, laneW: TILE * 1.5, laneGap: TILE * 2 };
+let challengeOffsetX = 0;
+let challengeOffsetY = 0;
 
 // Limite físico de afastamento entre os jogadores (a corrente é elástica, mas
 // há um teto rígido para não separarem além do que a câmera comporta).
@@ -114,7 +127,7 @@ const CAM_ZOOM_MIN = 1.05;   // afastados => zoom out
 const CAM_ZOOM_MAX = 1.55;   // juntos => zoom in
 
 function createPlayers() {
-    p1 = new Player(0, 0, "#ffd166", ["w", "s", "a", "d"], imgP1, "Amarelo", {
+    p1 = new Player(0, 0, "#ff6b64", ["w", "s", "a", "d"], imgP1, "Vermelho", {
         animated: true, frameCount: 8, cellSize: 100,
         cropX: 41, cropY: 37, cropW: 17, cropH: 23, drawHeight: 73,
         hurt: { img: imgP1Hurt, frameCount: 5, hurtFrame: 2, cellSize: 100, cropX: 42, cropY: 38, cropW: 16, cropH: 22 },
@@ -141,9 +154,20 @@ function newDungeon() {
     gameOver = false;
 
     const c = dungeon.current;
+    c.type = "challenge";
+    const challengeBounds = dungeon.currentBounds();
+    challengeOffsetX = challengeBounds.minX - CHALLENGE.minX;
+    challengeOffsetY = challengeBounds.minY - CHALLENGE.minY;
     const center = dungeon.cellCenter(c.gx, c.gy);
     p1.x = center.x - 30; p1.y = center.y; p1.vx = 0; p1.vy = 0;
     p2.x = center.x + 30; p2.y = center.y; p2.vx = 0; p2.vy = 0;
+    challengeTraps = [];
+    const laneCenters = [330, 550, 770];
+    for (let row = 0; row < 2; row++) {
+        for (const x of laneCenters) challengeTraps.push({ x: challengeOffsetX + x, y: challengeOffsetY + (row === 0 ? 330 : 470), phase: row * Math.PI + (laneCenters.indexOf(x) % 2) * Math.PI });
+    }
+    challengeArrows = [];
+    trapClock = 0; arrowClock = 0;
 
     // Câmera começa centrada nos jogadores
     renderer.camX = center.x;
@@ -163,7 +187,16 @@ function enterRoom() {
     if (!state) {
         state = { enemies: [], boxes: [], cleared: false };
 
-        if (cell.kind === "room" && cell.type !== "start") {
+        if (cell.type === "challenge") {
+            const positions = [[280, 180], [500, 220], [720, 520], [900, 560]];
+            for (const [x, y] of positions) {
+                const cfg = randomMeleeConfig();
+                const foe = new MeleeEnemy(challengeOffsetX + x, challengeOffsetY + y, cfg.img, cfg, floor);
+                foe.bloodPalette = bloodCanvas.palette;
+                foe.gibStainConfig = BLOOD_STAIN_CONFIG.gib;
+                state.enemies.push(foe);
+            }
+        } else if (cell.kind === "room" && cell.type !== "start") {
             // Caixas
             const b = arenaBounds;
             const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
@@ -229,7 +262,7 @@ function updateHud() {
     const c = dungeon.current;
     const tag = c.kind === "corridor" ? "CORREDOR" : (c.type === "boss" ? "SALA DO CHEFE" : "SALA");
     hudFloor.innerText = `DUNGEON ${floor} — ${tag}`;
-    hudP1.innerText = `P1 (Amarelo): ${"❤️".repeat(Math.max(0, p1.lives))}`;
+    hudP1.innerText = `P1 (Vermelho): ${"❤️".repeat(Math.max(0, p1.lives))}`;
     hudP2.innerText = `P2 (Azul): ${"❤️".repeat(Math.max(0, p2.lives))}`;
 }
 
@@ -283,6 +316,44 @@ function clampToRoomAndDoors(entity, bounds) {
     entity.y = Math.max(bounds.minY + entity.hitRadius, Math.min(bounds.maxY - entity.hitRadius, entity.y));
 }
 
+function keepOnColorLane(player, laneY) {
+    const half = CHALLENGE.laneW / 2;
+    // Duas passarelas paralelas: cada jogador fica preso à sua faixa.
+    const centerY = laneY;
+    player.y = Math.max(centerY - half + player.hitRadius, Math.min(centerY + half - player.hitRadius, player.y));
+    player.x = Math.max(challengeOffsetX + CHALLENGE.minX + player.hitRadius, Math.min(challengeOffsetX + CHALLENGE.maxX - player.hitRadius, player.x));
+}
+
+function updateChallenge() {
+    trapClock++;
+    arrowClock++;
+    if (arrowClock >= 150) {
+        arrowClock = 0;
+        for (let x = 210; x <= 890; x += 170) {
+            challengeArrows.push({ x: challengeOffsetX + x, y: challengeOffsetY + CHALLENGE.minY + 12, vy: 5.2, direction: 1 });
+            challengeArrows.push({ x: challengeOffsetX + x - 65, y: challengeOffsetY + CHALLENGE.maxY - 12, vy: -5.2, direction: -1 });
+        }
+    }
+    challengeArrows = challengeArrows.filter(a => {
+        a.y += a.vy;
+        for (const player of [p1, p2]) {
+            if (Math.abs(player.x - a.x) < 15 && Math.abs(player.y - a.y) < 20) {
+                if (player.takeDamage(a.x, a.y)) particleSystem.triggerBlood(player.x, player.y, 10, 0.8);
+            }
+        }
+        return a.y > challengeOffsetY + CHALLENGE.minY && a.y < challengeOffsetY + CHALLENGE.maxY;
+    });
+    for (const t of challengeTraps) {
+        t.frame = Math.max(0, Math.min(3, Math.floor((Math.sin((trapClock / 55) * Math.PI + t.phase) + 1) * 2)));
+        t.raised = t.frame >= 2;
+        if (t.raised) for (const player of [p1, p2]) {
+            if (Math.abs(player.x - t.x) < 35 && Math.abs(player.y - t.y) < 32 && player.takeDamage(t.x, t.y)) {
+                particleSystem.triggerBlood(player.x, player.y, 12, 0.9);
+            }
+        }
+    }
+}
+
 // Limite físico de afastamento entre os players (teto rígido).
 function enforceSeparationLimit() {
     const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -306,6 +377,11 @@ function gameLoop() {
 
         p1.update(input, arenaBounds);
         p2.update(input, arenaBounds);
+        if (dungeon.current.type === "challenge") {
+            keepOnColorLane(p1, challengeOffsetY + 470);
+            keepOnColorLane(p2, challengeOffsetY + 330);
+            updateChallenge();
+        }
 
         if (p1.justStartedRunning) spawnRunSmoke(p1);
         if (p2.justStartedRunning) spawnRunSmoke(p2);
@@ -385,7 +461,7 @@ function gameLoop() {
 
         // Transição por porta: só quando a sala está aberta (limpa/corredor) e
         // os DOIS players estão sobre o vão de uma porta.
-        if (!roomLocked()) {
+        if (!roomLocked() && dungeon.current.type !== "challenge") {
             const doors = dungeon.doorsOfCurrent();
             for (const door of doors) {
                 if (playersAtDoor(door)) { transitionThroughDoor(door); break; }
@@ -411,6 +487,30 @@ function gameLoop() {
     const open = !roomLocked();
     const state = roomStates.get(dungeon.currentKey);
     renderer.drawRoom(rect, arenaBounds, doors, dungeon.doorHalfWidth, open, state ? state.boxes : []);
+    if (dungeon.current.type === "challenge") {
+        const c = ctx;
+        c.save(); c.translate(challengeOffsetX, challengeOffsetY);
+        c.fillStyle = "#11131b";
+        c.fillRect(70, 70, 960, 540);
+        // Corredores laterais entre os emissores e as duas passarelas.
+        c.fillStyle = "#321c25"; c.fillRect(70, 70, 960, 150); c.fillRect(70, 460, 960, 150);
+        c.fillStyle = "#285b8e"; c.fillRect(70, 300, 960, 60);
+        c.fillStyle = "#98433f"; c.fillRect(70, 440, 960, 60);
+        c.strokeStyle = "#6bb4db"; c.lineWidth = 3; c.strokeRect(70, 300, 960, 60);
+        c.strokeStyle = "#ff6b64"; c.strokeRect(70, 440, 960, 60);
+        challengeTraps.forEach(t => {
+            const img = spikeFrames[t.frame ?? 0];
+            if (img.complete && img.naturalWidth) c.drawImage(img, t.x - challengeOffsetX - 38, t.y - challengeOffsetY - 30, 76, 60);
+            else { c.fillStyle = t.raised ? "#d8e1e8" : "#515966"; c.fillRect(t.x - challengeOffsetX - 30, t.y - challengeOffsetY - 12, 60, 24); }
+        });
+        challengeArrows.forEach(a => {
+            c.save(); c.translate(a.x - challengeOffsetX, a.y - challengeOffsetY); if (a.direction < 0) c.rotate(Math.PI);
+            if (arrowImage.complete && arrowImage.naturalWidth) c.drawImage(arrowImage, -18, -12, 36, 24);
+            else { c.fillStyle = "#e7d6a8"; c.fillRect(-3, -14, 6, 28); c.beginPath(); c.moveTo(-8, 7); c.lineTo(0, 17); c.lineTo(8, 7); c.fill(); }
+            c.restore();
+        });
+        c.restore();
+    }
 
     particleSystem.drawFloor(ctx);
     footprints.forEach(f => f.draw(ctx));
