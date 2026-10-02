@@ -249,6 +249,9 @@ export class Game {
         Physics.applyChainConstraint(p1, p2);
         this.enforceSeparationLimit();
 
+        // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
+        if (room.challenge) room.challenge.update([p1, p2]);
+
         // Inimigos: IA + dano no player (feedback via CombatSystem)
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
@@ -338,6 +341,10 @@ export class Game {
         this.effects.draw(ctx);
         this.particleSystem.drawSmoke(ctx);
 
+        // Desafio co-op: botões e spikes ficam no CHÃO (sob as entidades).
+        const challenge = rooms.current.challenge;
+        if (challenge) challenge.drawFloorLayer(ctx);
+
         const p1Bounce = this.p1.speedMag > 0.15 ? Math.abs(Math.sin(this.p1.animTimer)) : 0;
         const p2Bounce = this.p2.speedMag > 0.15 ? Math.abs(Math.sin(this.p2.animTimer)) : 0;
         renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, p1Bounce);
@@ -350,9 +357,17 @@ export class Game {
         const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
         drawables.forEach(e => e.draw(ctx));
 
+        // Indicadores dos atiradores de flecha: montados nas paredes, por cima
+        // das entidades (ficam na parede, não no chão).
+        if (challenge) challenge.drawWallLayer(ctx);
+
         renderer.drawFrontWall(rect, tiles, TILE, open, doors, doorHalf, DOOR_STUB_TILES);
 
         this.gibs.forEach(g => g.draw(ctx));
+
+        // Flechas em voo: por cima de tudo no mundo (camada "aérea").
+        if (challenge) challenge.drawAirLayer(ctx);
+
         this.particleSystem.drawAir(ctx);
 
         // Poeira/vento no MUNDO (dentro do clip). Como a iluminação é aplicada

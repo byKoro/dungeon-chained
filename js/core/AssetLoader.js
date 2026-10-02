@@ -21,6 +21,12 @@ export class AssetLoader {
 
         // Tileset das salas (grade 10x10 de 16px)
         this.load("tileset", "assets/tileset/tileset.png");
+
+        // Spikes (4 frames de 16x16): 0=recolhido ... 3=estendido
+        this.load("peaks0", "assets/peaks/peaks_0.png");
+        this.load("peaks1", "assets/peaks/peaks_1.png");
+        this.load("peaks2", "assets/peaks/peaks_2.png");
+        this.load("peaks3", "assets/peaks/peaks_3.png");
     }
 
     load(key, src) {
@@ -51,4 +57,6 @@ export class AssetLoader {
     get demon() { return this.images.demon; }
     get bloodMonster() { return this.images.bloodMonster; }
     get tileset() { return this.images.tileset; }
+    // Frames dos spikes, em ordem (recolhido -> estendido).
+    get peaks() { return [this.images.peaks0, this.images.peaks1, this.images.peaks2, this.images.peaks3]; }
 }

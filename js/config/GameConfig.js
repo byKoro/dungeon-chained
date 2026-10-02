@@ -213,3 +213,64 @@ export const POST_PROCESSING = {
         ]
     }
 };
+
+/**
+ * HAZARDS — perigos de corredor (spikes, atirador de flechas) e botões de
+ * pressão co-op. Tudo em px de MUNDO. As flechas, o indicador e o botão por
+ * enquanto são FORMAS GEOMÉTRICAS (sprites virão depois).
+ */
+export const HAZARDS = {
+    // ---- Spikes (espinhos no chão) ----
+    // Sprite animado em assets/peaks/peaks_0..3.png (16x16 cada):
+    //   frame 0 = recolhido (seguro) ... frame 3 = totalmente estendido (letal).
+    spike: {
+        size: TILE,            // ocupa 1 tile
+        damageRadius: 26,      // raio de dano quando estendido (px de mundo)
+        // Ciclo (em frames a 60fps): escondido -> subindo -> exposto -> descendo
+        hiddenFrames: 70,      // tempo recolhido (seguro)
+        warnFrames: 22,        // telegrafo (começa a subir; já machuca no fim)
+        exposedFrames: 46,     // totalmente para fora (letal)
+        retractFrames: 16,     // recolhendo
+        // Fração do ciclo em que o espinho realmente fere (do fim do warn até
+        // o fim do exposed). Calculado no entity a partir dos frames acima.
+        drawSize: TILE * 0.9   // tamanho de desenho do sprite
+    },
+
+    // ---- Atirador de flechas (armadilha de parede) ----
+    arrowTrap: {
+        intervalFrames: 95,    // intervalo entre disparos
+        warnFrames: 34,        // telegrafo do indicador antes de atirar
+        indicatorSize: 20,     // tamanho da forma do indicador na parede
+        indicatorColor: "#ffd166",
+        indicatorWarnColor: "#ff5470"
+    },
+    arrow: {
+        speed: 7.5,            // px/frame
+        length: 26,            // comprimento da flecha (forma)
+        width: 5,              // espessura
+        hitRadius: 10,         // raio de colisão com o player
+        color: "#f4e9c1",
+        headColor: "#ff5470",
+        maxLifeFrames: 240     // tempo de vida máximo (fail-safe)
+    },
+
+    // ---- Botão de pressão (co-op) ----
+    button: {
+        radius: 26,            // raio da base do botão
+        pressRadius: 30,       // raio em que um player conta como "pisando"
+        baseColor: "#3a2f4a",
+        ringColor: "#8a7fb0",
+        idleColor: "#6bb4db",  // topo solto
+        pressedColor: "#54d98b", // topo pressionado (verde)
+        pulseSpeed: 0.08
+    },
+
+    // ---- Porta/trava do desafio ----
+    // Enquanto o puzzle não é resolvido, o corredor fica TRANCADO (como uma
+    // sala de combate). Resolver = os DOIS botões pressionados ao mesmo tempo.
+    challenge: {
+        holdFrames: 10,        // frames que ambos precisam ficar juntos p/ abrir
+        barrierColor: "#2a2330",
+        barrierGlow: "#e53170"
+    }
+};

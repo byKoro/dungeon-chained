@@ -87,7 +87,7 @@ export class RoomManager {
      */
     enter() {
         const room = this.current;
-        room.populate(this.spawnSystem, this.getFloor());
+        room.populate(this.spawnSystem, this.getFloor(), this.spawnSystem.assets);
         if (room.cleared) this.dungeon.cleared.add(room.key);
         return room;
     }
