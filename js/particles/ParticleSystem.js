@@ -1,6 +1,9 @@
 import { FloorDebris } from './FloorDebris.js';
 import { DustPuff } from './DustPuff.js';
 
+// 1 "pixel" de sangue no mundo (= 1 pixel de tile: tile 16px desenhado a 64px).
+const BLOOD_PX = 4;
+
 class AirParticle {
     constructor(x, y, color, isBlood = false, spread = 1) {
         this.x = x;
@@ -8,8 +11,8 @@ class AirParticle {
         this.color = color;
         this.isBlood = isBlood;
 
-        const pixelSizes = isBlood ? [3, 4, 5] : [3, 4, 6];
-        this.size = pixelSizes[Math.floor(Math.random() * pixelSizes.length)];
+        // Tamanho sempre múltiplo do pixel de arte (1 ou 2 pixels de tile).
+        this.size = BLOOD_PX * (1 + (Math.random() < 0.35 ? 1 : 0));
 
         const angle = Math.random() * Math.PI * 2;
         const speed = ((isBlood ? 3 : 4) + Math.random() * (isBlood ? 8 : 11)) * spread;
@@ -56,7 +59,10 @@ class AirParticle {
     draw(ctx) {
         if (this.settled) return;
         ctx.fillStyle = this.color;
-        ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.size, this.size);
+        // Alinha à grade de pixels de sangue (coerente com os tiles).
+        const x = Math.round(this.x / BLOOD_PX) * BLOOD_PX;
+        const y = Math.round(this.y / BLOOD_PX) * BLOOD_PX;
+        ctx.fillRect(x, y, this.size, this.size);
     }
 }
 
@@ -146,12 +152,20 @@ export class ParticleSystem {
         }
     }
 
-    drawFloor(ctx) {
-        // Sangue de chão (buffer offscreen) primeiro, depois detritos avulsos
+    // 'clip' (opcional) {minX,maxX,minY,maxY}: restringe o sangue de chão à
+    // área jogável, para não aparecer sobre as paredes do cenário.
+    drawFloor(ctx, clip) {
+        ctx.save();
+        if (clip) {
+            ctx.beginPath();
+            ctx.rect(clip.minX, clip.minY, clip.maxX - clip.minX, clip.maxY - clip.minY);
+            ctx.clip();
+        }
         if (this.bloodCanvas) this.bloodCanvas.draw(ctx);
         for (let i = 0; i < this.floorDebris.length; i++) {
             this.floorDebris[i].draw(ctx);
         }
+        ctx.restore();
     }
 
     // Fumaça (poeira de corrida): desenhada na camada de chão, sob as entidades.

@@ -1,0 +1,84 @@
+import { Footprint } from '../particles/Footprint.js';
+import { BLOOD_STEPS, MAX_FOOTPRINTS } from '../config/GameConfig.js';
+
+/**
+ * ParticleEffects — efeitos "de pé" dos jogadores: poeira ao correr/andar e
+ * pegadas (normais ou ensanguentadas).
+ *
+ * Antes `spawnRunSmoke`, `spawnWalkDust` e `handleStep` eram funções soltas no
+ * main.js que liam campos do player e mexiam no pool global de pegadas. Aqui
+ * ficam agrupadas e donas do próprio pool de pegadas.
+ */
+export class ParticleEffects {
+    /**
+     * @param {object} opts
+     * @param {ParticleSystem} opts.particleSystem
+     * @param {BloodCanvas} opts.bloodCanvas
+     */
+    constructor({ particleSystem, bloodCanvas }) {
+        this.particleSystem = particleSystem;
+        this.bloodCanvas = bloodCanvas;
+        this.footprints = [];
+    }
+
+    clear() {
+        this.footprints = [];
+    }
+
+    // Fumaça do arranque (quando o jogador começa a correr).
+    spawnRunSmoke(player) {
+        const mag = Math.hypot(player.vx, player.vy) || 1;
+        const dirX = player.vx / mag, dirY = player.vy / mag;
+        const x = player.x - dirX * 12;
+        const y = player.y + 15 - dirY * 12 * 0.4;
+        this.particleSystem.triggerDust(x, y, dirX, dirY, 11);
+    }
+
+    // Poeirinha contínua ao caminhar (com cooldown por jogador).
+    spawnWalkDust(player) {
+        if (player.walkDustCooldown === undefined) player.walkDustCooldown = 0;
+        if (player.walkDustCooldown > 0) player.walkDustCooldown--;
+        if (player.speedMag < player.speed * 0.25) return;
+        if (player.walkDustCooldown > 0) return;
+        const mag = Math.hypot(player.vx, player.vy) || 1;
+        const dirX = player.vx / mag, dirY = player.vy / mag;
+        const x = player.x - dirX * 11;
+        const y = player.y + 15 - dirY * 11 * 0.4;
+        this.particleSystem.triggerDust(x, y, dirX, dirY, 2);
+        player.walkDustCooldown = player.speedMag > player.speed * 0.6 ? 7 : 12;
+    }
+
+    // Carimba uma pegada quando o jogador dá um passo (sangue se pisou em sangue).
+    handleStep(player) {
+        if (!player.justStepped) return;
+        const x = player.stepX, y = player.stepY, ang = player.stepAngle;
+        if (this.bloodCanvas.isBloodZone(x, y)) player.bloodStepsLeft = BLOOD_STEPS;
+        if (player.bloodStepsLeft > 0) {
+            const intensity = player.bloodStepsLeft / BLOOD_STEPS;
+            this.bloodCanvas.stampFootprint(x, y, ang, intensity);
+            player.bloodStepsLeft--;
+        } else {
+            this.footprints.push(new Footprint(x, y, ang));
+            if (this.footprints.length > MAX_FOOTPRINTS) this.footprints.shift();
+        }
+    }
+
+    // Processa todos os efeitos de pé de um jogador num frame.
+    processPlayer(player) {
+        if (player.justStartedRunning) this.spawnRunSmoke(player);
+        this.spawnWalkDust(player);
+        this.handleStep(player);
+    }
+
+    // Atualiza e descarta pegadas expiradas.
+    update() {
+        for (let i = this.footprints.length - 1; i >= 0; i--) {
+            this.footprints[i].update();
+            if (this.footprints[i].done) this.footprints.splice(i, 1);
+        }
+    }
+
+    draw(ctx) {
+        this.footprints.forEach(f => f.draw(ctx));
+    }
+}

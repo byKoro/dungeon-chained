@@ -55,19 +55,23 @@ export class Renderer {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
 
-        // Screen Shake
+        // Screen shake (em pixels de tela)
+        let shakeX = 0, shakeY = 0;
         if (this.screenShake > 0) {
-            const sx = (Math.random() - 0.5) * this.screenShake;
-            const sy = (Math.random() - 0.5) * this.screenShake;
-            this.ctx.translate(sx, sy);
+            shakeX = (Math.random() - 0.5) * this.screenShake;
+            shakeY = (Math.random() - 0.5) * this.screenShake;
             this.screenShake *= 0.88;
             if (this.screenShake < 0.3) this.screenShake = 0;
         }
 
-        // Câmera: centro da tela -> zoom -> desloca para o ponto (camX, camY).
-        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-        this.ctx.scale(this.zoom, this.zoom);
-        this.ctx.translate(-this.camX, -this.camY);
+        // Câmera via setTransform: um ponto de mundo (wx,wy) vai para a tela em
+        //   screen = wx*zoom + tx   (idem para y)
+        // Arredondamos tx/ty (translação final em TELA) para pixel inteiro,
+        // estabilizando o grid de rasterização e eliminando as costuras finas
+        // entre tiles que aparecem ao mover a câmera (sub-pixel seam).
+        const tx = Math.round(this.canvas.width / 2 - this.camX * this.zoom + shakeX);
+        const ty = Math.round(this.canvas.height / 2 - this.camY * this.zoom + shakeY);
+        this.ctx.setTransform(this.zoom, 0, 0, this.zoom, tx, ty);
     }
 
     endFrame() {
@@ -91,91 +95,216 @@ export class Renderer {
         this.ctx.restore();
     }
 
+    /** Define o tileset usado para desenhar as salas. */
+    setTileset(tileset) {
+        this.tileset = tileset;
+    }
+
     /**
-     * Desenha a sala atual em coordenadas de MUNDO (a câmera já aplicou o
-     * transform em beginFrame).
-     * @param {object} rect   { x, y, w, h } retângulo total da célula
-     * @param {object} bounds { minX, maxX, minY, maxY } área jogável (interna)
-     * @param {Array}  doors  [{ dir, x, y }] portas da sala
-     * @param {number} doorHalf meia-largura do vão da porta
-     * @param {boolean} doorsOpen portas abertas (sala limpa) ou fechadas
-     * @param {Array}  boxes  obstáculos (opcional)
+     * Preenche toda a área visível (mundo) com um tile de fundo. Usado para o
+     * "vazio" fora da sala não ficar preto. Deve ser chamado dentro do
+     * beginFrame/endFrame (usa o transform da câmera).
      */
-    drawRoom(rect, bounds, doors, doorHalf, doorsOpen, boxes = []) {
+    drawBackground(tileIndex, tile) {
+        if (!this.tileset || !this.tileset.ready) return;
+        // Cantos da viewport em coordenadas de mundo (com folga p/ o shake).
+        const tl = this.screenToWorld(-tile, -tile);
+        const br = this.screenToWorld(this.canvas.width + tile, this.canvas.height + tile);
+        const x0 = Math.floor(tl.x / tile) * tile;
+        const y0 = Math.floor(tl.y / tile) * tile;
+        for (let y = y0; y < br.y; y += tile) {
+            for (let x = x0; x < br.x; x += tile) {
+                this.tileset.draw(this.ctx, tileIndex, x, y, tile, tile);
+            }
+        }
+    }
+
+    /**
+     * Desenha a sala atual (tiles chunky) em coordenadas de MUNDO.
+     * @param {object} rect     { x, y, w, h } retângulo total da célula
+     * @param {object} bounds   { minX,maxX,minY,maxY } área jogável (fallback)
+     * @param {RoomTiles} tiles mapa de tiles da sala (floor[][] + props[])
+     * @param {number} tile     tamanho do tile no mundo (px)
+     * @param {boolean} doorsOpen portas abertas (só para o realce visual)
+     * @param {Array} doors     [{dir,x,y}] para realçar batente aberto/fechado
+     * @param {number} doorHalf meia-largura do vão (para o realce)
+     * @param {Array} boxes     obstáculos
+     */
+    drawRoom(rect, bounds, tiles, tile, doorsOpen, doors = [], doorHalf = 48) {
         const c = this.ctx;
-        const wallColor = "#0a0910";
-        const floorColor = "#15141f";
 
-        // Piso da área jogável
-        c.fillStyle = floorColor;
-        c.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-
-        // Grade do chão
-        c.strokeStyle = "#1e1d2d";
-        c.lineWidth = 2;
-        for (let x = bounds.minX; x <= bounds.maxX; x += 40) {
-            c.beginPath(); c.moveTo(x, bounds.minY); c.lineTo(x, bounds.maxY); c.stroke();
-        }
-        for (let y = bounds.minY; y <= bounds.maxY; y += 40) {
-            c.beginPath(); c.moveTo(bounds.minX, y); c.lineTo(bounds.maxX, y); c.stroke();
+        // Fallback simples caso o tileset ainda não tenha carregado
+        if (!this.tileset || !this.tileset.ready || !tiles) {
+            c.fillStyle = "#15141f";
+            c.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+            c.fillStyle = "#0a0910";
+            c.fillRect(rect.x, rect.y, rect.w, bounds.minY - rect.y);
+            c.fillRect(rect.x, bounds.maxY, rect.w, rect.y + rect.h - bounds.maxY);
+            c.fillRect(rect.x, rect.y, bounds.minX - rect.x, rect.h);
+            c.fillRect(bounds.maxX, rect.y, rect.x + rect.w - bounds.maxX, rect.h);
+            return;
         }
 
-        // Paredes (moldura). Desenhamos as 4 barras ao redor da área jogável.
-        c.fillStyle = wallColor;
-        // topo e base
-        c.fillRect(rect.x, rect.y, rect.w, bounds.minY - rect.y);
-        c.fillRect(rect.x, bounds.maxY, rect.w, rect.y + rect.h - bounds.maxY);
-        // esquerda e direita
-        c.fillRect(rect.x, rect.y, bounds.minX - rect.x, rect.h);
-        c.fillRect(bounds.maxX, rect.y, rect.x + rect.w - bounds.maxX, rect.h);
+        // Desenha a grade de tiles (piso + moldura de parede + portas)
+        for (let r = 0; r < tiles.rows; r++) {
+            for (let col = 0; col < tiles.cols; col++) {
+                const idx = tiles.floor[r][col];
+                const dx = rect.x + col * tile;
+                const dy = rect.y + r * tile;
+                this.tileset.draw(c, idx, dx, dy, tile, tile);
+            }
+        }
 
-        // Vãos das portas: abre um "buraco" na parede pintando o piso no vão.
+        // Props decorativos (encostados nas paredes)
+        for (const p of tiles.props) {
+            const dx = rect.x + p.col * tile;
+            const dy = rect.y + p.row * tile;
+            this.tileset.draw(c, p.index, dx, dy, tile, tile);
+        }
+
+        if (!doorsOpen && tiles.doorCells) {
+            // Portas FECHADAS (sala trancada): desenha o tile de porta no vão.
+            for (const d of tiles.doorCells) {
+                const dx = rect.x + d.col * tile;
+                const dy = rect.y + d.row * tile;
+                this.tileset.draw(c, d.index, dx, dy, tile, tile);
+            }
+        }
+        // O gradiente das portas abertas é desenhado DEPOIS dos stubs de
+        // corredor (ver drawDoorGradients, chamado pelo main.js).
+    }
+
+    // Público: gradiente das portas abertas (chamado após os stubs de corredor).
+    drawDoorGradients(doors, doorHalf, tile, stubTiles = 0) {
+        this._drawDoorGradients(doors, doorHalf, tile, stubTiles);
+    }
+
+    /**
+     * Desenha "stubs" de corredor: tiles de piso projetados para FORA de cada
+     * porta aberta, estendendo o chão da passagem alguns tiles para dentro do
+     * corredor. Deve ser chamado logo após a sala (antes do gradiente).
+     * @param stubTiles quantos tiles de piso projetar para fora
+     * @param floorIdx índice do tile de piso a usar
+     */
+    drawDoorStubs(rect, doors, tile, doorHalf, stubTiles = 2, floorIdx = 17) {
+        if (!this.tileset || !this.tileset.ready) return;
+        const ctx = this.ctx;
         for (const d of doors) {
-            c.fillStyle = floorColor;
-            if (d.dir === "N" || d.dir === "S") {
-                const y0 = d.dir === "N" ? rect.y : bounds.maxY;
-                c.fillRect(d.x - doorHalf, y0, doorHalf * 2, this.wallSizeY(rect, bounds, d.dir));
-            } else {
-                const x0 = d.dir === "W" ? rect.x : bounds.maxX;
-                c.fillRect(x0, d.y - doorHalf, this.wallSizeX(rect, bounds, d.dir), doorHalf * 2);
+            // nº de tiles de piso que cabem na largura do vão (2 tiles)
+            const across = Math.round((doorHalf * 2) / tile);
+            for (let s = 1; s <= stubTiles; s++) {
+                for (let k = 0; k < across; k++) {
+                    let dx, dy;
+                    if (d.dir === "N") {
+                        dx = d.x - doorHalf + k * tile;
+                        dy = d.y - s * tile;
+                    } else if (d.dir === "S") {
+                        dx = d.x - doorHalf + k * tile;
+                        dy = d.y + (s - 1) * tile;
+                    } else if (d.dir === "W") {
+                        dx = d.x - s * tile;
+                        dy = d.y - doorHalf + k * tile;
+                    } else { // E
+                        dx = d.x + (s - 1) * tile;
+                        dy = d.y - doorHalf + k * tile;
+                    }
+                    this.tileset.draw(ctx, floorIdx, dx, dy, tile, tile);
+                }
             }
+        }
+    }
 
-            // Batente da porta (fechada = vermelho, aberta = ciano)
-            c.fillStyle = doorsOpen ? "#00ebc7" : "#e5484d";
-            const t = 6;
-            if (d.dir === "N" || d.dir === "S") {
-                c.fillRect(d.x - doorHalf, d.y - t / 2, doorHalf * 2, t);
-            } else {
-                c.fillRect(d.x - t / 2, d.y - doorHalf, t, doorHalf * 2);
+    /**
+     * Redesenha a PAREDE FRONTAL (fileira inferior de tiles) por cima das
+     * entidades, para que quem encosta nela fique "atrás" da parede.
+     * Deve ser chamado depois de desenhar players/inimigos.
+     */
+    drawFrontWall(rect, tiles, tile, doorsOpen, doors = [], doorHalf = 64, stubTiles = 0) {
+        if (!this.tileset || !this.tileset.ready || !tiles) return;
+        const r = tiles.rows - 1;
+
+        // Colunas do vão da porta Sul (fileira inferior). Quando a sala está
+        // ABERTA, essas células são PASSAGEM: não as redesenhamos por cima do
+        // jogador (senão o piso do vão cobriria quem está entrando).
+        const southDoorCols = new Set();
+        if (doorsOpen && tiles.doorCells) {
+            for (const d of tiles.doorCells) {
+                if (d.row === r) southDoorCols.add(d.col);
             }
         }
 
-        // Contorno interno da área jogável
-        c.strokeStyle = "#2d2a3e";
-        c.lineWidth = 4;
-        c.strokeRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+        for (let col = 0; col < tiles.cols; col++) {
+            if (southDoorCols.has(col)) continue; // pula o vão aberto
+            const idx = tiles.floor[r][col];
+            const dx = rect.x + col * tile;
+            const dy = rect.y + r * tile;
+            this.tileset.draw(this.ctx, idx, dx, dy, tile, tile);
+        }
 
-        // Caixas
-        boxes.forEach(b => {
-            this.drawRoundShadow(b.x + b.w / 2, b.y + b.h / 2, 22, 0);
-            c.fillStyle = "#4a3c2c";
-            c.fillRect(b.x, b.y, b.w, b.h);
-            c.strokeStyle = "#282016";
-            c.lineWidth = 3;
-            c.strokeRect(b.x, b.y, b.w, b.h);
-            c.beginPath();
-            c.moveTo(b.x, b.y); c.lineTo(b.x + b.w, b.y + b.h);
-            c.moveTo(b.x + b.w, b.y); c.lineTo(b.x, b.y + b.h);
-            c.stroke();
-        });
+        if (!doorsOpen && tiles.doorCells) {
+            // Porta FECHADA da base por cima.
+            for (const d of tiles.doorCells) {
+                if (d.row === r) {
+                    this.tileset.draw(this.ctx, d.index, rect.x + d.col * tile, rect.y + d.row * tile, tile, tile);
+                }
+            }
+        } else if (doorsOpen) {
+            // Porta S ABERTA: a parede frontal taparia o gradiente do corredor
+            // Sul. Redesenhamos SÓ o gradiente (escuro) por cima — o stub de
+            // piso NÃO é redesenhado, para não cobrir os jogadores que estão
+            // no corredor (o piso fica atrás deles, como deve ser).
+            const south = doors.find(d => d.dir === "S");
+            if (south) this._drawDoorGradients([south], doorHalf, tile, stubTiles);
+        }
     }
 
-    // Espessura da parede no eixo vertical para o vão N/S
-    wallSizeY(rect, bounds, dir) {
-        return dir === "N" ? (bounds.minY - rect.y) : (rect.y + rect.h - bounds.maxY);
-    }
-    // Espessura da parede no eixo horizontal para o vão E/W
-    wallSizeX(rect, bounds, dir) {
-        return dir === "W" ? (bounds.minX - rect.x) : (rect.x + rect.w - bounds.maxX);
+    // Gradiente de entrada em cada porta aberta: da borda interna (transparente)
+    // para fora da sala (cor escura), sugerindo a passagem escura adiante.
+    _drawDoorGradients(doors, doorHalf, wallDepth, stubTiles = 0) {
+        const c = this.ctx;
+        // Cor do fundo (tile 78 ≈ rgb(37,19,26)). O gradiente representa um
+        // CORREDOR escuro atrás da parede: começa transparente na borda interna
+        // (o chão aparece) e escurece atravessando a parede para fora. Não
+        // invade o piso jogável; apenas a faixa da parede/vão.
+        const dark = "rgba(37, 19, 26, 1)";
+        const clear = "rgba(37, 19, 26, 0)";
+        // O caminho escuro vai da borda interna PARA FORA (afundando no
+        // corredor), cobrindo também os stubs de piso projetados. Não invade o
+        // piso jogável da sala.
+        const depth = wallDepth * 2.5 + stubTiles * wallDepth;
+        for (const d of doors) {
+            c.save();
+            let grad;
+            if (d.dir === "N") {
+                grad = c.createLinearGradient(0, d.y, 0, d.y - depth);
+                grad.addColorStop(0, clear);
+                grad.addColorStop(0.35, dark);
+                grad.addColorStop(1, dark);
+                c.fillStyle = grad;
+                c.fillRect(d.x - doorHalf, d.y - depth, doorHalf * 2, depth);
+            } else if (d.dir === "S") {
+                grad = c.createLinearGradient(0, d.y, 0, d.y + depth);
+                grad.addColorStop(0, clear);
+                grad.addColorStop(0.35, dark);
+                grad.addColorStop(1, dark);
+                c.fillStyle = grad;
+                c.fillRect(d.x - doorHalf, d.y, doorHalf * 2, depth);
+            } else if (d.dir === "W") {
+                grad = c.createLinearGradient(d.x, 0, d.x - depth, 0);
+                grad.addColorStop(0, clear);
+                grad.addColorStop(0.35, dark);
+                grad.addColorStop(1, dark);
+                c.fillStyle = grad;
+                c.fillRect(d.x - depth, d.y - doorHalf, depth, doorHalf * 2);
+            } else if (d.dir === "E") {
+                grad = c.createLinearGradient(d.x, 0, d.x + depth, 0);
+                grad.addColorStop(0, clear);
+                grad.addColorStop(0.35, dark);
+                grad.addColorStop(1, dark);
+                c.fillStyle = grad;
+                c.fillRect(d.x, d.y - doorHalf, depth, doorHalf * 2);
+            }
+            c.restore();
+        }
     }
 }

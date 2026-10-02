@@ -174,9 +174,9 @@ export class Player extends Entity {
             this.stepDist = 0;
         }
 
-        // Limites da arena
-        this.x = Math.max(bounds.minX + this.hitRadius, Math.min(bounds.maxX - this.hitRadius, this.x));
-        this.y = Math.max(bounds.minY + this.hitRadius, Math.min(bounds.maxY - this.hitRadius, this.y));
+        // Nota: o clamp aos limites da sala é feito no main.js
+        // (clampPlayerWithDoors), que conhece os vãos das portas e permite o
+        // jogador adentrá-los. Por isso NÃO prendemos aos bounds aqui.
     }
 
     draw(ctx) {

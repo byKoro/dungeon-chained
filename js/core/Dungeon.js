@@ -14,13 +14,19 @@ import { DungeonGraph } from './DungeonGraph.js';
  */
 export class Dungeon {
     constructor(opts = {}) {
-        // Tamanho de cada célula no mundo (px). Salas ocupam a tela ~inteira.
-        this.cellW = opts.cellW ?? 1100;
-        this.cellH = opts.cellH ?? 680;
-        // Espessura da "parede" (margem não-jogável dentro da célula).
-        this.wall = opts.wall ?? 70;
-        // Meia-largura da abertura da porta (vão livre).
-        this.doorHalf = opts.doorHalf ?? 70;
+        // Tiles chunky: cada célula é uma grade de tiles grandes.
+        this.tile = opts.tile ?? 64;         // tamanho do tile no mundo (px)
+        this.roomCols = opts.roomCols ?? 13; // tiles na largura da sala
+        this.roomRows = opts.roomRows ?? 9;  // tiles na altura da sala
+
+        // Tamanho de cada célula no mundo, derivado da grade de tiles.
+        this.cellW = this.roomCols * this.tile;
+        this.cellH = this.roomRows * this.tile;
+        // Parede = 1 tile de espessura.
+        this.wall = this.tile;
+        // Vão da porta: meia-largura = 1 tile (o vão tem 2 tiles de largura,
+        // exatamente os 2 tiles de porta desenhados).
+        this.doorHalf = opts.doorHalf ?? this.tile;
 
         this.graph = new DungeonGraph(opts).generate();
 
@@ -89,13 +95,18 @@ export class Dungeon {
         const cell = this.graph.cells.get(this._key(gx, gy));
         if (!cell) return [];
         const b = this.cellBounds(gx, gy);
-        const cx = gx * this.cellW + this.cellW / 2;
-        const cy = gy * this.cellH + this.cellH / 2;
+        const x0 = gx * this.cellW, y0 = gy * this.cellH;
+        // Alinha o centro do vão com o par de tiles de porta (2 tiles).
+        // N/S: colunas midC-1 e midC => centro em midC*tile. E/W idem nas linhas.
+        const midC = (this.roomCols / 2) | 0;
+        const midR = (this.roomRows / 2) | 0;
+        const doorCx = x0 + midC * this.tile;
+        const doorCy = y0 + midR * this.tile;
         const out = [];
-        if (cell.doors.N) out.push({ dir: "N", x: cx, y: b.minY, gx, gy: gy - 1 });
-        if (cell.doors.S) out.push({ dir: "S", x: cx, y: b.maxY, gx, gy: gy + 1 });
-        if (cell.doors.E) out.push({ dir: "E", x: b.maxX, y: cy, gx: gx + 1, gy });
-        if (cell.doors.W) out.push({ dir: "W", x: b.minX, y: cy, gx: gx - 1, gy });
+        if (cell.doors.N) out.push({ dir: "N", x: doorCx, y: b.minY, gx, gy: gy - 1 });
+        if (cell.doors.S) out.push({ dir: "S", x: doorCx, y: b.maxY, gx, gy: gy + 1 });
+        if (cell.doors.E) out.push({ dir: "E", x: b.maxX, y: doorCy, gx: gx + 1, gy });
+        if (cell.doors.W) out.push({ dir: "W", x: b.minX, y: doorCy, gx: gx - 1, gy });
         return out;
     }
 

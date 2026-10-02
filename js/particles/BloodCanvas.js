@@ -11,9 +11,13 @@
  * redor, todos com cores amostradas de assets/particles/blood.png.
  */
 export class BloodCanvas {
-    constructor(width, height, palette = null) {
+    constructor(width, height, palette = null, pixel = 4) {
         this.width = width;
         this.height = height;
+
+        // Tamanho de 1 "pixel" de sangue no mundo. Deve bater com 1 pixel de
+        // tile do cenário (tile 16px desenhado a 64px => 4px por pixel de arte).
+        this.px = pixel;
 
         this.canvas = document.createElement("canvas");
         this.canvas.width = width;
@@ -63,22 +67,25 @@ export class BloodCanvas {
     // Carimba uma pegada de sangue pixelada (fixa) no buffer, orientada por
     // 'angle' (direção do passo). 'intensity' 0..1 controla o tamanho/opacidade
     // (vai diminuindo a cada passo até "secar").
+    // Alinha um valor à grade de pixels de sangue.
+    _snap(v) { return Math.round(v / this.px) * this.px; }
+
     stampFootprint(x, y, angle, intensity = 1) {
         const ctx = this.ctx;
-        const px = 2;
-        const len = (2.5 + 2 * intensity); // comprimento da pegada (menor)
-        const wid = (1.5 + 1 * intensity); // largura (menor)
+        const px = this.px;
+        const len = px * (2 + Math.round(2 * intensity)); // em pixels de arte
+        const wid = px * (1 + Math.round(1 * intensity));
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(angle);
         ctx.globalAlpha = 0.5 + 0.5 * intensity;
-        // Elipse pixelada simples (sola do pé)
+        // Elipse pixelada (sola do pé), blocos alinhados à grade
         for (let yy = -wid; yy <= wid; yy += px) {
             for (let xx = -len; xx <= len; xx += px) {
                 const nx = xx / len, ny = yy / wid;
                 if (nx * nx + ny * ny <= 1 && Math.random() < 0.85) {
                     ctx.fillStyle = this._color();
-                    ctx.fillRect(Math.round(xx), Math.round(yy), px, px);
+                    ctx.fillRect(this._snap(xx), this._snap(yy), px, px);
                 }
             }
         }
@@ -95,8 +102,9 @@ export class BloodCanvas {
      * @param {number} px tamanho do "pixel"/bloco
      * @param {number} density 0..1 chance de preencher cada bloco (buracos)
      */
-    stampBlob(cx, cy, rx, ry, px = 3, density = 0.92) {
+    stampBlob(cx, cy, rx, ry, px = this.px, density = 0.92) {
         const ctx = this.ctx;
+        // Alinha a varredura à grade de pixels de sangue.
         const x0 = Math.floor((cx - rx) / px) * px;
         const y0 = Math.floor((cy - ry) / px) * px;
         const x1 = Math.ceil((cx + rx) / px) * px;
@@ -128,16 +136,16 @@ export class BloodCanvas {
      * Espalha "quadriculados" (blocos soltos) em volta de um ponto, para dar
      * o aspecto de respingo sujo.
      */
-    stampSpecks(cx, cy, spread, count, px = 3) {
+    stampSpecks(cx, cy, spread, count, px = this.px) {
         const ctx = this.ctx;
         for (let i = 0; i < count; i++) {
             const a = Math.random() * Math.PI * 2;
             const r = Math.random() * spread;
             const bx = Math.round((cx + Math.cos(a) * r) / px) * px;
             const by = Math.round((cy + Math.sin(a) * r) / px) * px;
-            const size = px * (1 + (Math.random() < 0.3 ? 1 : 0)); // alguns 2x
+            // Sempre 1 pixel de arte (coerente com os tiles)
             ctx.fillStyle = this._color();
-            ctx.fillRect(bx, by, size, size);
+            ctx.fillRect(bx, by, px, px);
         }
     }
 
@@ -145,11 +153,10 @@ export class BloodCanvas {
      * Respingo (ao ferir/receber dano): uma mancha central pequena + specks.
      */
     stampSplat(x, y, scale = 1) {
-        const px = 3;
         const rx = (6 + Math.random() * 6) * scale;
         const ry = (4 + Math.random() * 5) * scale;
-        this.stampBlob(x, y, rx, ry, px, 0.9);
-        this.stampSpecks(x, y, (18 + Math.random() * 14) * scale, 8 + ((Math.random() * 8) | 0), px);
+        this.stampBlob(x, y, rx, ry, this.px, 0.9);
+        this.stampSpecks(x, y, (18 + Math.random() * 14) * scale, 8 + ((Math.random() * 8) | 0), this.px);
         // Zona molhada (para pegadas): raio aproximado da mancha central
         this.addZone(x, y, Math.max(rx, ry) + 3);
     }
@@ -159,17 +166,16 @@ export class BloodCanvas {
      * formando uma geometria maior e mais complexa.
      */
     stampPool(x, y, scale = 1) {
-        const px = 3;
         const blobs = 4 + ((Math.random() * 4) | 0);
         for (let i = 0; i < blobs; i++) {
             const ox = (Math.random() - 0.5) * 22 * scale;
             const oy = (Math.random() - 0.5) * 14 * scale;
             const rx = (10 + Math.random() * 12) * scale;
             const ry = (7 + Math.random() * 8) * scale;
-            this.stampBlob(x + ox, y + oy, rx, ry, px, 0.94);
+            this.stampBlob(x + ox, y + oy, rx, ry, this.px, 0.94);
         }
         // Respingos ao redor da poça
-        this.stampSpecks(x, y, 40 * scale, 20 + ((Math.random() * 16) | 0), px);
+        this.stampSpecks(x, y, 40 * scale, 20 + ((Math.random() * 16) | 0), this.px);
         // Zona molhada da poça (maior)
         this.addZone(x, y, 26 * scale);
     }

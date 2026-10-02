@@ -5,38 +5,51 @@
     padding: 0;
 }
 
-body {
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
     background-color: #0f0e17;
     color: #fffffe;
     font-family: 'Courier New', Courier, monospace;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    overflow: hidden;
 }
 
+/* O canvas ocupa a tela inteira, sem janela/borda. */
+#gameCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    background-color: #0a0910;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* HUD sobreposto ao topo do jogo. */
 #ui-bar {
-    width: 1280px;
-    max-width: 95vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #1f1d2b;
-    padding: 10px 20px;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    border: 2px solid #332f4c;
-    border-bottom: none;
+    gap: 12px;
+    background: rgba(20, 18, 30, 0.72);
+    padding: 8px 18px;
+    pointer-events: none; /* deixa o clique passar, exceto nos botões */
 }
 
 .hud-item {
     font-size: 16px;
     font-weight: bold;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .btn {
+    pointer-events: auto; /* botões continuam clicáveis */
     background: #e53170;
     color: #fff;
     border: 2px solid #a81c4e;
@@ -57,18 +70,16 @@ body {
     transform: scale(0.95);
 }
 
-#gameCanvas {
-    background-color: #1a1824;
-    border: 3px solid #332f4c;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
-    max-width: 95vw;
-    max-height: calc(95vw * (9 / 16));
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-}
-
+/* Instruções sobrepostas na base. */
 #instructions {
-    margin-top: 8px;
+    position: fixed;
+    bottom: 6px;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    text-align: center;
     font-size: 13px;
     color: #a7a9be;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
 }
