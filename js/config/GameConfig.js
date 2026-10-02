@@ -126,6 +126,49 @@ export const TORCHES = {
 };
 
 /**
+ * WIND — poeira/vento ambiente que atravessa a cena, dando um aspecto vivo de
+ * ventania. Partículas finas (script) que cruzam a viewport na direção do
+ * vento, com rajadas que variam a intensidade e a direção devagar.
+ *
+ * Por padrão as partículas são desenhadas no MUNDO, ANTES da iluminação, então
+ * a luz das tochas/jogadores "revela" a poeira (mais atmosférico). Para vê-las
+ * na tela toda (inclusive no escuro), use layer: "screen".
+ */
+export const WIND = {
+    enabled: true,
+    count: 60,              // nº de partículas no pool (discreto)
+    layer: "world",         // "world" (revelada pela luz) ou "screen" (tela toda)
+
+    // Direção e força do vento (vetor base, px/frame no MUNDO).
+    speed: 2.6,             // velocidade base ao longo do vento
+    angle: 0.15,            // direção em radianos (0 = p/ direita; ~0.15 = leve diagonal)
+    angleDrift: 0.0025,     // o quanto o ângulo oscila devagar (0 = direção fixa)
+    angleDriftRange: 0.5,   // amplitude máx. do desvio de direção (radianos)
+
+    // Rajadas: a intensidade do vento oscila entre calmo e forte.
+    gustSpeed: 0.012,       // velocidade da oscilação de rajada
+    gustMin: 0.45,          // multiplicador de velocidade no vento calmo
+    gustMax: 1.35,          // multiplicador no auge da rajada
+
+    // Movimento individual das partículas.
+    sway: 0.6,              // deriva perpendicular (balanço) — evita linhas retas
+    swaySpeed: 0.05,        // frequência do balanço
+    speedVariation: 0.5,    // variação de velocidade entre partículas (0..1)
+
+    // Aparência (pixel art discreta).
+    color: "200, 195, 180", // poeira clara dessaturada (RGB)
+    alphaMin: 0.06,         // opacidade mínima (bem sutil)
+    alphaMax: 0.22,         // opacidade máxima
+    sizeMin: 2,             // tamanho em "pixels de arte" (menor)
+    sizeMax: 4,             // tamanho máximo
+    streak: 2.2,            // comprimento do rastro (múltiplo do tamanho; 1 = sem rastro)
+
+    // Área de emissão: margem (em px de MUNDO) além da sala, para as partículas
+    // entrarem/saírem fora de vista em vez de "nascer" na tela.
+    margin: 120
+};
+
+/**
  * POST_PROCESSING — todos os parâmetros de ajuste fino do PostProcessor.
  * Centralizado aqui para calibrar o visual sem abrir o código do sistema.
  */

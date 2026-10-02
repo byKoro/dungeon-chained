@@ -16,12 +16,13 @@ import { ParticleEffects } from './systems/ParticleEffects.js';
 import { CombatSystem } from './combat/CombatSystem.js';
 import { RoomManager } from './rooms/RoomManager.js';
 import { PostProcessor } from './systems/PostProcessor.js';
+import { WindSystem } from './systems/WindSystem.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
-    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES
+    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND
 } from './config/GameConfig.js';
 
 /**
@@ -63,6 +64,9 @@ export class Game {
 
         // Pós-processamento de tela (vinheta de masmorra).
         this.postProcessor = new PostProcessor(canvas, this.ctx);
+
+        // Poeira/vento ambiente (atmosfera viva).
+        this.wind = new WindSystem();
 
         // Sangue cobre o mundo inteiro
         this.bloodCanvas = new BloodCanvas(WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL);
@@ -225,6 +229,7 @@ export class Game {
         } else if (this.transition.phase === "in" && this.transition.t >= 1) {
             this.transition = null;
         }
+        this.wind.update(this.arenaBounds); // poeira continua viva durante o fade
         this._updateCameraToCurrentRoom();
         this.updateHud();
     }
@@ -278,6 +283,7 @@ export class Game {
         rooms.tryClearCurrent();
 
         this.particleSystem.update([p1, p2], this.arenaBounds);
+        this.wind.update(this.arenaBounds);
 
         if (p1.lives <= 0 || p2.lives <= 0) this.gameOver = true;
 
@@ -349,6 +355,10 @@ export class Game {
         this.gibs.forEach(g => g.draw(ctx));
         this.particleSystem.drawAir(ctx);
 
+        // Poeira/vento no MUNDO (dentro do clip). Como a iluminação é aplicada
+        // depois do endFrame, a luz das tochas/jogadores "revela" a poeira.
+        if (WIND.layer === "world") this.wind.draw(ctx);
+
         ctx.restore(); // fim do clip da sala
         renderer.endFrame();
 
@@ -387,6 +397,10 @@ export class Game {
         }
 
         this.postProcessor.draw();
+
+        // Poeira/vento em espaço de TELA (visível na cena toda, inclusive no
+        // escuro). Só quando WIND.layer === "screen".
+        if (WIND.layer === "screen") this.wind.drawScreen(ctx, (x, y) => renderer.worldToScreen(x, y));
 
         this._renderOverlays();
     }
