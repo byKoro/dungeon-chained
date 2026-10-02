@@ -162,7 +162,8 @@ function newDungeon() {
     p1.x = center.x - 30; p1.y = center.y; p1.vx = 0; p1.vy = 0;
     p2.x = center.x + 30; p2.y = center.y; p2.vx = 0; p2.vy = 0;
     challengeTraps = [];
-    const laneCenters = [330, 550, 770];
+    // Quatro espinhos no centro de cada passarela (azul em y=330, vermelha em y=470).
+    const laneCenters = [300, 470, 640, 800];
     for (let row = 0; row < 2; row++) {
         for (const x of laneCenters) challengeTraps.push({ x: challengeOffsetX + x, y: challengeOffsetY + (row === 0 ? 330 : 470), phase: row * Math.PI + (laneCenters.indexOf(x) % 2) * Math.PI });
     }
@@ -317,11 +318,31 @@ function clampToRoomAndDoors(entity, bounds) {
 }
 
 function keepOnColorLane(player, laneY) {
-    const half = CHALLENGE.laneW / 2;
-    // Duas passarelas paralelas: cada jogador fica preso à sua faixa.
-    const centerY = laneY;
-    player.y = Math.max(centerY - half + player.hitRadius, Math.min(centerY + half - player.hitRadius, player.y));
+    // A faixa é escolhida pela cor; o jogador também pode andar no chão lateral.
+    player.challengeLaneY = laneY;
     player.x = Math.max(challengeOffsetX + CHALLENGE.minX + player.hitRadius, Math.min(challengeOffsetX + CHALLENGE.maxX - player.hitRadius, player.x));
+}
+
+function onChallengeFloor(player) {
+    const x = player.x - challengeOffsetX;
+    const y = player.y - challengeOffsetY;
+    const shoreWidth = TILE * 4;
+    if (x < CHALLENGE.minX + shoreWidth || x > CHALLENGE.maxX - shoreWidth) return true;
+    const laneHalf = CHALLENGE.laneW / 2;
+    return Math.abs(y - player.challengeLaneY) <= laneHalf - player.hitRadius * 0.35;
+}
+
+function handleChallengeFall(player) {
+    if (onChallengeFloor(player)) return;
+    const b = arenaBounds;
+    const leftShore = challengeOffsetX + CHALLENGE.minX + TILE * 2;
+    const rightShore = challengeOffsetX + CHALLENGE.maxX - TILE * 2;
+    const landingX = player.x < challengeOffsetX + 550 ? leftShore : rightShore;
+    player.takeDamage(player.x, player.y - 1);
+    player.x = landingX;
+    player.y = Math.max(b.minY + player.hitRadius, Math.min(b.maxY - player.hitRadius, player.y));
+    player.vx = 0;
+    player.vy = 0;
 }
 
 function updateChallenge() {
@@ -391,6 +412,10 @@ function gameLoop() {
         // Corrente elástica + teto rígido de afastamento
         Physics.applyChainConstraint(p1, p2);
         enforceSeparationLimit();
+        if (dungeon.current.type === "challenge") {
+            handleChallengeFall(p1);
+            handleChallengeFall(p2);
+        }
 
         const state = roomStates.get(dungeon.currentKey);
         const boxes = state ? state.boxes : [];
@@ -461,7 +486,7 @@ function gameLoop() {
 
         // Transição por porta: só quando a sala está aberta (limpa/corredor) e
         // os DOIS players estão sobre o vão de uma porta.
-        if (!roomLocked() && dungeon.current.type !== "challenge") {
+        if (!roomLocked()) {
             const doors = dungeon.doorsOfCurrent();
             for (const door of doors) {
                 if (playersAtDoor(door)) { transitionThroughDoor(door); break; }
@@ -490,18 +515,20 @@ function gameLoop() {
     if (dungeon.current.type === "challenge") {
         const c = ctx;
         c.save(); c.translate(challengeOffsetX, challengeOffsetY);
-        c.fillStyle = "#11131b";
+        c.fillStyle = "#050508";
         c.fillRect(70, 70, 960, 540);
-        // Corredores laterais entre os emissores e as duas passarelas.
-        c.fillStyle = "#321c25"; c.fillRect(70, 70, 960, 150); c.fillRect(70, 460, 960, 150);
-        c.fillStyle = "#285b8e"; c.fillRect(70, 300, 960, 60);
-        c.fillStyle = "#98433f"; c.fillRect(70, 440, 960, 60);
-        c.strokeStyle = "#6bb4db"; c.lineWidth = 3; c.strokeRect(70, 300, 960, 60);
-        c.strokeStyle = "#ff6b64"; c.strokeRect(70, 440, 960, 60);
+        // Chão firme de quatro tiles nas laterais; as passarelas param nesse chão.
+        c.fillStyle = "#393944";
+        c.fillRect(70, 70, TILE * 4, 540);
+        c.fillRect(1030 - TILE * 4, 70, TILE * 4, 540);
+        c.fillStyle = "#285b8e"; c.fillRect(230, 300, 640, 60);
+        c.fillStyle = "#98433f"; c.fillRect(230, 440, 640, 60);
+        c.strokeStyle = "#6bb4db"; c.lineWidth = 3; c.strokeRect(230, 300, 640, 60);
+        c.strokeStyle = "#ff6b64"; c.strokeRect(230, 440, 640, 60);
         challengeTraps.forEach(t => {
             const img = spikeFrames[t.frame ?? 0];
-            if (img.complete && img.naturalWidth) c.drawImage(img, t.x - challengeOffsetX - 38, t.y - challengeOffsetY - 30, 76, 60);
-            else { c.fillStyle = t.raised ? "#d8e1e8" : "#515966"; c.fillRect(t.x - challengeOffsetX - 30, t.y - challengeOffsetY - 12, 60, 24); }
+            if (img.complete && img.naturalWidth) c.drawImage(img, t.x - challengeOffsetX - 30, t.y - challengeOffsetY - 28, 60, 56);
+            else { c.fillStyle = t.raised ? "#d8e1e8" : "#515966"; c.fillRect(t.x - challengeOffsetX - 28, t.y - challengeOffsetY - 12, 56, 24); }
         });
         challengeArrows.forEach(a => {
             c.save(); c.translate(a.x - challengeOffsetX, a.y - challengeOffsetY); if (a.direction < 0) c.rotate(Math.PI);
