@@ -151,33 +151,6 @@ export class DungeonGraph {
         }
     }
 
-    /**
-     * Marca corredores RETOS (exatamente 2 portas opostas: N+S ou E+W) como
-     * corredores-desafio. Cada um recebe `challenge: true` e um `challengeIndex`
-     * (qual layout usar, ciclando entre os 3). Determinístico pela RNG.
-     */
-    _markChallenges(cells) {
-        const straight = [];
-        for (const cell of cells.values()) {
-            if (cell.kind !== "corridor") continue;
-            const d = cell.doors;
-            const ns = d.N && d.S && !d.E && !d.W;
-            const ew = d.E && d.W && !d.N && !d.S;
-            if (ns || ew) straight.push(cell);
-        }
-        // Embaralha de forma determinística e marca uma fração deles.
-        for (let i = straight.length - 1; i > 0; i--) {
-            const j = this._rand(i + 1);
-            [straight[i], straight[j]] = [straight[j], straight[i]];
-        }
-        // Converte ~metade dos corredores retos em desafios (ao menos 1 se houver).
-        const target = Math.max(straight.length > 0 ? 1 : 0, Math.ceil(straight.length * 0.5));
-        for (let i = 0; i < target && i < straight.length; i++) {
-            straight[i].challenge = true;
-            straight[i].challengeIndex = i;
-        }
-    }
-
     /** Calcula as portas de cada célula: abre para todo vizinho ocupado. */
     _computeDoors(cells) {
         for (const cell of cells.values()) {
@@ -207,9 +180,9 @@ export class DungeonGraph {
         // Calcula portas (conexões entre células vizinhas)
         this._computeDoors(cells);
 
-        // Marca alguns corredores RETOS (passagem limpa de 2 portas opostas)
-        // como "desafio": recebem perigos + botões co-op. Determinístico.
-        this._markChallenges(cells);
+        // NOTA: não há mais marcação PROCEDURAL de corredores-desafio. Perigos,
+        // botões e traps vêm exclusivamente das peças autorais (/map) que você
+        // desenha — nada é injetado automaticamente.
 
         return {
             cols: this.cols,

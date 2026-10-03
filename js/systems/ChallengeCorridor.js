@@ -1,11 +1,11 @@
 import { SpikeTrap } from '../entities/SpikeTrap.js';
 import { ArrowTrap, Arrow } from '../entities/ArrowTrap.js';
 import { PressureButton } from '../entities/PressureButton.js';
-import { HAZARDS } from '../config/GameConfig.js';
+import { HAZARDS, TILE } from '../config/GameConfig.js';
 
 /**
- * ChallengeCorridor — instancia e gerencia um corredor-desafio a partir de um
- * layout autoral (ver ChallengeLayouts.js).
+ * ChallengeCorridor — instancia e gerencia os perigos/botões de uma peça
+ * autoral (os hazards vêm do arquivo da sala desenhada no editor).
  *
  * Responsabilidades:
  *  - Converter coordenadas normalizadas (u ao longo / v através) do layout para
@@ -45,6 +45,8 @@ export class ChallengeCorridor {
         this.arrows = [];
         this.buttons = [];
 
+        // Sem 2 botões não há puzzle de botões a resolver: nasce "resolvido"
+        // (quem controla o trancamento é a regra da sala — ver Room.lockRule).
         this.solved = false;
         this.holdTimer = 0;
 
@@ -52,6 +54,24 @@ export class ChallengeCorridor {
         this._pad = 36;
 
         this._build(assets);
+    }
+
+    // Centro de mundo (px) do tile (col,row). A célula tem 1 tile de parede, de
+    // modo que bounds.minX/minY coincidem com o início do tile de índice 1.
+    _tileToWorld(col, row) {
+        return {
+            x: this.bounds.minX + (col - 1 + 0.5) * TILE,
+            y: this.bounds.minY + (row - 1 + 0.5) * TILE
+        };
+    }
+
+    // Resolve a posição de mundo de um elemento: por tile (col,row) se o editor
+    // forneceu, senão pelas coordenadas normalizadas (u,v) do layout autoral.
+    _elemWorld(el, u = el.u, v = el.v) {
+        if (el.col !== undefined && el.row !== undefined) {
+            return this._tileToWorld(el.col, el.row);
+        }
+        return this._toWorld(u, v);
     }
 
     // Converte (u,v) normalizados -> (x,y) no mundo.
@@ -96,31 +116,38 @@ export class ChallengeCorridor {
         const peaks = assets && assets.peaks ? assets.peaks : null;
 
         for (const el of this.layout.elements) {
+            const byTile = el.col !== undefined && el.row !== undefined;
             switch (el.type) {
                 case "spike": {
-                    const p = this._toWorld(el.u, el.v);
+                    const p = this._elemWorld(el);
                     this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: el.phase || 0 }));
                     break;
                 }
                 case "spikeRow": {
                     const count = el.count || 4;
                     for (let i = 0; i < count; i++) {
-                        // Distribui ao longo do eixo "através" (v de 0..1).
-                        const v = (i + 0.5) / count;
                         const phase = ((el.phase || 0) + i * (el.wave || 0)) % 1;
-                        const p = this._toWorld(el.u, v);
+                        let p;
+                        if (byTile) {
+                            // Tiles consecutivos a partir de (col,row).
+                            p = this._tileToWorld(el.col + i, el.row);
+                        } else {
+                            // Distribui ao longo do eixo "através" (v de 0..1).
+                            const v = (i + 0.5) / count;
+                            p = this._toWorld(el.u, v);
+                        }
                         this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: phase }));
                     }
                     break;
                 }
                 case "arrow": {
-                    const p = this._toWorld(el.u, el.v);
+                    const p = this._elemWorld(el);
                     const dir = this._fireDir(el.dir || "across+");
                     this.arrowTraps.push(new ArrowTrap(p.x, p.y, dir, { phaseOffset: el.phase || 0 }));
                     break;
                 }
                 case "button": {
-                    const p = this._toWorld(el.u, el.v);
+                    const p = this._elemWorld(el);
                     this.buttons.push(new PressureButton(p.x, p.y));
                     break;
                 }

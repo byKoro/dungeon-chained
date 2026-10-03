@@ -218,25 +218,6 @@ export function flipInnerHorizontal(matrix, cols = ROOM_COLS, rows = ROOM_ROWS) 
 }
 
 /**
- * Espelha verticalmente o miolo interno de piso (linhas 1..rows-2).
- */
-export function flipInnerVertical(matrix, cols = ROOM_COLS, rows = ROOM_ROWS) {
-    const result = matrix.map(r => [...r]);
-    const firstRow = 1;
-    const lastRow = rows - 2;
-
-    for (let r = firstRow; r <= Math.floor((firstRow + lastRow) / 2); r++) {
-        const oppR = lastRow - (r - firstRow);
-        for (let c = 1; c < cols - 1; c++) {
-            const temp = result[r][c];
-            result[r][c] = result[oppR][c];
-            result[oppR][c] = temp;
-        }
-    }
-    return result;
-}
-
-/**
  * Transforma o miolo de piso de uma orientação base para uma orientação alvo.
  * Aplica automaticamente as simetrias matemáticas:
  *  - Curva NE -> NW (Flip X)
@@ -255,34 +236,40 @@ export function flipInnerVertical(matrix, cols = ROOM_COLS, rows = ROOM_ROWS) {
  * @returns {number[][]} Matriz com o miolo adaptado e moldura correta aplicada
  */
 export function transformRoomFloor(baseMatrix, archetype, targetOrientation, cols = ROOM_COLS, rows = ROOM_ROWS) {
+    // POLÍTICA: só espelhamos HORIZONTALMENTE. O espelhamento vertical inverte
+    // o miolo (topo/base) e corrompe o conteúdo direcional de algumas salas, por
+    // isso é PROIBIDO. Orientações que diferem no eixo vertical em relação à base
+    // canônica (ex.: CORNER SE/SW, T_SOUTH, DEADEND SOUTH) são atendidas por uma
+    // base própria registrada na variação (baseFloorByOrientation) ou, na falta
+    // dela, por um miolo procedural gerado já na orientação-alvo — nunca por flip
+    // vertical do desenho da base.
     let transformed = baseMatrix.map(r => [...r]);
 
     if (archetype === ARCHETYPE.CORNER) {
-        transformed = transformCornerFloor(transformed, targetOrientation, cols, rows);
-    } else if (archetype === ARCHETYPE.DEADEND) {
-        // Base: NORTH (Porta Norte)
-        if (targetOrientation === "SOUTH") {
-            transformed = flipInnerVertical(transformed, cols, rows);
-        } else if (targetOrientation === "EAST" || targetOrientation === "WEST") {
-            transformed = adaptStraightOrDeadendAxis(transformed, "VERTICAL", "HORIZONTAL", cols, rows);
-            if (targetOrientation === "EAST") {
-                transformed = flipInnerHorizontal(transformed, cols, rows);
-            }
-        }
+        // Base canônica: NE. Par horizontal seguro: NE->NW (flip H).
+        if (targetOrientation === "NW") transformed = flipInnerHorizontal(transformed, cols, rows);
+        // SE/SW diferem verticalmente -> tratados por base dedicada antes de
+        // chegar aqui (ver getFloorForDoors). Se chegarem, mantém a base.
     } else if (archetype === ARCHETYPE.STRAIGHT) {
-        // Base: HORIZONTAL (Leste-Oeste)
+        // HORIZONTAL -> VERTICAL é troca de EIXO (rotação de trilha), não flip V.
         if (targetOrientation === "VERTICAL") {
             transformed = adaptStraightOrDeadendAxis(transformed, "HORIZONTAL", "VERTICAL", cols, rows);
         }
+    } else if (archetype === ARCHETYPE.DEADEND) {
+        // Base canônica: NORTH. E/W são troca de eixo (+flip H entre si).
+        if (targetOrientation === "EAST" || targetOrientation === "WEST") {
+            transformed = adaptStraightOrDeadendAxis(transformed, "VERTICAL", "HORIZONTAL", cols, rows);
+            if (targetOrientation === "EAST") transformed = flipInnerHorizontal(transformed, cols, rows);
+        }
+        // SOUTH difere verticalmente -> base dedicada (ver getFloorForDoors).
     } else if (archetype === ARCHETYPE.T_JUNCTION) {
-        // Base: T_NORTH (Portas N, E, W)
-        if (targetOrientation === "T_SOUTH") {
-            transformed = flipTJunctionNorthToSouth(transformed, cols, rows);
-        } else if (targetOrientation === "T_WEST") {
+        // Base canônica: T_NORTH. T_WEST é troca de eixo; T_EAST = T_WEST flip H.
+        if (targetOrientation === "T_WEST") {
             transformed = adaptTJunctionToWest(transformed, cols, rows);
         } else if (targetOrientation === "T_EAST") {
             transformed = flipInnerHorizontal(adaptTJunctionToWest(transformed, cols, rows), cols, rows);
         }
+        // T_SOUTH difere verticalmente -> base dedicada (ver getFloorForDoors).
     }
 
     // Aplica a moldura de paredes e portas inviolável para a orientação alvo
@@ -291,83 +278,29 @@ export function transformRoomFloor(baseMatrix, archetype, targetOrientation, col
 }
 
 /**
- * Transforma o piso de Curva em L (Base: NE) para as outras 3 orientações (NW, SE, SW),
- * garantindo alinhamento perfeito com portas e paredes.
+ * Orientações que NÃO são alcançáveis a partir da base canônica apenas com
+ * espelhamento horizontal / troca de eixo (ou seja, exigiriam flip vertical).
+ * Para elas, usamos uma base própria (desenhada ou procedural na orientação).
  */
-export function transformCornerFloor(baseMatrix, targetOrientation, cols = ROOM_COLS, rows = ROOM_ROWS) {
-    if (targetOrientation === "NW") {
-        return flipInnerHorizontal(baseMatrix, cols, rows);
-    }
+export const VERTICAL_ORIENTATIONS = Object.freeze({
+    CORNER: ["SE", "SW"],
+    T_JUNCTION: ["T_SOUTH"],
+    DEADEND: ["SOUTH"],
+    STRAIGHT: [],
+    CROSS: []
+});
 
-    const midC = (cols / 2) | 0;
-    const midR = (rows / 2) | 0;
+// Orientação canônica da "metade inferior" (base dedicada) de cada arquétipo.
+export const LOWER_BASE_ORIENTATION = Object.freeze({
+    CORNER: "SE",
+    T_JUNCTION: "T_SOUTH",
+    DEADEND: "SOUTH"
+});
 
-    if (targetOrientation === "SE") {
-        // A haste vertical que subia até o Norte (r <= midR) agora desce até o Sul (r >= midR - 1)
-        // O corredor leste em rows midR-1 e midR continua alinhado com a porta Leste
-        const se = Array(rows).fill(null).map(() => Array(cols).fill(16));
-        for (let r = 1; r < rows - 1; r++) {
-            for (let c = 1; c < cols - 1; c++) {
-                if ((r === midR - 1 || r === midR) && c >= midC - 1) {
-                    se[r][c] = baseMatrix[r][c];
-                } else if ((c === midC - 1 || c === midC) && r >= midR - 1) {
-                    const sourceR = (rows - 1) - r;
-                    se[r][c] = baseMatrix[Math.max(1, sourceR)][c];
-                } else {
-                    const oppR = (rows - 1) - r;
-                    se[r][c] = baseMatrix[Math.max(1, Math.min(rows - 2, oppR))][c];
-                }
-            }
-        }
-        return se;
-    }
-
-    if (targetOrientation === "SW") {
-        const se = transformCornerFloor(baseMatrix, "SE", cols, rows);
-        return flipInnerHorizontal(se, cols, rows);
-    }
-
-    return baseMatrix.map(r => [...r]);
-}
-
-/**
- * Espelha verticalmente uma Junção em T (T_NORTH -> T_SOUTH).
- * A haste vertical que subia até o Norte passa a descer até o Sul,
- * enquanto o corredor Leste-Oeste em midR-1 e midR permanece alinhado às portas E e W.
- */
-export function flipTJunctionNorthToSouth(matrix, cols = ROOM_COLS, rows = ROOM_ROWS) {
-    const result = matrix.map(r => [...r]);
-    const midC = (cols / 2) | 0;
-    const midR = (rows / 2) | 0;
-
-    // Haste central (colunas midC-1 e midC)
-    for (let c = midC - 1; c <= midC; c++) {
-        for (let r = 1; r < rows - 1; r++) {
-            if (r >= midR) {
-                // A haste sul recebe o conteúdo da haste norte original
-                const sourceR = (rows - 1) - r;
-                result[r][c] = matrix[Math.max(1, sourceR)][c];
-            } else if (r < midR - 1) {
-                // Onde havia a haste norte, passa a ter o piso de fundo do sul original
-                const sourceR = (rows - 1) - r;
-                result[r][c] = matrix[Math.min(rows - 2, sourceR)][c];
-            }
-        }
-    }
-
-    // Quadrantes fora da haste central: inverte topo e fundo
-    for (let r = 1; r <= 2; r++) {
-        const oppR = (rows - 1) - r;
-        for (let c = 1; c < cols - 1; c++) {
-            if (c !== midC - 1 && c !== midC) {
-                const temp = result[r][c];
-                result[r][c] = result[oppR][c];
-                result[oppR][c] = temp;
-            }
-        }
-    }
-
-    return result;
+/** O alvo exige base da metade inferior (teria que usar flip vertical)? */
+export function needsLowerBase(archetype, orientation) {
+    const list = VERTICAL_ORIENTATIONS[archetype] || [];
+    return list.includes(orientation);
 }
 
 /**
@@ -443,44 +376,51 @@ export class RoomVariantCatalog {
     }
 
     _initDefaultVariants() {
-        // Variação 1: Curva Padrão (NE)
+        // Variação 1: Curva Padrão. Base-topo = NE; base-inferior = SE (dedicada,
+        // gerada já na orientação, sem flip vertical).
         this.addVariant(ARCHETYPE.CORNER, {
             id: "corner_default",
             name: "Curva Pedras Clássicas",
-            floor: this._generateCurvedFloorPath(ROOM_COLS, ROOM_ROWS, 16, 26)
+            floor: this._generateCurvedFloorPath(ROOM_COLS, ROOM_ROWS, 16, 26, "NE"),
+            lowerFloor: this._generateCurvedFloorPath(ROOM_COLS, ROOM_ROWS, 16, 26, "SE")
         });
 
-        // Variação 2: Curva Covil / Ruínas (NE)
+        // Variação 2: Curva Covil / Ruínas
         this.addVariant(ARCHETYPE.CORNER, {
             id: "corner_ruins",
             name: "Curva Ruínas Antigas",
-            floor: this._generateCurvedFloorPath(ROOM_COLS, ROOM_ROWS, 17, 72)
+            floor: this._generateCurvedFloorPath(ROOM_COLS, ROOM_ROWS, 17, 72, "NE"),
+            lowerFloor: this._generateCurvedFloorPath(ROOM_COLS, ROOM_ROWS, 17, 72, "SE")
         });
 
-        // Variação: Corredor Reto
+        // Variação: Corredor Reto (sem metade inferior — eixos são simétricos)
         this.addVariant(ARCHETYPE.STRAIGHT, {
             id: "straight_default",
             name: "Corredor Liso",
             floor: this._generateStraightFloorPath(ROOM_COLS, ROOM_ROWS, 16, 26)
         });
 
-        // Variação: Junção em T (Base: T_NORTH - portas N, E, W)
+        // Variação: Junção em T. Base-topo = T_NORTH; base-inferior = T_SOUTH.
         this.addVariant(ARCHETYPE.T_JUNCTION, {
             id: "t_default",
             name: "Junção T Pedras Clássicas",
-            floor: this._generateTJunctionFloor(ROOM_COLS, ROOM_ROWS, 16, 26)
+            floor: this._generateTJunctionFloor(ROOM_COLS, ROOM_ROWS, 16, 26, "T_NORTH"),
+            lowerFloor: this._generateTJunctionFloor(ROOM_COLS, ROOM_ROWS, 16, 26, "T_SOUTH")
         });
         this.addVariant(ARCHETYPE.T_JUNCTION, {
             id: "t_ruins",
             name: "Junção T Ruínas de Sangue",
-            floor: this._generateTJunctionFloor(ROOM_COLS, ROOM_ROWS, 17, 72)
+            floor: this._generateTJunctionFloor(ROOM_COLS, ROOM_ROWS, 17, 72, "T_NORTH"),
+            lowerFloor: this._generateTJunctionFloor(ROOM_COLS, ROOM_ROWS, 17, 72, "T_SOUTH")
         });
 
-        // Variação: Dead-end (Câmara Final)
+        // Variação: Dead-end (altar centralizado — simétrico, mas registramos a
+        // base-inferior por consistência da política).
         this.addVariant(ARCHETYPE.DEADEND, {
             id: "deadend_default",
             name: "Câmara de Altar",
-            floor: this._generateDeadendFloor(ROOM_COLS, ROOM_ROWS, 16, 73)
+            floor: this._generateDeadendFloor(ROOM_COLS, ROOM_ROWS, 16, 73),
+            lowerFloor: this._generateDeadendFloor(ROOM_COLS, ROOM_ROWS, 16, 73)
         });
 
         // Variação: Cruzamento 4-Vias
@@ -491,16 +431,32 @@ export class RoomVariantCatalog {
         });
     }
 
-    addVariant(archetype, { id, name, floor }) {
+    /**
+     * Registra uma variação. `floor` é o desenho na base-topo (orientação
+     * canônica). `lowerFloor` (opcional) é o desenho dedicado para a base da
+     * metade inferior (ex.: SE / T_SOUTH / SOUTH) — usado no lugar de espelhar
+     * verticalmente. Se ausente para um arquétipo que o exige, cai num miolo
+     * procedural liso na orientação inferior.
+     */
+    addVariant(archetype, { id, name, floor, lowerFloor = null }) {
         if (!this.variants[archetype]) this.variants[archetype] = [];
-        // Aplica a moldura imutável da base canônica
-        const baseDoors = getDoorsForOrientation(archetype, CANONICAL_BASE_ORIENTATION[archetype]);
-        const framedFloor = applyImmutableFrame(floor, baseDoors, ROOM_COLS, ROOM_ROWS);
+
+        const upperDoors = getDoorsForOrientation(archetype, CANONICAL_BASE_ORIENTATION[archetype]);
+        const framedUpper = applyImmutableFrame(floor, upperDoors, ROOM_COLS, ROOM_ROWS);
+
+        let framedLower = null;
+        const lowerOri = LOWER_BASE_ORIENTATION[archetype];
+        if (lowerOri) {
+            const lowerDoors = getDoorsForOrientation(archetype, lowerOri);
+            const lowerSrc = lowerFloor || Array(ROOM_ROWS).fill(null).map(() => Array(ROOM_COLS).fill(16));
+            framedLower = applyImmutableFrame(lowerSrc, lowerDoors, ROOM_COLS, ROOM_ROWS);
+        }
 
         const variant = {
             id: id || `${archetype}_var_${this.variants[archetype].length + 1}`,
             name: name || `Variação ${this.variants[archetype].length + 1}`,
-            baseFloor: framedFloor
+            baseFloor: framedUpper,
+            lowerBaseFloor: framedLower
         };
 
         const existingIdx = this.variants[archetype].findIndex(v => v.id === variant.id);
@@ -517,8 +473,10 @@ export class RoomVariantCatalog {
     }
 
     /**
-     * Obtém o piso pronto e transformado para qualquer combinação de portas,
-     * escolhendo uma variação específica ou aleatória.
+     * Obtém o piso pronto para qualquer combinação de portas. NUNCA espelha
+     * verticalmente: orientações da metade inferior usam a base dedicada
+     * (lowerBaseFloor); as demais derivam da base-topo só com flip horizontal /
+     * troca de eixo.
      *
      * @param {{ N?: boolean, S?: boolean, E?: boolean, W?: boolean }} doors
      * @param {number|null} [variantIndex=null]
@@ -528,7 +486,6 @@ export class RoomVariantCatalog {
         const { archetype, orientation } = detectShapeFromDoors(doors);
         const list = this.getVariants(archetype);
         if (list.length === 0) {
-            // Fallback: piso liso com moldura
             const emptyFloor = Array(ROOM_ROWS).fill(null).map(() => Array(ROOM_COLS).fill(16));
             return applyImmutableFrame(emptyFloor, doors, ROOM_COLS, ROOM_ROWS);
         }
@@ -538,22 +495,47 @@ export class RoomVariantCatalog {
             : Math.floor(Math.random() * list.length);
 
         const chosenVariant = list[idx];
+
+        if (needsLowerBase(archetype, orientation)) {
+            // Metade inferior: parte da base dedicada, já na orientação-base
+            // inferior (LOWER_BASE_ORIENTATION). Dessa base, só o espelho
+            // HORIZONTAL leva à orientação-alvo (ex.: SE -> SW).
+            const lowerBase = chosenVariant.lowerBaseFloor || chosenVariant.baseFloor;
+            const baseOri = LOWER_BASE_ORIENTATION[archetype];
+            let m = lowerBase.map(r => [...r]);
+            if (orientation !== baseOri) {
+                // SE->SW é flip horizontal. (T_SOUTH e SOUTH não têm par
+                // horizontal distinto, então não entram aqui.)
+                m = flipInnerHorizontal(m, ROOM_COLS, ROOM_ROWS);
+            }
+            const targetDoors = getDoorsForOrientation(archetype, orientation);
+            return applyImmutableFrame(m, targetDoors, ROOM_COLS, ROOM_ROWS);
+        }
+
         return transformRoomFloor(chosenVariant.baseFloor, archetype, orientation, ROOM_COLS, ROOM_ROWS);
     }
 
-    /* Geradores utilitários de pisos decorativos padrão */
-    _generateCurvedFloorPath(cols, rows, baseTile, pathTile) {
+    /* Geradores utilitários de pisos decorativos padrão.
+     * Cada gerador produz o miolo DIRETAMENTE na orientação pedida (sem flip
+     * vertical). O par horizontal (ex.: NE<->NW, SE<->SW) é obtido depois por
+     * espelhamento horizontal. */
+
+    // Curva em L. orientation: "NE" (haste Norte + Leste) ou "SE" (haste Sul + Leste).
+    _generateCurvedFloorPath(cols, rows, baseTile, pathTile, orientation = "NE") {
         const m = Array(rows).fill(null).map(() => Array(cols).fill(baseTile));
         const midC = (cols / 2) | 0;
         const midR = (rows / 2) | 0;
+        const north = orientation === "NE" || orientation === "NW";
 
-        // Trilha que sai da porta Norte (colunas midC-1 e midC) e curva para a porta Leste (linhas midR-1 e midR)
         for (let r = 1; r < rows - 1; r++) {
             for (let c = 1; c < cols - 1; c++) {
-                if ((r <= midR && (c === midC - 1 || c === midC)) ||
-                    (c >= midC - 1 && (r === midR - 1 || r === midR))) {
-                    m[r][c] = pathTile;
-                }
+                // Haste vertical: sobe até o Norte (r <= midR) ou desce até o Sul
+                // (r >= midR - 1), conforme a orientação. Corredor Leste nas
+                // linhas centrais em ambos os casos.
+                const vertical = (c === midC - 1 || c === midC) &&
+                    (north ? r <= midR : r >= midR - 1);
+                const horizontal = (c >= midC - 1) && (r === midR - 1 || r === midR);
+                if (vertical || horizontal) m[r][c] = pathTile;
             }
         }
         return m;
@@ -570,21 +552,22 @@ export class RoomVariantCatalog {
         return m;
     }
 
-    _generateTJunctionFloor(cols, rows, baseTile, pathTile) {
+    // Junção em T. orientation: "T_NORTH" (haste p/ Norte) ou "T_SOUTH" (haste
+    // p/ Sul). O corredor Leste-Oeste central é comum às duas.
+    _generateTJunctionFloor(cols, rows, baseTile, pathTile, orientation = "T_NORTH") {
         const m = Array(rows).fill(null).map(() => Array(cols).fill(baseTile));
         const midC = (cols / 2) | 0;
         const midR = (rows / 2) | 0;
+        const north = orientation === "T_NORTH";
 
         for (let r = 1; r < rows - 1; r++) {
             for (let c = 1; c < cols - 1; c++) {
                 // Corredor horizontal Leste-Oeste (linhas midR-1 e midR)
-                if (r === midR - 1 || r === midR) {
-                    m[r][c] = pathTile;
-                }
-                // Haste vertical Norte (colunas midC-1 e midC, r <= midR)
-                if (r <= midR && (c === midC - 1 || c === midC)) {
-                    m[r][c] = pathTile;
-                }
+                if (r === midR - 1 || r === midR) m[r][c] = pathTile;
+                // Haste vertical: para o Norte (r <= midR) ou para o Sul (r >= midR - 1)
+                const inStem = (c === midC - 1 || c === midC) &&
+                    (north ? r <= midR : r >= midR - 1);
+                if (inStem) m[r][c] = pathTile;
             }
         }
         return m;

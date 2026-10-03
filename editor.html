@@ -43,11 +43,6 @@
                     <option value="room_start_hub">🏁 Câmara Inicial (Start Hub)</option>
                     <option value="room_boss_chamber">💀 Câmara do Chefe (Boss)</option>
                 </optgroup>
-                <optgroup label="── Corredores-Desafio (Puzzles Co-op) ──">
-                    <option value="challenge_0">⚡ Desafio A — Espinhos em Onda</option>
-                    <option value="challenge_1">⚡ Desafio B — Fogo Cruzado (Flechas)</option>
-                    <option value="challenge_2">⚡ Desafio C — Corrida de Obstáculos</option>
-                </optgroup>
                 <optgroup label="── Customizado ──">
                     <option value="custom_new">+ Criar Nova Sala em Branco...</option>
                 </optgroup>
@@ -70,6 +65,8 @@
         <aside id="sidebar-left">
             <nav class="mode-tabs">
                 <button class="tab-btn active" data-tab="tab-holes">🕳️ Buracos</button>
+                <button class="tab-btn" data-tab="tab-torches">🔥 Tochas</button>
+                <button class="tab-btn" data-tab="tab-props">🏺 Props</button>
                 <button class="tab-btn" data-tab="tab-challenges">⚠️ Traps</button>
                 <button class="tab-btn" data-tab="tab-enemies">👾 Inimigos</button>
                 <button class="tab-btn" data-tab="tab-spawns">👥 Spawns Players</button>
@@ -97,8 +94,80 @@
                     </div>
                 </div>
 
+                <!-- ABA: TOCHAS (PONTOS DE LUZ) -->
+                <div class="tab-panel" id="tab-torches">
+                    <div class="panel-section">
+                        <div class="panel-title">Posicionar Tochas (Luz)</div>
+                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                            Clique numa <strong>parede</strong> (borda da sala) para colocar uma tocha. Cada tocha emite luz para dentro da sala. Clique de novo numa tocha para removê-la.
+                        </p>
+                    </div>
+                    <div class="panel-section">
+                        <div class="panel-title">Tochas Colocadas (<span id="torch-count">0</span>)</div>
+                        <div id="torches-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;"></div>
+                        <button class="btn btn-sm btn-danger" id="btn-clear-torches">Limpar Todas as Tochas</button>
+                    </div>
+                </div>
+
+                <!-- ABA: PROPS (DECORAÇÃO) -->
+                <div class="tab-panel" id="tab-props">
+                    <div class="panel-section">
+                        <div class="panel-title">Props Aleatórios</div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-scatter-props"> Aleatorizar props pelo chão
+                        </label>
+                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:4px;">
+                            O jogo espalha props nos tiles de chão livre. Enquanto ligado, a colocação manual fica desativada.
+                        </p>
+                        <div id="scatter-density-row" style="margin-top:6px; display:none;">
+                            <div class="control-row">
+                                <span style="font-size:12px;">Densidade</span>
+                                <span class="val-badge" id="scatter-density-val">8%</span>
+                            </div>
+                            <input type="range" id="scatter-density" min="0" max="40" value="8" step="1" style="width:100%;">
+                        </div>
+                    </div>
+                    <div class="panel-section" id="props-manual-section">
+                        <div class="panel-title">Decoração ao Clicar</div>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <label class="btn tool-prop-btn active" data-prop="59">
+                                <input type="radio" name="prop-choice" value="59" checked> 🪨 Rocha
+                            </label>
+                            <label class="btn tool-prop-btn" data-prop="77">
+                                <input type="radio" name="prop-choice" value="77"> 💀 Caveira
+                            </label>
+                            <label class="btn tool-prop-btn" data-prop="68">
+                                <input type="radio" name="prop-choice" value="68"> 🦴 Ossos
+                            </label>
+                            <label class="btn tool-prop-btn" data-prop="64">
+                                <input type="radio" name="prop-choice" value="64"> 🕸️ Teia
+                            </label>
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:6px;">
+                            Clique num tile de piso para colocar a decoração. Clique de novo para remover.
+                        </p>
+                    </div>
+                    <div class="panel-section">
+                        <div class="panel-title">Props Colocados (<span id="prop-count">0</span>)</div>
+                        <div id="props-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;"></div>
+                        <button class="btn btn-sm btn-danger" id="btn-clear-props">Limpar Todos os Props</button>
+                    </div>
+                </div>
+
                 <!-- ABA 2: PERIGOS & TRAPS -->
                 <div class="tab-panel" id="tab-challenges">
+                    <div class="panel-section">
+                        <div class="panel-title">Regra das Portas (Trancamento)</div>
+                        <select id="lock-rule" class="styled-select" style="width:100%;">
+                            <option value="auto">Automático (deduz pelo conteúdo)</option>
+                            <option value="none">Nunca trancar (portas sempre abertas)</option>
+                            <option value="enemies">Trancar até matar todos os inimigos</option>
+                            <option value="buttons">Trancar até pisar nos 2 botões juntos</option>
+                        </select>
+                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:4px;">
+                            Define quando as portas abrem. "Buttons" exige 2 botões de pressão na sala.
+                        </p>
+                    </div>
                     <div class="panel-section">
                         <div class="panel-title">Adicionar Trap ao Clicar</div>
                         <div style="display:flex; flex-direction:column; gap:6px;">

@@ -17,9 +17,8 @@ import { AssetLoader } from '../core/AssetLoader.js';
 import { Tileset } from '../core/Tileset.js';
 import { RoomSocket, RoomTemplate } from '../rooms/RoomSocket.js';
 import { RoomPresets } from '../rooms/RoomPresets.js';
-import { CHALLENGE_LAYOUTS } from '../systems/ChallengeLayouts.js';
 import { RoomTiles } from '../core/RoomTiles.js';
-import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions } from '../config/GameConfig.js';
+import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor } from '../config/GameConfig.js';
 import { demonConfig, bloodMonsterConfig, playerConfigs } from '../config/EntityConfig.js';
 
 class RoomEditor {
@@ -49,13 +48,22 @@ class RoomEditor {
             floor: [],            // matriz [r][c] de índices de tile
             holes: new Set(),     // coordenadas "c,r" onde NÃO haverá piso (abismo)
             hazards: [],          // perigos { type, u, v, count, phase, wave, dir }
-            enemies: []           // inimigos { type, col, row }
+            enemies: [],          // inimigos { type, col, row }
+            torches: [],          // tochas (luz) { col, row, side }
+            props: [],            // decoração manual { col, row, index, flip }
+            // Props aleatórios: quando enabled, o jogo espalha props no chão na
+            // geração (exclusivo com props manuais).
+            scatterProps: { enabled: false, density: 0.08 },
+            // Regra de trancamento das portas: "auto" (deduz), "none" (nunca),
+            // "enemies" (até matar todos), "buttons" (puzzle de 2 botões).
+            lock: "auto"
         };
 
         // Estado das Ferramentas
-        this.activeTab = "tab-holes"; // tab-holes, tab-challenges, tab-enemies, tab-spawns
+        this.activeTab = "tab-holes"; // tab-holes, tab-torches, tab-props, tab-challenges, tab-enemies, tab-spawns
         this.selectedHazard = "button";
         this.selectedEnemy = "demon";
+        this.selectedProp = 59;
 
         // Viewport (Zoom e Pan)
         this.zoom = 1.0;
@@ -86,20 +94,72 @@ class RoomEditor {
     async _initAssets() {
         await this.assets.whenReady();
         this.tileset = new Tileset(this.assets.tileset, 16, 10);
-        this._loadInitialPreset("room_cross_4way");
+        // Restaura a última cena editada (persistida em localStorage) para que
+        // o conteúdo não se perca ao ir/voltar do teste no jogo. Se não houver
+        // nada salvo, carrega o preset padrão.
+        if (!this._loadSavedState()) {
+            this._loadInitialPreset("room_cross_4way");
+        }
         this._fitScreen();
         this.render();
+    }
+
+    /* --------------------------------------------------------------------------
+     * PERSISTÊNCIA DA CENA (localStorage) — sobrevive a recarregar/testar
+     * -------------------------------------------------------------------------- */
+    _sceneToData() {
+        return {
+            id: this.room.id,
+            name: this.room.name,
+            cols: this.cols,
+            rows: this.rows,
+            kind: this.room.kind,
+            type: this.room.type,
+            doors: {
+                N: !!this.room.sockets.N,
+                S: !!this.room.sockets.S,
+                E: !!this.room.sockets.E,
+                W: !!this.room.sockets.W
+            },
+            holes: Array.from(this.room.holes),
+            floor: this.room.floor,
+            hazards: this.room.hazards,
+            enemies: this.room.enemies,
+            torches: this.room.torches,
+            props: this.room.scatterProps.enabled ? [] : this.room.props,
+            scatterProps: this.room.scatterProps,
+            lock: this.room.lock
+        };
+    }
+
+    _saveState() {
+        try {
+            localStorage.setItem("editor_scene_state", JSON.stringify(this._sceneToData()));
+        } catch (e) {
+            // Silencioso: se o localStorage estiver indisponível, apenas não persiste.
+        }
+    }
+
+    _loadSavedState() {
+        try {
+            const raw = localStorage.getItem("editor_scene_state");
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            this._importFromData(data);
+            // Mantém o seletor de presets coerente com a cena restaurada.
+            const sel = document.getElementById("preset-select");
+            if (sel) sel.value = "custom_new";
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 
     /* --------------------------------------------------------------------------
      * GERENCIAMENTO DE PRESETS & CARREGAMENTO (PORTAS FIXAS)
      * -------------------------------------------------------------------------- */
     _loadInitialPreset(presetKey) {
-        if (presetKey.startsWith("challenge_")) {
-            const idx = parseInt(presetKey.replace("challenge_", ""), 10);
-            const challenge = CHALLENGE_LAYOUTS[idx] || CHALLENGE_LAYOUTS[0];
-            this._loadChallengeLayout(challenge, idx);
-        } else if (presetKey === "custom_new") {
+        if (presetKey === "custom_new") {
             this._createBlankRoom();
         } else {
             const enumKey = this._presetKeyToEnum(presetKey);
@@ -143,6 +203,10 @@ class RoomEditor {
         this.room.holes = new Set();
         this.room.hazards = [];
         this.room.enemies = [];
+        this.room.torches = [];
+        this.room.props = [];
+        this.room.scatterProps = { enabled: false, density: 0.08 };
+        this.room.lock = "auto";
 
         // Portas fixas do template
         this.room.sockets = {
@@ -153,33 +217,6 @@ class RoomEditor {
         };
 
         // Reconstrói layout de piso procedural
-        this._rebuildAutotile();
-        this._updateUIFromState();
-        this.render();
-    }
-
-    _loadChallengeLayout(challenge, idx) {
-        this.cols = ROOM_COLS;
-        this.rows = ROOM_ROWS;
-        this.room.id = `challenge_${idx}`;
-        this.room.name = challenge.name;
-        this.room.cols = this.cols;
-        this.room.rows = this.rows;
-        this.room.kind = "corridor";
-        this.room.type = "challenge";
-
-        const midR = (this.rows / 2) | 0;
-        this.room.sockets = {
-            N: null,
-            S: null,
-            E: new RoomSocket({ dir: "E", offset: midR - 1, span: 2 }),
-            W: new RoomSocket({ dir: "W", offset: midR - 1, span: 2 })
-        };
-
-        this.room.holes = new Set();
-        this.room.hazards = JSON.parse(JSON.stringify(challenge.elements || []));
-        this.room.enemies = [];
-
         this._rebuildAutotile();
         this._updateUIFromState();
         this.render();
@@ -203,6 +240,10 @@ class RoomEditor {
         this.room.holes = new Set();
         this.room.hazards = [];
         this.room.enemies = [];
+        this.room.torches = [];
+        this.room.props = [];
+        this.room.scatterProps = { enabled: false, density: 0.08 };
+        this.room.lock = "auto";
 
         this._rebuildAutotile();
         this._updateUIFromState();
@@ -279,12 +320,6 @@ class RoomEditor {
     _checkSpawnSafety() {
         const spawns = this._getPlayerSpawns();
         const warnings = [];
-        const tileW = this.tilePx;
-        const totalW = this.cols * tileW;
-        const totalH = this.rows * tileW;
-        const pad = tileW * 1.5;
-        const innerW = totalW - pad * 2;
-        const innerH = totalH - pad * 2;
 
         for (const sp of spawns) {
             // Verifica buracos nos tiles específicos de spawn
@@ -295,18 +330,15 @@ class RoomEditor {
                 warnings.push(`Buraco sem piso sobre o tile de spawn do P2 [Col ${sp.p2.col}, Linha ${sp.p2.row}] na ${sp.label}!`);
             }
 
-            // Verifica armadilhas / hazards nos tiles de spawn
+            // Verifica armadilhas / hazards nos tiles de spawn (por tile).
             for (const h of this.room.hazards) {
-                const hx = pad + (h.u ?? 0.5) * innerW;
-                const hy = pad + (h.v ?? 0.5) * innerH;
-                const hc = Math.floor(hx / tileW);
-                const hr = Math.floor(hy / tileW);
-
-                if (hc === sp.p1.col && hr === sp.p1.row) {
-                    warnings.push(`Perigo (${this._hazardLabel(h.type)}) sobre o tile de spawn do P1 [Col ${hc}, Linha ${hr}] na ${sp.label}!`);
-                }
-                if (hc === sp.p2.col && hr === sp.p2.row) {
-                    warnings.push(`Perigo (${this._hazardLabel(h.type)}) sobre o tile de spawn do P2 [Col ${hc}, Linha ${hr}] na ${sp.label}!`);
+                for (const t of this._hazardTiles(h)) {
+                    if (t.col === sp.p1.col && t.row === sp.p1.row) {
+                        warnings.push(`Perigo (${this._hazardLabel(h.type)}) sobre o tile de spawn do P1 [Col ${t.col}, Linha ${t.row}] na ${sp.label}!`);
+                    }
+                    if (t.col === sp.p2.col && t.row === sp.p2.row) {
+                        warnings.push(`Perigo (${this._hazardLabel(h.type)}) sobre o tile de spawn do P2 [Col ${t.col}, Linha ${t.row}] na ${sp.label}!`);
+                    }
                 }
             }
         }
@@ -342,13 +374,18 @@ class RoomEditor {
         document.getElementById("prop-rows").value = this.room.rows;
         document.getElementById("prop-kind").value = this.room.kind;
         document.getElementById("prop-type").value = this.room.type;
+        const lockSel = document.getElementById("lock-rule");
+        if (lockSel) lockSel.value = this.room.lock || "auto";
 
         // Buracos
         document.getElementById("holes-count").textContent = this.room.holes.size;
 
-        // Listas de Perigos e Inimigos
+        // Listas de Perigos, Inimigos, Tochas e Props
         this._updateHazardsListUI();
         this._updateEnemiesListUI();
+        this._updateTorchesListUI();
+        this._updatePropsListUI();
+        this._syncScatterUI();
         this._updateSpawnsListUI();
 
         // Checklist e Código
@@ -406,7 +443,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>${this._hazardLabel(h.type)} (u:${h.u?.toFixed(2)}, v:${h.v?.toFixed(2) ?? '-'})</span>
+                <span>${this._hazardLabel(h.type)} (col:${h.col ?? '-'}, lin:${h.row ?? '-'})</span>
                 <button class="btn btn-sm btn-danger" data-del-hazard="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -466,6 +503,74 @@ class RoomEditor {
         });
     }
 
+    _updateTorchesListUI() {
+        const listEl = document.getElementById("torches-list");
+        const countEl = document.getElementById("torch-count");
+        if (!listEl || !countEl) return;
+        countEl.textContent = this.room.torches.length;
+        listEl.innerHTML = "";
+
+        if (this.room.torches.length === 0) {
+            listEl.innerHTML = `<div style="font-size:11px; color:var(--text-dim); text-align:center; padding:10px;">Nenhuma tocha colocada</div>`;
+            return;
+        }
+
+        this.room.torches.forEach((t, i) => {
+            const item = document.createElement("div");
+            item.className = "status-item";
+            item.innerHTML = `
+                <span>🔥 Tocha ${t.side} (${t.col}, ${t.row})</span>
+                <button class="btn btn-sm btn-danger" data-del-torch="${i}">✕</button>
+            `;
+            listEl.appendChild(item);
+        });
+
+        listEl.querySelectorAll("[data-del-torch]").forEach(btn => {
+            btn.onclick = (e) => {
+                const idx = parseInt(e.target.dataset.delTorch, 10);
+                this.room.torches.splice(idx, 1);
+                this._updateTorchesListUI();
+                this._updateValidationChecklist();
+                this._updateCodeOutput();
+                this.render();
+            };
+        });
+    }
+
+    _updatePropsListUI() {
+        const listEl = document.getElementById("props-list");
+        const countEl = document.getElementById("prop-count");
+        if (!listEl || !countEl) return;
+        countEl.textContent = this.room.props.length;
+        listEl.innerHTML = "";
+
+        if (this.room.props.length === 0) {
+            listEl.innerHTML = `<div style="font-size:11px; color:var(--text-dim); text-align:center; padding:10px;">Nenhum prop colocado</div>`;
+            return;
+        }
+
+        this.room.props.forEach((p, i) => {
+            const item = document.createElement("div");
+            item.className = "status-item";
+            item.innerHTML = `
+                <span>🏺 Prop #${p.index} (${p.col}, ${p.row})</span>
+                <button class="btn btn-sm btn-danger" data-del-prop="${i}">✕</button>
+            `;
+            listEl.appendChild(item);
+        });
+
+        listEl.querySelectorAll("[data-del-prop]").forEach(btn => {
+            btn.onclick = (e) => {
+                const idx = parseInt(e.target.dataset.delProp, 10);
+                this.room.props.splice(idx, 1);
+                this._updatePropsListUI();
+                this._updateValidationChecklist();
+                this._updateCodeOutput();
+                this.render();
+            };
+        });
+    }
+
     _updateValidationChecklist() {
         // Portas
         const activeDirs = ["N", "S", "E", "W"].filter(d => !!this.room.sockets[d]);
@@ -515,6 +620,10 @@ class RoomEditor {
             const code = `RoomTemplate.createStandard({\n  id: "${this.room.id}",\n  name: "${this.room.name}",\n  cols: ${this.cols},\n  rows: ${this.rows},\n  doors: ${JSON.stringify(doors)},\n  kind: "${this.room.kind}",\n  type: "${this.room.type}"${holesCode}${enemiesCode}\n})`;
             out.textContent = code;
         }
+
+        // Persiste a cena atual a cada mudança (este método é chamado por
+        // praticamente toda mutação do editor), para sobreviver ao playtest.
+        this._saveState();
     }
 
     /* --------------------------------------------------------------------------
@@ -555,6 +664,10 @@ class RoomEditor {
 
         // 2. Renderiza Buracos (Sem Piso / Abismos)
         this._renderHoles(ctx, tileW);
+
+        // 2b. Props decorativos e tochas (desenhados sobre o piso/parede)
+        this._renderProps(ctx, tileW);
+        this._renderTorches(ctx, tileW);
 
         // 3. Renderiza Perigos (Traps)
         this._renderHazards(ctx, totalW, totalH);
@@ -605,6 +718,7 @@ class RoomEditor {
     }
 
     _renderHoles(ctx, tileW) {
+        const floor = this.room.floor;
         for (const holeKey of this.room.holes) {
             const [c, r] = holeKey.split(",").map(Number);
             const x = c * tileW;
@@ -614,19 +728,94 @@ class RoomEditor {
             ctx.fillStyle = "#030206";
             ctx.fillRect(x, y, tileW, tileW);
 
-            // Borda com textura de buraco / abismo
-            ctx.strokeStyle = "rgba(229, 49, 112, 0.5)";
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([4, 4]);
-            ctx.strokeRect(x + 2, y + 2, tileW - 4, tileW - 4);
-            ctx.setLineDash([]);
+            // Tile real do abismo (autotiling pelos vizinhos), igual à engine.
+            if (this.tileset && floor && floor.length) {
+                const idx = holeTileFor(floor, c, r);
+                this.tileset.draw(ctx, idx, x, y, tileW, tileW);
+            }
 
-            // Ícone indicativo de abismo
-            ctx.fillStyle = "rgba(229, 49, 112, 0.8)";
-            ctx.font = "14px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("🕳️", x + tileW / 2, y + tileW / 2);
+            // Realce sutil só na aba de buracos, para indicar que é editável.
+            if (this.activeTab === "tab-holes") {
+                ctx.strokeStyle = "rgba(229, 49, 112, 0.45)";
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.strokeRect(x + 2, y + 2, tileW - 4, tileW - 4);
+                ctx.setLineDash([]);
+            }
+        }
+    }
+
+    _renderProps(ctx, tileW) {
+        if (!this.tileset) return;
+
+        // Modo aleatório: desenha um PREVIEW determinístico do espalhamento
+        // (apenas ilustrativo — no jogo é regerado por célula).
+        if (this.room.scatterProps && this.room.scatterProps.enabled) {
+            if (this.room.floor.length !== this.rows) return;
+            const preview = scatterPropsOnFloor(this.room.floor, {
+                density: this.room.scatterProps.density,
+                rng: this._previewRng(1234)
+            });
+            ctx.save();
+            ctx.globalAlpha = 0.75;
+            for (const p of preview) {
+                this.tileset.draw(ctx, p.index, p.col * tileW, p.row * tileW, tileW, tileW);
+            }
+            ctx.restore();
+            return;
+        }
+
+        for (const p of this.room.props) {
+            const dx = p.col * tileW, dy = p.row * tileW;
+            if (p.flip) {
+                ctx.save();
+                ctx.translate(dx + tileW, dy);
+                ctx.scale(-1, 1);
+                this.tileset.draw(ctx, p.index, 0, 0, tileW, tileW);
+                ctx.restore();
+            } else {
+                this.tileset.draw(ctx, p.index, dx, dy, tileW, tileW);
+            }
+        }
+    }
+
+    // RNG determinístico para o preview do scatter (mulberry32).
+    _previewRng(seed) {
+        let a = seed >>> 0;
+        return function () {
+            a |= 0; a = (a + 0x6D2B79F5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    _renderTorches(ctx, tileW) {
+        for (const t of this.room.torches) {
+            const dx = t.col * tileW, dy = t.row * tileW;
+            // Tile da tocha: norte usa TORCHES.index; laterais usam sideIndex
+            // (espelhado na parede direita, como no jogo).
+            if (this.tileset) {
+                const idx = (t.side === "N" || t.side === "S") ? TORCHES.index : TORCHES.sideIndex;
+                if (t.side === "E") {
+                    ctx.save();
+                    ctx.translate(dx + tileW, dy);
+                    ctx.scale(-1, 1);
+                    this.tileset.draw(ctx, idx, 0, 0, tileW, tileW);
+                    ctx.restore();
+                } else {
+                    this.tileset.draw(ctx, idx, dx, dy, tileW, tileW);
+                }
+            }
+            // Halo indicativo da luz (só visual no editor).
+            const cx = dx + tileW / 2, cy = dy + tileW / 2;
+            const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, tileW * 0.9);
+            grad.addColorStop(0, "rgba(255, 190, 110, 0.45)");
+            grad.addColorStop(1, "rgba(255, 190, 110, 0)");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, tileW * 0.9, 0, Math.PI * 2);
+            ctx.fill();
         }
     }
 
@@ -734,69 +923,92 @@ class RoomEditor {
         }
     }
 
+    /**
+     * Renderiza os perigos. TODOS são posicionados por TILE (col,row) — um por
+     * tile — e desenhados alinhados à grade, exatamente como no jogo.
+     */
     _renderHazards(ctx, totalW, totalH) {
-        const pad = this.tilePx * 1.5;
-        const innerW = totalW - pad * 2;
-        const innerH = totalH - pad * 2;
+        const tileW = this.tilePx;
 
         for (const h of this.room.hazards) {
-            const x = pad + (h.u ?? 0.5) * innerW;
-            const y = pad + (h.v ?? 0.5) * innerH;
+            // Tiles que este perigo ocupa (spikeRow ocupa `count` tiles em linha).
+            const tiles = this._hazardTiles(h);
 
             if (h.type === "button") {
+                const t = tiles[0];
+                const cx = t.col * tileW + tileW / 2;
+                const cy = t.row * tileW + tileW / 2;
                 // Botão de pressão co-op
                 ctx.fillStyle = "#5c0a18";
                 ctx.beginPath();
-                ctx.ellipse(x, y, 20, 12, 0, 0, Math.PI * 2);
+                ctx.ellipse(cx, cy, 22, 14, 0, 0, Math.PI * 2);
                 ctx.fill();
-
                 ctx.strokeStyle = "#ff8906";
                 ctx.lineWidth = 2;
                 ctx.stroke();
-
                 ctx.fillStyle = "#e53170";
                 ctx.beginPath();
-                ctx.ellipse(x, y - 4, 12, 7, 0, 0, Math.PI * 2);
+                ctx.ellipse(cx, cy - 4, 13, 8, 0, 0, Math.PI * 2);
                 ctx.fill();
             } else if (h.type === "spike" || h.type === "spikeRow") {
-                const count = h.count || 1;
-                for (let i = 0; i < count; i++) {
-                    const sx = x;
-                    const sy = y + (i - (count - 1) / 2) * 32;
-
-                    const peakImg = this.assets.get("peaks2");
+                const peakImg = this.assets.get("peaks2");
+                for (const t of tiles) {
+                    const dx = t.col * tileW;
+                    const dy = t.row * tileW;
                     if (peakImg && peakImg.complete) {
-                        ctx.drawImage(peakImg, sx - 16, sy - 16, 32, 32);
+                        ctx.drawImage(peakImg, dx, dy, tileW, tileW);
                     } else {
+                        const cx = dx + tileW / 2, cy = dy + tileW / 2;
                         ctx.fillStyle = "#f5a623";
                         ctx.beginPath();
-                        ctx.moveTo(sx, sy - 14);
-                        ctx.lineTo(sx + 10, sy + 10);
-                        ctx.lineTo(sx - 10, sy + 10);
+                        ctx.moveTo(cx, cy - tileW * 0.3);
+                        ctx.lineTo(cx + tileW * 0.25, cy + tileW * 0.25);
+                        ctx.lineTo(cx - tileW * 0.25, cy + tileW * 0.25);
                         ctx.closePath();
                         ctx.fill();
                     }
                 }
             } else if (h.type === "arrow") {
-                // Atirador de flecha na parede
-                ctx.fillStyle = "#3da9fc";
-                ctx.fillRect(x - 12, y - 12, 24, 24);
-                ctx.strokeStyle = "#fff";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x - 12, y - 12, 24, 24);
-
-                // Seta de direção do disparo
+                const t = tiles[0];
+                const dx = t.col * tileW;
+                const dy = t.row * tileW;
+                // Sprite do lançador de flechas: tile 75 do tileset.
+                if (this.tileset) {
+                    this.tileset.draw(ctx, 75, dx, dy, tileW, tileW);
+                }
+                // Seta de direção do disparo (overlay guia).
+                const cx = dx + tileW / 2, cy = dy + tileW / 2;
                 ctx.strokeStyle = "#ff8906";
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.moveTo(x, y);
-                if (h.dir === "across+") ctx.lineTo(x + 24, y);
-                else if (h.dir === "across-") ctx.lineTo(x - 24, y);
-                else if (h.dir === "along+") ctx.lineTo(x, y + 24);
-                else ctx.lineTo(x, y - 24);
+                ctx.moveTo(cx, cy);
+                const L = tileW * 0.4;
+                if (h.dir === "across+") ctx.lineTo(cx + L, cy);
+                else if (h.dir === "across-") ctx.lineTo(cx - L, cy);
+                else if (h.dir === "along+") ctx.lineTo(cx, cy + L);
+                else ctx.lineTo(cx, cy - L);
                 ctx.stroke();
             }
         }
+    }
+
+    /**
+     * Lista de tiles {col,row} que um perigo ocupa. spikeRow ocupa uma fileira
+     * horizontal de `count` tiles a partir de (col,row); os demais, 1 tile.
+     */
+    _hazardTiles(h) {
+        const col = h.col ?? 0;
+        const row = h.row ?? 0;
+        if (h.type === "spikeRow") {
+            const count = h.count || 4;
+            const tiles = [];
+            for (let i = 0; i < count; i++) {
+                const c = Math.min(this.cols - 2, Math.max(1, col + i));
+                tiles.push({ col: c, row });
+            }
+            return tiles;
+        }
+        return [{ col, row }];
     }
 
     /**
@@ -1022,6 +1234,13 @@ class RoomEditor {
             this.render();
         };
 
+        // Regra de trancamento das portas
+        const lockSelect = document.getElementById("lock-rule");
+        if (lockSelect) lockSelect.onchange = (e) => {
+            this.room.lock = e.target.value;
+            this._updateCodeOutput();
+        };
+
         // Inimigos
         document.querySelectorAll("[name='enemy-choice']").forEach(r => {
             r.onchange = () => { this.selectedEnemy = r.value; };
@@ -1035,6 +1254,48 @@ class RoomEditor {
         };
         document.getElementById("btn-distribute-circle").onclick = () => {
             this._distributeEnemiesCircle();
+        };
+
+        // Tochas
+        const btnClearTorches = document.getElementById("btn-clear-torches");
+        if (btnClearTorches) btnClearTorches.onclick = () => {
+            this.room.torches = [];
+            this._updateTorchesListUI();
+            this._updateValidationChecklist();
+            this._updateCodeOutput();
+            this.render();
+        };
+
+        // Props
+        document.querySelectorAll("[name='prop-choice']").forEach(r => {
+            r.onchange = () => { this.selectedProp = parseInt(r.value, 10); };
+        });
+        const btnClearProps = document.getElementById("btn-clear-props");
+        if (btnClearProps) btnClearProps.onclick = () => {
+            this.room.props = [];
+            this._updatePropsListUI();
+            this._updateValidationChecklist();
+            this._updateCodeOutput();
+            this.render();
+        };
+
+        // Props aleatórios (scatter)
+        const toggleScatter = document.getElementById("toggle-scatter-props");
+        if (toggleScatter) toggleScatter.onchange = (e) => {
+            this.room.scatterProps.enabled = e.target.checked;
+            // Modo exclusivo: ligar o scatter limpa os props manuais.
+            if (e.target.checked && this.room.props.length) this.room.props = [];
+            this._syncScatterUI();
+            this._updatePropsListUI();
+            this._updateCodeOutput();
+            this.render();
+        };
+        const scatterSlider = document.getElementById("scatter-density");
+        if (scatterSlider) scatterSlider.oninput = (e) => {
+            this.room.scatterProps.density = parseInt(e.target.value, 10) / 100;
+            this._syncScatterUI();
+            this._updateCodeOutput();
+            this.render();
         };
 
         // Spawns Players Toggle (na aba e na barra de ferramentas)
@@ -1213,8 +1474,12 @@ class RoomEditor {
 
         if (this.activeTab === "tab-holes") {
             this._toggleHole(col, row);
+        } else if (this.activeTab === "tab-torches") {
+            this._toggleTorchAt(col, row);
+        } else if (this.activeTab === "tab-props") {
+            this._togglePropAt(col, row);
         } else if (this.activeTab === "tab-challenges") {
-            this._addHazardAt(localX, localY);
+            this._addHazardAt(col, row);
         } else if (this.activeTab === "tab-enemies") {
             this._addEnemyAt(col, row);
         }
@@ -1246,26 +1511,43 @@ class RoomEditor {
         this.render();
     }
 
-    _addHazardAt(px, py) {
-        const totalW = this.cols * this.tilePx;
-        const totalH = this.rows * this.tilePx;
-        const pad = this.tilePx * 1.5;
+    /**
+     * Adiciona um perigo no TILE (col,row) clicado. Um perigo por tile: se já
+     * houver outro perigo ocupando o mesmo tile, não duplica.
+     */
+    _addHazardAt(col, row) {
+        const type = this.selectedHazard;
 
-        const u = Math.max(0, Math.min(1, (px - pad) / (totalW - pad * 2)));
-        const v = Math.max(0, Math.min(1, (py - pad) / (totalH - pad * 2)));
+        // Lançadores de flecha vão na PAREDE (borda superior/inferior); os
+        // demais perigos ficam em tiles internos de piso.
+        if (type === "arrow") {
+            // Prende às paredes horizontais (topo = row 0, base = última linha).
+            if (row !== 0 && row !== this.rows - 1) {
+                row = (row < this.rows / 2) ? 0 : this.rows - 1;
+            }
+            col = Math.min(this.cols - 1, Math.max(0, col));
+        } else {
+            if (col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1) return;
+        }
 
-        const newHazard = {
-            type: this.selectedHazard,
-            u: parseFloat(u.toFixed(2)),
-            v: parseFloat(v.toFixed(2))
-        };
+        // Impede dois perigos no mesmo tile.
+        const occupied = this.room.hazards.some(h =>
+            this._hazardTiles(h).some(t => t.col === col && t.row === row)
+        );
+        if (occupied) return;
 
-        if (this.selectedHazard === "spikeRow") {
+        const newHazard = { type, col, row };
+
+        if (type === "spikeRow") {
             newHazard.count = 4;
             newHazard.phase = 0.0;
             newHazard.wave = 0.12;
-        } else if (this.selectedHazard === "arrow") {
-            newHazard.dir = "across+";
+            // Evita a fileira estourar a parede direita.
+            newHazard.col = Math.min(col, this.cols - 1 - newHazard.count);
+            if (newHazard.col < 1) newHazard.col = 1;
+        } else if (type === "arrow") {
+            // Dispara atravessando o corredor, para dentro da sala.
+            newHazard.dir = (row === 0) ? "along+" : "along-";
             newHazard.phase = 0.0;
         }
 
@@ -1288,6 +1570,88 @@ class RoomEditor {
         });
 
         this._updateEnemiesListUI();
+        this._updateValidationChecklist();
+        this._updateCodeOutput();
+        this.render();
+    }
+
+    /**
+     * Coloca/remove uma tocha numa PAREDE (borda da sala). O lado (side) é
+     * deduzido da borda clicada e define para onde a luz é empurrada no jogo.
+     */
+    _toggleTorchAt(col, row) {
+        const last = this.cols - 1, bottom = this.rows - 1;
+        const onBorder = col === 0 || col === last || row === 0 || row === bottom;
+        // Também aceita clique no PISO logo à frente das paredes laterais
+        // (col 1 ou last-1), que é onde o sprite da tocha lateral encaixa.
+        const nearSideWall = (col === 1 || col === last - 1) && row > 0 && row < bottom;
+        if (!onBorder && !nearSideWall) return;
+
+        // Deduz o lado da parede a que a tocha pertence e normaliza a COLUNA
+        // para o tile correto: paredes N/S ficam na própria borda (row 0/bottom);
+        // paredes E/W ficam no PISO à frente (col 1 à esquerda, last-1 à direita).
+        let side, tcol = col, trow = row;
+        if (row === 0) { side = "N"; }
+        else if (row === bottom) { side = "S"; }
+        else if (col === 0 || col === 1) { side = "W"; tcol = 1; }
+        else if (col === last || col === last - 1) { side = "E"; tcol = last - 1; }
+        else return;
+
+        // Não coloca tocha sobre o vão de porta (nem no piso à frente dele).
+        const midC = (this.cols / 2) | 0;
+        const midR = (this.rows / 2) | 0;
+        const blockN = this.room.sockets.N && side === "N" && (tcol === midC - 1 || tcol === midC);
+        const blockS = this.room.sockets.S && side === "S" && (tcol === midC - 1 || tcol === midC);
+        const blockW = this.room.sockets.W && side === "W" && (trow === midR - 1 || trow === midR);
+        const blockE = this.room.sockets.E && side === "E" && (trow === midR - 1 || trow === midR);
+        if (blockN || blockS || blockW || blockE) return;
+
+        const i = this.room.torches.findIndex(t => t.col === tcol && t.row === trow);
+        if (i >= 0) {
+            this.room.torches.splice(i, 1);
+        } else {
+            this.room.torches.push({ col: tcol, row: trow, side });
+        }
+
+        this._updateTorchesListUI();
+        this._updateValidationChecklist();
+        this._updateCodeOutput();
+        this.render();
+    }
+
+    /** Reflete o estado de scatterProps nos controles da UI. */
+    _syncScatterUI() {
+        const sp = this.room.scatterProps || { enabled: false, density: 0.08 };
+        const toggle = document.getElementById("toggle-scatter-props");
+        const row = document.getElementById("scatter-density-row");
+        const val = document.getElementById("scatter-density-val");
+        const slider = document.getElementById("scatter-density");
+        const manual = document.getElementById("props-manual-section");
+        if (toggle) toggle.checked = sp.enabled;
+        if (row) row.style.display = sp.enabled ? "block" : "none";
+        if (slider) slider.value = Math.round(sp.density * 100);
+        if (val) val.textContent = `${Math.round(sp.density * 100)}%`;
+        // Modo exclusivo: desativa a seção de colocação manual quando ligado.
+        if (manual) {
+            manual.style.opacity = sp.enabled ? "0.4" : "1";
+            manual.style.pointerEvents = sp.enabled ? "none" : "auto";
+        }
+    }
+
+    /** Coloca/remove um prop decorativo num tile de piso interno. */
+    _togglePropAt(col, row) {
+        // Modo aleatório ligado: colocação manual desativada.
+        if (this.room.scatterProps && this.room.scatterProps.enabled) return;
+        if (col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1) return;
+
+        const i = this.room.props.findIndex(p => p.col === col && p.row === row);
+        if (i >= 0) {
+            this.room.props.splice(i, 1);
+        } else {
+            this.room.props.push({ col, row, index: this.selectedProp, flip: false });
+        }
+
+        this._updatePropsListUI();
         this._updateValidationChecklist();
         this._updateCodeOutput();
         this.render();
@@ -1342,9 +1706,17 @@ class RoomEditor {
                 W: !!this.room.sockets.W
             },
             holes: Array.from(this.room.holes),
+            // Grade de tiles já com os buracos aplicados (-1). É o que a engine
+            // consome como `customFloor`, preservando os abismos no jogo.
+            floor: this.room.floor,
             hazards: this.room.hazards,
-            enemies: this.room.enemies
+            enemies: this.room.enemies,
+            torches: this.room.torches,
+            props: this.room.scatterProps.enabled ? [] : this.room.props,
+            scatterProps: this.room.scatterProps
         };
+        // Só grava a regra de trancamento se não for "auto" (padrão deduzido).
+        if (this.room.lock && this.room.lock !== "auto") exportData.lock = this.room.lock;
 
         const jsonStr = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonStr], { type: "application/json" });
@@ -1390,6 +1762,10 @@ class RoomEditor {
         this.room.type = data.type || "normal";
         this.room.hazards = data.hazards || [];
         this.room.enemies = data.enemies || [];
+        this.room.torches = data.torches || [];
+        this.room.props = data.props || [];
+        this.room.scatterProps = data.scatterProps || { enabled: false, density: 0.08 };
+        this.room.lock = data.lock || "auto";
         this.room.holes = new Set(data.holes || []);
 
         this.room.sockets = { N: null, S: null, E: null, W: null };
@@ -1430,11 +1806,20 @@ class RoomEditor {
                 W: !!this.room.sockets.W
             },
             holes: Array.from(this.room.holes),
+            // Grade de tiles já com os buracos aplicados (-1), consumida pela
+            // engine como `customFloor` — é o que preserva os abismos no jogo.
+            floor: this.room.floor,
             hazards: this.room.hazards,
-            enemies: this.room.enemies
+            enemies: this.room.enemies,
+            torches: this.room.torches,
+            props: this.room.scatterProps.enabled ? [] : this.room.props,
+            scatterProps: this.room.scatterProps
         };
+        if (this.room.lock && this.room.lock !== "auto") playtestData.lock = this.room.lock;
 
         sessionStorage.setItem("editor_custom_room", JSON.stringify(playtestData));
+        // Garante que a cena do editor fique salva antes de sair para o teste.
+        this._saveState();
         window.location.href = "index.html?playtest=true";
     }
 }

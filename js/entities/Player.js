@@ -48,6 +48,26 @@ export class Player extends Entity {
         this.justStepped = false; // true só no frame em que dá um passo
         this.stepX = 0; this.stepY = 0; this.stepAngle = 0;
         this.bloodStepsLeft = 0;  // passos ensanguentados restantes (ao pisar em sangue)
+
+        // --- Queda em buraco/abismo ---
+        // Ao pisar num tile de buraco (floor === -1), o jogador cai: encolhe e
+        // afunda por `fallDuration` frames e então morre (perde TODAS as vidas).
+        this.falling = false;
+        this.fallTimer = 0;
+        this.fallDuration = 34;   // ~0.57s de animação de queda
+        this.fallX = 0;           // centro do tile em que caiu (trava a posição)
+        this.fallY = 0;
+    }
+
+    // Dispara a queda no buraco (uma vez). Trava o jogador no centro do tile e
+    // zera a velocidade; a morte é concluída ao fim da animação (ver update).
+    startFalling(tileCenterX, tileCenterY) {
+        if (this.falling) return;
+        this.falling = true;
+        this.fallTimer = this.fallDuration;
+        this.fallX = tileCenterX;
+        this.fallY = tileCenterY;
+        this.vx = 0; this.vy = 0;
     }
 
     // Seleciona a folha e o frame corretos conforme o estado atual do player.
@@ -134,6 +154,19 @@ export class Player extends Entity {
     }
 
     update(input, bounds) {
+        // Caindo no abismo: ignora input/movimento, só avança o timer de queda.
+        // Trava a posição no centro do tile para o sprite afundar no lugar.
+        if (this.falling) {
+            this.x = this.fallX;
+            this.y = this.fallY;
+            this.vx = 0; this.vy = 0;
+            if (this.fallTimer > 0) {
+                this.fallTimer--;
+                if (this.fallTimer === 0) this.lives = 0; // morte instantânea
+            }
+            return;
+        }
+
         if (this.invulnerableTimer > 0) this.invulnerableTimer--;
         if (this.hurtTimer > 0) this.hurtTimer--;
         if (this.scaredTimer > 0) this.scaredTimer--;
@@ -223,8 +256,18 @@ export class Player extends Entity {
 
         ctx.translate(this.x, this.y);
 
+        // Queda no abismo: encolhe, afunda um pouco e gira — some no buraco.
+        if (this.falling) {
+            const t = 1 - (this.fallTimer / this.fallDuration); // 0 -> 1
+            const shrink = Math.max(0, 1 - t);                  // 1 -> 0 (some)
+            ctx.translate(0, t * 10);                            // afunda levemente
+            ctx.rotate(t * 1.6);                                 // tomba girando
+            ctx.scale(shrink, shrink);
+            ctx.globalAlpha = Math.max(0, 1 - t * 0.8);
+        }
+
         // Balanço BRUSCO ao receber dano (mais forte no impacto, decaindo com o tempo)
-        if (this.hurtTimer > 0) {
+        if (this.hurtTimer > 0 && !this.falling) {
             const intensity = this.hurtTimer / this.hurtDuration; // 1 -> 0
             const shake = 16 * intensity;
             ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake * 0.5);

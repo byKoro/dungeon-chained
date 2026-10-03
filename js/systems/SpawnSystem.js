@@ -1,6 +1,12 @@
 import { MeleeEnemy } from '../entities/MeleeEnemy.js';
-import { MELEE_ENEMY_CONFIGS } from '../config/EntityConfig.js';
+import { MELEE_ENEMY_CONFIGS, demonConfig, bloodMonsterConfig } from '../config/EntityConfig.js';
 import { BLOOD_STAIN_CONFIG } from '../config/GameConfig.js';
+
+// Mapeia o "type" autoral (escolhido no editor) para a fábrica de config.
+const ENEMY_CONFIG_BY_TYPE = {
+    demon: demonConfig,
+    bloodMonster: bloodMonsterConfig
+};
 
 /**
  * SpawnSystem — fábrica de inimigos.
@@ -25,32 +31,17 @@ export class SpawnSystem {
         return factory(this.assets);
     }
 
-    createEnemy(x, y, floor) {
-        const cfg = this.randomMeleeConfig();
+    /**
+     * Cria um inimigo. Se `type` ("demon"|"bloodMonster") for informado (vindo
+     * da peça autoral do editor), usa a config correspondente; senão sorteia.
+     */
+    createEnemy(x, y, floor, type = null) {
+        const factory = (type && ENEMY_CONFIG_BY_TYPE[type]) || null;
+        const cfg = factory ? factory(this.assets) : this.randomMeleeConfig();
         const foe = new MeleeEnemy(x, y, cfg.img, cfg, floor);
         foe.bloodPalette = this.bloodCanvas.palette;
         foe.gibStainConfig = BLOOD_STAIN_CONFIG.gib;
         return foe;
     }
 
-    /**
-     * Popula uma sala de combate: distribui inimigos num anel ao redor do centro.
-     * @param {object} bounds { minX, maxX, minY, maxY } bounds jogáveis da sala
-     * @param {number} floor  andar atual (influencia a quantidade)
-     * @returns {MeleeEnemy[]}
-     */
-    populateRoom(bounds, floor) {
-        const cx = (bounds.minX + bounds.maxX) / 2;
-        const cy = (bounds.minY + bounds.maxY) / 2;
-        const count = 3 + Math.floor(Math.random() * 3) + Math.floor(floor / 2);
-
-        const enemies = [];
-        for (let i = 0; i < count; i++) {
-            const angle = (i / count) * Math.PI * 2;
-            const ex = cx + Math.cos(angle) * (bounds.maxX - bounds.minX) * 0.28;
-            const ey = cy + Math.sin(angle) * (bounds.maxY - bounds.minY) * 0.28;
-            enemies.push(this.createEnemy(ex, ey, floor));
-        }
-        return enemies;
-    }
 }

@@ -1,3 +1,5 @@
+import { holeTileFor, TORCHES } from '../config/GameConfig.js';
+
 export class Renderer {
     constructor(canvas, ctx) {
         this.canvas = canvas;
@@ -193,12 +195,15 @@ export class Renderer {
             return;
         }
 
-        // Desenha a grade de tiles (piso + moldura de parede + portas)
+        // Desenha a grade de tiles (piso + moldura de parede + portas).
+        // idx < 0 marca um buraco/abismo (vindo do editor): desenha o tile de
+        // borda do abismo correspondente (autotiling pelos vizinhos).
         for (let r = 0; r < tiles.rows; r++) {
             for (let col = 0; col < tiles.cols; col++) {
-                const idx = tiles.floor[r][col];
+                let idx = tiles.floor[r][col];
                 const dx = rect.x + col * tile;
                 const dy = rect.y + r * tile;
+                if (idx < 0) idx = holeTileFor(tiles.floor, col, r);
                 this.tileset.draw(c, idx, dx, dy, tile, tile);
             }
         }
@@ -217,6 +222,26 @@ export class Renderer {
                 c.restore();
             } else {
                 this.tileset.draw(c, p.index, dx, dy, tile, tile);
+            }
+        }
+
+        // Tochas: desenha o SPRITE da tocha (a LUZ é adicionada à parte pelo
+        // Game, lendo tiles.torches). N/S usam TORCHES.index; E/W usam
+        // sideIndex, com o lado Leste espelhado (o tile encaixa na esquerda).
+        if (tiles.torches) {
+            for (const t of tiles.torches) {
+                const idx = (t.side === "N" || t.side === "S") ? TORCHES.index : TORCHES.sideIndex;
+                const dx = rect.x + t.col * tile;
+                const dy = rect.y + t.row * tile;
+                if (t.side === "E") {
+                    c.save();
+                    c.translate(dx + tile, dy);
+                    c.scale(-1, 1);
+                    this.tileset.draw(c, idx, 0, 0, tile, tile);
+                    c.restore();
+                } else {
+                    this.tileset.draw(c, idx, dx, dy, tile, tile);
+                }
             }
         }
 
@@ -293,7 +318,8 @@ export class Renderer {
 
         for (let col = 0; col < tiles.cols; col++) {
             if (southDoorCols.has(col)) continue; // pula o vão aberto
-            const idx = tiles.floor[r][col];
+            let idx = tiles.floor[r][col];
+            if (idx < 0) idx = holeTileFor(tiles.floor, col, r); // buraco/abismo
             const dx = rect.x + col * tile;
             const dy = rect.y + r * tile;
             this.tileset.draw(this.ctx, idx, dx, dy, tile, tile);

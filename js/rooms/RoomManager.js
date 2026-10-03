@@ -2,7 +2,7 @@ import { Dungeon } from '../core/Dungeon.js';
 import { Room } from './Room.js';
 import {
     TILE, ROOM_COLS, ROOM_ROWS, GRID_COLS, GRID_ROWS, ROOM_COUNT,
-    DOOR_ENTER_DEPTH
+    DOOR_ENTER_DEPTH, scatterPropsOnFloor
 } from '../config/GameConfig.js';
 
 /**
@@ -31,9 +31,10 @@ export class RoomManager {
      * @param {SpawnSystem} opts.spawnSystem
      * @param {() => number} opts.getFloor  retorna o andar atual
      */
-    constructor({ spawnSystem, getFloor }) {
+    constructor({ spawnSystem, getFloor, roomCatalog = null }) {
         this.spawnSystem = spawnSystem;
         this.getFloor = getFloor;
+        this.roomCatalog = roomCatalog;  // peças autorais de /map (ou null)
         this.rooms = new Map();   // key "gx,gy" -> Room
         this.dungeon = null;
         this.reset();
@@ -53,6 +54,18 @@ export class RoomManager {
                     const cells = new Map();
                     const key = `${midGx},${midGy}`;
 
+                    // Props: respeita o modo da peça (manual x aleatório).
+                    let props = data.props;
+                    if (data.scatterProps && data.scatterProps.enabled && Array.isArray(data.floor)) {
+                        const occupied = new Set();
+                        for (const foe of (data.enemies || [])) occupied.add(`${foe.col},${foe.row}`);
+                        props = scatterPropsOnFloor(data.floor, {
+                            density: data.scatterProps.density,
+                            tiles: data.scatterProps.tiles,
+                            occupied
+                        });
+                    }
+
                     cells.set(key, {
                         gx: midGx,
                         gy: midGy,
@@ -62,6 +75,9 @@ export class RoomManager {
                         customFloor: data.floor,
                         customHazards: data.hazards,
                         customEnemies: data.enemies,
+                        customTorches: data.torches,
+                        customProps: props,
+                        customLock: data.lock,
                         customName: data.name
                     });
 
@@ -83,6 +99,11 @@ export class RoomManager {
             tile: TILE, roomCols: ROOM_COLS, roomRows: ROOM_ROWS,
             graph: customGraph || null
         });
+        // Semente única desta dungeon: faz a escolha de variações MUDAR entre
+        // partidas, mas permanecer ESTÁVEL dentro da mesma (a sala não troca de
+        // layout ao reentrar). Sem ela, salas em posição fixa (ex.: a start)
+        // sorteariam sempre a mesma variação.
+        this.runSeed = (Math.random() * 0xffffffff) >>> 0;
         this.rooms.clear();
         return this.dungeon;
     }
@@ -109,10 +130,71 @@ export class RoomManager {
         const key = `${cell.gx},${cell.gy}`;
         let room = this.rooms.get(key);
         if (!room) {
+            // Sorteia uma peça autoral (/map) com a assinatura de portas do slot
+            // e anexa seu conteúdo ao cell. Determinístico por posição da célula
+            // para a sala não "trocar" de layout ao reentrar nela.
+            this._applyAuthoredPiece(cell);
             room = new Room(cell, this.dungeon.cellBounds(cell.gx, cell.gy));
             this.rooms.set(key, room);
         }
         return room;
+    }
+
+    /**
+     * Escolhe uma peça autoral para a célula (se houver no catálogo) e copia
+     * seu conteúdo para os campos custom* do cell, que a Room já consome. Se não
+     * houver peça para a assinatura de portas, não faz nada (fallback procedural
+     * do RoomTiles). A escolha é determinística pela posição da célula.
+     */
+    _applyAuthoredPiece(cell) {
+        if (!this.roomCatalog || cell._authored) return;
+        cell._authored = true; // marca para não re-sortear ao reentrar
+
+        // Peças de playtest/custom já trazem o conteúdo embutido: respeita.
+        if (cell.customFloor) return;
+
+        const rng = this._cellRng(cell.gx, cell.gy);
+        // Tipo da célula: salas usam cell.type (start/boss/normal); corredores
+        // são "normal" (desafios agora vêm só das peças autorais com botões).
+        const type = cell.type || "normal";
+        const piece = this.roomCatalog.pick(cell.doors, type, rng);
+        if (!piece) return;
+
+        if (Array.isArray(piece.floor)) cell.customFloor = piece.floor;
+        if (Array.isArray(piece.torches)) cell.customTorches = piece.torches;
+        if (Array.isArray(piece.enemies) && piece.enemies.length) cell.customEnemies = piece.enemies;
+        if (Array.isArray(piece.hazards) && piece.hazards.length) cell.customHazards = piece.hazards;
+        if (piece.lock) cell.customLock = piece.lock;
+        if (piece.name) cell.customName = piece.name;
+
+        // Props: ou AUTORAIS (manuais) ou ALEATÓRIOS pelo chão (exclusivo).
+        const scatter = piece.scatterProps;
+        if (scatter && scatter.enabled && Array.isArray(piece.floor)) {
+            // Evita colocar props sobre inimigos (os perigos usam px, não tile;
+            // ficam fora do piso liso de qualquer forma).
+            const occupied = new Set();
+            for (const foe of (piece.enemies || [])) occupied.add(`${foe.col},${foe.row}`);
+            cell.customProps = scatterPropsOnFloor(piece.floor, {
+                density: scatter.density,
+                tiles: scatter.tiles,
+                occupied,
+                rng
+            });
+        } else if (Array.isArray(piece.props)) {
+            cell.customProps = piece.props;
+        }
+    }
+
+    // RNG determinístico por célula DENTRO de uma dungeon (estável ao reentrar),
+    // mas que varia entre partidas via runSeed.
+    _cellRng(gx, gy) {
+        let a = ((gx * 73856093) ^ (gy * 19349663) ^ (this.getFloor() * 83492791) ^ (this.runSeed || 0)) >>> 0;
+        return function () {
+            a |= 0; a = (a + 0x6D2B79F5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
     }
 
     get current() {

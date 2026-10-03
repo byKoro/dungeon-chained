@@ -1,7 +1,6 @@
 import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
-import { layoutByIndex } from '../systems/ChallengeLayouts.js';
 import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
 
 /**
@@ -33,6 +32,9 @@ export class Room {
         // Layout de tiles (determinístico pela posição da sala ou vindo do editor).
         const seed = (cell.gx * 73856093) ^ (cell.gy * 19349663);
         this.tiles = new RoomTiles(ROOM_COLS, ROOM_ROWS, cell.doors, seed, cell.kind === "room");
+
+        // Piso: peça autoral (editor/map) tem prioridade; depois o catálogo de
+        // arquétipos em código; por fim, o fallback liso do RoomTiles.
         if (cell.customFloor && Array.isArray(cell.customFloor)) {
             this.tiles.floor = cell.customFloor;
         } else if (GlobalRoomVariantCatalog) {
@@ -41,6 +43,11 @@ export class Room {
                 this.tiles.floor = authorialFloor;
             }
         }
+
+        // Tochas (luz) e props (decoração) autorais: substituem o que o
+        // RoomTiles traria (hoje vazio, já que não há mais geração procedural).
+        if (Array.isArray(cell.customTorches)) this.tiles.torches = cell.customTorches;
+        if (Array.isArray(cell.customProps)) this.tiles.props = cell.customProps;
     }
 
     get isCombatRoom() {
@@ -48,8 +55,33 @@ export class Room {
     }
 
     get isChallengeCorridor() {
-        return (this.cell.kind === "corridor" && !!this.cell.challenge) ||
-               (this.cell.customHazards && this.cell.customHazards.length > 0);
+        return !!(this.cell.customHazards && this.cell.customHazards.length > 0);
+    }
+
+    // nº de botões de pressão nos perigos autorais (o puzzle co-op usa 2).
+    get buttonCount() {
+        if (!this.cell.customHazards) return 0;
+        return this.cell.customHazards.filter(h => h.type === "button").length;
+    }
+
+    /**
+     * Regra de trancamento das portas desta sala/corredor:
+     *   "none"    — nunca tranca.
+     *   "enemies" — tranca até matar todos os inimigos.
+     *   "buttons" — tranca até o puzzle de 2 botões ser resolvido.
+     * Usa o campo autoral `customLock` se definido; senão deduz um padrão
+     * sensato (botões -> buttons; inimigos -> enemies; nada -> none).
+     */
+    get lockRule() {
+        const explicit = this.cell.customLock;
+        // "buttons" exige 2 botões para ser resolvível; sem eles, não tranca.
+        if (explicit === "buttons") return this.buttonCount >= 2 ? "buttons" : "none";
+        if (explicit === "enemies") return "enemies";
+        if (explicit === "none") return "none";
+        // Padrão deduzido quando a peça não define `lock`:
+        if (this.buttonCount >= 2) return "buttons";
+        if (this.cell.customEnemies && this.cell.customEnemies.length > 0) return "enemies";
+        return "none";
     }
 
     get isBoss() {
@@ -71,53 +103,75 @@ export class Room {
         if (this.populated) return;
         this.populated = true;
 
+        // 1) Instancia o CONTEÚDO (independente de trancar ou não).
+        // Perigos autorais (spikes/flechas/botões) -> ChallengeCorridor, que os
+        // mantém ativos (ferindo). Só vêm da peça desenhada — nada procedural.
         if (this.cell.customHazards && this.cell.customHazards.length > 0) {
-            // Desafio customizado vindo do Editor Visual
             const layout = { name: this.cell.customName || "Desafio Custom", elements: this.cell.customHazards };
             this.challenge = new ChallengeCorridor(layout, this.bounds, this.cell.doors, assets);
+        }
+
+        // Inimigos autorais (podem coexistir com perigos). Pula tiles de buraco.
+        if (this.cell.customEnemies && this.cell.customEnemies.length > 0) {
+            const floorGrid = this.tiles.floor;
+            this.enemies = this.cell.customEnemies
+                .filter(foe => {
+                    const row = floorGrid[foe.row];
+                    return !row || row[foe.col] !== -1;
+                })
+                .map(foe => {
+                    const ex = this.bounds.minX + foe.col * 64;
+                    const ey = this.bounds.minY + foe.row * 64;
+                    return spawnSystem.createEnemy(ex, ey, floor, foe.type);
+                });
+        }
+
+        // 2) Define o estado "limpo" conforme a REGRA DE TRANCAMENTO.
+        //   none    -> nasce limpa (portas abertas), mesmo com perigos.
+        //   buttons -> trancada até o puzzle (challenge.solved).
+        //   enemies -> trancada até matar todos os inimigos.
+        const rule = this.lockRule;
+        if (rule === "buttons" && this.challenge) {
             this.cleared = false;
-        } else if (this.cell.customEnemies && this.cell.customEnemies.length > 0) {
-            // Inimigos colocados manualmente pelo Editor Visual
-            this.enemies = this.cell.customEnemies.map(foe => {
-                const ex = this.bounds.minX + foe.col * 64;
-                const ey = this.bounds.minY + foe.row * 64;
-                return spawnSystem.createEnemy(ex, ey, floor);
-            });
-        } else if (this.isChallengeCorridor) {
-            // Corredor-desafio: nasce TRANCADO (portas fechadas) até o puzzle
-            // co-op ser resolvido. Sem inimigos.
-            const layout = layoutByIndex(this.cell.challengeIndex || 0);
-            this.challenge = new ChallengeCorridor(layout, this.bounds, this.cell.doors, assets);
+        } else if (rule === "enemies" && this.enemies.length > 0) {
             this.cleared = false;
-        } else if (this.isCombatRoom) {
-            this.enemies = spawnSystem.populateRoom(this.bounds, floor);
         } else {
             this.cleared = true;
         }
     }
 
-    // A sala está trancada (portas fechadas) enquanto:
-    //  - for sala de combate com inimigos vivos, OU
-    //  - for corredor-desafio ainda não resolvido.
+    // A sala está trancada (portas fechadas) conforme a regra de trancamento.
+    //   none    -> nunca tranca.
+    //   buttons -> trancada até o puzzle co-op ser resolvido.
+    //   enemies -> trancada até matar todos os inimigos.
     isLocked() {
-        if (this.challenge) return this.challenge.locked;
-        return !this.cleared && this.enemies.length > 0;
+        if (this.cleared) return false;
+        const rule = this.lockRule;
+        if (rule === "buttons") return this.challenge ? this.challenge.locked : false;
+        if (rule === "enemies") return this.enemies.length > 0;
+        return false;
     }
 
-    // Marca a sala como limpa quando não há mais inimigos (ou o desafio foi
-    // resolvido).
+    // Marca a sala como limpa quando a condição da regra é satisfeita.
     tryClear() {
-        if (this.challenge) {
-            if (!this.cleared && this.challenge.solved) {
+        if (this.cleared) return false;
+        const rule = this.lockRule;
+
+        if (rule === "buttons") {
+            if (this.challenge && this.challenge.solved) {
                 this.cleared = true;
                 return true;
             }
             return false;
         }
-        if (!this.cleared && this.enemies.length === 0) {
-            this.cleared = true;
-            return true;
+        if (rule === "enemies") {
+            if (this.enemies.length === 0) {
+                this.cleared = true;
+                return true;
+            }
+            return false;
         }
+        // "none": já nasce limpa.
         return false;
     }
 

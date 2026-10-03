@@ -120,6 +120,125 @@ export const PLAYER_SAFE_ZONE = 46;
 // ---- Fundo ----
 export const BACKGROUND_TILE = 78; // tile que preenche o vazio fora da sala
 
+/**
+ * HOLES — buracos / abismos (tiles sem piso onde quem pisa cai e morre).
+ *
+ * No layout de tiles um buraco é marcado com -1. Na hora de desenhar, cada
+ * buraco recebe um tile de borda conforme QUAIS lados vizinhos NÃO são buraco
+ * (a "parede" do abismo aparece justamente nesses lados). A combinação dos 4
+ * lados é uma bitmask (N=1, E=2, S=4, W=8) que indexa HOLE_TILES.
+ *
+ * Índices do tileset (grade 10 colunas): a borda está no(s) lado(s) marcado(s).
+ */
+export const HOLE_TILE = -1; // marcador de "sem piso" na grade floor[r][c]
+
+// bitmask (N=1,E=2,S=4,W=8 => lado COM borda) -> índice do tile no tileset.
+export const HOLE_TILES = Object.freeze({
+    0:  116,  // interior puro (cercado por buraco em todos os lados)
+    1:  103, // N
+    2:  105, // E
+    3:  102, // N+E
+    4:  104, // S
+    5:  115, // N+S
+    6:  109, // E+S
+    7:  112, // N+E+S
+    8:  106, // W
+    9:  101, // N+W
+    10: 114, // E+W
+    11: 110, // N+E+W
+    12: 107, // S+W
+    13: 113, // N+S+W
+    14: 111, // E+S+W
+    15: 100  // N+E+S+W (buraco isolado de 1 tile)
+});
+
+/**
+ * Resolve o índice visual de um tile de buraco em (col,row) olhando os quatro
+ * vizinhos ortogonais na grade `floor`. Um lado ganha borda quando o vizinho
+ * daquele lado NÃO é buraco (é piso, parede ou fica fora da grade).
+ *
+ * @param {number[][]} floor grade de índices (HOLE_TILE = -1 marca buraco)
+ * @param {number} col
+ * @param {number} row
+ * @returns {number} índice de tile de borda do buraco
+ */
+export function holeTileFor(floor, col, row) {
+    const isHole = (c, r) => {
+        const line = floor[r];
+        return !!line && line[c] === HOLE_TILE;
+    };
+    let mask = 0;
+    if (!isHole(col, row - 1)) mask |= 1; // N
+    if (!isHole(col + 1, row)) mask |= 2; // E
+    if (!isHole(col, row + 1)) mask |= 4; // S
+    if (!isHole(col - 1, row)) mask |= 8; // W
+    return HOLE_TILES[mask];
+}
+
+/**
+ * PROP_SCATTER — espalhamento AUTORAL de props pelo chão. A peça pode optar por
+ * "props aleatórios" (em vez de posicionar cada um manualmente): o jogo espalha
+ * props nos tiles de piso livre na geração, de forma determinística por célula.
+ */
+export const PROP_SCATTER = {
+    // Tiles de piso "liso" onde um prop pode ser espalhado (centro da sala).
+    floorTiles: [16],
+    // Props disponíveis para o sorteio (índices do tileset).
+    tiles: [59, 77, 68, 64],
+    // Densidade padrão (fração dos tiles de piso livre que recebem prop).
+    defaultDensity: 0.08,
+    minDensity: 0.0,
+    maxDensity: 0.4
+};
+
+/**
+ * Espalha props pelos tiles de piso livre de uma sala, de forma determinística.
+ * Evita paredes, buracos (-1), vãos/entradas de porta e qualquer tile já
+ * ocupado (nas listas `occupied`). Retorna uma lista [{ col, row, index }].
+ *
+ * @param {number[][]} floor  matriz de tiles (−1 = buraco)
+ * @param {object} opts
+ *   density   fração 0..1 dos tiles livres que recebem prop
+ *   tiles     índices de prop para sortear (default PROP_SCATTER.tiles)
+ *   occupied  Set de chaves "col,row" a evitar (inimigos, traps, portas, etc.)
+ *   rng       função 0..1 determinística
+ */
+export function scatterPropsOnFloor(floor, opts = {}) {
+    const density = Math.max(0, Math.min(1, opts.density ?? PROP_SCATTER.defaultDensity));
+    const propTiles = opts.tiles && opts.tiles.length ? opts.tiles : PROP_SCATTER.tiles;
+    const occupied = opts.occupied || new Set();
+    const rng = opts.rng || Math.random;
+    const rows = floor.length;
+    const cols = rows > 0 ? floor[0].length : 0;
+
+    // Candidatos: tiles internos de piso liso, sem buraco e não ocupados.
+    const candidates = [];
+    for (let r = 1; r < rows - 1; r++) {
+        for (let c = 1; c < cols - 1; c++) {
+            const idx = floor[r][c];
+            if (idx < 0) continue;                              // buraco
+            if (!PROP_SCATTER.floorTiles.includes(idx)) continue; // só piso liso (evita beiras/portas)
+            if (occupied.has(`${c},${r}`)) continue;
+            candidates.push({ col: c, row: r });
+        }
+    }
+
+    const target = Math.round(candidates.length * density);
+    // Embaralho determinístico (Fisher-Yates com rng).
+    for (let i = candidates.length - 1; i > 0; i--) {
+        const j = (rng() * (i + 1)) | 0;
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+
+    const out = [];
+    for (let i = 0; i < target && i < candidates.length; i++) {
+        const { col, row } = candidates[i];
+        const index = propTiles[(rng() * propTiles.length) | 0];
+        out.push({ col, row, index, flip: rng() < 0.5 });
+    }
+    return out;
+}
+
 // ---- Iluminação / Pós-processamento ----
 // Raio (em px de MUNDO) do halo de luz que cada jogador carrega. É convertido
 // para px de tela pelo zoom na hora de desenhar (ver Game._render).

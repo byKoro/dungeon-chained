@@ -23,7 +23,7 @@ import {
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
-    getPlayerSpawnPositions
+    getPlayerSpawnPositions, HOLE_TILE
 } from './config/GameConfig.js';
 
 /**
@@ -38,10 +38,13 @@ import {
  *   game.start();
  */
 export class Game {
-    constructor(canvas) {
+    constructor(canvas, opts = {}) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.ctx.imageSmoothingEnabled = false;
+
+        // Catálogo de peças autorais (/map); pode ser null (cai no fallback).
+        this.roomCatalog = opts.roomCatalog || null;
 
         // Assets e tela
         this.assets = new AssetLoader();
@@ -83,7 +86,12 @@ export class Game {
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem });
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas });
-        this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor });
+        this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
+
+        // Modo de teste do editor: carrega UMA sala custom e desabilita a
+        // troca de salas (não há vizinhas — transicionar causaria crash).
+        this.playtest = typeof window !== "undefined" &&
+            !!window.location && window.location.search.includes("playtest=true");
 
         // Estado de jogo
         this.floor = 1;
@@ -146,18 +154,65 @@ export class Game {
         this.particleSystem.clear();
         this.gameOver = false;
 
+        this.rooms.enter();
+        this.arenaBounds = this.rooms.currentBounds;
+
         const rect = this.rooms.cellRect();
         const spawns = getPlayerSpawnPositions("CENTER", rect.x, rect.y, TILE);
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
 
+        // No modo de teste do editor, o spawn central pode cair sobre um buraco
+        // (morte instantânea em loop). Reposiciona cada player no tile de piso
+        // seguro mais próximo do centro.
+        if (this.playtest) {
+            this._ensureSafeSpawn(this.p1, rect);
+            this._ensureSafeSpawn(this.p2, rect);
+        }
+
         const center = this.rooms.cellCenter();
         this.renderer.camX = center.x;
         this.renderer.camY = center.y;
 
-        this.rooms.enter();
-        this.arenaBounds = this.rooms.currentBounds;
         this.updateHud();
+    }
+
+    // Garante que um jogador não nasça sobre um buraco (-1): se o tile atual for
+    // abismo, busca em espiral o tile de piso válido mais próximo e recoloca o
+    // jogador no centro dele.
+    _ensureSafeSpawn(player, rect) {
+        const tiles = this.rooms.currentTiles;
+        if (!tiles || !tiles.floor) return;
+        const floor = tiles.floor;
+
+        const col = Math.floor((player.x - rect.x) / TILE);
+        const row = Math.floor((player.y - rect.y) / TILE);
+
+        const isSafe = (c, r) => {
+            const line = floor[r];
+            // Dentro da sala, não ser parede de borda e não ser buraco.
+            return !!line && line[c] !== undefined && line[c] >= 0 &&
+                c > 0 && r > 0 && c < tiles.cols - 1 && r < tiles.rows - 1;
+        };
+
+        if (isSafe(col, row)) return;
+
+        // Busca em anéis crescentes ao redor do tile original.
+        const maxR = Math.max(tiles.cols, tiles.rows);
+        for (let radius = 1; radius < maxR; radius++) {
+            for (let dr = -radius; dr <= radius; dr++) {
+                for (let dc = -radius; dc <= radius; dc++) {
+                    if (Math.max(Math.abs(dr), Math.abs(dc)) !== radius) continue;
+                    const c = col + dc, r = row + dr;
+                    if (isSafe(c, r)) {
+                        player.x = rect.x + (c + 0.5) * TILE;
+                        player.y = rect.y + (r + 0.5) * TILE;
+                        player.vx = 0; player.vy = 0;
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     // Move para a sala vizinha através de uma porta, reposicionando cada player em um tile logo à frente da porta.
@@ -268,6 +323,10 @@ export class Game {
         rooms.clampPlayer(p1, this.arenaBounds, doors, canPass);
         rooms.clampPlayer(p2, this.arenaBounds, doors, canPass);
 
+        // Queda em buracos/abismos: se o centro do jogador está sobre um tile
+        // sem piso (-1), ele cai e morre. A posição já está confinada acima.
+        this._checkHoleFalls([p1, p2]);
+
         // Arma
         this.currentWeapon.update();
         this.combat.resolveWeaponHits(this.currentWeapon, enemies, p1, p2);
@@ -295,8 +354,32 @@ export class Game {
         this.updateHud();
     }
 
+    // Verifica se cada jogador está sobre um tile de buraco (-1). Em caso
+    // positivo, dispara a queda (que leva à morte ao fim da animação). Usa o
+    // centro do jogador convertido para coordenada de tile da sala atual.
+    _checkHoleFalls(players) {
+        const tiles = this.rooms.currentTiles;
+        if (!tiles || !tiles.floor) return;
+        const rect = this.rooms.cellRect();
+
+        for (const p of players) {
+            if (p.falling) continue;
+            const col = Math.floor((p.x - rect.x) / TILE);
+            const row = Math.floor((p.y - rect.y) / TILE);
+            const line = tiles.floor[row];
+            if (line && line[col] === HOLE_TILE) {
+                // Centro do tile do buraco, para o sprite afundar alinhado.
+                const cx = rect.x + (col + 0.5) * TILE;
+                const cy = rect.y + (row + 0.5) * TILE;
+                p.startFalling(cx, cy);
+            }
+        }
+    }
+
     // Dispara a transição quando ambos os players adentraram o mesmo vão.
     _checkDoorTransition(doors) {
+        // No modo de teste do editor só existe UMA sala: nunca transiciona.
+        if (this.playtest) return;
         if (this.rooms.isLocked() || this.transition) return;
         const { p1, p2, rooms } = this;
         for (const door of doors) {
@@ -402,6 +485,7 @@ export class Game {
                 let wx = rect.x + t.col * TILE + TILE / 2;
                 let wy = rect.y + t.row * TILE + TILE / 2;
                 if (t.side === "N") wy += tl.offsetY;
+                else if (t.side === "S") wy -= tl.offsetY; // empurra para dentro (para cima)
                 else if (t.side === "W") wx += tl.offsetX;
                 else if (t.side === "E") wx -= tl.offsetX;
 
