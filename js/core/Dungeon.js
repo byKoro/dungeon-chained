@@ -28,7 +28,7 @@ export class Dungeon {
         // exatamente os 2 tiles de porta desenhados).
         this.doorHalf = opts.doorHalf ?? this.tile;
 
-        this.graph = new DungeonGraph(opts).generate();
+        this.graph = opts.graph || new DungeonGraph(opts).generate();
 
         // Estado
         this.currentKey = this._key(this.graph.start.gx, this.graph.start.gy);

@@ -22,7 +22,8 @@ import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
-    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND
+    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
+    getPlayerSpawnPositions
 } from './config/GameConfig.js';
 
 /**
@@ -145,10 +146,12 @@ export class Game {
         this.particleSystem.clear();
         this.gameOver = false;
 
-        const center = this.rooms.cellCenter();
-        this.p1.x = center.x - 30; this.p1.y = center.y; this.p1.vx = 0; this.p1.vy = 0;
-        this.p2.x = center.x + 30; this.p2.y = center.y; this.p2.vx = 0; this.p2.vy = 0;
+        const rect = this.rooms.cellRect();
+        const spawns = getPlayerSpawnPositions("CENTER", rect.x, rect.y, TILE);
+        this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
+        this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
 
+        const center = this.rooms.cellCenter();
         this.renderer.camX = center.x;
         this.renderer.camY = center.y;
 
@@ -157,22 +160,19 @@ export class Game {
         this.updateHud();
     }
 
-    // Move para a sala vizinha através de uma porta, reposicionando os players.
+    // Move para a sala vizinha através de uma porta, reposicionando cada player em um tile logo à frente da porta.
     transitionThroughDoor(door) {
         this.rooms.transitionTo(door);
         this.arenaBounds = this.rooms.currentBounds;
 
-        const nb = this.arenaBounds;
-        const cx = (nb.minX + nb.maxX) / 2, cy = (nb.minY + nb.maxY) / 2;
-        let ex = cx, ey = cy;
-        const inset = 90;
-        if (door.dir === "N") { ey = nb.maxY - inset; ex = cx; }
-        else if (door.dir === "S") { ey = nb.minY + inset; ex = cx; }
-        else if (door.dir === "E") { ex = nb.minX + inset; ey = cy; }
-        else if (door.dir === "W") { ex = nb.maxX - inset; ey = cy; }
+        // A porta de entrada na nova sala é o lado oposto da porta atravessada na sala anterior:
+        // Ex: saiu pela porta Norte -> entra pela porta Sul da nova sala.
+        const entryDir = { N: "S", S: "N", E: "W", W: "E" }[door.dir] || "CENTER";
+        const rect = this.rooms.cellRect();
+        const spawns = getPlayerSpawnPositions(entryDir, rect.x, rect.y, TILE);
 
-        this.p1.x = ex - 24; this.p1.y = ey; this.p1.vx = 0; this.p1.vy = 0;
-        this.p2.x = ex + 24; this.p2.y = ey; this.p2.vx = 0; this.p2.vy = 0;
+        this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
+        this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
         this.updateHud();
     }
 

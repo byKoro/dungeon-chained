@@ -54,6 +54,65 @@ export const DOOR_STUB_TILES = 2;
 // Profundidade (px) que o jogador pode adentrar o vão antes de transicionar.
 export const DOOR_ENTER_DEPTH = 70;
 
+// ---- Regra de Spawn dos Jogadores ----
+// Cada jogador nasce exatamente em um tile individual logo à frente do vão da porta (span de 2 tiles).
+// P1 (Amarelo) e P2 (Azul) ocupam os dois tiles adjacentes à porta correspondente.
+export const PLAYER_DOOR_SPAWN_TILES = {
+    // Ao entrar pela porta Norte (descendo para a sala):
+    N: {
+        p1: { col: 6, row: 1 },
+        p2: { col: 7, row: 1 }
+    },
+    // Ao entrar pela porta Sul (subindo para a sala):
+    S: {
+        p1: { col: 6, row: ROOM_ROWS - 2 }, // row 7
+        p2: { col: 7, row: ROOM_ROWS - 2 }  // row 7
+    },
+    // Ao entrar pela porta Oeste (entrando pela esquerda):
+    W: {
+        p1: { col: 1, row: 3 },
+        p2: { col: 1, row: 4 }
+    },
+    // Ao entrar pela porta Leste (entrando pela direita):
+    E: {
+        p1: { col: ROOM_COLS - 2, row: 3 }, // col 12
+        p2: { col: ROOM_COLS - 2, row: 4 }  // col 12
+    },
+    // Spawn inicial da dungeon (centro da sala):
+    CENTER: {
+        p1: { col: 6, row: 4 },
+        p2: { col: 7, row: 4 }
+    }
+};
+
+/**
+ * Retorna as posições de spawn (col, row e coordenadas px no mundo) dos jogadores
+ * conforme a regra: cada um em um tile logo à frente da porta.
+ *
+ * @param {"N"|"S"|"E"|"W"|"CENTER"} entryDoorDir Direção da porta pela qual os players entram
+ * @param {number} x0 Origem X da célula no mundo (px)
+ * @param {number} y0 Origem Y da célula no mundo (px)
+ * @param {number} tilePx Tamanho do tile em px (padrão TILE = 64)
+ */
+export function getPlayerSpawnPositions(entryDoorDir, x0 = 0, y0 = 0, tilePx = TILE) {
+    const rule = PLAYER_DOOR_SPAWN_TILES[entryDoorDir] || PLAYER_DOOR_SPAWN_TILES.CENTER;
+    return {
+        entryDir: entryDoorDir,
+        p1: {
+            col: rule.p1.col,
+            row: rule.p1.row,
+            x: x0 + (rule.p1.col + 0.5) * tilePx,
+            y: y0 + (rule.p1.row + 0.5) * tilePx
+        },
+        p2: {
+            col: rule.p2.col,
+            row: rule.p2.row,
+            x: x0 + (rule.p2.col + 0.5) * tilePx,
+            y: y0 + (rule.p2.row + 0.5) * tilePx
+        }
+    };
+}
+
 // ---- Combate ----
 // Zona morta perto dos players onde a arma não fere inimigos.
 export const PLAYER_SAFE_ZONE = 46;

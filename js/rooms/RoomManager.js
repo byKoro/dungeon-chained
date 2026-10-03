@@ -39,11 +39,49 @@ export class RoomManager {
         this.reset();
     }
 
-    // Gera uma nova dungeon do zero e limpa o cache de salas.
+    // Gera uma nova dungeon do zero ou carrega a sala do editor se estiver em modo playtest.
     reset() {
+        let customGraph = null;
+        if (typeof window !== "undefined" && window.sessionStorage) {
+            const isPlaytest = window.location.search.includes("playtest=true");
+            const raw = window.sessionStorage.getItem("editor_custom_room");
+            if (isPlaytest && raw) {
+                try {
+                    const data = JSON.parse(raw);
+                    const midGx = (GRID_COLS / 2) | 0;
+                    const midGy = (GRID_ROWS / 2) | 0;
+                    const cells = new Map();
+                    const key = `${midGx},${midGy}`;
+
+                    cells.set(key, {
+                        gx: midGx,
+                        gy: midGy,
+                        kind: data.kind || "room",
+                        type: data.type || "start",
+                        doors: data.doors || { N: false, S: false, E: false, W: false },
+                        customFloor: data.floor,
+                        customHazards: data.hazards,
+                        customEnemies: data.enemies,
+                        customName: data.name
+                    });
+
+                    customGraph = {
+                        cols: GRID_COLS,
+                        rows: GRID_ROWS,
+                        cells,
+                        rooms: [{ gx: midGx, gy: midGy, type: data.type || "start" }],
+                        start: { gx: midGx, gy: midGy }
+                    };
+                } catch (e) {
+                    console.error("Erro ao carregar sala do editor para playtest:", e);
+                }
+            }
+        }
+
         this.dungeon = new Dungeon({
             cols: GRID_COLS, rows: GRID_ROWS, roomCount: ROOM_COUNT,
-            tile: TILE, roomCols: ROOM_COLS, roomRows: ROOM_ROWS
+            tile: TILE, roomCols: ROOM_COLS, roomRows: ROOM_ROWS,
+            graph: customGraph || null
         });
         this.rooms.clear();
         return this.dungeon;

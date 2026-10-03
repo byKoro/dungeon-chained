@@ -2,6 +2,7 @@ import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
 import { layoutByIndex } from '../systems/ChallengeLayouts.js';
+import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
 
 /**
  * Room — uma sala concreta da dungeon.
@@ -29,9 +30,17 @@ export class Room {
         // populate() se a célula estiver marcada como desafio.
         this.challenge = null;
 
-        // Layout de tiles (determinístico pela posição da sala).
+        // Layout de tiles (determinístico pela posição da sala ou vindo do editor).
         const seed = (cell.gx * 73856093) ^ (cell.gy * 19349663);
         this.tiles = new RoomTiles(ROOM_COLS, ROOM_ROWS, cell.doors, seed, cell.kind === "room");
+        if (cell.customFloor && Array.isArray(cell.customFloor)) {
+            this.tiles.floor = cell.customFloor;
+        } else if (GlobalRoomVariantCatalog) {
+            const authorialFloor = GlobalRoomVariantCatalog.getFloorForDoors(cell.doors);
+            if (authorialFloor) {
+                this.tiles.floor = authorialFloor;
+            }
+        }
     }
 
     get isCombatRoom() {
@@ -39,7 +48,8 @@ export class Room {
     }
 
     get isChallengeCorridor() {
-        return this.cell.kind === "corridor" && !!this.cell.challenge;
+        return (this.cell.kind === "corridor" && !!this.cell.challenge) ||
+               (this.cell.customHazards && this.cell.customHazards.length > 0);
     }
 
     get isBoss() {
@@ -61,7 +71,19 @@ export class Room {
         if (this.populated) return;
         this.populated = true;
 
-        if (this.isChallengeCorridor) {
+        if (this.cell.customHazards && this.cell.customHazards.length > 0) {
+            // Desafio customizado vindo do Editor Visual
+            const layout = { name: this.cell.customName || "Desafio Custom", elements: this.cell.customHazards };
+            this.challenge = new ChallengeCorridor(layout, this.bounds, this.cell.doors, assets);
+            this.cleared = false;
+        } else if (this.cell.customEnemies && this.cell.customEnemies.length > 0) {
+            // Inimigos colocados manualmente pelo Editor Visual
+            this.enemies = this.cell.customEnemies.map(foe => {
+                const ex = this.bounds.minX + foe.col * 64;
+                const ey = this.bounds.minY + foe.row * 64;
+                return spawnSystem.createEnemy(ex, ey, floor);
+            });
+        } else if (this.isChallengeCorridor) {
             // Corredor-desafio: nasce TRANCADO (portas fechadas) até o puzzle
             // co-op ser resolvido. Sem inimigos.
             const layout = layoutByIndex(this.cell.challengeIndex || 0);
