@@ -1,6 +1,7 @@
 import { MeleeEnemy } from '../entities/MeleeEnemy.js';
 import { MELEE_ENEMY_CONFIGS } from '../config/EntityConfig.js';
 import { BLOOD_STAIN_CONFIG } from '../config/GameConfig.js';
+import { FireSkullEnemy } from '../entities/FireSkullEnemy.js';
 
 /**
  * SpawnSystem — fábrica de inimigos.
@@ -45,6 +46,9 @@ export class SpawnSystem {
         const count = 3 + Math.floor(Math.random() * 3) + Math.floor(floor / 2);
 
         const enemies = [];
+        // Inclui um atirador em cada sala de combate para tornar o novo tipo
+        // visível durante a exploração normal do jogo.
+        enemies.push(new FireSkullEnemy(cx, cy - 70, this.assets.fireSkull));
         for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2;
             const ex = cx + Math.cos(angle) * (bounds.maxX - bounds.minX) * 0.28;

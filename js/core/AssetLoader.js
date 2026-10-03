@@ -18,6 +18,7 @@ export class AssetLoader {
         // Inimigos
         this.load("demon", "assets/enemies/demon.png");
         this.load("bloodMonster", "assets/enemies/blood_monster.png");
+        this.load("fireSkull", "assets/enemies/skull_fire_sheet.png");
 
         // Tileset das salas (grade 10x10 de 16px)
         this.load("tileset", "assets/tileset/tileset.png");
@@ -56,6 +57,7 @@ export class AssetLoader {
     get p2() { return this.images.p2; }
     get demon() { return this.images.demon; }
     get bloodMonster() { return this.images.bloodMonster; }
+    get fireSkull() { return this.images.fireSkull; }
     get tileset() { return this.images.tileset; }
     // Frames dos spikes, em ordem (recolhido -> estendido).
     get peaks() { return [this.images.peaks0, this.images.peaks1, this.images.peaks2, this.images.peaks3]; }
