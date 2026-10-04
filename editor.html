@@ -11,222 +11,228 @@
     <!-- ================= BARRA SUPERIOR (HEADER) ================= -->
     <header id="editor-header">
         <div class="brand">
-            <h1>🗡️ DUNGEON CHAINED</h1>
-            <span class="badge">Editor de Salas</span>
+            <span class="editor-title">Editor</span>
         </div>
 
         <div class="header-center">
-            <!-- Navegador de FORMAS (setas percorrem as formas de sala/corredor) -->
-            <div class="shape-nav">
-                <button class="btn nav-arrow" id="shape-prev" title="Forma anterior">◀</button>
-                <div class="shape-info">
-                    <div class="shape-name" id="shape-name">—</div>
-                    <div class="shape-status" id="shape-status"></div>
-                </div>
-                <button class="btn nav-arrow" id="shape-next" title="Próxima forma">▶</button>
-            </div>
-            <!-- Navegador de VARIAÇÕES dentro da forma -->
-            <div class="variant-nav">
-                <button class="btn btn-sm nav-arrow" id="variant-prev" title="Variação anterior">◀</button>
-                <span class="variant-label" id="variant-label">—</span>
-                <button class="btn btn-sm nav-arrow" id="variant-next" title="Próxima variação">▶</button>
-                <button class="btn btn-sm" id="variant-new" title="Criar nova variação (molde limpo)">➕ Nova</button>
+            <!-- Nome da FORMA atual, centralizado em negrito grande -->
+            <div class="shape-info">
+                <div class="shape-name" id="shape-name">—</div>
+                <div class="shape-status" id="shape-status"></div>
             </div>
         </div>
 
         <div class="header-actions">
-            <button class="btn btn-primary" id="btn-save-room" title="Salvar esta peça na pasta /map">💾 Salvar</button>
-            <button class="btn btn-primary" id="btn-playtest" title="Executar e jogar diretamente nesta sala!">⚡ Testar</button>
-            <button class="btn" id="btn-coverage" title="Ver quais peças já foram feitas e quais faltam">📊 Cobertura</button>
-            <button class="btn" id="btn-export-json">💾 JSON</button>
-            <button class="btn" id="btn-import-json">📂 Importar</button>
-            <a href="index.html" class="btn btn-accent">🎮 Jogo</a>
+            <button class="btn btn-primary" id="btn-save-room" title="Salvar esta peça na pasta /map">Salvar</button>
+            <button class="btn btn-danger" id="btn-delete-room" title="Deletar esta variação da pasta /map">Deletar</button>
+            <button class="btn btn-primary" id="btn-playtest" title="Executar e jogar diretamente nesta sala!">Testar</button>
+            <button class="btn" id="btn-coverage" title="Ver quais peças já foram feitas e quais faltam">Cobertura</button>
+            <a href="index.html" class="btn btn-accent">Jogo</a>
         </div>
     </header>
 
     <!-- ================= WORKSPACE PRINCIPAL ================= -->
     <main id="editor-workspace">
 
-        <!-- PAINEL ESQUERDO: FERRAMENTAS FOCADAS -->
+        <!-- PAINEL ESQUERDO: FERRAMENTAS FOCADAS (CARDS COLAPSÁVEIS) -->
         <aside id="sidebar-left">
-            <nav class="mode-tabs">
-                <button class="tab-btn active" data-tab="tab-holes">🕳️ Buracos</button>
-                <button class="tab-btn" data-tab="tab-torches">🔥 Tochas</button>
-                <button class="tab-btn" data-tab="tab-props">🏺 Props</button>
-                <button class="tab-btn" data-tab="tab-challenges">⚠️ Traps</button>
-                <button class="tab-btn" data-tab="tab-enemies">👾 Inimigos</button>
-                <button class="tab-btn" data-tab="tab-spawns">👥 Spawns Players</button>
-            </nav>
 
             <div class="tab-panel-container">
 
-                <!-- ABA 1: BURACOS / SEM PISO (ABISMO) -->
-                <div class="tab-panel active" id="tab-holes">
-                    <div class="panel-section">
-                        <div class="panel-title">Definir Onde NÃO Terá Piso</div>
-                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                            O piso decorativo e tochas são gerados automaticamente pelo motor. Clique nos tiles internos para <strong>abrir ou tapar buracos / abismos</strong> onde nem jogadores nem inimigos podem pisar.
-                        </p>
-                    </div>
+                <!-- GRUPO 1: BURACOS / SEM PISO (ABISMO) -->
+                <section class="tool-group expanded active" data-group="tab-holes">
+                    <h2 class="group-title">Buracos</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-holes">
+                            <div class="panel-section">
+                                <div class="panel-title">Definir Onde NÃO Terá Piso</div>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                                    O piso decorativo e tochas são gerados automaticamente pelo motor. Clique nos tiles internos para <strong>abrir ou tapar buracos / abismos</strong> onde nem jogadores nem inimigos podem pisar.
+                                </p>
+                            </div>
 
-                    <div class="panel-section">
-                        <div class="card">
-                            <div class="control-row">
-                                <span style="font-size:12px; font-weight:700;">Tiles sem Piso (Buracos):</span>
-                                <span class="val-badge" id="holes-count" style="color:var(--accent); font-size:13px;">0</span>
+                            <div class="panel-section">
+                                <div class="card">
+                                    <div class="control-row">
+                                        <span style="font-size:12px; font-weight:700;">Tiles sem Piso (Buracos):</span>
+                                        <span class="val-badge" id="holes-count" style="color:var(--accent); font-size:13px;">0</span>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-danger" id="btn-clear-holes">Limpar Todos os Buracos (Restaurar Piso)</button>
                             </div>
                         </div>
-                        <button class="btn btn-sm btn-danger" id="btn-clear-holes">🧹 Limpar Todos os Buracos (Restaurar Piso)</button>
                     </div>
-                </div>
+                </section>
 
-                <!-- ABA: TOCHAS (PONTOS DE LUZ) -->
-                <div class="tab-panel" id="tab-torches">
-                    <div class="panel-section">
-                        <div class="panel-title">Posicionar Tochas (Luz)</div>
-                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                            Clique numa <strong>parede</strong> (borda da sala) para colocar uma tocha. Cada tocha emite luz para dentro da sala. Clique de novo numa tocha para removê-la.
-                        </p>
-                    </div>
-                    <div class="panel-section">
-                        <div class="panel-title">Tochas Colocadas (<span id="torch-count">0</span>)</div>
-                        <div id="torches-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;"></div>
-                        <button class="btn btn-sm btn-danger" id="btn-clear-torches">Limpar Todas as Tochas</button>
-                    </div>
-                </div>
-
-                <!-- ABA: PROPS (DECORAÇÃO) -->
-                <div class="tab-panel" id="tab-props">
-                    <div class="panel-section">
-                        <div class="panel-title">Props Aleatórios</div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="toggle-scatter-props"> Aleatorizar props pelo chão
-                        </label>
-                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:4px;">
-                            O jogo espalha props nos tiles de chão livre. Enquanto ligado, a colocação manual fica desativada.
-                        </p>
-                        <div id="scatter-density-row" style="margin-top:6px; display:none;">
-                            <div class="control-row">
-                                <span style="font-size:12px;">Densidade</span>
-                                <span class="val-badge" id="scatter-density-val">8%</span>
+                <!-- GRUPO: TOCHAS (PONTOS DE LUZ) -->
+                <section class="tool-group collapsed" data-group="tab-torches">
+                    <h2 class="group-title">Tochas</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-torches">
+                            <div class="panel-section">
+                                <div class="panel-title">Posicionar Tochas (Luz)</div>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                                    Clique numa <strong>parede</strong> (borda da sala) para colocar uma tocha. Cada tocha emite luz para dentro da sala. Clique de novo numa tocha para removê-la.
+                                </p>
                             </div>
-                            <input type="range" id="scatter-density" min="0" max="40" value="8" step="1" style="width:100%;">
+                            <div class="panel-section">
+                                <div class="panel-title">Tochas Colocadas (<span id="torch-count">0</span>)</div>
+                                <div id="torches-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;"></div>
+                                <button class="btn btn-sm btn-danger" id="btn-clear-torches">Limpar Todas as Tochas</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="panel-section" id="props-manual-section">
-                        <div class="panel-title">Decoração ao Clicar</div>
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <label class="btn tool-prop-btn active" data-prop="59">
-                                <input type="radio" name="prop-choice" value="59" checked> 🪨 Rocha
-                            </label>
-                            <label class="btn tool-prop-btn" data-prop="77">
-                                <input type="radio" name="prop-choice" value="77"> 💀 Caveira
-                            </label>
-                            <label class="btn tool-prop-btn" data-prop="68">
-                                <input type="radio" name="prop-choice" value="68"> 🦴 Ossos
-                            </label>
-                            <label class="btn tool-prop-btn" data-prop="64">
-                                <input type="radio" name="prop-choice" value="64"> 🕸️ Teia
-                            </label>
-                        </div>
-                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:6px;">
-                            Clique num tile de piso para colocar a decoração. Clique de novo para remover.
-                        </p>
-                    </div>
-                    <div class="panel-section">
-                        <div class="panel-title">Props Colocados (<span id="prop-count">0</span>)</div>
-                        <div id="props-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;"></div>
-                        <button class="btn btn-sm btn-danger" id="btn-clear-props">Limpar Todos os Props</button>
-                    </div>
-                </div>
+                </section>
 
-                <!-- ABA 2: PERIGOS & TRAPS -->
-                <div class="tab-panel" id="tab-challenges">
-                    <div class="panel-section">
-                        <div class="panel-title">Regra das Portas (Trancamento)</div>
-                        <select id="lock-rule" class="styled-select" style="width:100%;">
-                            <option value="auto">Automático (deduz pelo conteúdo)</option>
-                            <option value="none">Nunca trancar (portas sempre abertas)</option>
-                            <option value="enemies">Trancar até matar todos os inimigos</option>
-                            <option value="buttons">Trancar até pisar nos 2 botões juntos</option>
-                        </select>
-                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:4px;">
-                            Define quando as portas abrem. "Buttons" exige 2 botões de pressão na sala.
-                        </p>
-                    </div>
-                    <div class="panel-section">
-                        <div class="panel-title">Adicionar Trap ao Clicar</div>
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <label class="btn tool-hazard-btn active" data-hazard="button">
-                                <input type="radio" name="hazard-choice" value="button" checked> 🔘 Botão de Pressão Co-op
-                            </label>
-                            <label class="btn tool-hazard-btn" data-hazard="spikeRow">
-                                <input type="radio" name="hazard-choice" value="spikeRow"> 🔺 Fileira de Espinhos (Onda)
-                            </label>
-                            <label class="btn tool-hazard-btn" data-hazard="spike">
-                                <input type="radio" name="hazard-choice" value="spike"> 🎯 Espinho Individual
-                            </label>
-                            <label class="btn tool-hazard-btn" data-hazard="arrow">
-                                <input type="radio" name="hazard-choice" value="arrow"> 🏹 Atirador de Flecha na Parede
-                            </label>
+                <!-- GRUPO: PROPS (DECORAÇÃO) -->
+                <section class="tool-group collapsed" data-group="tab-props">
+                    <h2 class="group-title">Props</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-props">
+                            <div class="panel-section">
+                                <div class="panel-title">Props Aleatórios</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="toggle-scatter-props"> Aleatorizar props pelo chão
+                                </label>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:4px;">
+                                    O jogo espalha props nos tiles de chão livre. Enquanto ligado, a colocação manual fica desativada.
+                                </p>
+                                <div id="scatter-density-row" style="margin-top:6px; display:none;">
+                                    <div class="control-row">
+                                        <span style="font-size:12px;">Densidade</span>
+                                        <span class="val-badge" id="scatter-density-val">8%</span>
+                                    </div>
+                                    <input type="range" id="scatter-density" min="0" max="40" value="8" step="1" style="width:100%;">
+                                </div>
+                            </div>
+                            <div class="panel-section" id="props-manual-section">
+                                <div class="panel-title">Decoração ao Clicar</div>
+                                <div style="display:flex; flex-direction:column; gap:6px;">
+                                    <label class="btn tool-prop-btn active" data-prop="59">
+                                        <input type="radio" name="prop-choice" value="59" checked> Rocha
+                                    </label>
+                                    <label class="btn tool-prop-btn" data-prop="77">
+                                        <input type="radio" name="prop-choice" value="77"> Caveira
+                                    </label>
+                                    <label class="btn tool-prop-btn" data-prop="68">
+                                        <input type="radio" name="prop-choice" value="68"> Ossos
+                                    </label>
+                                    <label class="btn tool-prop-btn" data-prop="64">
+                                        <input type="radio" name="prop-choice" value="64"> Teia
+                                    </label>
+                                </div>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:6px;">
+                                    Clique num tile de piso para colocar a decoração. Clique de novo para remover.
+                                </p>
+                            </div>
+                            <div class="panel-section">
+                                <div class="panel-title">Props Colocados (<span id="prop-count">0</span>)</div>
+                                <div id="props-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;"></div>
+                                <button class="btn btn-sm btn-danger" id="btn-clear-props">Limpar Todos os Props</button>
+                            </div>
                         </div>
                     </div>
+                </section>
 
-                    <div class="panel-section">
-                        <div class="panel-title">Traps no Mapa (<span id="hazard-count">0</span>)</div>
-                        <div id="hazards-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
-                            <!-- Inserido dinamicamente -->
-                        </div>
-                        <button class="btn btn-sm btn-danger" id="btn-clear-hazards">Limpar Todas as Traps</button>
-                    </div>
-                </div>
+                <!-- GRUPO: PERIGOS & TRAPS -->
+                <section class="tool-group collapsed" data-group="tab-challenges">
+                    <h2 class="group-title">Traps</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-challenges">
+                            <div class="panel-section">
+                                <div class="panel-title">Regra das Portas (Trancamento)</div>
+                                <select id="lock-rule" class="styled-select" style="width:100%;">
+                                    <option value="auto">Automático (deduz pelo conteúdo)</option>
+                                    <option value="none">Nunca trancar (portas sempre abertas)</option>
+                                    <option value="enemies">Trancar até matar todos os inimigos</option>
+                                    <option value="buttons">Trancar até pisar nos 2 botões juntos</option>
+                                </select>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:4px;">
+                                    Define quando as portas abrem. "Buttons" exige 2 botões de pressão na sala.
+                                </p>
+                            </div>
+                            <div class="panel-section">
+                                <div class="panel-title">Adicionar Trap ao Clicar</div>
+                                <div style="display:flex; flex-direction:column; gap:6px;">
+                                    <label class="btn tool-hazard-btn active" data-hazard="button">
+                                        <input type="radio" name="hazard-choice" value="button" checked> Botão de Pressão Co-op
+                                    </label>
+                                    <label class="btn tool-hazard-btn" data-hazard="spikeRow">
+                                        <input type="radio" name="hazard-choice" value="spikeRow"> Fileira de Espinhos (Onda)
+                                    </label>
+                                    <label class="btn tool-hazard-btn" data-hazard="spike">
+                                        <input type="radio" name="hazard-choice" value="spike"> Espinho Individual
+                                    </label>
+                                    <label class="btn tool-hazard-btn" data-hazard="arrow">
+                                        <input type="radio" name="hazard-choice" value="arrow"> Atirador de Flecha na Parede
+                                    </label>
+                                </div>
+                            </div>
 
-                <!-- ABA 3: INIMIGOS & SPAWNS -->
-                <div class="tab-panel" id="tab-enemies">
-                    <div class="panel-section">
-                        <div class="panel-title">Tipo de Inimigo ao Clicar</div>
-                        <div style="display:flex; flex-direction:column; gap:6px;">
-                            <label class="btn tool-enemy-btn active" data-enemy="demon">
-                                <input type="radio" name="enemy-choice" value="demon" checked> 👹 Demônio (Rápido)
-                            </label>
-                            <label class="btn tool-enemy-btn" data-enemy="bloodMonster">
-                                <input type="radio" name="enemy-choice" value="bloodMonster"> 🩸 Monstro de Sangue (Tanque)
-                            </label>
+                            <div class="panel-section">
+                                <div class="panel-title">Traps no Mapa (<span id="hazard-count">0</span>)</div>
+                                <div id="hazards-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
+                                    <!-- Inserido dinamicamente -->
+                                </div>
+                                <button class="btn btn-sm btn-danger" id="btn-clear-hazards">Limpar Todas as Traps</button>
+                            </div>
                         </div>
                     </div>
+                </section>
 
-                    <div class="panel-section">
-                        <div class="panel-title">Inimigos Posicionados (<span id="enemy-count">0</span>)</div>
-                        <div id="enemies-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
-                            <!-- Inserido dinamicamente -->
-                        </div>
-                        <button class="btn btn-sm" id="btn-distribute-circle">⚡ Auto-Distribuir em Círculo</button>
-                        <button class="btn btn-sm btn-danger" id="btn-clear-enemies">Limpar Todos os Inimigos</button>
-                    </div>
-                </div>
+                <!-- GRUPO: INIMIGOS -->
+                <section class="tool-group collapsed" data-group="tab-enemies">
+                    <h2 class="group-title">Inimigos</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-enemies">
+                            <div class="panel-section">
+                                <div class="panel-title">Tipo de Inimigo ao Clicar</div>
+                                <div style="display:flex; flex-direction:column; gap:6px;">
+                                    <label class="btn tool-enemy-btn active" data-enemy="demon">
+                                        <input type="radio" name="enemy-choice" value="demon" checked> Demônio (Rápido)
+                                    </label>
+                                    <label class="btn tool-enemy-btn" data-enemy="bloodMonster">
+                                        <input type="radio" name="enemy-choice" value="bloodMonster"> Monstro de Sangue (Tanque)
+                                    </label>
+                                </div>
+                            </div>
 
-                <!-- ABA 4: SPAWNS DOS JOGADORES (PONTOS DE ENTRADA) -->
-                <div class="tab-panel" id="tab-spawns">
-                    <div class="panel-section">
-                        <div class="panel-title">Onde os Players vão Nascer</div>
-                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                            Mostra a posição exata onde os jogadores aparecem ao entrar nesta sala por cada uma das portas. Use como referência de segurança para <strong>não colocar armadilhas ou buracos</strong> logo na entrada!
-                        </p>
-                        <label class="toggle-switch" style="margin-top:6px;">
-                            <input type="checkbox" id="toggle-show-spawns" checked> Exibir Ícones de Spawn no Canvas
-                        </label>
+                            <div class="panel-section">
+                                <div class="panel-title">Inimigos Posicionados (<span id="enemy-count">0</span>)</div>
+                                <div id="enemies-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
+                                    <!-- Inserido dinamicamente -->
+                                </div>
+                                <button class="btn btn-sm" id="btn-distribute-circle">Auto-Distribuir em Círculo</button>
+                                <button class="btn btn-sm btn-danger" id="btn-clear-enemies">Limpar Todos os Inimigos</button>
+                            </div>
+                        </div>
                     </div>
+                </section>
 
-                    <div class="panel-section">
-                        <div class="panel-title">Zonas de Entrada Desta Sala</div>
-                        <div id="spawns-info-list" style="display:flex; flex-direction:column; gap:8px;">
-                            <!-- Inserido dinamicamente conforme as portas da sala ativa -->
-                        </div>
-                        <div id="spawn-warning-box" class="spawn-warning-alert" style="display:none; margin-top:8px;">
-                            <!-- Alerta se houver trap sobre a zona de spawn dos players -->
+                <!-- GRUPO: SPAWNS DOS JOGADORES (PONTOS DE ENTRADA) -->
+                <section class="tool-group collapsed" data-group="tab-spawns">
+                    <h2 class="group-title">Spawns Players</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-spawns">
+                            <div class="panel-section">
+                                <div class="panel-title">Onde os Players vão Nascer</div>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                                    Mostra a posição exata onde os jogadores aparecem ao entrar nesta sala por cada uma das portas. Use como referência de segurança para <strong>não colocar armadilhas ou buracos</strong> logo na entrada!
+                                </p>
+                                <label class="toggle-switch" style="margin-top:6px;">
+                                    <input type="checkbox" id="toggle-show-spawns" checked> Exibir Ícones de Spawn no Canvas
+                                </label>
+                            </div>
+
+                            <div class="panel-section">
+                                <div class="panel-title">Zonas de Entrada Desta Sala</div>
+                                <div id="spawns-info-list" style="display:flex; flex-direction:column; gap:8px;">
+                                    <!-- Inserido dinamicamente conforme as portas da sala ativa -->
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
             </div>
         </aside>
@@ -235,17 +241,14 @@
         <section id="editor-viewport">
             <div class="viewport-toolbar">
                 <div class="viewport-tools-left">
-                    <button class="btn btn-sm" id="btn-zoom-in">🔍 +</button>
-                    <button class="btn btn-sm" id="btn-zoom-out">🔍 -</button>
+                    <button class="btn btn-sm" id="btn-zoom-in">+</button>
+                    <button class="btn btn-sm" id="btn-zoom-out">-</button>
                     <button class="btn btn-sm" id="btn-zoom-reset">100%</button>
                     <button class="btn btn-sm" id="btn-fit-screen">Ajustar</button>
                 </div>
                 <div class="viewport-tools-right">
                     <label class="toggle-switch">
                         <input type="checkbox" id="toggle-grid" checked> Grade
-                    </label>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="toggle-coords" checked> Coords
                     </label>
                     <label class="toggle-switch">
                         <input type="checkbox" id="toggle-doors" checked> Portas
@@ -258,6 +261,18 @@
 
             <div class="canvas-container" id="canvas-container">
                 <canvas id="roomCanvas" width="896" height="576"></canvas>
+
+                <!-- Setas de FORMA nas laterais do grid -->
+                <button class="btn nav-arrow shape-arrow-left" id="shape-prev" title="Forma anterior">◀</button>
+                <button class="btn nav-arrow shape-arrow-right" id="shape-next" title="Próxima forma">▶</button>
+
+                <!-- Navegador de VARIAÇÕES na base central do grid -->
+                <div class="variant-bar">
+                    <button class="btn btn-sm nav-arrow" id="variant-prev" title="Variação anterior">◀</button>
+                    <span class="variant-label" id="variant-label">—</span>
+                    <button class="btn btn-sm nav-arrow" id="variant-next" title="Próxima variação">▶</button>
+                    <button class="btn btn-sm" id="variant-new" title="Criar nova variação (molde limpo)">Nova</button>
+                </div>
             </div>
 
             <footer class="viewport-statusbar">
@@ -265,89 +280,6 @@
                 <div id="status-dims">14 x 9 tiles (896 x 576 px)</div>
             </footer>
         </section>
-
-        <!-- PAINEL DIREITO: PROPRIEDADES & OUTPUT -->
-        <aside id="sidebar-right">
-            <div class="sidebar-content">
-
-                <div class="card">
-                    <div class="panel-title">Metadados da Sala</div>
-                    
-                    <div class="prop-group">
-                        <label>ID da Peça:</label>
-                        <input type="text" id="prop-id" class="styled-input" value="room_cross_4way">
-                    </div>
-
-                    <div class="prop-group">
-                        <label>Nome:</label>
-                        <input type="text" id="prop-name" class="styled-input" value="Sala de Quatro Vias">
-                    </div>
-
-                    <div class="prop-row-2">
-                        <div class="prop-group">
-                            <label>Largura (Cols):</label>
-                            <input type="number" id="prop-cols" class="styled-input" value="14" min="7" max="30">
-                        </div>
-                        <div class="prop-group">
-                            <label>Altura (Rows):</label>
-                            <input type="number" id="prop-rows" class="styled-input" value="9" min="5" max="25">
-                        </div>
-                    </div>
-
-                    <div class="prop-row-2">
-                        <div class="prop-group">
-                            <label>Tipo:</label>
-                            <select id="prop-kind" class="styled-select">
-                                <option value="room" selected>Sala (Combate)</option>
-                                <option value="corridor">Corredor</option>
-                            </select>
-                        </div>
-                        <div class="prop-group">
-                            <label>Finalidade:</label>
-                            <select id="prop-type" class="styled-select">
-                                <option value="normal" selected>Normal</option>
-                                <option value="start">Início (Start)</option>
-                                <option value="boss">Chefe (Boss)</option>
-                                <option value="challenge">Desafio</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="panel-title">Checklist de Integridade</div>
-                    <div class="status-item">
-                        <span>Portas Ativas:</span>
-                        <span id="stat-doors" class="status-badge ok">4 Portas</span>
-                    </div>
-                    <div class="status-item">
-                        <span>Buracos (Sem Piso):</span>
-                        <span id="stat-holes" class="status-badge ok">0 Buracos</span>
-                    </div>
-                    <div class="status-item">
-                        <span>Traps / Perigos:</span>
-                        <span id="stat-hazards" class="status-badge ok">0 Traps</span>
-                    </div>
-                    <div class="status-item">
-                        <span>Inimigos Spawns:</span>
-                        <span id="stat-enemies" class="status-badge ok">0 Inimigos</span>
-                    </div>
-                    <div class="status-item">
-                        <span>Segurança Spawns:</span>
-                        <span id="stat-spawns-safety" class="status-badge ok">Seguro</span>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="panel-title">
-                        <span>Código / JSON Gerado</span>
-                        <button class="btn btn-sm" id="btn-quick-copy">Copiar</button>
-                    </div>
-                    <div class="code-box" id="code-output">// Gerando código...</div>
-                </div>
-
-            </div>
-        </aside>
 
     </main>
 
@@ -370,13 +302,13 @@
     <div class="modal-overlay" id="coverage-modal">
         <div class="modal-content" style="max-width:720px;">
             <div class="modal-header">
-                <h3>📊 Cobertura de Peças</h3>
+                <h3>Cobertura de Peças</h3>
                 <button class="modal-close" id="coverage-close-btn">&times;</button>
             </div>
             <div id="coverage-summary" style="font-size:13px; margin-bottom:10px;"></div>
             <div id="coverage-body" style="max-height:60vh; overflow-y:auto;"></div>
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
-                <button class="btn" id="coverage-refresh-btn">🔄 Atualizar</button>
+                <button class="btn" id="coverage-refresh-btn">Atualizar</button>
                 <button class="btn" id="coverage-dismiss-btn">Fechar</button>
             </div>
         </div>

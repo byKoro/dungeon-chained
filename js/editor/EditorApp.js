@@ -124,23 +124,23 @@ class RoomEditor {
     _allShapes() {
         const d = (N, E, S, W) => ({ N: !!N, E: !!E, S: !!S, W: !!W });
         return [
-            { name: "➕ Cruzamento (4 vias)", doors: d(1, 1, 1, 1), kind: "room", type: "normal" },
-            { name: "🔀 Junção T (N,E,W)", doors: d(1, 1, 0, 1), kind: "room", type: "normal" },
-            { name: "🔀 Junção T (S,E,W)", doors: d(0, 1, 1, 1), kind: "room", type: "normal" },
-            { name: "🔀 Junção T (N,S,E)", doors: d(1, 1, 1, 0), kind: "room", type: "normal" },
-            { name: "🔀 Junção T (N,S,W)", doors: d(1, 0, 1, 1), kind: "room", type: "normal" },
-            { name: "↔️ Corredor Leste-Oeste", doors: d(0, 1, 0, 1), kind: "corridor", type: "normal" },
-            { name: "↕️ Corredor Norte-Sul", doors: d(1, 0, 1, 0), kind: "corridor", type: "normal" },
-            { name: "↱ Curva Norte-Leste", doors: d(1, 1, 0, 0), kind: "corridor", type: "normal" },
-            { name: "↰ Curva Norte-Oeste", doors: d(1, 0, 0, 1), kind: "corridor", type: "normal" },
-            { name: "↳ Curva Sul-Leste", doors: d(0, 1, 1, 0), kind: "corridor", type: "normal" },
-            { name: "↲ Curva Sul-Oeste", doors: d(0, 0, 1, 1), kind: "corridor", type: "normal" },
-            { name: "🚪 Dead-End Norte", doors: d(1, 0, 0, 0), kind: "room", type: "normal" },
-            { name: "🚪 Dead-End Leste", doors: d(0, 1, 0, 0), kind: "room", type: "normal" },
-            { name: "🚪 Dead-End Sul", doors: d(0, 0, 1, 0), kind: "room", type: "normal" },
-            { name: "🚪 Dead-End Oeste", doors: d(0, 0, 0, 1), kind: "room", type: "normal" },
-            { name: "🏁 Câmara Inicial (Start)", doors: d(1, 1, 1, 1), kind: "room", type: "start" },
-            { name: "💀 Câmara do Chefe (Boss)", doors: d(0, 0, 0, 1), kind: "room", type: "boss" }
+            { name: "Cruzamento (4 vias)", doors: d(1, 1, 1, 1), kind: "room", type: "normal" },
+            { name: "Junção T (N,E,W)", doors: d(1, 1, 0, 1), kind: "room", type: "normal" },
+            { name: "Junção T (S,E,W)", doors: d(0, 1, 1, 1), kind: "room", type: "normal" },
+            { name: "Junção T (N,S,E)", doors: d(1, 1, 1, 0), kind: "room", type: "normal" },
+            { name: "Junção T (N,S,W)", doors: d(1, 0, 1, 1), kind: "room", type: "normal" },
+            { name: "Corredor Leste-Oeste", doors: d(0, 1, 0, 1), kind: "corridor", type: "normal" },
+            { name: "Corredor Norte-Sul", doors: d(1, 0, 1, 0), kind: "corridor", type: "normal" },
+            { name: "Curva Norte-Leste", doors: d(1, 1, 0, 0), kind: "corridor", type: "normal" },
+            { name: "Curva Norte-Oeste", doors: d(1, 0, 0, 1), kind: "corridor", type: "normal" },
+            { name: "Curva Sul-Leste", doors: d(0, 1, 1, 0), kind: "corridor", type: "normal" },
+            { name: "Curva Sul-Oeste", doors: d(0, 0, 1, 1), kind: "corridor", type: "normal" },
+            { name: "Dead-End Norte", doors: d(1, 0, 0, 0), kind: "room", type: "normal" },
+            { name: "Dead-End Leste", doors: d(0, 1, 0, 0), kind: "room", type: "normal" },
+            { name: "Dead-End Sul", doors: d(0, 0, 1, 0), kind: "room", type: "normal" },
+            { name: "Dead-End Oeste", doors: d(0, 0, 0, 1), kind: "room", type: "normal" },
+            { name: "Câmara Inicial (Start)", doors: d(1, 1, 1, 1), kind: "room", type: "start" },
+            { name: "Câmara do Chefe (Boss)", doors: d(0, 0, 0, 1), kind: "room", type: "boss" }
         ];
     }
 
@@ -481,6 +481,12 @@ class RoomEditor {
     }
 
     _checkSpawnSafety() {
+        // O alerta de spawn e o badge de segurança foram removidos da UI.
+        // Guard clause: sem os elementos no DOM, este método é um no-op seguro.
+        const warnBox = document.getElementById("spawn-warning-box");
+        const statSafety = document.getElementById("stat-spawns-safety");
+        if (!warnBox || !statSafety) return;
+
         const spawns = this._getPlayerSpawns();
         const warnings = [];
 
@@ -506,9 +512,6 @@ class RoomEditor {
             }
         }
 
-        const warnBox = document.getElementById("spawn-warning-box");
-        const statSafety = document.getElementById("stat-spawns-safety");
-
         if (warnings.length > 0) {
             warnBox.style.display = "block";
             warnBox.innerHTML = `
@@ -530,18 +533,13 @@ class RoomEditor {
      * ATUALIZAÇÃO DA INTERFACE A PARTIR DO ESTADO
      * -------------------------------------------------------------------------- */
     _updateUIFromState() {
-        // Campos de metadados
-        document.getElementById("prop-id").value = this.room.id;
-        document.getElementById("prop-name").value = this.room.name;
-        document.getElementById("prop-cols").value = this.room.cols;
-        document.getElementById("prop-rows").value = this.room.rows;
-        document.getElementById("prop-kind").value = this.room.kind;
-        document.getElementById("prop-type").value = this.room.type;
+        // Regra de trancamento das portas (único controle que reflete metadados).
         const lockSel = document.getElementById("lock-rule");
         if (lockSel) lockSel.value = this.room.lock || "auto";
 
         // Buracos
-        document.getElementById("holes-count").textContent = this.room.holes.size;
+        const holesCount = document.getElementById("holes-count");
+        if (holesCount) holesCount.textContent = this.room.holes.size;
 
         // Listas de Perigos, Inimigos, Tochas e Props
         this._updateHazardsListUI();
@@ -551,13 +549,13 @@ class RoomEditor {
         this._syncScatterUI();
         this._updateSpawnsListUI();
 
-        // Checklist e Código
-        this._updateValidationChecklist();
+        // Segurança de spawn (no-op com guard) e persistência da cena.
         this._checkSpawnSafety();
         this._updateCodeOutput();
 
         // Status bar
-        document.getElementById("status-dims").textContent = `${this.cols} x ${this.rows} tiles (${this.cols * this.tilePx} x ${this.rows * this.tilePx} px)`;
+        const statusDims = document.getElementById("status-dims");
+        if (statusDims) statusDims.textContent = `${this.cols} x ${this.rows} tiles (${this.cols * this.tilePx} x ${this.rows * this.tilePx} px)`;
     }
 
     _updateSpawnsListUI() {
@@ -576,12 +574,12 @@ class RoomEditor {
             card.className = "spawn-card";
             card.innerHTML = `
                 <div class="spawn-header">
-                    <strong>🚪 ${sp.label}</strong>
+                    <strong>${sp.label}</strong>
                     <span class="badge" style="font-size:10px;">Regra: 1 Tile à Frente</span>
                 </div>
                 <div style="font-size:11px; margin-top:6px; display:flex; flex-direction:column; gap:4px;">
-                    <span style="color:#ffd166; font-weight:600;">🟡 P1 (Amarelo): Tile [Col ${sp.p1.col}, Linha ${sp.p1.row}]</span>
-                    <span style="color:#6bb4db; font-weight:600;">🔵 P2 (Azul): Tile [Col ${sp.p2.col}, Linha ${sp.p2.row}]</span>
+                    <span style="color:#ffd166; font-weight:600;">P1 (Amarelo): Tile [Col ${sp.p1.col}, Linha ${sp.p1.row}]</span>
+                    <span style="color:#6bb4db; font-weight:600;">P2 (Azul): Tile [Col ${sp.p2.col}, Linha ${sp.p2.row}]</span>
                 </div>
                 <div style="font-size:10px; color:var(--text-dim); margin-top:4px;">
                     Centros px: P1 (${Math.round(sp.p1.x)}, ${Math.round(sp.p1.y)}) | P2 (${Math.round(sp.p2.x)}, ${Math.round(sp.p2.y)})
@@ -617,7 +615,6 @@ class RoomEditor {
                 const idx = parseInt(e.target.dataset.delHazard, 10);
                 this.room.hazards.splice(idx, 1);
                 this._updateHazardsListUI();
-                this._updateValidationChecklist();
                 this._checkSpawnSafety();
                 this._updateCodeOutput();
                 this.render();
@@ -626,10 +623,10 @@ class RoomEditor {
     }
 
     _hazardLabel(type) {
-        if (type === "button") return "🔘 Botão Co-op";
-        if (type === "spikeRow") return "🔺 Fileira Espinhos";
-        if (type === "spike") return "🎯 Espinho Único";
-        if (type === "arrow") return "🏹 Atirador Flecha";
+        if (type === "button") return "Botão Co-op";
+        if (type === "spikeRow") return "Fileira Espinhos";
+        if (type === "spike") return "Espinho Único";
+        if (type === "arrow") return "Atirador Flecha";
         return type;
     }
 
@@ -648,7 +645,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>${foe.type === "demon" ? "👹 Demônio" : "🩸 Monstro Sangue"} (${foe.col}, ${foe.row})</span>
+                <span>${foe.type === "demon" ? "Demônio" : "Monstro Sangue"} (${foe.col}, ${foe.row})</span>
                 <button class="btn btn-sm btn-danger" data-del-enemy="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -659,7 +656,6 @@ class RoomEditor {
                 const idx = parseInt(e.target.dataset.delEnemy, 10);
                 this.room.enemies.splice(idx, 1);
                 this._updateEnemiesListUI();
-                this._updateValidationChecklist();
                 this._updateCodeOutput();
                 this.render();
             };
@@ -682,7 +678,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>🔥 Tocha ${t.side} (${t.col}, ${t.row})</span>
+                <span>Tocha ${t.side} (${t.col}, ${t.row})</span>
                 <button class="btn btn-sm btn-danger" data-del-torch="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -693,7 +689,6 @@ class RoomEditor {
                 const idx = parseInt(e.target.dataset.delTorch, 10);
                 this.room.torches.splice(idx, 1);
                 this._updateTorchesListUI();
-                this._updateValidationChecklist();
                 this._updateCodeOutput();
                 this.render();
             };
@@ -716,7 +711,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>🏺 Prop #${p.index} (${p.col}, ${p.row})</span>
+                <span>Prop #${p.index} (${p.col}, ${p.row})</span>
                 <button class="btn btn-sm btn-danger" data-del-prop="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -727,65 +722,16 @@ class RoomEditor {
                 const idx = parseInt(e.target.dataset.delProp, 10);
                 this.room.props.splice(idx, 1);
                 this._updatePropsListUI();
-                this._updateValidationChecklist();
                 this._updateCodeOutput();
                 this.render();
             };
         });
     }
 
-    _updateValidationChecklist() {
-        // Portas
-        const activeDirs = ["N", "S", "E", "W"].filter(d => !!this.room.sockets[d]);
-        const statDoors = document.getElementById("stat-doors");
-        statDoors.textContent = `${activeDirs.length} Porta(s) (${activeDirs.join(", ") || "Nenhuma"})`;
-        statDoors.className = `status-badge ${activeDirs.length > 0 ? "ok" : "warn"}`;
-
-        // Buracos
-        const statHoles = document.getElementById("stat-holes");
-        statHoles.textContent = `${this.room.holes.size} Buraco(s)`;
-        statHoles.className = `status-badge ok`;
-
-        // Perigos
-        const statHazards = document.getElementById("stat-hazards");
-        statHazards.textContent = `${this.room.hazards.length} Perigo(s)`;
-
-        // Inimigos
-        const statEnemies = document.getElementById("stat-enemies");
-        statEnemies.textContent = `${this.room.enemies.length} Inimigos`;
-    }
-
+    // O card "Código / JSON Gerado" foi removido da UI. Este método agora serve
+    // apenas para persistir a cena: é chamado por praticamente toda mutação do
+    // editor, garantindo que o estado continue sendo gravado no localStorage.
     _updateCodeOutput() {
-        const out = document.getElementById("code-output");
-        const doors = {
-            N: !!this.room.sockets.N,
-            S: !!this.room.sockets.S,
-            E: !!this.room.sockets.E,
-            W: !!this.room.sockets.W
-        };
-
-        const holesArray = Array.from(this.room.holes);
-
-        if (this.room.hazards.length > 0) {
-            // Formato ChallengeLayouts
-            const obj = {
-                name: this.room.name,
-                doors,
-                holes: holesArray.length > 0 ? holesArray : undefined,
-                elements: this.room.hazards,
-                enemies: this.room.enemies.length > 0 ? this.room.enemies : undefined
-            };
-            out.textContent = JSON.stringify(obj, null, 2);
-        } else {
-            // Formato RoomPresets
-            const holesCode = holesArray.length > 0 ? `,\n  holes: ${JSON.stringify(holesArray)}` : "";
-            const enemiesCode = this.room.enemies.length > 0 ? `,\n  enemies: ${JSON.stringify(this.room.enemies)}` : "";
-            const code = `RoomTemplate.createStandard({\n  id: "${this.room.id}",\n  name: "${this.room.name}",\n  cols: ${this.cols},\n  rows: ${this.rows},\n  doors: ${JSON.stringify(doors)},\n  kind: "${this.room.kind}",\n  type: "${this.room.type}"${holesCode}${enemiesCode}\n})`;
-            out.textContent = code;
-        }
-
-        // Persiste a cena atual a cada mudança (este método é chamado por
-        // praticamente toda mutação do editor), para sobreviver ao playtest.
         this._saveState();
     }
 
@@ -999,21 +945,6 @@ class RoomEditor {
             ctx.lineTo(totalW, r * tileW);
             ctx.stroke();
         }
-
-        // Números de colunas e linhas
-        if (this.showCoords) {
-            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-            ctx.font = "10px monospace";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-
-            for (let c = 0; c < this.cols; c++) {
-                ctx.fillText(`${c}`, c * tileW + tileW / 2, 12);
-            }
-            for (let r = 0; r < this.rows; r++) {
-                ctx.fillText(`${r}`, 12, r * tileW + tileW / 2);
-            }
-        }
     }
 
     _renderSocketsHighlight(ctx, tileW, totalW, totalH) {
@@ -1028,11 +959,6 @@ class RoomEditor {
             ctx.strokeStyle = "#3da9fc";
             ctx.lineWidth = 3;
             ctx.strokeRect(x, 0, w, tileW);
-
-            ctx.fillStyle = "#3da9fc";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`🚪 N [${s.N.offset}..${s.N.offset + s.N.span - 1}]`, x + w / 2, tileW / 2);
         }
 
         // Borda Sul (Amarelo)
@@ -1045,11 +971,6 @@ class RoomEditor {
             ctx.strokeStyle = "#ffd166";
             ctx.lineWidth = 3;
             ctx.strokeRect(x, y, w, tileW);
-
-            ctx.fillStyle = "#ffd166";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`🚪 S [${s.S.offset}..${s.S.offset + s.S.span - 1}]`, x + w / 2, y + tileW / 2);
         }
 
         // Borda Leste (Verde)
@@ -1062,11 +983,6 @@ class RoomEditor {
             ctx.strokeStyle = "#2cb67d";
             ctx.lineWidth = 3;
             ctx.strokeRect(x, y, tileW, h);
-
-            ctx.fillStyle = "#2cb67d";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`🚪 E [${s.E.offset}..${s.E.offset + s.E.span - 1}]`, x + tileW / 2, y + h / 2);
         }
 
         // Borda Oeste (Magenta)
@@ -1078,11 +994,6 @@ class RoomEditor {
             ctx.strokeStyle = "#e53170";
             ctx.lineWidth = 3;
             ctx.strokeRect(0, y, tileW, h);
-
-            ctx.fillStyle = "#e53170";
-            ctx.font = "bold 11px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`🚪 W [${s.W.offset}..${s.W.offset + s.W.span - 1}]`, tileW / 2, y + h / 2);
         }
     }
 
@@ -1209,12 +1120,6 @@ class RoomEditor {
                     ctx.fill();
                 }
 
-                // Badge indicativo
-                ctx.fillStyle = "#ef4565";
-                ctx.font = "bold 9px sans-serif";
-                ctx.textAlign = "center";
-                ctx.fillText("👹 DEMON", cx, cy + 24);
-
             } else {
                 // Blood Monster config: cellSize: 100, cropX: 36, cropY: 30, cropW: 48, cropH: 30, row: 1
                 const sprite = this.assets.get("bloodMonster");
@@ -1239,11 +1144,6 @@ class RoomEditor {
                     ctx.arc(cx, cy, 18, 0, Math.PI * 2);
                     ctx.fill();
                 }
-
-                ctx.fillStyle = "#7f5af0";
-                ctx.font = "bold 9px sans-serif";
-                ctx.textAlign = "center";
-                ctx.fillText("🩸 MONSTER", cx, cy + 24);
             }
         }
     }
@@ -1267,11 +1167,6 @@ class RoomEditor {
             ctx.lineWidth = 2;
             ctx.strokeRect(p1x + 1, p1y + 1, tileW - 2, tileW - 2);
 
-            ctx.fillStyle = "#ffd166";
-            ctx.font = "bold 9px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`🟡 P1 [${sp.p1.col},${sp.p1.row}]`, p1x + tileW / 2, p1y + 11);
-
             // 2. Destaque do Tile de Spawn do P2 (Azul)
             const p2x = sp.p2.col * tileW;
             const p2y = sp.p2.row * tileW;
@@ -1280,11 +1175,6 @@ class RoomEditor {
             ctx.strokeStyle = "#6bb4db";
             ctx.lineWidth = 2;
             ctx.strokeRect(p2x + 1, p2y + 1, tileW - 2, tileW - 2);
-
-            ctx.fillStyle = "#6bb4db";
-            ctx.font = "bold 9px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(`🔵 P2 [${sp.p2.col},${sp.p2.row}]`, p2x + tileW / 2, p2y + 11);
 
             // 3. Linha de Corrente entre os centros dos dois tiles
             ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
@@ -1345,12 +1235,6 @@ class RoomEditor {
             ctx.fill();
             ctx.stroke();
         }
-
-        // Badge textual P1 / P2
-        ctx.fillStyle = glowColor;
-        ctx.font = "bold 10px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(label, px, py - 18);
     }
 
     /* --------------------------------------------------------------------------
@@ -1365,18 +1249,29 @@ class RoomEditor {
         bind("variant-next", () => this._navVariant(1));
         bind("variant-new", () => this._newVariant());
         bind("btn-save-room", () => this._saveRoomToServer());
+        bind("btn-delete-room", () => this._deleteRoomFromServer());
 
-        // Abas
-        document.querySelectorAll(".tab-btn").forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-                document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        // Cards colapsáveis da sidebar esquerda: clicar no título (h2) alterna
+        // minimizar/expandir aquele card. Ao expandir, o card vira o "ativo"
+        // (último interagido) e define this.activeTab para rotear os cliques
+        // no grid para o modo correspondente.
+        document.querySelectorAll(".group-title").forEach(h => {
+            h.onclick = () => {
+                const group = h.closest(".tool-group");
+                if (!group) return;
+                const id = group.dataset.group;
+                const wasExpanded = group.classList.contains("expanded");
 
-                btn.classList.add("active");
-                this.activeTab = btn.dataset.tab;
-                const panel = document.getElementById(this.activeTab);
-                if (panel) panel.classList.add("active");
-                this.render();
+                group.classList.toggle("expanded");
+                group.classList.toggle("collapsed");
+
+                // Ao expandir, torna este o card ativo e re-renderiza.
+                if (!wasExpanded) {
+                    document.querySelectorAll(".tool-group").forEach(g => g.classList.remove("active"));
+                    group.classList.add("active");
+                    this.activeTab = id;
+                    this.render();
+                }
             };
         });
 
@@ -1395,7 +1290,6 @@ class RoomEditor {
         document.getElementById("btn-clear-hazards").onclick = () => {
             this.room.hazards = [];
             this._updateHazardsListUI();
-            this._updateValidationChecklist();
             this._checkSpawnSafety();
             this._updateCodeOutput();
             this.render();
@@ -1415,7 +1309,6 @@ class RoomEditor {
         document.getElementById("btn-clear-enemies").onclick = () => {
             this.room.enemies = [];
             this._updateEnemiesListUI();
-            this._updateValidationChecklist();
             this._updateCodeOutput();
             this.render();
         };
@@ -1428,7 +1321,6 @@ class RoomEditor {
         if (btnClearTorches) btnClearTorches.onclick = () => {
             this.room.torches = [];
             this._updateTorchesListUI();
-            this._updateValidationChecklist();
             this._updateCodeOutput();
             this.render();
         };
@@ -1441,7 +1333,6 @@ class RoomEditor {
         if (btnClearProps) btnClearProps.onclick = () => {
             this.room.props = [];
             this._updatePropsListUI();
-            this._updateValidationChecklist();
             this._updateCodeOutput();
             this.render();
         };
@@ -1485,7 +1376,6 @@ class RoomEditor {
 
         // Alternadores de Exibição
         document.getElementById("toggle-grid").onchange = (e) => { this.showGrid = e.target.checked; this.render(); };
-        document.getElementById("toggle-coords").onchange = (e) => { this.showCoords = e.target.checked; this.render(); };
         document.getElementById("toggle-doors").onchange = (e) => { this.showDoors = e.target.checked; this.render(); };
 
         // Botões de Zoom & Pan
@@ -1493,22 +1383,6 @@ class RoomEditor {
         document.getElementById("btn-zoom-out").onclick = () => { this.zoom = Math.max(0.4, this.zoom / 1.2); this.render(); };
         document.getElementById("btn-zoom-reset").onclick = () => { this.zoom = 1.0; this.panX = 0; this.panY = 0; this.render(); };
         document.getElementById("btn-fit-screen").onclick = () => { this._fitScreen(); this.render(); };
-
-        // Inputs de Propriedades
-        document.getElementById("prop-id").onchange = (e) => { this.room.id = e.target.value; this._updateCodeOutput(); };
-        document.getElementById("prop-name").onchange = (e) => { this.room.name = e.target.value; this._updateCodeOutput(); };
-        document.getElementById("prop-kind").onchange = (e) => { this.room.kind = e.target.value; this._updateCodeOutput(); };
-        document.getElementById("prop-type").onchange = (e) => {
-            this.room.type = e.target.value;
-            this._updateUIFromState();
-            this.render();
-        };
-
-        // Copiar Código e Exportar
-        const quickCopy = document.getElementById("btn-quick-copy");
-        if (quickCopy) quickCopy.onclick = () => { this._copyCodeToClipboard(); };
-        document.getElementById("btn-export-json").onclick = () => { this._exportJSON(); };
-        document.getElementById("btn-import-json").onclick = () => { this._openImportModal(); };
 
         // Modal
         document.getElementById("modal-close-btn").onclick = () => { this._closeModal(); };
@@ -1730,7 +1604,6 @@ class RoomEditor {
 
         this.room.hazards.push(newHazard);
         this._updateHazardsListUI();
-        this._updateValidationChecklist();
         this._checkSpawnSafety();
         this._updateCodeOutput();
         this.render();
@@ -1747,7 +1620,6 @@ class RoomEditor {
         });
 
         this._updateEnemiesListUI();
-        this._updateValidationChecklist();
         this._updateCodeOutput();
         this.render();
     }
@@ -1791,7 +1663,6 @@ class RoomEditor {
         }
 
         this._updateTorchesListUI();
-        this._updateValidationChecklist();
         this._updateCodeOutput();
         this.render();
     }
@@ -1829,7 +1700,6 @@ class RoomEditor {
         }
 
         this._updatePropsListUI();
-        this._updateValidationChecklist();
         this._updateCodeOutput();
         this.render();
     }
@@ -1853,7 +1723,6 @@ class RoomEditor {
         }
 
         this._updateEnemiesListUI();
-        this._updateValidationChecklist();
         this._updateCodeOutput();
         this.render();
     }
@@ -1861,13 +1730,6 @@ class RoomEditor {
     /* --------------------------------------------------------------------------
      * EXPORTAÇÃO, IMPORTAÇÃO & TESTE NO JOGO
      * -------------------------------------------------------------------------- */
-    _copyCodeToClipboard() {
-        const code = document.getElementById("code-output").textContent;
-        navigator.clipboard.writeText(code).then(() => {
-            alert("✅ Código copiado para a área de transferência!");
-        });
-    }
-
     _exportJSON() {
         const exportData = {
             id: this.room.id,
@@ -1915,29 +1777,29 @@ class RoomEditor {
         const d = (N, E, S, W) => ({ N, E, S, W });
         return [
             { group: "Cruzamento (4 vias)", items: [
-                { name: "➕ Cruzamento", doors: d(1, 1, 1, 1) }
+                { name: "Cruzamento", doors: d(1, 1, 1, 1) }
             ]},
             { group: "Junções T (3 vias)", items: [
-                { name: "🔀 T sem Sul (N,E,W)", doors: d(1, 1, 0, 1) },
-                { name: "🔀 T sem Norte (S,E,W)", doors: d(0, 1, 1, 1) },
-                { name: "🔀 T sem Oeste (N,S,E)", doors: d(1, 1, 1, 0) },
-                { name: "🔀 T sem Leste (N,S,W)", doors: d(1, 0, 1, 1) }
+                { name: "T sem Sul (N,E,W)", doors: d(1, 1, 0, 1) },
+                { name: "T sem Norte (S,E,W)", doors: d(0, 1, 1, 1) },
+                { name: "T sem Oeste (N,S,E)", doors: d(1, 1, 1, 0) },
+                { name: "T sem Leste (N,S,W)", doors: d(1, 0, 1, 1) }
             ]},
             { group: "Corredores retos (2 vias)", items: [
-                { name: "↔️ Corredor Leste-Oeste", doors: d(0, 1, 0, 1) },
-                { name: "↕️ Corredor Norte-Sul", doors: d(1, 0, 1, 0) }
+                { name: "Corredor Leste-Oeste", doors: d(0, 1, 0, 1) },
+                { name: "Corredor Norte-Sul", doors: d(1, 0, 1, 0) }
             ]},
             { group: "Curvas em L (2 vias)", items: [
-                { name: "↱ Curva N-E", doors: d(1, 1, 0, 0) },
-                { name: "↰ Curva N-O", doors: d(1, 0, 0, 1) },
-                { name: "↳ Curva S-E", doors: d(0, 1, 1, 0) },
-                { name: "↲ Curva S-O", doors: d(0, 0, 1, 1) }
+                { name: "Curva N-E", doors: d(1, 1, 0, 0) },
+                { name: "Curva N-O", doors: d(1, 0, 0, 1) },
+                { name: "Curva S-E", doors: d(0, 1, 1, 0) },
+                { name: "Curva S-O", doors: d(0, 0, 1, 1) }
             ]},
             { group: "Dead-ends (1 via)", items: [
-                { name: "🚪 Entrada Norte", doors: d(1, 0, 0, 0) },
-                { name: "🚪 Entrada Leste", doors: d(0, 1, 0, 0) },
-                { name: "🚪 Entrada Sul", doors: d(0, 0, 1, 0) },
-                { name: "🚪 Entrada Oeste", doors: d(0, 0, 0, 1) }
+                { name: "Entrada Norte", doors: d(1, 0, 0, 0) },
+                { name: "Entrada Leste", doors: d(0, 1, 0, 0) },
+                { name: "Entrada Sul", doors: d(0, 0, 1, 0) },
+                { name: "Entrada Oeste", doors: d(0, 0, 0, 1) }
             ]}
         ];
     }
@@ -2000,8 +1862,8 @@ class RoomEditor {
         };
         html += `<div class="card" style="margin-bottom:8px;">
             <div class="panel-title">Especiais</div>
-            ${specialRow("🏁 Sala Inicial (start)", startN)}
-            ${specialRow("💀 Sala do Chefe (boss)", bossN)}</div>`;
+            ${specialRow("Sala Inicial (start)", startN)}
+            ${specialRow("Sala do Chefe (boss)", bossN)}</div>`;
 
         totalShapes += 2;
         if (startN > 0) doneShapes++; else missing++;
@@ -2049,6 +1911,51 @@ class RoomEditor {
         } catch (e) {
             alert("❌ Não foi possível contatar o servidor: " + e.message +
                 "\n\nVocê precisa rodar 'python serve.py' (versão com /api/save-room).");
+        }
+    }
+
+    /**
+     * Deleta a VARIAÇÃO atual (apaga o arquivo de /map e tira do index). Só
+     * funciona quando a variação exibida é uma peça existente (não o molde
+     * "nova variação"). Pede confirmação antes.
+     */
+    async _deleteRoomFromServer() {
+        const shape = this._allShapes()[this.shapeIndex];
+        const variants = this._variantsForShape(shape);
+        const piece = variants[this.variantIndex];
+
+        if (!piece || !piece.__file) {
+            alert("Nada para deletar: esta é uma variação nova ainda não salva.\nUse as setas de variação para selecionar uma peça existente.");
+            return;
+        }
+
+        if (!confirm(`Deletar a peça "${piece.__file}"?\nEsta ação remove o arquivo de /map e não pode ser desfeita.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/delete-room", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ file: piece.__file })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) {
+                alert("❌ Falha ao deletar: " + (data.error || `HTTP ${res.status}`) +
+                    "\n\nDica: reinicie o servidor (python serve.py) para habilitar.");
+                return;
+            }
+
+            // Recarrega o catálogo e reposiciona na forma (variação válida ou molde).
+            this.catalog = new RoomCatalog();
+            await this.catalog.load();
+            const left = this._variantsForShape(shape);
+            this.variantIndex = Math.min(this.variantIndex, left.length); // clamp (left.length = slot "nova")
+            this._loadCurrentShapeVariant();
+            alert(`🗑️ Peça "${data.file}" deletada (${data.count} peças restantes).`);
+        } catch (e) {
+            alert("❌ Não foi possível contatar o servidor: " + e.message +
+                "\n\nVocê precisa rodar 'python serve.py' (versão com /api/delete-room).");
         }
     }
 
