@@ -2,8 +2,11 @@ import { InputHandler } from './core/InputHandler.js';
 import { Physics } from './core/Physics.js';
 import { Renderer } from './core/Renderer.js';
 import { Dungeon } from './core/Dungeon.js';
+import { DungeonGraph } from './core/DungeonGraph.js';
+import { AudioManager } from './core/AudioManager.js';
 import { Player } from './entities/Player.js';
 import { MeleeEnemy } from './entities/MeleeEnemy.js';
+import { HeartPickup } from './entities/HeartPickup.js';
 import { LaserWeapon } from './weapons/LaserWeapon.js';
 import { SawWeapon } from './weapons/SawWeapon.js';
 import { ParticleSystem } from './particles/ParticleSystem.js';
@@ -20,6 +23,9 @@ const hudP1 = document.getElementById("hud-p1");
 const hudP2 = document.getElementById("hud-p2");
 const btnWeapon = document.getElementById("btn-weapon");
 const btnRestart = document.getElementById("btn-restart");
+const mapFile = document.getElementById("map-file");
+const btnRandomMap = document.getElementById("btn-random-map");
+const CUSTOM_MAP_KEY = "dungeon-chained-custom-map";
 
 // ---- Assets ----
 const imgP1 = new Image();
@@ -35,6 +41,16 @@ const imgDemon = new Image();
 imgDemon.src = "assets/enemies/demon.png";
 const imgBloodMonster = new Image();
 imgBloodMonster.src = "assets/enemies/blood_monster.png";
+
+const audio = new AudioManager({
+    playerHurt: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/player-hurt-${String(i).padStart(2, "0")}.wav`),
+    monsterHurt: [1, 2, 3].map(i => `assets/audio/monster-hurt-0${i}.ogg`),
+    playerStep: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/footstep-stone-0${i}.ogg`),
+    enemyStep: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/footstep-stone-0${i}.ogg`),
+    enemyAttack: [1, 2, 3].map(i => `assets/audio/enemy-attack-0${i}.wav`),
+    enemyAttackVoice: [1, 2, 3].map(i => `assets/audio/monster-attack-0${i}.ogg`),
+    pickup: ["assets/audio/item-pickup.flac"]
+});
 
 // ---- Cores do sangue ----
 const BLOOD_COLORS = ["#5c0210", "#7a0404", "#960e11", "#a30808", "#c60f0e"];
@@ -72,7 +88,9 @@ function bloodMonsterConfig() {
     };
 }
 const MELEE_ENEMY_CONFIGS = [demonConfig, bloodMonsterConfig];
-function randomMeleeConfig() {
+function randomMeleeConfig(type = "random") {
+    if (type === "demon") return demonConfig();
+    if (type === "blood") return bloodMonsterConfig();
     return MELEE_ENEMY_CONFIGS[(Math.random() * MELEE_ENEMY_CONFIGS.length) | 0]();
 }
 
@@ -93,6 +111,16 @@ let floor = 1;
 let gameOver = false;
 let p1, p2;
 let dungeon;
+let activeMapLayout = null;
+try {
+    const savedMap = JSON.parse(localStorage.getItem(CUSTOM_MAP_KEY));
+    if (savedMap) {
+        new DungeonGraph({ cols: 9, rows: 7, layout: savedMap }).generate();
+        activeMapLayout = savedMap;
+    }
+} catch {
+    localStorage.removeItem(CUSTOM_MAP_KEY);
+}
 let arenaBounds;            // bounds da sala atual (dinâmico)
 let enemies = [];
 let gibs = [];
@@ -132,7 +160,8 @@ function createPlayers() {
 function newDungeon() {
     dungeon = new Dungeon({
         cols: 9, rows: 7, roomCount: 8,
-        cellW: 1100, cellH: 680, wall: 70, doorHalf: 70
+        cellW: 1100, cellH: 680, wall: 70, doorHalf: 70,
+        ...(activeMapLayout ? { layout: activeMapLayout } : {})
     });
     roomStates = new Map();
     gibs = [];
@@ -161,13 +190,14 @@ function enterRoom() {
 
     let state = roomStates.get(key);
     if (!state) {
-        state = { enemies: [], boxes: [], cleared: false };
+        state = { enemies: [], boxes: [], hearts: [], cleared: false };
 
         if (cell.kind === "room" && cell.type !== "start") {
+            const customRoom = Number.isInteger(cell.enemyCount);
             // Caixas
             const b = arenaBounds;
             const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
-            const boxCount = 2 + Math.floor(Math.random() * 3);
+            const boxCount = Number.isInteger(cell.boxCount) ? cell.boxCount : 2 + Math.floor(Math.random() * 3);
             for (let i = 0; i < boxCount; i++) {
                 state.boxes.push({
                     x: cx + (Math.random() - 0.5) * (b.maxX - b.minX) * 0.5,
@@ -176,17 +206,22 @@ function enterRoom() {
                 });
             }
             // Inimigos
-            const count = 3 + Math.floor(Math.random() * 3) + Math.floor(floor / 2);
+            const count = customRoom ? cell.enemyCount : 3 + Math.floor(Math.random() * 3) + Math.floor(floor / 2);
             for (let i = 0; i < count; i++) {
                 const angle = (i / count) * Math.PI * 2;
                 const ex = cx + Math.cos(angle) * (b.maxX - b.minX) * 0.28;
                 const ey = cy + Math.sin(angle) * (b.maxY - b.minY) * 0.28;
-                const cfg = randomMeleeConfig();
+                const cfg = randomMeleeConfig(cell.enemyType || "random");
                 const foe = new MeleeEnemy(ex, ey, cfg.img, cfg, floor);
                 foe.bloodPalette = bloodCanvas.palette;
                 foe.gibStainConfig = BLOOD_STAIN_CONFIG.gib;
                 state.enemies.push(foe);
             }
+            const heartCount = Number.isInteger(cell.heartCount) ? cell.heartCount : 0;
+            for (let i = 0; i < heartCount; i++) {
+                state.hearts.push(new HeartPickup(cx + (Math.random() - 0.5) * 180, cy + (Math.random() - 0.5) * 120));
+            }
+            if (count === 0) state.cleared = true;
         } else {
             // start e corredores já nascem "limpos"
             state.cleared = true;
@@ -228,7 +263,7 @@ function transitionThroughDoor(door) {
 function updateHud() {
     const c = dungeon.current;
     const tag = c.kind === "corridor" ? "CORREDOR" : (c.type === "boss" ? "SALA DO CHEFE" : "SALA");
-    hudFloor.innerText = `DUNGEON ${floor} — ${tag}`;
+    hudFloor.innerText = `${activeMapLayout ? "MAPA PERSONALIZADO" : `DUNGEON ${floor}`} — ${tag}`;
     hudP1.innerText = `P1 (Amarelo): ${"❤️".repeat(Math.max(0, p1.lives))}`;
     hudP2.innerText = `P2 (Azul): ${"❤️".repeat(Math.max(0, p2.lives))}`;
 }
@@ -240,6 +275,29 @@ btnWeapon.addEventListener("click", () => {
     btnWeapon.style.background = w.name === "SERRAS" ? "#ff5470" : "#e53170";
 });
 btnRestart.addEventListener("click", () => { floor = 1; createPlayers(); newDungeon(); });
+mapFile.addEventListener("change", async () => {
+    const file = mapFile.files?.[0];
+    if (!file) return;
+    try {
+        const imported = JSON.parse(await file.text());
+        new DungeonGraph({ cols: 9, rows: 7, layout: imported }).generate();
+        localStorage.setItem(CUSTOM_MAP_KEY, JSON.stringify(imported));
+        activeMapLayout = imported;
+        floor = 1;
+        createPlayers();
+        newDungeon();
+    } catch (error) {
+        alert(`Não foi possível importar o mapa: ${error.message}`);
+    }
+    mapFile.value = "";
+});
+btnRandomMap.addEventListener("click", () => {
+    activeMapLayout = null;
+    localStorage.removeItem(CUSTOM_MAP_KEY);
+    floor = 1;
+    createPlayers();
+    newDungeon();
+});
 
 // ---- Poeira / pegadas (inalterado, agora em coords de mundo) ----
 function spawnRunSmoke(player) {
@@ -263,6 +321,10 @@ function spawnWalkDust(player) {
 }
 function handleStep(player) {
     if (!player.justStepped) return;
+    if ((player.footstepSoundCooldown ?? 0) <= 0) {
+        audio.play("playerStep", { volume: 0.35, rate: 0.92 + Math.random() * 0.16 });
+        player.footstepSoundCooldown = player.speedMag > player.speed * 0.7 ? 7 : 10;
+    }
     const x = player.stepX, y = player.stepY, ang = player.stepAngle;
     if (bloodCanvas.isBloodZone(x, y)) player.bloodStepsLeft = BLOOD_STEPS;
     if (player.bloodStepsLeft > 0) {
@@ -307,6 +369,10 @@ function gameLoop() {
         p1.update(input, arenaBounds);
         p2.update(input, arenaBounds);
 
+        [p1, p2].forEach(player => {
+            if (player.footstepSoundCooldown > 0) player.footstepSoundCooldown--;
+        });
+
         if (p1.justStartedRunning) spawnRunSmoke(p1);
         if (p2.justStartedRunning) spawnRunSmoke(p2);
         spawnWalkDust(p1); spawnWalkDust(p2);
@@ -324,8 +390,16 @@ function gameLoop() {
         enemies.forEach(e => {
             e.update([p1, p2], (hitPlayer) => {
                 renderer.triggerShake(14);
-                if (hitPlayer) particleSystem.triggerBlood(hitPlayer.x, hitPlayer.y, 16, 1.1);
+                if (hitPlayer) {
+                    audio.play("playerHurt", { volume: 0.75, rate: 0.9 + Math.random() * 0.2 });
+                    particleSystem.triggerBlood(hitPlayer.x, hitPlayer.y, 16, 1.1);
+                }
             });
+            if (e.justStepped) audio.play("enemyStep", { volume: 0.32, rate: 0.68 + Math.random() * 0.08 });
+            if (e.justAttacked) {
+                audio.play("enemyAttack", { volume: 0.45, rate: 0.85 + Math.random() * 0.15 });
+                audio.play("enemyAttackVoice", { volume: 0.3, rate: 0.85 + Math.random() * 0.15 });
+            }
             Physics.resolveBoxCollisions(e, boxes);
         });
 
@@ -348,6 +422,7 @@ function gameLoop() {
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
             if (enemy.state !== "dying" && !nearPlayer && d < currentWeapon.hitThreshold + enemy.hitRadius) {
                 enemy.startDying();
+                audio.play("monsterHurt", { volume: 0.58, rate: 0.85 + Math.random() * 0.2 });
                 renderer.triggerShake(4);
             }
         }
@@ -360,8 +435,28 @@ function gameLoop() {
                 particleSystem.triggerBloodPool(enemy.x, enemy.y);
                 gibs.push(...enemy.explodeIntoGibs());
                 while (gibs.length > MAX_ACTIVE_GIBS) gibs.shift();
+                const room = dungeon.current;
+                const dropChance = Number.isFinite(room.heartDropChance) ? room.heartDropChance / 100 : 40 / 100;
+                if (Math.random() < dropChance) {
+                    state.hearts.push(new HeartPickup(enemy.x, enemy.y));
+                }
                 enemies.splice(i, 1);
                 renderer.triggerShake(7);
+            }
+        }
+
+        // Qualquer jogador pode recolher o coração, desde que ainda tenha
+        // espaço para recuperar uma vida (o máximo é três).
+        for (let i = state.hearts.length - 1; i >= 0; i--) {
+            const heart = state.hearts[i];
+            heart.update();
+            const collector = [p1, p2].find(player =>
+                player.lives < 3 && Math.hypot(player.x - heart.x, player.y - heart.y) <= heart.radius + player.hitRadius
+            );
+            if (collector) {
+                collector.lives = Math.min(3, collector.lives + 1);
+                audio.play("pickup", { volume: 0.65, rate: 0.95 + Math.random() * 0.1 });
+                state.hearts.splice(i, 1);
             }
         }
 
@@ -414,6 +509,7 @@ function gameLoop() {
     renderer.drawRoom(rect, arenaBounds, doors, dungeon.doorHalfWidth, open, state ? state.boxes : []);
 
     particleSystem.drawFloor(ctx);
+    if (state) state.hearts.forEach(heart => heart.draw(ctx));
     footprints.forEach(f => f.draw(ctx));
     particleSystem.drawSmoke(ctx);
 

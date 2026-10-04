@@ -71,6 +71,9 @@ export class MeleeEnemy extends Entity {
         this.corpseTimer = 0;    // tempo desde que virou cadáver (para escurecer)
 
         this.target = null;
+        this.stepDistance = 0;
+        this.justStepped = false;
+        this.justAttacked = false;
     }
 
     get isDead() {
@@ -171,6 +174,8 @@ export class MeleeEnemy extends Entity {
     }
 
     update(players, onPlayerHit) {
+        this.justStepped = false;
+        this.justAttacked = false;
         this.animTime++;
 
         if (this.state === "dying") {
@@ -236,6 +241,7 @@ export class MeleeEnemy extends Entity {
                     ];
                     const atk = this.sprite.rows[this.currentAttack];
                     this.state = "attack";
+                    this.justAttacked = true;
                     this.stateTimer = atk.frames * atk.fps;
                     this.animTime = 0;
                     this.dealtHit = false;
@@ -284,6 +290,16 @@ export class MeleeEnemy extends Entity {
 
         this._applyPush();
         super.update();
+
+        if (this.state === "chase" && this.speedMag > 0.35) {
+            this.stepDistance += this.speedMag;
+            if (this.stepDistance >= 48) {
+                this.stepDistance %= 48;
+                this.justStepped = true;
+            }
+        } else if (this.state !== "chase") {
+            this.stepDistance = 0;
+        }
     }
 
     // Soma o empurrão da física à posição e o faz decair. Assim o empurrão

@@ -36,6 +36,7 @@ export class DungeonGraph {
         this.rows = opts.rows ?? 7;
         this.roomCount = opts.roomCount ?? 8;
         this.rng = opts.rng ?? Math.random;
+        this.layout = opts.layout ?? null;
     }
 
     _key(x, y) { return `${x},${y}`; }
@@ -161,7 +162,95 @@ export class DungeonGraph {
         }
     }
 
+    _generateFromLayout(layout) {
+        if (!layout || layout.version !== 1) {
+            throw new Error("Formato de mapa inválido (esperada a versão 1).");
+        }
+        if (layout.cols !== this.cols || layout.rows !== this.rows) {
+            throw new Error(`O mapa precisa ter grade ${this.cols}x${this.rows}.`);
+        }
+        if (!Array.isArray(layout.rooms) || !Array.isArray(layout.edges)) {
+            throw new Error("O mapa precisa conter as listas rooms e edges.");
+        }
+
+        const rooms = [];
+        const roomByKey = new Map();
+        for (const input of layout.rooms) {
+            const { gx, gy, type } = input || {};
+            if (!Number.isInteger(gx) || !Number.isInteger(gy) ||
+                gx < 0 || gx >= this.cols || gy < 0 || gy >= this.rows) {
+                throw new Error("Há uma sala fora dos limites da grade.");
+            }
+            if (!["start", "normal", "boss"].includes(type)) {
+                throw new Error(`Tipo de sala inválido em ${gx},${gy}.`);
+            }
+            for (const [field, max] of [["enemyCount", 20], ["boxCount", 10], ["heartCount", 10], ["heartDropChance", 100]]) {
+                if (input[field] !== undefined && (!Number.isInteger(input[field]) || input[field] < 0 || input[field] > max)) {
+                    throw new Error(`Valor inválido para ${field} na sala ${gx},${gy}.`);
+                }
+            }
+            if (input.enemyType !== undefined && !["random", "demon", "blood"].includes(input.enemyType)) {
+                throw new Error(`Tipo de inimigo inválido na sala ${gx},${gy}.`);
+            }
+            const key = this._key(gx, gy);
+            if (roomByKey.has(key)) throw new Error(`Há mais de uma sala em ${key}.`);
+            const room = { ...input, gx, gy, type };
+            rooms.push(room);
+            roomByKey.set(key, room);
+        }
+
+        const starts = rooms.filter(room => room.type === "start");
+        if (starts.length !== 1) throw new Error("O mapa precisa ter exatamente uma sala inicial.");
+        const start = starts[0];
+        if (!layout.start || layout.start.gx !== start.gx || layout.start.gy !== start.gy) {
+            throw new Error("A posição start precisa apontar para a sala inicial.");
+        }
+
+        const edges = [];
+        const adjacency = new Map(rooms.map(room => [this._key(room.gx, room.gy), new Set()]));
+        const edgeKeys = new Set();
+        for (const input of layout.edges) {
+            const a = input?.a, b = input?.b;
+            const aKey = a && this._key(a.gx, a.gy);
+            const bKey = b && this._key(b.gx, b.gy);
+            if (!a || !b || !roomByKey.has(aKey) || !roomByKey.has(bKey) || aKey === bKey) {
+                throw new Error("Uma conexão aponta para uma sala inexistente ou para ela mesma.");
+            }
+            const edgeKey = [aKey, bKey].sort().join("|");
+            if (edgeKeys.has(edgeKey)) throw new Error("O mapa contém uma conexão duplicada.");
+            edgeKeys.add(edgeKey);
+            const roomA = roomByKey.get(aKey), roomB = roomByKey.get(bKey);
+            edges.push({ a: roomA, b: roomB });
+            adjacency.get(aKey).add(bKey);
+            adjacency.get(bKey).add(aKey);
+        }
+
+        const reached = new Set([this._key(start.gx, start.gy)]);
+        const queue = [this._key(start.gx, start.gy)];
+        while (queue.length) {
+            for (const next of adjacency.get(queue.shift())) {
+                if (!reached.has(next)) { reached.add(next); queue.push(next); }
+            }
+        }
+        if (reached.size !== rooms.length) {
+            throw new Error("Todas as salas precisam estar conectadas à sala inicial.");
+        }
+
+        const cells = new Map();
+        for (const room of rooms) {
+            cells.set(this._key(room.gx, room.gy), {
+                ...room, gx: room.gx, gy: room.gy, kind: "room", type: room.type,
+                doors: { N: false, S: false, E: false, W: false }
+            });
+        }
+        for (const edge of edges) this._carveCorridor(edge.a, edge.b, cells);
+        this._computeDoors(cells);
+
+        return { cols: this.cols, rows: this.rows, cells, rooms, edges, start: { gx: start.gx, gy: start.gy } };
+    }
+
     generate() {
+        if (this.layout) return this._generateFromLayout(this.layout);
         const { rooms, start } = this._scatterRooms();
 
         // Registra as salas como células
