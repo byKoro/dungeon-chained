@@ -1442,6 +1442,10 @@ class RoomEditor {
     }
 
     _onMouseDown(e) {
+        // Ignora cliques em elementos sobrepostos ao canvas (setas de forma/variação),
+        // para que a navegação não dispare mutação na célula do grid por baixo.
+        if (e.target !== this.canvas) return;
+
         if (e.button === 1 || e.shiftKey || e.altKey) {
             // Pan
             this.isPanning = true;
