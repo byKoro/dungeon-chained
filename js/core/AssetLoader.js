@@ -13,7 +13,9 @@ export class AssetLoader {
         this.load("p1", "assets/player_01/player_walk.png");
         this.load("p1Hurt", "assets/player_01/player_hurt.png");
         this.load("p1Scared", "assets/player_01/player_walk_scared.png");
-        this.load("p2", "assets/player_02.png");
+        this.load("p2", "assets/player_02/player_walk.png");
+        this.load("p2Hurt", "assets/player_02/player_hurt.png");
+        this.load("p2Scared", "assets/player_02/player_walk_scared.png");
 
         // Inimigos
         this.load("demon", "assets/enemies/demon.png");
@@ -54,6 +56,8 @@ export class AssetLoader {
     get p1Hurt() { return this.images.p1Hurt; }
     get p1Scared() { return this.images.p1Scared; }
     get p2() { return this.images.p2; }
+    get p2Hurt() { return this.images.p2Hurt; }
+    get p2Scared() { return this.images.p2Scared; }
     get demon() { return this.images.demon; }
     get bloodMonster() { return this.images.bloodMonster; }
     get tileset() { return this.images.tileset; }

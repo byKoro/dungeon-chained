@@ -1216,13 +1216,11 @@ class RoomEditor {
 
         const sprite = this.assets.get(playerKey);
         if (sprite && sprite.complete) {
-            // P1: cropX: 41, cropY: 37, cropW: 17, cropH: 23
-            // P2: cropX: 39, cropY: 35, cropW: 21, cropH: 25
-            const isP1 = playerKey === "p1";
-            const sx = isP1 ? 41 : 39;
-            const sy = isP1 ? 37 : 35;
-            const sw = isP1 ? 17 : 21;
-            const sh = isP1 ? 23 : 25;
+            // P1 & P2: cropX: 41, cropY: 37, cropW: 17, cropH: 23
+            const sx = 41;
+            const sy = 37;
+            const sw = 17;
+            const sh = 23;
 
             const scale = 1.4;
             const dw = sw * scale;

@@ -64,7 +64,9 @@ export function playerConfigs(assets) {
             name: "Azul",
             sprite: {
                 animated: true, frameCount: 8, cellSize: 100,
-                cropX: 39, cropY: 35, cropW: 21, cropH: 25, drawHeight: 73
+                cropX: 41, cropY: 37, cropW: 17, cropH: 23, drawHeight: 73,
+                hurt: { img: assets.p2Hurt, frameCount: 5, hurtFrame: 2, cellSize: 100, cropX: 41, cropY: 37, cropW: 17, cropH: 23 },
+                scared: { img: assets.p2Scared, frameCount: 8, cellSize: 100, cropX: 41, cropY: 37, cropW: 17, cropH: 23 }
             }
         }
     ];
