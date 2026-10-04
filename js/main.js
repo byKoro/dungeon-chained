@@ -416,11 +416,10 @@ function gameLoop() {
         const PLAYER_SAFE_ZONE = 46;
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
-            const d = Physics.distToSegment(enemy.x, enemy.y, p1.x, p1.y, p2.x, p2.y);
             const dP1 = Math.hypot(enemy.x - p1.x, enemy.y - p1.y);
             const dP2 = Math.hypot(enemy.x - p2.x, enemy.y - p2.y);
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
-            if (enemy.state !== "dying" && !nearPlayer && d < currentWeapon.hitThreshold + enemy.hitRadius) {
+            if (enemy.state !== "dying" && !nearPlayer && currentWeapon.hitsTarget(enemy, p1, p2)) {
                 enemy.startDying();
                 audio.play("monsterHurt", { volume: 0.58, rate: 0.85 + Math.random() * 0.2 });
                 renderer.triggerShake(4);
