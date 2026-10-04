@@ -738,3 +738,47 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
+
+/* ===== Navegador de Formas / Variações (header) ===== */
+.header-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+.shape-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.shape-nav .nav-arrow {
+    font-size: 16px;
+    padding: 4px 12px;
+    line-height: 1;
+}
+.shape-info {
+    min-width: 240px;
+    text-align: center;
+}
+.shape-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text, #fffffe);
+}
+.shape-status {
+    font-size: 11px;
+    margin-top: 2px;
+}
+.shape-status.done { color: #2cb67d; }
+.shape-status.missing { color: #ffb020; }
+.variant-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.variant-label {
+    font-size: 11px;
+    color: var(--text-muted, #a7a9be);
+    min-width: 120px;
+    text-align: center;
+}

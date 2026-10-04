@@ -17,6 +17,7 @@ import { AssetLoader } from '../core/AssetLoader.js';
 import { Tileset } from '../core/Tileset.js';
 import { RoomSocket, RoomTemplate } from '../rooms/RoomSocket.js';
 import { RoomPresets } from '../rooms/RoomPresets.js';
+import { RoomCatalog, doorSignature } from '../rooms/RoomCatalog.js';
 import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor } from '../config/GameConfig.js';
 import { demonConfig, bloodMonsterConfig, playerConfigs } from '../config/EntityConfig.js';
@@ -65,6 +66,11 @@ class RoomEditor {
         this.selectedEnemy = "demon";
         this.selectedProp = 59;
 
+        // Navegador de formas/variações
+        this.shapeIndex = 0;        // forma atual (ver _allShapes)
+        this.variantIndex = 0;      // variação atual (0..n-1 = existentes; n = nova)
+        this.catalog = null;        // RoomCatalog carregado (peças de /map)
+
         // Viewport (Zoom e Pan)
         this.zoom = 1.0;
         this.panX = 0;
@@ -94,14 +100,171 @@ class RoomEditor {
     async _initAssets() {
         await this.assets.whenReady();
         this.tileset = new Tileset(this.assets.tileset, 16, 10);
-        // Restaura a última cena editada (persistida em localStorage) para que
-        // o conteúdo não se perca ao ir/voltar do teste no jogo. Se não houver
-        // nada salvo, carrega o preset padrão.
+
+        // Carrega o catálogo de peças (/map) para o navegador de formas/variações.
+        this.catalog = new RoomCatalog();
+        await this.catalog.load();
+
+        // Restaura a última cena editada (localStorage) para não perder trabalho
+        // ao ir/voltar do teste; senão, abre na primeira forma.
         if (!this._loadSavedState()) {
-            this._loadInitialPreset("room_cross_4way");
+            this.shapeIndex = 0;
+            this.variantIndex = 0;
+            this._loadCurrentShapeVariant();
         }
         this._fitScreen();
         this.render();
+    }
+
+    /* --------------------------------------------------------------------------
+     * NAVEGADOR DE FORMAS & VARIAÇÕES (setas no header)
+     * -------------------------------------------------------------------------- */
+
+    // Lista canônica de TODAS as formas navegáveis (ordem das setas).
+    _allShapes() {
+        const d = (N, E, S, W) => ({ N: !!N, E: !!E, S: !!S, W: !!W });
+        return [
+            { name: "➕ Cruzamento (4 vias)", doors: d(1, 1, 1, 1), kind: "room", type: "normal" },
+            { name: "🔀 Junção T (N,E,W)", doors: d(1, 1, 0, 1), kind: "room", type: "normal" },
+            { name: "🔀 Junção T (S,E,W)", doors: d(0, 1, 1, 1), kind: "room", type: "normal" },
+            { name: "🔀 Junção T (N,S,E)", doors: d(1, 1, 1, 0), kind: "room", type: "normal" },
+            { name: "🔀 Junção T (N,S,W)", doors: d(1, 0, 1, 1), kind: "room", type: "normal" },
+            { name: "↔️ Corredor Leste-Oeste", doors: d(0, 1, 0, 1), kind: "corridor", type: "normal" },
+            { name: "↕️ Corredor Norte-Sul", doors: d(1, 0, 1, 0), kind: "corridor", type: "normal" },
+            { name: "↱ Curva Norte-Leste", doors: d(1, 1, 0, 0), kind: "corridor", type: "normal" },
+            { name: "↰ Curva Norte-Oeste", doors: d(1, 0, 0, 1), kind: "corridor", type: "normal" },
+            { name: "↳ Curva Sul-Leste", doors: d(0, 1, 1, 0), kind: "corridor", type: "normal" },
+            { name: "↲ Curva Sul-Oeste", doors: d(0, 0, 1, 1), kind: "corridor", type: "normal" },
+            { name: "🚪 Dead-End Norte", doors: d(1, 0, 0, 0), kind: "room", type: "normal" },
+            { name: "🚪 Dead-End Leste", doors: d(0, 1, 0, 0), kind: "room", type: "normal" },
+            { name: "🚪 Dead-End Sul", doors: d(0, 0, 1, 0), kind: "room", type: "normal" },
+            { name: "🚪 Dead-End Oeste", doors: d(0, 0, 0, 1), kind: "room", type: "normal" },
+            { name: "🏁 Câmara Inicial (Start)", doors: d(1, 1, 1, 1), kind: "room", type: "start" },
+            { name: "💀 Câmara do Chefe (Boss)", doors: d(0, 0, 0, 1), kind: "room", type: "boss" }
+        ];
+    }
+
+    // Peças existentes no catálogo para a forma atual (mesmo tipo + assinatura).
+    _variantsForShape(shape) {
+        if (!this.catalog) return [];
+        const want = doorSignature(shape.doors);
+        const wantType = shape.type === "start" || shape.type === "boss" ? shape.type : "normal";
+        return this.catalog.pieces.filter(p => {
+            const t = p.type === "start" || p.type === "boss" ? p.type : "normal";
+            return t === wantType && doorSignature(p.doors) === want;
+        });
+    }
+
+    _navShape(delta) {
+        const shapes = this._allShapes();
+        this.shapeIndex = (this.shapeIndex + delta + shapes.length) % shapes.length;
+        this.variantIndex = 0; // começa na 1ª variação (ou "nova" se não houver)
+        this._loadCurrentShapeVariant();
+    }
+
+    _navVariant(delta) {
+        const shape = this._allShapes()[this.shapeIndex];
+        const variants = this._variantsForShape(shape);
+        const slots = variants.length + 1; // +1 = slot "nova variação"
+        this.variantIndex = (this.variantIndex + delta + slots) % slots;
+        this._loadCurrentShapeVariant();
+    }
+
+    _newVariant() {
+        const shape = this._allShapes()[this.shapeIndex];
+        const variants = this._variantsForShape(shape);
+        this.variantIndex = variants.length; // o slot "nova"
+        this._loadCurrentShapeVariant();
+    }
+
+    // Carrega na tela a variação atual: uma peça existente ou o molde limpo.
+    _loadCurrentShapeVariant() {
+        const shape = this._allShapes()[this.shapeIndex];
+        const variants = this._variantsForShape(shape);
+
+        if (this.variantIndex < variants.length) {
+            // Variação existente: carrega a peça do catálogo.
+            this._importFromData(variants[this.variantIndex]);
+        } else {
+            // Slot "nova": molde limpo com as portas da forma.
+            this._loadBlankShape(shape);
+        }
+        this._updateShapeNavUI();
+    }
+
+    // Monta um molde limpo (moldura + portas + piso) para a forma dada.
+    _loadBlankShape(shape) {
+        this.cols = ROOM_COLS;
+        this.rows = ROOM_ROWS;
+        this.room.id = `${shape.type === "start" ? "room_start_hub" : shape.type === "boss" ? "room_boss" : (shape.kind === "corridor" ? "corridor" : "room")}`;
+        this.room.name = shape.name.replace(/^[^\w]+/, "").trim();
+        this.room.cols = this.cols;
+        this.room.rows = this.rows;
+        this.room.kind = shape.kind;
+        this.room.type = shape.type;
+        const midC = (this.cols / 2) | 0;
+        const midR = (this.rows / 2) | 0;
+        this.room.sockets = {
+            N: shape.doors.N ? new RoomSocket({ dir: "N", offset: midC - 1, span: 2 }) : null,
+            S: shape.doors.S ? new RoomSocket({ dir: "S", offset: midC - 1, span: 2 }) : null,
+            E: shape.doors.E ? new RoomSocket({ dir: "E", offset: midR - 1, span: 2 }) : null,
+            W: shape.doors.W ? new RoomSocket({ dir: "W", offset: midR - 1, span: 2 }) : null
+        };
+        this.room.holes = new Set();
+        this.room.hazards = [];
+        this.room.enemies = [];
+        this.room.torches = [];
+        this.room.props = [];
+        this.room.scatterProps = { enabled: false, density: 0.08 };
+        this.room.lock = "auto";
+
+        this._rebuildAutotile();
+        this._updateUIFromState();
+        this.render();
+    }
+
+    _updateShapeNavUI() {
+        const shapes = this._allShapes();
+        const shape = shapes[this.shapeIndex];
+        const variants = this._variantsForShape(shape);
+
+        const nameEl = document.getElementById("shape-name");
+        const statusEl = document.getElementById("shape-status");
+        const varLabel = document.getElementById("variant-label");
+        if (nameEl) nameEl.textContent = `${shape.name}  (${this.shapeIndex + 1}/${shapes.length})`;
+        if (statusEl) {
+            if (variants.length > 0) {
+                statusEl.textContent = `✓ ${variants.length} variação${variants.length > 1 ? "ões" : ""} criada${variants.length > 1 ? "s" : ""}`;
+                statusEl.className = "shape-status done";
+            } else {
+                statusEl.textContent = "⚠ nenhuma variação — falta criar";
+                statusEl.className = "shape-status missing";
+            }
+        }
+        if (varLabel) {
+            if (this.variantIndex < variants.length) {
+                varLabel.textContent = `variação ${this.variantIndex + 1} de ${variants.length}`;
+            } else {
+                varLabel.textContent = variants.length > 0 ? "✨ nova variação" : "✨ primeira variação";
+            }
+        }
+    }
+
+    // Aponta o navegador para a forma que corresponde à cena atual (doors+tipo).
+    _syncShapeIndexToCurrentRoom() {
+        const doors = {
+            N: !!this.room.sockets.N, E: !!this.room.sockets.E,
+            S: !!this.room.sockets.S, W: !!this.room.sockets.W
+        };
+        const sig = doorSignature(doors);
+        const type = this.room.type === "start" || this.room.type === "boss" ? this.room.type : "normal";
+        const shapes = this._allShapes();
+        const idx = shapes.findIndex(s => {
+            const st = s.type === "start" || s.type === "boss" ? s.type : "normal";
+            return st === type && doorSignature(s.doors) === sig;
+        });
+        if (idx >= 0) this.shapeIndex = idx;
+        this.variantIndex = 0;
     }
 
     /* --------------------------------------------------------------------------
@@ -146,9 +309,9 @@ class RoomEditor {
             if (!raw) return false;
             const data = JSON.parse(raw);
             this._importFromData(data);
-            // Mantém o seletor de presets coerente com a cena restaurada.
-            const sel = document.getElementById("preset-select");
-            if (sel) sel.value = "custom_new";
+            // Sincroniza o navegador com a forma restaurada (sem trocar a cena).
+            this._syncShapeIndexToCurrentRoom();
+            this._updateShapeNavUI();
             return true;
         } catch (e) {
             return false;
@@ -1194,10 +1357,14 @@ class RoomEditor {
      * EVENTOS DE ENTRADA & INTERAÇÃO COM O CANVAS
      * -------------------------------------------------------------------------- */
     _initEvents() {
-        // Seletor de Presets
-        document.getElementById("preset-select").onchange = (e) => {
-            this._loadInitialPreset(e.target.value);
-        };
+        // Navegador de Formas e Variações (setas no header)
+        const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+        bind("shape-prev", () => this._navShape(-1));
+        bind("shape-next", () => this._navShape(1));
+        bind("variant-prev", () => this._navVariant(-1));
+        bind("variant-next", () => this._navVariant(1));
+        bind("variant-new", () => this._newVariant());
+        bind("btn-save-room", () => this._saveRoomToServer());
 
         // Abas
         document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -1338,8 +1505,8 @@ class RoomEditor {
         };
 
         // Copiar Código e Exportar
-        document.getElementById("btn-quick-copy").onclick = () => { this._copyCodeToClipboard(); };
-        document.getElementById("btn-copy-code").onclick = () => { this._copyCodeToClipboard(); };
+        const quickCopy = document.getElementById("btn-quick-copy");
+        if (quickCopy) quickCopy.onclick = () => { this._copyCodeToClipboard(); };
         document.getElementById("btn-export-json").onclick = () => { this._exportJSON(); };
         document.getElementById("btn-import-json").onclick = () => { this._openImportModal(); };
 
@@ -1349,6 +1516,16 @@ class RoomEditor {
 
         // Testar no Jogo
         document.getElementById("btn-playtest").onclick = () => { this._playtestInGame(); };
+
+        // Cobertura de peças
+        const btnCoverage = document.getElementById("btn-coverage");
+        if (btnCoverage) btnCoverage.onclick = () => { this._openCoverageModal(); };
+        const covClose = document.getElementById("coverage-close-btn");
+        const covDismiss = document.getElementById("coverage-dismiss-btn");
+        const covRefresh = document.getElementById("coverage-refresh-btn");
+        if (covClose) covClose.onclick = () => { document.getElementById("coverage-modal").classList.remove("active"); };
+        if (covDismiss) covDismiss.onclick = () => { document.getElementById("coverage-modal").classList.remove("active"); };
+        if (covRefresh) covRefresh.onclick = () => { this._renderCoverage(true); };
 
         // Interação com o Canvas da Sala (Mouse)
         this.container.onmousedown = (e) => { this._onMouseDown(e); };
@@ -1726,6 +1903,153 @@ class RoomEditor {
         a.download = `${this.room.id}.json`;
         a.click();
         URL.revokeObjectURL(url);
+    }
+
+    /* --------------------------------------------------------------------------
+     * COBERTURA DE PEÇAS — quais formas já foram feitas e quantas variações
+     * -------------------------------------------------------------------------- */
+
+    // Formas esperadas: cada assinatura de portas (N,E,S,W) com nome amigável,
+    // agrupadas por categoria. É o "checklist" de peças a desenhar.
+    _expectedShapes() {
+        const d = (N, E, S, W) => ({ N, E, S, W });
+        return [
+            { group: "Cruzamento (4 vias)", items: [
+                { name: "➕ Cruzamento", doors: d(1, 1, 1, 1) }
+            ]},
+            { group: "Junções T (3 vias)", items: [
+                { name: "🔀 T sem Sul (N,E,W)", doors: d(1, 1, 0, 1) },
+                { name: "🔀 T sem Norte (S,E,W)", doors: d(0, 1, 1, 1) },
+                { name: "🔀 T sem Oeste (N,S,E)", doors: d(1, 1, 1, 0) },
+                { name: "🔀 T sem Leste (N,S,W)", doors: d(1, 0, 1, 1) }
+            ]},
+            { group: "Corredores retos (2 vias)", items: [
+                { name: "↔️ Corredor Leste-Oeste", doors: d(0, 1, 0, 1) },
+                { name: "↕️ Corredor Norte-Sul", doors: d(1, 0, 1, 0) }
+            ]},
+            { group: "Curvas em L (2 vias)", items: [
+                { name: "↱ Curva N-E", doors: d(1, 1, 0, 0) },
+                { name: "↰ Curva N-O", doors: d(1, 0, 0, 1) },
+                { name: "↳ Curva S-E", doors: d(0, 1, 1, 0) },
+                { name: "↲ Curva S-O", doors: d(0, 0, 1, 1) }
+            ]},
+            { group: "Dead-ends (1 via)", items: [
+                { name: "🚪 Entrada Norte", doors: d(1, 0, 0, 0) },
+                { name: "🚪 Entrada Leste", doors: d(0, 1, 0, 0) },
+                { name: "🚪 Entrada Sul", doors: d(0, 0, 1, 0) },
+                { name: "🚪 Entrada Oeste", doors: d(0, 0, 0, 1) }
+            ]}
+        ];
+    }
+
+    async _openCoverageModal() {
+        document.getElementById("coverage-modal").classList.add("active");
+        await this._renderCoverage(false);
+    }
+
+    async _renderCoverage(forceReload) {
+        const body = document.getElementById("coverage-body");
+        const summary = document.getElementById("coverage-summary");
+        body.innerHTML = `<div style="padding:12px; color:var(--text-dim);">Carregando peças de /map...</div>`;
+
+        // (Re)carrega o catálogo de /map.
+        if (forceReload || !this._coverageCatalog) {
+            this._coverageCatalog = new RoomCatalog();
+            await this._coverageCatalog.load();
+        }
+        const catalog = this._coverageCatalog;
+
+        // Conta variações por "tipo|assinatura".
+        const countByKey = new Map();
+        for (const p of catalog.pieces) {
+            const type = (p.type === "start" || p.type === "boss") ? p.type : "normal";
+            const key = `${type}|${doorSignature(p.doors)}`;
+            countByKey.set(key, (countByKey.get(key) || 0) + 1);
+        }
+
+        const groups = this._expectedShapes();
+        let totalShapes = 0, doneShapes = 0, totalVariants = 0, missing = 0;
+        let html = "";
+
+        // Seções normais (por forma de portas).
+        for (const g of groups) {
+            let rows = "";
+            for (const item of g.items) {
+                totalShapes++;
+                const key = `normal|${doorSignature(item.doors)}`;
+                const n = countByKey.get(key) || 0;
+                totalVariants += n;
+                if (n > 0) doneShapes++; else missing++;
+                const badge = n > 0
+                    ? `<span class="status-badge ok">${n} variação${n > 1 ? "ões" : ""}</span>`
+                    : `<span class="status-badge warn">faltando</span>`;
+                rows += `<div class="status-item"><span>${item.name}</span>${badge}</div>`;
+            }
+            html += `<div class="card" style="margin-bottom:8px;">
+                <div class="panel-title">${g.group}</div>${rows}</div>`;
+        }
+
+        // Especiais: Start e Boss (contadas por tipo, qualquer assinatura).
+        const startN = catalog.pieces.filter(p => p.type === "start").length;
+        const bossN = catalog.pieces.filter(p => p.type === "boss").length;
+        const specialRow = (label, n) => {
+            const badge = n > 0
+                ? `<span class="status-badge ok">${n} variação${n > 1 ? "ões" : ""}</span>`
+                : `<span class="status-badge warn">faltando</span>`;
+            return `<div class="status-item"><span>${label}</span>${badge}</div>`;
+        };
+        html += `<div class="card" style="margin-bottom:8px;">
+            <div class="panel-title">Especiais</div>
+            ${specialRow("🏁 Sala Inicial (start)", startN)}
+            ${specialRow("💀 Sala do Chefe (boss)", bossN)}</div>`;
+
+        totalShapes += 2;
+        if (startN > 0) doneShapes++; else missing++;
+        if (bossN > 0) doneShapes++; else missing++;
+        totalVariants += startN + bossN;
+
+        summary.innerHTML = `
+            <strong>${doneShapes}/${totalShapes}</strong> formas com ao menos 1 peça ·
+            <strong>${totalVariants}</strong> variações no total ·
+            <span style="color:${missing > 0 ? "#ffb020" : "#2cb67d"};">${missing} faltando</span>`;
+        body.innerHTML = html;
+    }
+
+    /**
+     * Salva a peça atual na pasta /map via POST ao servidor (serve.py), que
+     * grava o arquivo com nome automático e atualiza o index.json. Depois
+     * recarrega o catálogo e reposiciona o navegador na variação recém-criada.
+     */
+    async _saveRoomToServer() {
+        const payload = this._sceneToData();
+        // Props: modo exclusivo (scatter vs manual) já é tratado em _sceneToData.
+        if (this.room.lock && this.room.lock !== "auto") payload.lock = this.room.lock;
+
+        try {
+            const res = await fetch("/api/save-room", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) {
+                alert("❌ Falha ao salvar: " + (data.error || `HTTP ${res.status}`) +
+                    "\n\nDica: reinicie o servidor (python serve.py) para habilitar o salvamento.");
+                return;
+            }
+
+            // Recarrega o catálogo para refletir a nova peça e aponta para ela.
+            this.catalog = new RoomCatalog();
+            await this.catalog.load();
+            const shape = this._allShapes()[this.shapeIndex];
+            const variants = this._variantsForShape(shape);
+            this.variantIndex = Math.max(0, variants.length - 1); // última = recém-salva
+            this._updateShapeNavUI();
+            alert(`✅ Peça salva como ${data.file} (${data.count} peças no total).`);
+        } catch (e) {
+            alert("❌ Não foi possível contatar o servidor: " + e.message +
+                "\n\nVocê precisa rodar 'python serve.py' (versão com /api/save-room).");
+        }
     }
 
     _openImportModal() {

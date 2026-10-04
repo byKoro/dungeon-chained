@@ -1,0 +1,353 @@
+{
+  "id": "room_cross_4way",
+  "name": "Sala de Quatro Vias",
+  "cols": 14,
+  "rows": 9,
+  "kind": "room",
+  "type": "normal",
+  "doors": {
+    "N": true,
+    "S": true,
+    "E": true,
+    "W": true
+  },
+  "holes": [],
+  "floor": [
+    [
+      0,
+      2,
+      2,
+      2,
+      2,
+      2,
+      16,
+      16,
+      2,
+      2,
+      2,
+      2,
+      2,
+      5
+    ],
+    [
+      20,
+      11,
+      12,
+      12,
+      12,
+      12,
+      16,
+      16,
+      12,
+      12,
+      12,
+      12,
+      14,
+      25
+    ],
+    [
+      20,
+      21,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      24,
+      25
+    ],
+    [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    [
+      20,
+      21,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      24,
+      25
+    ],
+    [
+      20,
+      21,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      16,
+      24,
+      25
+    ],
+    [
+      20,
+      31,
+      32,
+      32,
+      32,
+      32,
+      16,
+      16,
+      32,
+      32,
+      32,
+      32,
+      34,
+      25
+    ],
+    [
+      40,
+      42,
+      42,
+      42,
+      42,
+      42,
+      16,
+      16,
+      42,
+      42,
+      42,
+      42,
+      42,
+      45
+    ]
+  ],
+  "hazards": [
+    {
+      "type": "spike",
+      "col": 2,
+      "row": 2
+    },
+    {
+      "type": "spike",
+      "col": 2,
+      "row": 5
+    },
+    {
+      "type": "spike",
+      "col": 4,
+      "row": 6
+    },
+    {
+      "type": "spike",
+      "col": 5,
+      "row": 3
+    },
+    {
+      "type": "spike",
+      "col": 8,
+      "row": 2
+    },
+    {
+      "type": "spike",
+      "col": 11,
+      "row": 4
+    },
+    {
+      "type": "spike",
+      "col": 9,
+      "row": 6
+    },
+    {
+      "type": "arrow",
+      "col": 4,
+      "row": 0,
+      "dir": "along+",
+      "phase": 0
+    },
+    {
+      "type": "arrow",
+      "col": 10,
+      "row": 0,
+      "dir": "along+",
+      "phase": 0
+    },
+    {
+      "type": "arrow",
+      "col": 1,
+      "row": 0,
+      "dir": "along+",
+      "phase": 0
+    }
+  ],
+  "enemies": [
+    {
+      "type": "bloodMonster",
+      "col": 2,
+      "row": 6
+    },
+    {
+      "type": "bloodMonster",
+      "col": 3,
+      "row": 7
+    },
+    {
+      "type": "bloodMonster",
+      "col": 5,
+      "row": 6
+    },
+    {
+      "type": "demon",
+      "col": 3,
+      "row": 5
+    },
+    {
+      "type": "demon",
+      "col": 3,
+      "row": 1
+    },
+    {
+      "type": "demon",
+      "col": 3,
+      "row": 2
+    },
+    {
+      "type": "demon",
+      "col": 5,
+      "row": 2
+    },
+    {
+      "type": "demon",
+      "col": 11,
+      "row": 1
+    },
+    {
+      "type": "demon",
+      "col": 11,
+      "row": 2
+    },
+    {
+      "type": "demon",
+      "col": 9,
+      "row": 2
+    },
+    {
+      "type": "demon",
+      "col": 11,
+      "row": 6
+    },
+    {
+      "type": "demon",
+      "col": 10,
+      "row": 6
+    },
+    {
+      "type": "demon",
+      "col": 9,
+      "row": 7
+    },
+    {
+      "type": "bloodMonster",
+      "col": 11,
+      "row": 7
+    }
+  ],
+  "torches": [
+    {
+      "col": 3,
+      "row": 0,
+      "side": "N"
+    },
+    {
+      "col": 1,
+      "row": 1,
+      "side": "W"
+    },
+    {
+      "col": 1,
+      "row": 2,
+      "side": "W"
+    },
+    {
+      "col": 11,
+      "row": 0,
+      "side": "N"
+    },
+    {
+      "col": 12,
+      "row": 2,
+      "side": "E"
+    },
+    {
+      "col": 9,
+      "row": 0,
+      "side": "N"
+    },
+    {
+      "col": 12,
+      "row": 6,
+      "side": "E"
+    },
+    {
+      "col": 11,
+      "row": 8,
+      "side": "S"
+    },
+    {
+      "col": 9,
+      "row": 8,
+      "side": "S"
+    },
+    {
+      "col": 3,
+      "row": 8,
+      "side": "S"
+    },
+    {
+      "col": 1,
+      "row": 6,
+      "side": "W"
+    }
+  ],
+  "props": [],
+  "scatterProps": {
+    "enabled": true,
+    "density": 0.13
+  }
+}

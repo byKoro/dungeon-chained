@@ -1,25 +1,20 @@
 {
   "rooms": [
-    "piece_N_01.json",
-    "piece_S_01.json",
-    "piece_NS_01.json",
-    "piece_E_01.json",
-    "piece_NE_01.json",
-    "piece_ES_01.json",
-    "piece_NES_01.json",
-    "piece_W_01.json",
-    "piece_NW_01.json",
-    "piece_SW_01.json",
-    "piece_NSW_01.json",
-    "piece_EW_01.json",
-    "piece_NEW_01.json",
-    "piece_ESW_01.json",
-    "piece_cross_01.json",
     "room_start_hub_0.json",
     "room_start_hub_1.json",
     "corridor_horizontal_ew_0.json",
     "corridor_horizontal_ew_1.json",
     "corridor_vertical_ns_0.json",
-    "room_corner_ne_0.json"
+    "corridor_vertical_ns_1.json",
+    "room_corner_ne_0.json",
+    "corredor_ne_01.json",
+    "room_corner_se_0.json",
+    "room_cross_4way_0.json",
+    "room_t_junction_n_0.json",
+    "room_nesw_0.json",
+    "corridor_esw_0.json",
+    "room_esw_0.json",
+    "room_nes_0.json",
+    "corridor_nsw_0.json"
   ]
 }

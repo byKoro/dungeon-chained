@@ -16,45 +16,31 @@
         </div>
 
         <div class="header-center">
-            <label for="preset-select">Sala / Corredor:</label>
-            <select id="preset-select" class="styled-select">
-                <optgroup label="── Salas de Combate ──">
-                    <option value="room_cross_4way" selected>➕ Sala 4-Vias (Cruzamento)</option>
-                    <option value="room_t_junction_n">🔀 Junção T (Sem Sul — Portas N, E, W)</option>
-                    <option value="room_t_junction_s">🔀 Junção T (Sem Norte — Portas S, E, W)</option>
-                    <option value="room_t_junction_e">🔀 Junção T (Sem Oeste — Portas N, S, E)</option>
-                    <option value="room_t_junction_w">🔀 Junção T (Sem Leste — Portas N, S, W)</option>
-                </optgroup>
-                <optgroup label="── Corredores Retos & Curvas ──">
-                    <option value="corridor_horizontal_ew">↔️ Corredor Reto Leste-Oeste</option>
-                    <option value="corridor_vertical_ns">↕️ Corredor Reto Norte-Sul</option>
-                    <option value="room_corner_ne">↩️ Curva Leste-Norte (N, E)</option>
-                    <option value="room_corner_nw">↪️ Curva Oeste-Norte (N, W)</option>
-                    <option value="room_corner_se">↪️ Curva Leste-Sul (S, E)</option>
-                    <option value="room_corner_sw">↩️ Curva Oeste-Sul (S, W)</option>
-                </optgroup>
-                <optgroup label="── Câmaras sem Saída (Dead-Ends) ──">
-                    <option value="room_deadend_n">🚪 Dead-End Entrada Sul (Porta S)</option>
-                    <option value="room_deadend_s">🚪 Dead-End Entrada Norte (Porta N)</option>
-                    <option value="room_deadend_e">🚪 Dead-End Entrada Oeste (Porta W)</option>
-                    <option value="room_deadend_w">🚪 Dead-End Entrada Leste (Porta E)</option>
-                </optgroup>
-                <optgroup label="── Câmaras Especiais ──">
-                    <option value="room_start_hub">🏁 Câmara Inicial (Start Hub)</option>
-                    <option value="room_boss_chamber">💀 Câmara do Chefe (Boss)</option>
-                </optgroup>
-                <optgroup label="── Customizado ──">
-                    <option value="custom_new">+ Criar Nova Sala em Branco...</option>
-                </optgroup>
-            </select>
+            <!-- Navegador de FORMAS (setas percorrem as formas de sala/corredor) -->
+            <div class="shape-nav">
+                <button class="btn nav-arrow" id="shape-prev" title="Forma anterior">◀</button>
+                <div class="shape-info">
+                    <div class="shape-name" id="shape-name">—</div>
+                    <div class="shape-status" id="shape-status"></div>
+                </div>
+                <button class="btn nav-arrow" id="shape-next" title="Próxima forma">▶</button>
+            </div>
+            <!-- Navegador de VARIAÇÕES dentro da forma -->
+            <div class="variant-nav">
+                <button class="btn btn-sm nav-arrow" id="variant-prev" title="Variação anterior">◀</button>
+                <span class="variant-label" id="variant-label">—</span>
+                <button class="btn btn-sm nav-arrow" id="variant-next" title="Próxima variação">▶</button>
+                <button class="btn btn-sm" id="variant-new" title="Criar nova variação (molde limpo)">➕ Nova</button>
+            </div>
         </div>
 
         <div class="header-actions">
-            <button class="btn btn-primary" id="btn-playtest" title="Executar e jogar diretamente nesta sala!">⚡ Testar no Jogo</button>
-            <button class="btn" id="btn-export-json">💾 Exportar JSON</button>
-            <button class="btn" id="btn-copy-code">📋 Copiar Código JS</button>
+            <button class="btn btn-primary" id="btn-save-room" title="Salvar esta peça na pasta /map">💾 Salvar</button>
+            <button class="btn btn-primary" id="btn-playtest" title="Executar e jogar diretamente nesta sala!">⚡ Testar</button>
+            <button class="btn" id="btn-coverage" title="Ver quais peças já foram feitas e quais faltam">📊 Cobertura</button>
+            <button class="btn" id="btn-export-json">💾 JSON</button>
             <button class="btn" id="btn-import-json">📂 Importar</button>
-            <a href="index.html" class="btn btn-accent">🎮 Voltar ao Jogo</a>
+            <a href="index.html" class="btn btn-accent">🎮 Jogo</a>
         </div>
     </header>
 
@@ -376,6 +362,22 @@
             <div style="display:flex; justify-content:flex-end; gap:8px;">
                 <button class="btn" id="modal-action-btn">Confirmar</button>
                 <button class="btn" id="modal-cancel-btn">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE COBERTURA DE PEÇAS -->
+    <div class="modal-overlay" id="coverage-modal">
+        <div class="modal-content" style="max-width:720px;">
+            <div class="modal-header">
+                <h3>📊 Cobertura de Peças</h3>
+                <button class="modal-close" id="coverage-close-btn">&times;</button>
+            </div>
+            <div id="coverage-summary" style="font-size:13px; margin-bottom:10px;"></div>
+            <div id="coverage-body" style="max-height:60vh; overflow-y:auto;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                <button class="btn" id="coverage-refresh-btn">🔄 Atualizar</button>
+                <button class="btn" id="coverage-dismiss-btn">Fechar</button>
             </div>
         </div>
     </div>
