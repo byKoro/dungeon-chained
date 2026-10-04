@@ -26,7 +26,7 @@ export class SpikeTrap {
         this.cfg = opts.cfg || HAZARDS.spike;
 
         // Metade das durações anteriores; não depende da taxa do RAF.
-        this.durations = [0.5, 0.5, 0.5, 1];
+        this.durations = [1, 0.15, 0.15, 2];
         this.cycle = this.durations.reduce((sum, seconds) => sum + seconds, 0);
         // Deslocamento de fase para criar ondas entre spikes vizinhos.
         this.elapsed = ((opts.phaseOffset || 0) * this.cycle) % this.cycle;
