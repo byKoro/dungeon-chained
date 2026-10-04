@@ -66,7 +66,10 @@ export class RoomCatalog {
                 const res = await fetch(MAP_DIR + file, { cache: "no-store" });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const piece = await res.json();
-                return this._validate(piece, file) ? piece : null;
+                if (!this._validate(piece, file)) return null;
+                // Rastreia o nome do arquivo de origem (para deletar/editar).
+                Object.defineProperty(piece, "__file", { value: file, enumerable: false });
+                return piece;
             } catch (e) {
                 console.warn(`[RoomCatalog] Falha ao carregar peça "${file}":`, e.message);
                 return null;

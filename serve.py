@@ -110,15 +110,56 @@ class RoomServerHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length) if length > 0 else b""
+        return json.loads(raw.decode("utf-8"))
+
+    def _handle_delete(self):
+        """Remove uma peça: apaga map/<file>.json e tira do index.json."""
+        try:
+            body = self._read_json_body()
+        except (ValueError, json.JSONDecodeError) as e:
+            self._send_json(400, {"ok": False, "error": f"JSON inválido: {e}"})
+            return
+
+        filename = (body or {}).get("file", "")
+        # Segurança: só um nome de arquivo .json simples, sem subpastas/traversal.
+        if not filename or not re.fullmatch(r"[A-Za-z0-9_\-]+\.json", filename):
+            self._send_json(400, {"ok": False, "error": "nome de arquivo inválido"})
+            return
+
+        target = os.path.join(MAP_DIR, filename)
+        existed = os.path.exists(target)
+        if existed:
+            try:
+                os.remove(target)
+            except OSError as e:
+                self._send_json(500, {"ok": False, "error": f"falha ao apagar: {e}"})
+                return
+
+        # Remove do index (mesmo se o arquivo já não existia, para limpar refs).
+        rooms = _load_index()
+        if filename in rooms:
+            rooms = [r for r in rooms if r != filename]
+            _save_index(rooms)
+
+        if not existed:
+            self._send_json(404, {"ok": False, "error": "arquivo não encontrado", "count": len(rooms)})
+            return
+        self._send_json(200, {"ok": True, "file": filename, "count": len(rooms)})
+
     def do_POST(self):
-        if self.path.rstrip("/") != "/api/save-room":
+        route = self.path.rstrip("/")
+        if route == "/api/delete-room":
+            self._handle_delete()
+            return
+        if route != "/api/save-room":
             self._send_json(404, {"ok": False, "error": "rota não encontrada"})
             return
 
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            raw = self.rfile.read(length) if length > 0 else b""
-            piece = json.loads(raw.decode("utf-8"))
+            piece = self._read_json_body()
         except (ValueError, json.JSONDecodeError) as e:
             self._send_json(400, {"ok": False, "error": f"JSON inválido: {e}"})
             return

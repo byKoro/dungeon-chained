@@ -1,7 +1,5 @@
 {
   "rooms": [
-    "room_start_hub_0.json",
-    "room_start_hub_1.json",
     "corridor_horizontal_ew_0.json",
     "corridor_horizontal_ew_1.json",
     "corridor_vertical_ns_0.json",
@@ -15,6 +13,7 @@
     "corridor_esw_0.json",
     "room_esw_0.json",
     "room_nes_0.json",
-    "corridor_nsw_0.json"
+    "corridor_nsw_0.json",
+    "room_start_hub_2.json"
   ]
 }
