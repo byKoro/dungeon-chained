@@ -24,11 +24,26 @@ export class AssetLoader {
         // Tileset das salas (grade 10x10 de 16px)
         this.load("tileset", "assets/tileset/tileset.png");
 
-        // Spikes (4 frames de 16x16): 0=recolhido ... 3=estendido
+        // Spikes (4 sprites de 16x16; a sequência usa os índices 3, 1 e 2)
         this.load("peaks0", "assets/peaks/peaks_0.png");
         this.load("peaks1", "assets/peaks/peaks_1.png");
         this.load("peaks2", "assets/peaks/peaks_2.png");
         this.load("peaks3", "assets/peaks/peaks_3.png");
+
+        // Armadilha de flecha e projétil
+        this.load("arrowTrap1", "assets/arrow/arrow_1.png");
+        this.load("arrowTrap2", "assets/arrow/arrow_2.png");
+        this.load("arrowTrap3", "assets/arrow/arrow_3.png");
+        this.load("arrowTrap4", "assets/arrow/arrow_4.png");
+        this.load("arrow", "assets/arrow/Just_arrow.png");
+
+        // Animações de fogo para paredes e candlesticks.
+        for (let frame = 1; frame <= 4; frame++) {
+            this.load(`torch${frame}`, `assets/torch/torch_${frame}.png`);
+            this.load(`sideTorch${frame}`, `assets/torch/side_torch_${frame}.png`);
+            this.load(`candlestick1_${frame}`, `assets/torch/candlestick_1_${frame}.png`);
+            this.load(`candlestick2_${frame}`, `assets/torch/candlestick_2_${frame}.png`);
+        }
     }
 
     load(key, src) {
@@ -61,6 +76,16 @@ export class AssetLoader {
     get demon() { return this.images.demon; }
     get bloodMonster() { return this.images.bloodMonster; }
     get tileset() { return this.images.tileset; }
-    // Frames dos spikes, em ordem (recolhido -> estendido).
+    // Sprites dos spikes, indexados pelo nome do arquivo (0..3).
     get peaks() { return [this.images.peaks0, this.images.peaks1, this.images.peaks2, this.images.peaks3]; }
+    get arrowTrap() { return [this.images.arrowTrap1, this.images.arrowTrap2, this.images.arrowTrap3, this.images.arrowTrap4]; }
+    get arrow() { return this.images.arrow; }
+    get torchSprites() {
+        return {
+            torch: [1, 2, 3, 4].map(frame => this.images[`torch${frame}`]),
+            sideTorch: [1, 2, 3, 4].map(frame => this.images[`sideTorch${frame}`]),
+            candlestick1: [1, 2, 3, 4].map(frame => this.images[`candlestick1_${frame}`]),
+            candlestick2: [1, 2, 3, 4].map(frame => this.images[`candlestick2_${frame}`])
+        };
+    }
 }

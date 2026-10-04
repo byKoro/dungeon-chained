@@ -72,8 +72,13 @@
                             <div class="panel-section">
                                 <div class="panel-title">Posicionar Tochas (Luz)</div>
                                 <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-                                    Clique numa <strong>parede</strong> (borda da sala) para colocar uma tocha. Cada tocha emite luz para dentro da sala. Clique de novo numa tocha para removê-la.
+                                    Escolha uma chama. Tochas ficam nas paredes; candlesticks podem ser colocados no piso. Clique de novo para remover. Todas emitem luz.
                                 </p>
+                                <div style="display:flex; flex-direction:column; gap:6px;">
+                                    <label class="btn"><input type="radio" name="torch-choice" value="torch" checked> Tocha de parede</label>
+                                    <label class="btn"><input type="radio" name="torch-choice" value="candlestick_1"> Candlestick 1</label>
+                                    <label class="btn"><input type="radio" name="torch-choice" value="candlestick_2"> Candlestick 2</label>
+                                </div>
                             </div>
                             <div class="panel-section">
                                 <div class="panel-title">Tochas Colocadas (<span id="torch-count">0</span>)</div>

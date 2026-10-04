@@ -1,11 +1,11 @@
-import { HAZARDS } from '../config/GameConfig.js';
+import { HAZARDS, TILE } from '../config/GameConfig.js';
 
 /**
  * Arrow — projétil de flecha. Viaja em linha reta na direção (dirX,dirY) até
  * sair dos bounds ou acertar um player. Forma geométrica por enquanto.
  */
 export class Arrow {
-    constructor(x, y, dirX, dirY) {
+    constructor(x, y, dirX, dirY, sprite = null) {
         this.x = x;
         this.y = y;
         const cfg = HAZARDS.arrow;
@@ -16,16 +16,21 @@ export class Arrow {
         this.hitRadius = cfg.hitRadius;
         this.life = cfg.maxLifeFrames;
         this.dead = false;
+        this.sprite = sprite;
+        this.lifeSeconds = cfg.maxLifeFrames / 60;
     }
 
     // Avança e checa colisão. Devolve o player atingido (ou null).
-    update(players, bounds) {
-        this.x += this.dx;
-        this.y += this.dy;
-        if (--this.life <= 0) { this.dead = true; return null; }
+    update(players, bounds, deltaSeconds = 1 / 60) {
+        const frameScale = Math.max(0, deltaSeconds) * 60;
+        this.x += this.dx * frameScale;
+        this.y += this.dy * frameScale;
+        this.lifeSeconds -= Math.max(0, deltaSeconds);
+        if (this.lifeSeconds <= 0) { this.dead = true; return null; }
 
-        // Saiu da área jogável (bate na parede) -> somem.
-        const m = 8;
+        // A flecha nasce dentro do tile da parede. Mantém-se viva até cruzar
+        // a parede oposta, em vez de morrer ao sair dos bounds de piso.
+        const m = TILE;
         if (this.x < bounds.minX - m || this.x > bounds.maxX + m ||
             this.y < bounds.minY - m || this.y > bounds.maxY + m) {
             this.dead = true;
@@ -47,6 +52,12 @@ export class Arrow {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
+        if (this.sprite && this.sprite.complete && this.sprite.naturalWidth > 0) {
+            const length = cfg.length + 12;
+            ctx.drawImage(this.sprite, -length / 2, -length / 2, length, length);
+            ctx.restore();
+            return;
+        }
         // Haste
         ctx.strokeStyle = cfg.color;
         ctx.lineWidth = cfg.width;
@@ -72,7 +83,7 @@ export class Arrow {
  *
  * A cada `intervalFrames` ele telegrafa (indicador pulsa/muda de cor por
  * `warnFrames`) e então dispara uma flecha atravessando o corredor na direção
- * `dir`. O indicador e a flecha são formas geométricas (sprites virão depois).
+ * `dir`. Usa os sprites de assets/arrow, com fallback geométrico.
  *
  * O trap NÃO guarda as flechas: ao disparar, chama `onFire(arrow)` para que o
  * dono (Room/Game) as gerencie num pool compartilhado.
@@ -82,7 +93,7 @@ export class ArrowTrap {
      * @param {number} x posição do emissor (na parede)
      * @param {number} y
      * @param {{x:number,y:number}} dir direção de disparo (será normalizada)
-     * @param {object} opts { phaseOffset:0..1 }
+     * @param {object} opts { phaseOffset:0..1, sprites, arrowSprite }
      */
     constructor(x, y, dir, opts = {}) {
         this.x = x;
@@ -93,29 +104,27 @@ export class ArrowTrap {
         this.dirY = dir.y / len;
 
         this.cfg = HAZARDS.arrowTrap;
-        this.t = Math.floor((opts.phaseOffset || 0) * this.cfg.intervalFrames) % this.cfg.intervalFrames;
+        this.sprites = opts.sprites || null;
+        this.arrowSprite = opts.arrowSprite || null;
+        this.intervalSeconds = this.cfg.intervalFrames / 60;
+        this.warnSeconds = this.cfg.warnFrames / 60;
+        this.elapsed = ((opts.phaseOffset || 0) % 1) * this.intervalSeconds;
         this.pulse = 0;
-        this._fired = false;
     }
 
     get isWarning() {
-        return this.t >= this.cfg.intervalFrames - this.cfg.warnFrames;
+        return (this.elapsed % this.intervalSeconds) >= this.intervalSeconds - this.warnSeconds;
     }
 
-    update(onFire) {
-        this.t = (this.t + 1) % this.cfg.intervalFrames;
-        this.pulse += 0.2;
-        if (this.isWarning) {
-            if (!this._fired && this.t === this.cfg.intervalFrames - 1) {
-                // último frame do warn: dispara
-                this._fired = true;
-                // nasce um pouco à frente da boca do atirador
-                const sx = this.x + this.dirX * 14;
-                const sy = this.y + this.dirY * 14;
-                onFire(new Arrow(sx, sy, this.dirX, this.dirY));
-            }
-        } else {
-            this._fired = false;
+    update(onFire, deltaSeconds = 1 / 60) {
+        this.elapsed += Math.max(0, deltaSeconds);
+        this.pulse += Math.max(0, deltaSeconds) * 12;
+        if (this.elapsed >= this.intervalSeconds) {
+            // Dispara em intervalos constantes, preservando o excedente do tick.
+            this.elapsed %= this.intervalSeconds;
+            const sx = this.x + this.dirX * 14;
+            const sy = this.y + this.dirY * 14;
+            onFire(new Arrow(sx, sy, this.dirX, this.dirY, this.arrowSprite));
         }
     }
 
@@ -128,7 +137,19 @@ export class ArrowTrap {
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(Math.atan2(this.dirY, this.dirX));
+        // Os sprites da parede apontam para cima por padrão.
+        ctx.rotate(Math.atan2(this.dirY, this.dirX) + Math.PI / 2);
+
+        const spriteIndex = Math.floor(this.pulse * (warn ? 3 : 1)) % 4;
+        const sprite = this.sprites && this.sprites[spriteIndex];
+        if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+            const width = cfg.indicatorSize * 1.6;
+            const height = width * (sprite.naturalHeight / sprite.naturalWidth);
+            ctx.globalAlpha = pulse;
+            ctx.drawImage(sprite, -width / 2, -height / 2, width, height);
+            ctx.restore();
+            return;
+        }
 
         // Base montada na parede (losango).
         ctx.fillStyle = "#2a2330";

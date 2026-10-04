@@ -1,7 +1,7 @@
 import { SpikeTrap } from '../entities/SpikeTrap.js';
 import { ArrowTrap, Arrow } from '../entities/ArrowTrap.js';
 import { PressureButton } from '../entities/PressureButton.js';
-import { HAZARDS, TILE } from '../config/GameConfig.js';
+import { HAZARDS, TILE, ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 
 /**
  * ChallengeCorridor — instancia e gerencia os perigos/botões de uma peça
@@ -27,7 +27,7 @@ export class ChallengeCorridor {
      * @param {object} layout  definição (de ChallengeLayouts)
      * @param {object} bounds   bounds jogáveis da célula { minX,maxX,minY,maxY }
      * @param {object} doors    { N,S,E,W: bool } portas da célula
-     * @param {object} assets   AssetLoader (para o sprite dos spikes)
+     * @param {object} assets   AssetLoader (sprites dos perigos)
      */
     constructor(layout, bounds, doors, assets) {
         this.layout = layout;
@@ -112,8 +112,21 @@ export class ChallengeCorridor {
         return { x: 1, y: 0 };
     }
 
+    // Dispara para dentro, na direção oposta à parede de montagem.
+    _fireDirFromWall(side) {
+        switch (side) {
+            case "top": return { x: 0, y: -1 };
+            case "bottom": return { x: 0, y: 1 };
+            case "left": return { x: -1, y: 0 };
+            case "right": return { x: 1, y: 0 };
+            default: return null;
+        }
+    }
+
     _build(assets) {
         const peaks = assets && assets.peaks ? assets.peaks : null;
+        const arrowTrapSprites = assets && assets.arrowTrap ? assets.arrowTrap : null;
+        const arrowSprite = assets && assets.arrow ? assets.arrow : null;
 
         for (const el of this.layout.elements) {
             const byTile = el.col !== undefined && el.row !== undefined;
@@ -142,8 +155,12 @@ export class ChallengeCorridor {
                 }
                 case "arrow": {
                     const p = this._elemWorld(el);
-                    const dir = this._fireDir(el.dir || "across+");
-                    this.arrowTraps.push(new ArrowTrap(p.x, p.y, dir, { phaseOffset: el.phase || 0 }));
+                    const inferredSide = el.side || (el.row === 0 ? "top"
+                        : el.row === ROOM_ROWS - 1 ? "bottom"
+                            : el.col === 0 ? "left"
+                                : el.col === ROOM_COLS - 1 ? "right" : null);
+                    const dir = this._fireDirFromWall(inferredSide) || this._fireDir(el.dir || "across+");
+                    this.arrowTraps.push(new ArrowTrap(p.x, p.y, dir, { phaseOffset: el.phase || 0, sprites: arrowTrapSprites, arrowSprite }));
                     break;
                 }
                 case "button": {
@@ -160,15 +177,15 @@ export class ChallengeCorridor {
         return !this.solved;
     }
 
-    update(players) {
+    update(players, deltaSeconds = 1 / 60) {
         // Spikes
-        for (const s of this.spikes) s.update(players);
+        for (const s of this.spikes) s.update(players, deltaSeconds);
 
         // Atiradores + flechas
         const onFire = (arrow) => this.arrows.push(arrow);
-        for (const t of this.arrowTraps) t.update(onFire);
+        for (const t of this.arrowTraps) t.update(onFire, deltaSeconds);
         for (let i = this.arrows.length - 1; i >= 0; i--) {
-            this.arrows[i].update(players, this.bounds);
+            this.arrows[i].update(players, this.bounds, deltaSeconds);
             if (this.arrows[i].dead) this.arrows.splice(i, 1);
         }
 

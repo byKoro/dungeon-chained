@@ -4,6 +4,7 @@ export class Renderer {
     constructor(canvas, ctx) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.assets = null;
         this.zoom = 1.50;         // zoom atual (animado)
         this.screenShake = 0;
 
@@ -20,6 +21,10 @@ export class Renderer {
     // Informa o tamanho do tile no mundo (px) para a quantização do zoom.
     setTileWorldSize(px) {
         if (px > 0) this.tileWorldSize = px;
+    }
+
+    setAssets(assets) {
+        this.assets = assets;
     }
 
     /**
@@ -225,22 +230,39 @@ export class Renderer {
             }
         }
 
-        // Tochas: desenha o SPRITE da tocha (a LUZ é adicionada à parte pelo
-        // Game, lendo tiles.torches). N/S usam TORCHES.index; E/W usam
-        // sideIndex, com o lado Leste espelhado (o tile encaixa na esquerda).
+        // Tochas e candlesticks animados. O Game acrescenta a luz separadamente.
         if (tiles.torches) {
+            const torchSprites = this.assets && this.assets.torchSprites;
+            const frame = Math.floor(performance.now() / 160) % 4;
             for (const t of tiles.torches) {
-                const idx = (t.side === "N" || t.side === "S") ? TORCHES.index : TORCHES.sideIndex;
                 const dx = rect.x + t.col * tile;
                 const dy = rect.y + t.row * tile;
-                if (t.side === "E") {
+                const type = t.type || "torch";
+                const sprites = type === "candlestick_1" ? torchSprites?.candlestick1
+                    : type === "candlestick_2" ? torchSprites?.candlestick2
+                        : (t.side === "W" || t.side === "E") ? torchSprites?.sideTorch
+                            : torchSprites?.torch;
+                const img = sprites && sprites[frame];
+                const flip = type === "torch" && t.side === "E";
+                if (img && img.complete && img.naturalWidth > 0 && flip) {
                     c.save();
                     c.translate(dx + tile, dy);
                     c.scale(-1, 1);
-                    this.tileset.draw(c, idx, 0, 0, tile, tile);
+                    c.drawImage(img, 0, 0, tile, tile);
                     c.restore();
+                } else if (img && img.complete && img.naturalWidth > 0) {
+                    c.drawImage(img, dx, dy, tile, tile);
                 } else {
-                    this.tileset.draw(c, idx, dx, dy, tile, tile);
+                    const idx = (t.side === "N" || t.side === "S") ? TORCHES.index : TORCHES.sideIndex;
+                    if (flip) {
+                        c.save();
+                        c.translate(dx + tile, dy);
+                        c.scale(-1, 1);
+                        this.tileset.draw(c, idx, 0, 0, tile, tile);
+                        c.restore();
+                    } else {
+                        this.tileset.draw(c, idx, dx, dy, tile, tile);
+                    }
                 }
             }
         }

@@ -416,7 +416,7 @@ export const HAZARDS = {
 
     // ---- Atirador de flechas (armadilha de parede) ----
     arrowTrap: {
-        intervalFrames: 95,    // intervalo entre disparos
+        intervalFrames: 90,    // intervalo entre disparos (1,5 s a 60 FPS)
         warnFrames: 34,        // telegrafo do indicador antes de atirar
         indicatorSize: 20,     // tamanho da forma do indicador na parede
         indicatorColor: "#ffd166",

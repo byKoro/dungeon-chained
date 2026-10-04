@@ -3,12 +3,9 @@ import { HAZARDS } from '../config/GameConfig.js';
 /**
  * SpikeTrap — espinhos de chão que sobem e descem num ciclo.
  *
- * Ciclo de estados (em frames):
- *   hidden  -> warn (telegrafo, subindo) -> exposed (letal) -> retract -> hidden
+ * Ciclo de sprites: peaks_3 -> peaks_0 -> peaks_1 -> peaks_2.
  *
- * Enquanto EXPOSTO (e no fim do warn), qualquer player cujo centro esteja
- * dentro de `damageRadius` recebe dano. Usa os 4 frames de assets/peaks
- * (0 recolhido .. 3 estendido). Se os sprites não carregarem, desenha uma
+ * Só peaks_2 causa dano. Se os sprites não carregarem, desenha uma
  * forma geométrica (triângulos) como fallback.
  *
  * O ciclo pode receber um `phase` (0..1) inicial para dessincronizar spikes
@@ -28,50 +25,46 @@ export class SpikeTrap {
         this.peaks = peaks;
         this.cfg = opts.cfg || HAZARDS.spike;
 
-        const c = this.cfg;
-        this.cycle = c.hiddenFrames + c.warnFrames + c.exposedFrames + c.retractFrames;
+        // Metade das durações anteriores; não depende da taxa do RAF.
+        this.durations = [0.5, 0.5, 0.5, 1];
+        this.cycle = this.durations.reduce((sum, seconds) => sum + seconds, 0);
         // Deslocamento de fase para criar ondas entre spikes vizinhos.
-        this.t = Math.floor((opts.phaseOffset || 0) * this.cycle) % this.cycle;
+        this.elapsed = ((opts.phaseOffset || 0) * this.cycle) % this.cycle;
 
         this.state = "hidden";
         this.extend = 0; // 0 (recolhido) .. 1 (totalmente para fora)
+        this.frameIndex = 3;
     }
 
     // Fase atual -> estado + nível de extensão (0..1).
-    _advance() {
-        const c = this.cfg;
-        this.t = (this.t + 1) % this.cycle;
-        let t = this.t;
-
-        if (t < c.hiddenFrames) {
+    _advance(deltaSeconds) {
+        this.elapsed = (this.elapsed + deltaSeconds) % this.cycle;
+        if (this.elapsed < this.durations[0]) {
+            this.frameIndex = 3;
             this.state = "hidden";
             this.extend = 0;
-            return;
-        }
-        t -= c.hiddenFrames;
-        if (t < c.warnFrames) {
+        } else if (this.elapsed < this.durations[0] + this.durations[1]) {
+            this.frameIndex = 0;
             this.state = "warn";
-            this.extend = t / c.warnFrames; // sobe gradualmente
-            return;
-        }
-        t -= c.warnFrames;
-        if (t < c.exposedFrames) {
+            this.extend = 0.25;
+        } else if (this.elapsed < this.durations[0] + this.durations[1] + this.durations[2]) {
+            this.frameIndex = 1;
+            this.state = "warn";
+            this.extend = 0.5;
+        } else {
+            this.frameIndex = 2;
             this.state = "exposed";
             this.extend = 1;
-            return;
         }
-        t -= c.exposedFrames;
-        this.state = "retract";
-        this.extend = 1 - (t / c.retractFrames); // desce gradualmente
     }
 
     // Fere quando quase/totalmente estendido (letal perto do topo do ciclo).
     get isDangerous() {
-        return this.extend >= 0.75;
+        return this.frameIndex === 2;
     }
 
-    update(players) {
-        this._advance();
+    update(players, deltaSeconds = 1 / 60) {
+        this._advance(Math.max(0, deltaSeconds));
         if (!this.isDangerous) return;
 
         const r = this.cfg.damageRadius;
@@ -83,21 +76,13 @@ export class SpikeTrap {
         }
     }
 
-    // Índice do frame de sprite (0..3) conforme a extensão.
-    _frameIndex() {
-        if (this.extend <= 0.02) return 0;
-        if (this.extend < 0.5) return 1;
-        if (this.extend < 0.9) return 2;
-        return 3;
-    }
-
     draw(ctx) {
         const size = this.cfg.drawSize;
         const half = size / 2;
 
         // Sprite animado, se disponível.
         const frames = this.peaks;
-        const img = frames && frames[this._frameIndex()];
+        const img = frames && frames[this.frameIndex];
         if (img && img.complete && img.naturalWidth > 0) {
             ctx.drawImage(img, this.x - half, this.y - half, size, size);
             return;

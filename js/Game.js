@@ -62,6 +62,7 @@ export class Game {
         // Subsistemas de render / mundo
         this.renderer = new Renderer(canvas, this.ctx);
         this.renderer.setTileset(new Tileset(this.assets.tileset, 16, 10));
+        this.renderer.setAssets(this.assets);
         // Informa o tamanho do tile no mundo para a quantização do zoom
         // (mantém a grade de tiles alinhada ao pixel de tela — tiles fixos).
         this.renderer.setTileWorldSize(TILE);
@@ -102,6 +103,7 @@ export class Game {
         this.arenaBounds = null;
         this.gibs = [];
         this.transition = null; // { phase: "out"|"in", t, door }
+        this._lastFrameTimestamp = null;
 
         this._bindButtons();
     }
@@ -264,11 +266,15 @@ export class Game {
     }
 
     // ---- Loop ----
-    _loop() {
+    _loop(timestamp) {
+        const deltaSeconds = this._lastFrameTimestamp === null
+            ? 0
+            : Math.min(Math.max((timestamp - this._lastFrameTimestamp) / 1000, 0), 0.1);
+        this._lastFrameTimestamp = timestamp;
         if (!this.gameOver && this.transition) {
             this._updateTransition();
         } else if (!this.gameOver) {
-            this._updateGameplay();
+            this._updateGameplay(deltaSeconds);
         }
         this._render();
         requestAnimationFrame(this._loop);
@@ -289,7 +295,7 @@ export class Game {
         this.updateHud();
     }
 
-    _updateGameplay() {
+    _updateGameplay(deltaSeconds = 1 / 60) {
         const { p1, p2, rooms } = this;
         this.arenaBounds = rooms.currentBounds;
         const room = rooms.current;
@@ -305,7 +311,7 @@ export class Game {
         this.enforceSeparationLimit();
 
         // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
-        if (room.challenge) room.challenge.update([p1, p2]);
+        if (room.challenge) room.challenge.update([p1, p2], deltaSeconds);
 
         // Inimigos: IA + dano no player (feedback via CombatSystem)
         const enemies = room.enemies;

@@ -65,6 +65,7 @@ class RoomEditor {
         this.selectedHazard = "button";
         this.selectedEnemy = "demon";
         this.selectedProp = 59;
+        this.selectedTorchType = "torch";
 
         // Navegador de formas/variações
         this.shapeIndex = 0;        // forma atual (ver _allShapes)
@@ -678,7 +679,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>Tocha ${t.side} (${t.col}, ${t.row})</span>
+                <span>${t.type === "candlestick_1" ? "Candlestick 1" : t.type === "candlestick_2" ? "Candlestick 2" : `Tocha ${t.side}`} (${t.col}, ${t.row})</span>
                 <button class="btn btn-sm btn-danger" data-del-torch="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -900,13 +901,28 @@ class RoomEditor {
     }
 
     _renderTorches(ctx, tileW) {
+        const spriteGroups = this.assets.torchSprites;
+        const frame = Math.floor(performance.now() / 160) % 4;
         for (const t of this.room.torches) {
             const dx = t.col * tileW, dy = t.row * tileW;
-            // Tile da tocha: norte usa TORCHES.index; laterais usam sideIndex
-            // (espelhado na parede direita, como no jogo).
-            if (this.tileset) {
+            const type = t.type || "torch";
+            const sprites = type === "candlestick_1" ? spriteGroups.candlestick1
+                : type === "candlestick_2" ? spriteGroups.candlestick2
+                    : (t.side === "W" || t.side === "E") ? spriteGroups.sideTorch
+                        : spriteGroups.torch;
+            const img = sprites && sprites[frame];
+            const flip = type === "torch" && t.side === "E";
+            if (img && img.complete && img.naturalWidth > 0 && flip) {
+                ctx.save();
+                ctx.translate(dx + tileW, dy);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, 0, 0, tileW, tileW);
+                ctx.restore();
+            } else if (img && img.complete && img.naturalWidth > 0) {
+                ctx.drawImage(img, dx, dy, tileW, tileW);
+            } else if (this.tileset) {
                 const idx = (t.side === "N" || t.side === "S") ? TORCHES.index : TORCHES.sideIndex;
-                if (t.side === "E") {
+                if (flip) {
                     ctx.save();
                     ctx.translate(dx + tileW, dy);
                     ctx.scale(-1, 1);
@@ -1057,9 +1073,11 @@ class RoomEditor {
                 ctx.beginPath();
                 ctx.moveTo(cx, cy);
                 const L = tileW * 0.4;
-                if (h.dir === "across+") ctx.lineTo(cx + L, cy);
-                else if (h.dir === "across-") ctx.lineTo(cx - L, cy);
-                else if (h.dir === "along+") ctx.lineTo(cx, cy + L);
+                const sideDirs = { top: "along+", bottom: "along-", left: "across+", right: "across-" };
+                const dir = sideDirs[h.side] || h.dir;
+                if (dir === "across+") ctx.lineTo(cx + L, cy);
+                else if (dir === "across-") ctx.lineTo(cx - L, cy);
+                else if (dir === "along+") ctx.lineTo(cx, cy + L);
                 else ctx.lineTo(cx, cy - L);
                 ctx.stroke();
             }
@@ -1322,6 +1340,9 @@ class RoomEditor {
             this._updateCodeOutput();
             this.render();
         };
+        document.querySelectorAll("[name='torch-choice']").forEach(radio => {
+            radio.onchange = () => { this.selectedTorchType = radio.value; };
+        });
 
         // Props
         document.querySelectorAll("[name='prop-choice']").forEach(r => {
@@ -1571,14 +1592,22 @@ class RoomEditor {
     _addHazardAt(col, row) {
         const type = this.selectedHazard;
 
-        // Lançadores de flecha vão na PAREDE (borda superior/inferior); os
-        // demais perigos ficam em tiles internos de piso.
+        // Lançadores de flecha podem ocupar qualquer uma das quatro paredes.
         if (type === "arrow") {
-            // Prende às paredes horizontais (topo = row 0, base = última linha).
-            if (row !== 0 && row !== this.rows - 1) {
-                row = (row < this.rows / 2) ? 0 : this.rows - 1;
-            }
-            col = Math.min(this.cols - 1, Math.max(0, col));
+            const lastCol = this.cols - 1, lastRow = this.rows - 1;
+            const distances = [
+                { side: "top", distance: row },
+                { side: "bottom", distance: lastRow - row },
+                { side: "left", distance: col },
+                { side: "right", distance: lastCol - col }
+            ];
+            const side = distances.reduce((best, item) => item.distance < best.distance ? item : best).side;
+            if (side === "top") row = 0;
+            else if (side === "bottom") row = lastRow;
+            else if (side === "left") col = 0;
+            else col = lastCol;
+            col = Math.min(lastCol, Math.max(0, col));
+            row = Math.min(lastRow, Math.max(0, row));
         } else {
             if (col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1) return;
         }
@@ -1599,8 +1628,9 @@ class RoomEditor {
             newHazard.col = Math.min(col, this.cols - 1 - newHazard.count);
             if (newHazard.col < 1) newHazard.col = 1;
         } else if (type === "arrow") {
-            // Dispara atravessando o corredor, para dentro da sala.
-            newHazard.dir = (row === 0) ? "along+" : "along-";
+            newHazard.side = row === 0 ? "top"
+                : row === this.rows - 1 ? "bottom"
+                    : col === 0 ? "left" : "right";
             newHazard.phase = 0.0;
         }
 
@@ -1631,6 +1661,19 @@ class RoomEditor {
      * deduzido da borda clicada e define para onde a luz é empurrada no jogo.
      */
     _toggleTorchAt(col, row) {
+        const type = this.selectedTorchType || "torch";
+        if (type === "candlestick_1" || type === "candlestick_2") {
+            if (col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1) return;
+            if (this.room.holes.has(`${col},${row}`)) return;
+            const i = this.room.torches.findIndex(t => t.col === col && t.row === row);
+            if (i >= 0) this.room.torches.splice(i, 1);
+            else this.room.torches.push({ col, row, side: "F", type });
+            this._updateTorchesListUI();
+            this._updateCodeOutput();
+            this.render();
+            return;
+        }
+
         const last = this.cols - 1, bottom = this.rows - 1;
         const onBorder = col === 0 || col === last || row === 0 || row === bottom;
         // Também aceita clique no PISO logo à frente das paredes laterais
