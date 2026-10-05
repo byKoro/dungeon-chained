@@ -32,15 +32,15 @@ export class CombatSystem {
             e.update(players, (hitPlayer) => {
                 this.renderer.triggerShake(14);
                 if (hitPlayer) {
-                    if (this.audio) this.audio.play("playerHurt", { volume: 0.75, rate: 0.9 + Math.random() * 0.2 });
+                    if (this.audio) this.audio.play("playerHurt");
                     this.particleSystem.triggerBlood(hitPlayer.x, hitPlayer.y, 16, 1.1);
                 }
             });
             if (this.audio) {
-                if (e.justStepped) this.audio.play("enemyStep", { volume: 0.32, rate: 0.68 + Math.random() * 0.08 });
+                if (e.justStepped) this.audio.play("enemyStep");
                 if (e.justAttacked) {
-                    this.audio.play("enemyAttack", { volume: 0.45, rate: 0.85 + Math.random() * 0.15 });
-                    this.audio.play("enemyAttackVoice", { volume: 0.3, rate: 0.85 + Math.random() * 0.15 });
+                    this.audio.play("enemyAttack");
+                    this.audio.play("enemyAttackVoice");
                 }
             }
         }
@@ -62,7 +62,7 @@ export class CombatSystem {
 
             if (!nearPlayer && d < weapon.hitThreshold + enemy.hitRadius) {
                 enemy.startDying();
-                if (this.audio) this.audio.play("monsterHurt", { volume: 0.58, rate: 0.85 + Math.random() * 0.2 });
+                if (this.audio) this.audio.play("monsterHurt");
                 this.renderer.triggerShake(4);
             }
         }

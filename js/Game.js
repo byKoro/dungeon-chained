@@ -24,8 +24,9 @@ import {
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
-    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CLIPS
+    getPlayerSpawnPositions, HOLE_TILE
 } from './config/GameConfig.js';
+import { AUDIO_CONFIG, MASTER_VOLUME } from './config/AudioConfig.js';
 
 /**
  * Game — orquestrador do jogo.
@@ -81,7 +82,7 @@ export class Game {
         // Áudio: efeitos locais com variações/sobreposição. O navegador só
         // libera reprodução após o primeiro gesto do usuário (o jogo começa
         // com clique/tecla), então não há desbloqueio extra aqui.
-        this.audio = new AudioManager(AUDIO_CLIPS);
+        this.audio = new AudioManager(AUDIO_CONFIG, MASTER_VOLUME);
 
         // Entrada e armas
         this.input = new InputHandler();
@@ -406,7 +407,7 @@ export class Game {
             );
             if (collector) {
                 collector.lives = Math.min(3, collector.lives + 1);
-                this.audio.play("pickup", { volume: 0.65, rate: 0.95 + Math.random() * 0.1 });
+                this.audio.play("pickup");
                 hearts.splice(i, 1);
             }
         }
