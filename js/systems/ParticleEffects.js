@@ -15,9 +15,10 @@ export class ParticleEffects {
      * @param {ParticleSystem} opts.particleSystem
      * @param {BloodCanvas} opts.bloodCanvas
      */
-    constructor({ particleSystem, bloodCanvas }) {
+    constructor({ particleSystem, bloodCanvas, audio = null }) {
         this.particleSystem = particleSystem;
         this.bloodCanvas = bloodCanvas;
+        this.audio = audio;
         this.footprints = [];
     }
 
@@ -66,6 +67,11 @@ export class ParticleEffects {
     // Carimba uma pegada quando o jogador dá um passo (sangue se pisou em sangue).
     handleStep(player) {
         if (!player.justStepped) return;
+        // Som de passo com cooldown por jogador: corre -> toca mais rápido.
+        if (this.audio && (player.footstepSoundCooldown ?? 0) <= 0) {
+            this.audio.play("playerStep", { volume: 0.35, rate: 0.92 + Math.random() * 0.16 });
+            player.footstepSoundCooldown = player.speedMag > player.speed * 0.7 ? 7 : 10;
+        }
         const x = player.stepX, y = player.stepY, ang = player.stepAngle;
         if (this.bloodCanvas.isBloodZone(x, y)) player.bloodStepsLeft = BLOOD_STEPS;
         if (player.bloodStepsLeft > 0) {
@@ -80,6 +86,8 @@ export class ParticleEffects {
 
     // Processa todos os efeitos de pé de um jogador num frame.
     processPlayer(player) {
+        // Cooldown do som de passo (decrementa por frame; usado em handleStep).
+        if (player.footstepSoundCooldown > 0) player.footstepSoundCooldown--;
         if (player.justStartedRunning) this.spawnRunSmoke(player);
         if (player.justStopped) this.spawnBrakeDust(player);
         this.spawnWalkDust(player);

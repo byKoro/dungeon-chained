@@ -3,6 +3,7 @@ import { Physics } from './core/Physics.js';
 import { Renderer } from './core/Renderer.js';
 import { Tileset } from './core/Tileset.js';
 import { AssetLoader } from './core/AssetLoader.js';
+import { AudioManager } from './core/AudioManager.js';
 
 import { LaserWeapon } from './weapons/LaserWeapon.js';
 import { SawWeapon } from './weapons/SawWeapon.js';
@@ -23,7 +24,7 @@ import {
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
-    getPlayerSpawnPositions, HOLE_TILE
+    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CLIPS
 } from './config/GameConfig.js';
 
 /**
@@ -77,6 +78,11 @@ export class Game {
         this.bloodCanvas = new BloodCanvas(WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL);
         this.particleSystem = new ParticleSystem(this.bloodCanvas);
 
+        // Áudio: efeitos locais com variações/sobreposição. O navegador só
+        // libera reprodução após o primeiro gesto do usuário (o jogo começa
+        // com clique/tecla), então não há desbloqueio extra aqui.
+        this.audio = new AudioManager(AUDIO_CLIPS);
+
         // Entrada e armas
         this.input = new InputHandler();
         this.weapons = [new LaserWeapon(), new SawWeapon()];
@@ -85,8 +91,8 @@ export class Game {
         // Fábricas / sistemas
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
-        this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem });
-        this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas });
+        this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio });
+        this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
         this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
 
         // Modo de teste do editor: carrega UMA sala custom e desabilita a
@@ -338,6 +344,10 @@ export class Game {
         this.combat.resolveWeaponHits(this.currentWeapon, enemies, p1, p2);
         this.combat.resolveDeaths(room, this.gibs);
 
+        // Corações de cura: atualiza, e qualquer player com vida < 3 que
+        // encoste coleta (cura até o máximo de 3). Toca o som de pickup.
+        this._updateHearts(room);
+
         // Gibs
         for (let i = this.gibs.length - 1; i >= 0; i--) {
             this.gibs[i].update(this.arenaBounds);
@@ -378,6 +388,26 @@ export class Game {
                 const cx = rect.x + (col + 0.5) * TILE;
                 const cy = rect.y + (row + 0.5) * TILE;
                 p.startFalling(cx, cy);
+            }
+        }
+    }
+
+    // Atualiza os corações da sala e resolve a coleta pelos jogadores.
+    // Qualquer player pode recolher um coração desde que ainda tenha espaço para
+    // recuperar uma vida (o máximo é três). Coletar cura +1 e toca "pickup".
+    _updateHearts(room) {
+        const { p1, p2 } = this;
+        const hearts = room.hearts;
+        for (let i = hearts.length - 1; i >= 0; i--) {
+            const heart = hearts[i];
+            heart.update();
+            const collector = [p1, p2].find(player =>
+                player.lives < 3 && Math.hypot(player.x - heart.x, player.y - heart.y) <= heart.radius + player.hitRadius
+            );
+            if (collector) {
+                collector.lives = Math.min(3, collector.lives + 1);
+                this.audio.play("pickup", { volume: 0.65, rate: 0.95 + Math.random() * 0.1 });
+                hearts.splice(i, 1);
             }
         }
     }
@@ -433,6 +463,9 @@ export class Game {
         // Desafio co-op: botões e spikes ficam no CHÃO (sob as entidades).
         const challenge = rooms.current.challenge;
         if (challenge) challenge.drawFloorLayer(ctx);
+
+        // Corações de cura: desenhados no CHÃO, sob as entidades e suas sombras.
+        rooms.current.hearts.forEach(h => h.draw(ctx));
 
         const p1Bounce = this.p1.speedMag > 0.15 ? Math.abs(Math.sin(this.p1.animTimer)) : 0;
         const p2Bounce = this.p2.speedMag > 0.15 ? Math.abs(Math.sin(this.p2.animTimer)) : 0;

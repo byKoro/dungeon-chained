@@ -2,6 +2,7 @@ import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
 import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
+import { HeartPickup } from '../entities/HeartPickup.js';
 
 /**
  * Room — uma sala concreta da dungeon.
@@ -22,6 +23,7 @@ export class Room {
         this.key = `${cell.gx},${cell.gy}`;
 
         this.enemies = [];
+        this.hearts = [];
         this.cleared = false;
         this.populated = false;
 
@@ -126,6 +128,17 @@ export class Room {
                 });
         }
 
+        // Corações iniciais: a peça autoral pode semear `heartCount` corações
+        // espalhados pelo centro da sala (mesmo espalhamento do design original).
+        const heartCount = Number.isInteger(this.cell.heartCount) ? this.cell.heartCount : 0;
+        if (heartCount > 0) {
+            const cx = (this.bounds.minX + this.bounds.maxX) / 2;
+            const cy = (this.bounds.minY + this.bounds.maxY) / 2;
+            for (let i = 0; i < heartCount; i++) {
+                this.addHeart(cx + (Math.random() - 0.5) * 180, cy + (Math.random() - 0.5) * 120);
+            }
+        }
+
         // 2) Define o estado "limpo" conforme a REGRA DE TRANCAMENTO.
         //   none    -> nasce limpa (portas abertas), mesmo com perigos.
         //   buttons -> trancada até o puzzle (challenge.solved).
@@ -177,5 +190,11 @@ export class Room {
 
     removeEnemyAt(index) {
         this.enemies.splice(index, 1);
+    }
+
+    // Adiciona um coração de cura na posição dada (ex.: drop na morte de um
+    // inimigo ou semeadura inicial da sala).
+    addHeart(x, y) {
+        this.hearts.push(new HeartPickup(x, y));
     }
 }

@@ -113,6 +113,20 @@ export function getPlayerSpawnPositions(entryDoorDir, x0 = 0, y0 = 0, tilePx = T
     };
 }
 
+// ---- Áudio ----
+// Mapa de clipes para o AudioManager. Cada nome aponta para uma lista de
+// variações (o AudioManager sorteia uma a cada reprodução). Caminhos relativos
+// à raiz do jogo (mesma base que os demais assets).
+export const AUDIO_CLIPS = {
+    playerHurt: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/player-hurt-${String(i).padStart(2, "0")}.wav`),
+    monsterHurt: [1, 2, 3].map(i => `assets/audio/monster-hurt-0${i}.ogg`),
+    playerStep: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/footstep-stone-0${i}.ogg`),
+    enemyStep: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/footstep-stone-0${i}.ogg`),
+    enemyAttack: [1, 2, 3].map(i => `assets/audio/enemy-attack-0${i}.wav`),
+    enemyAttackVoice: [1, 2, 3].map(i => `assets/audio/monster-attack-0${i}.ogg`),
+    pickup: ["assets/audio/item-pickup.flac"]
+};
+
 // ---- Combate ----
 // Zona morta perto dos players onde a arma não fere inimigos.
 export const PLAYER_SAFE_ZONE = 46;

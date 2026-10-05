@@ -15,21 +15,34 @@ export class CombatSystem {
      * @param {Renderer} opts.renderer         para o screen shake
      * @param {ParticleSystem} opts.particleSystem  para sangue/poças
      */
-    constructor({ renderer, particleSystem }) {
+    constructor({ renderer, particleSystem, audio = null }) {
         this.renderer = renderer;
         this.particleSystem = particleSystem;
+        this.audio = audio;
     }
 
     /**
      * Atualiza todos os inimigos (IA + dano no player via callback de feedback).
      * O dano em si é aplicado dentro do MeleeEnemy; aqui só reagimos ao impacto.
+     * Também dispara os sons do inimigo (passo, ataque) e o som de dano no
+     * player quando um golpe conecta.
      */
     updateEnemies(enemies, players) {
         for (const e of enemies) {
             e.update(players, (hitPlayer) => {
                 this.renderer.triggerShake(14);
-                if (hitPlayer) this.particleSystem.triggerBlood(hitPlayer.x, hitPlayer.y, 16, 1.1);
+                if (hitPlayer) {
+                    if (this.audio) this.audio.play("playerHurt", { volume: 0.75, rate: 0.9 + Math.random() * 0.2 });
+                    this.particleSystem.triggerBlood(hitPlayer.x, hitPlayer.y, 16, 1.1);
+                }
             });
+            if (this.audio) {
+                if (e.justStepped) this.audio.play("enemyStep", { volume: 0.32, rate: 0.68 + Math.random() * 0.08 });
+                if (e.justAttacked) {
+                    this.audio.play("enemyAttack", { volume: 0.45, rate: 0.85 + Math.random() * 0.15 });
+                    this.audio.play("enemyAttackVoice", { volume: 0.3, rate: 0.85 + Math.random() * 0.15 });
+                }
+            }
         }
     }
 
@@ -49,6 +62,7 @@ export class CombatSystem {
 
             if (!nearPlayer && d < weapon.hitThreshold + enemy.hitRadius) {
                 enemy.startDying();
+                if (this.audio) this.audio.play("monsterHurt", { volume: 0.58, rate: 0.85 + Math.random() * 0.2 });
                 this.renderer.triggerShake(4);
             }
         }
@@ -70,6 +84,13 @@ export class CombatSystem {
             this.particleSystem.triggerBloodPool(enemy.x, enemy.y);
             gibs.push(...enemy.explodeIntoGibs());
             while (gibs.length > MAX_ACTIVE_GIBS) gibs.shift();
+
+            // Chance de dropar um coração de cura no lugar do inimigo. Usa o
+            // campo autoral da célula (0..100%); sem ele, 40% por padrão.
+            const chanceField = room.cell.heartDropChance;
+            const dropChance = Number.isFinite(chanceField) ? chanceField / 100 : 40 / 100;
+            if (Math.random() < dropChance) room.addHeart(enemy.x, enemy.y);
+
             room.removeEnemyAt(i);
             this.renderer.triggerShake(7);
         }
