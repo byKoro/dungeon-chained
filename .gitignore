@@ -12,6 +12,8 @@ package-lock.json
 # --- Ferramentas de agente / IA ---
 .agents/
 .claude/
+.kiro/
+.gemini/
 agent/
 skills-lock.json
 
@@ -30,3 +32,6 @@ Desktop.ini
 *.log
 *.tmp
 *.bak
+
+graphify-out/
+GEMINI.md
