@@ -9,6 +9,7 @@ Uso:
 """
 import http.server
 import socketserver
+import socket
 import json
 import os
 import re
@@ -96,6 +97,10 @@ def _validate(piece):
 
 
 class RoomServerHandler(http.server.SimpleHTTPRequestHandler):
+    def address_string(self):
+        # Desativa lookup de DNS reverso lento no log que bloqueia requisições locais
+        return self.client_address[0]
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")
@@ -184,7 +189,28 @@ class RoomServerHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {"ok": True, "file": filename, "count": len(rooms)})
 
 
+class DualStackServer(http.server.ThreadingHTTPServer):
+    """Servidor multithread com suporte simultâneo a IPv4 e IPv6 e fila de conexão aumentada."""
+    request_queue_size = 128
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except (AttributeError, OSError):
+            pass
+        super().server_bind()
+
+
 if __name__ == "__main__":
-    with socketserver.TCPServer(("", PORT), RoomServerHandler) as httpd:
-        print(f"Servindo em http://localhost:{PORT}/ (sem cache, com /api/save-room)")
-        httpd.serve_forever()
+    try:
+        httpd = DualStackServer(("::", PORT), RoomServerHandler)
+    except OSError:
+        httpd = http.server.ThreadingHTTPServer(("", PORT), RoomServerHandler)
+
+    with httpd:
+        print(f"Servindo em http://localhost:{PORT}/ (multithread, IPv4/IPv6, sem cache, com /api/save-room)")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nServidor finalizado.")
