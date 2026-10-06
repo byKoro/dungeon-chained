@@ -69,7 +69,7 @@ export class ParticleEffects {
         if (!player.justStepped) return;
         // Som de passo com cooldown por jogador: corre -> toca mais rápido.
         if (this.audio && (player.footstepSoundCooldown ?? 0) <= 0) {
-            this.audio.play("playerStep", { volume: 0.35, rate: 0.92 + Math.random() * 0.16 });
+            this.audio.play("playerStep");
             player.footstepSoundCooldown = player.speedMag > player.speed * 0.7 ? 7 : 10;
         }
         const x = player.stepX, y = player.stepY, ang = player.stepAngle;

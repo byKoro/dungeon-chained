@@ -1,84 +1,47 @@
-/**
- * GameConfig — todas as constantes de tuning do jogo num lugar só.
- *
- * Antes essas constantes estavam espalhadas pelo main.js. Centralizá-las aqui
- * deixa o balanceamento num ponto único e os módulos passam a depender de
- * dados, não de valores mágicos duplicados.
- */
-
-// ---- Escala do mundo (tiles chunky) ----
 export const TILE = 64;        // tamanho do tile no mundo (px)
 export const ROOM_COLS = 14;   // par: porta N/S de 2 tiles fica centralizada
 export const ROOM_ROWS = 9;
 export const GRID_COLS = 9;    // nº de células (salas) na grade do mundo
 export const GRID_ROWS = 7;
-
-// Mundo inteiro (grade * célula) — usado pelo buffer de sangue.
 export const WORLD_W = GRID_COLS * ROOM_COLS * TILE;
 export const WORLD_H = GRID_ROWS * ROOM_ROWS * TILE;
-
-// ---- Dungeon ----
 export const ROOM_COUNT = 8;   // quantas salas gerar por andar
-
-// ---- Sangue / partículas ----
-// Tons de vinho/bordô profundos e dessaturados. São compostos sobre o piso em
-// "multiply" (ver BloodCanvas.draw), então aparecem mais escuros ainda na tela:
-// a ideia é que o sangue TINJA o chão e pareça fazer parte do cenário, em vez
-// do vermelho saturado que "flutuava" por cima.
 export const BLOOD_COLORS = ["#4a0612", "#5c0a18", "#6e0f1c", "#480810", "#3a0510"];
-// 1 pixel de sangue = 1 pixel de tile (TILE / tamanho do tile fonte 16px).
 export const BLOOD_PIXEL = TILE / 16;
 export const BLOOD_STAIN_CONFIG = {
     gib: { count: 3, life: Infinity, sizeMin: 2, sizeMax: 4, alpha: 0.9 }
 };
 export const BLOOD_STEPS = 6;  // passos ensanguentados após pisar em sangue
 
-// ---- Limites de pool de efeitos ----
 export const MAX_ACTIVE_GIBS = 90;
 export const MAX_FOOTPRINTS = 60;
 
-// ---- Corrente / separação dos jogadores ----
-// A corrente é elástica, mas há um teto rígido para não separarem além do que
-// a câmera comporta.
 export const MAX_PLAYER_SEPARATION = 620;
 
-// ---- Câmera ----
 export const CAM_MARGIN = 90;  // folga nas bordas (afasta a câmera do cenário)
 
-// ---- Transição entre salas (fade) ----
 export const TRANSITION_SPEED = 0.05; // ~10 frames por fase
 
-// ---- Portas / corredores ----
-// Quantos tiles de piso projetar para fora de cada porta (corredor de entrada).
 export const DOOR_STUB_TILES = 2;
-// Profundidade (px) que o jogador pode adentrar o vão antes de transicionar.
 export const DOOR_ENTER_DEPTH = 70;
 
-// ---- Regra de Spawn dos Jogadores ----
-// Cada jogador nasce exatamente em um tile individual logo à frente do vão da porta (span de 2 tiles).
-// P1 (Amarelo) e P2 (Azul) ocupam os dois tiles adjacentes à porta correspondente.
 export const PLAYER_DOOR_SPAWN_TILES = {
-    // Ao entrar pela porta Norte (descendo para a sala):
     N: {
         p1: { col: 6, row: 1 },
         p2: { col: 7, row: 1 }
     },
-    // Ao entrar pela porta Sul (subindo para a sala):
     S: {
         p1: { col: 6, row: ROOM_ROWS - 2 }, // row 7
         p2: { col: 7, row: ROOM_ROWS - 2 }  // row 7
     },
-    // Ao entrar pela porta Oeste (entrando pela esquerda):
     W: {
         p1: { col: 1, row: 3 },
         p2: { col: 1, row: 4 }
     },
-    // Ao entrar pela porta Leste (entrando pela direita):
     E: {
         p1: { col: ROOM_COLS - 2, row: 3 }, // col 12
         p2: { col: ROOM_COLS - 2, row: 4 }  // col 12
     },
-    // Spawn inicial da dungeon (centro da sala):
     CENTER: {
         p1: { col: 6, row: 4 },
         p2: { col: 7, row: 4 }
@@ -114,18 +77,7 @@ export function getPlayerSpawnPositions(entryDoorDir, x0 = 0, y0 = 0, tilePx = T
 }
 
 // ---- Áudio ----
-// Mapa de clipes para o AudioManager. Cada nome aponta para uma lista de
-// variações (o AudioManager sorteia uma a cada reprodução). Caminhos relativos
-// à raiz do jogo (mesma base que os demais assets).
-export const AUDIO_CLIPS = {
-    playerHurt: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/player-hurt-${String(i).padStart(2, "0")}.wav`),
-    monsterHurt: [1, 2, 3].map(i => `assets/audio/monster-hurt-0${i}.ogg`),
-    playerStep: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/footstep-stone-0${i}.ogg`),
-    enemyStep: [1, 2, 3, 4, 5, 6].map(i => `assets/audio/footstep-stone-0${i}.ogg`),
-    enemyAttack: [1, 2, 3].map(i => `assets/audio/enemy-attack-0${i}.wav`),
-    enemyAttackVoice: [1, 2, 3].map(i => `assets/audio/monster-attack-0${i}.ogg`),
-    pickup: ["assets/audio/item-pickup.flac"]
-};
+export { AUDIO_CONFIG, AUDIO_CLIPS } from './AudioConfig.js';
 
 // ---- Combate ----
 // Zona morta perto dos players onde a arma não fere inimigos.
@@ -134,16 +86,6 @@ export const PLAYER_SAFE_ZONE = 46;
 // ---- Fundo ----
 export const BACKGROUND_TILE = 78; // tile que preenche o vazio fora da sala
 
-/**
- * HOLES — buracos / abismos (tiles sem piso onde quem pisa cai e morre).
- *
- * No layout de tiles um buraco é marcado com -1. Na hora de desenhar, cada
- * buraco recebe um tile de borda conforme QUAIS lados vizinhos NÃO são buraco
- * (a "parede" do abismo aparece justamente nesses lados). A combinação dos 4
- * lados é uma bitmask (N=1, E=2, S=4, W=8) que indexa HOLE_TILES.
- *
- * Índices do tileset (grade 10 colunas): a borda está no(s) lado(s) marcado(s).
- */
 export const HOLE_TILE = -1; // marcador de "sem piso" na grade floor[r][c]
 
 // bitmask (N=1,E=2,S=4,W=8 => lado COM borda) -> índice do tile no tileset.
@@ -189,11 +131,6 @@ export function holeTileFor(floor, col, row) {
     return HOLE_TILES[mask];
 }
 
-/**
- * PROP_SCATTER — espalhamento AUTORAL de props pelo chão. A peça pode optar por
- * "props aleatórios" (em vez de posicionar cada um manualmente): o jogo espalha
- * props nos tiles de piso livre na geração, de forma determinística por célula.
- */
 export const PROP_SCATTER = {
     // Tiles de piso "liso" onde um prop pode ser espalhado (centro da sala).
     floorTiles: [16],
@@ -253,21 +190,10 @@ export function scatterPropsOnFloor(floor, opts = {}) {
     return out;
 }
 
-// ---- Iluminação / Pós-processamento ----
-// Raio (em px de MUNDO) do halo de luz que cada jogador carrega. É convertido
-// para px de tela pelo zoom na hora de desenhar (ver Game._render).
 export const PLAYER_LIGHT_RADIUS = 260;
 
-// Fator que define o tamanho do "pixel" chunky da elipse de luz. O pixel de
-// arte na tela é (TILE/16) * zoom; multiplicamos por este fator para blocos
-// mais grossos/visíveis. Maior = elipse mais "pixelona".
 export const LIGHT_PIXEL_SCALE = 1.5;
 
-/**
- * TORCHES — tochas de parede (pontos de luz naturais do cenário).
- * O tile `index` é desenhado na parede NORTE das salas e emite uma luz suave.
- * Totalmente configurável aqui.
- */
 export const TORCHES = {
     enabled: true,
     index: 90,          // tile da tocha da parede NORTE (topo)
@@ -277,10 +203,7 @@ export const TORCHES = {
     marginTiles: 2,     // afasta das quinas (não cola nos cantos)
     minGap: 2,          // distância mínima (em tiles) entre duas tochas
     onlyCombatRooms: true, // só em salas de combate (não em corredores)
-
-    // Tochas laterais: ficam no PISO à frente da parede lateral (coluna interna
-    // adjacente). O tile 91 é desenhado encaixado na parede ESQUERDA por padrão;
-    // na parede DIREITA ele é espelhado horizontalmente (flip).
+    
     sides: {
         enabled: true,
         left: true,     // gerar tochas na parede esquerda
