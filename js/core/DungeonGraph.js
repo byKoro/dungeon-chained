@@ -189,7 +189,7 @@ export class DungeonGraph {
                     throw new Error(`Valor inválido para ${field} na sala ${gx},${gy}.`);
                 }
             }
-            if (input.enemyType !== undefined && !["random", "demon", "blood"].includes(input.enemyType)) {
+            if (input.enemyType !== undefined && !["random", "demon", "blood", "cleaveDemon", "frostGuardian"].includes(input.enemyType)) {
                 throw new Error(`Tipo de inimigo inválido na sala ${gx},${gy}.`);
             }
             const key = this._key(gx, gy);

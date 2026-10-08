@@ -61,9 +61,10 @@ export class CombatSystem {
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
 
             if (!nearPlayer && d < weapon.hitThreshold + enemy.hitRadius) {
-                enemy.startDying();
-                if (this.audio) this.audio.play("monsterHurt");
-                this.renderer.triggerShake(4);
+                if (enemy.startDying()) {
+                    if (this.audio) this.audio.play("monsterHurt");
+                    this.renderer.triggerShake(4);
+                }
             }
         }
     }

@@ -1,11 +1,13 @@
 import { MeleeEnemy } from '../entities/MeleeEnemy.js';
-import { MELEE_ENEMY_CONFIGS, demonConfig, bloodMonsterConfig } from '../config/EntityConfig.js';
+import { MELEE_ENEMY_CONFIGS, demonConfig, bloodMonsterConfig, cleaveDemonConfig, frostGuardianConfig } from '../config/EntityConfig.js';
 import { BLOOD_STAIN_CONFIG } from '../config/GameConfig.js';
 
 // Mapeia o "type" autoral (escolhido no editor) para a fábrica de config.
 const ENEMY_CONFIG_BY_TYPE = {
     demon: demonConfig,
-    bloodMonster: bloodMonsterConfig
+    bloodMonster: bloodMonsterConfig,
+    cleaveDemon: cleaveDemonConfig,
+    frostGuardian: frostGuardianConfig
 };
 
 /**

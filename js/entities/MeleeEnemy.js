@@ -28,10 +28,13 @@ export class MeleeEnemy extends Entity {
         super(x, y, 18);
         this.sheet = sheet;
         this.sprite = spriteConfig;
+        this.maxHealth = spriteConfig.health || 1;
+        this.health = this.maxHealth;
+        this.hitCooldown = 0;
         this.isSkeleton = false; // compat. com código antigo de partículas
 
         // Movimento
-        this.speed = 1.7;
+        this.speed = 1.7 * (spriteConfig.speedMultiplier || 1);
 
         // Alcances
         this.attackRange = 44;   // distância para parar e iniciar o ataque
@@ -93,7 +96,12 @@ export class MeleeEnemy extends Entity {
     // Chamado pela arma/corrente quando o inimigo é atingido. Não explode na
     // hora: entra no estado "dying" (trava + pisca branco) por poucos frames.
     startDying() {
-        if (this.state === "dying" || this.state === "dead") return;
+        if (this.state === "dying" || this.state === "dead" || this.hitCooldown > 0) return false;
+        this.health--;
+        if (this.health > 0) {
+            this.hitCooldown = 20;
+            return true;
+        }
         // Congela a pose atual (a "travada brusca" na posição em que apanhou).
         const anim = this._currentAnim();
         this._frozen = { anim, frame: this._currentFrameIndex(anim) };
@@ -103,6 +111,7 @@ export class MeleeEnemy extends Entity {
         this.vy = 0;
         this.pushVx = 0;
         this.pushVy = 0;
+        return true;
     }
 
     // Picota o inimigo em VÁRIOS fragmentos pequenos (gibs) recortados do
@@ -110,6 +119,27 @@ export class MeleeEnemy extends Entity {
     // posicionado com o offset relativo à sua fatia e é arrastável pela física.
     explodeIntoGibs() {
         const s = this.sprite;
+        if (s.frameImages) {
+            const image = s.rows.death.frameImages.at(-1);
+            if (!image?.complete || image.naturalWidth === 0) return [];
+            const cols = s.gib?.gridCols ?? 5, rows = s.gib?.gridRows ?? 4;
+            const pieceW = image.naturalWidth / cols, pieceH = image.naturalHeight / rows;
+            const scale = s.drawHeight / image.naturalHeight;
+            const pieces = [];
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                const sw = Math.ceil(pieceW), sh = Math.ceil(pieceH);
+                const piece = new GibPiece(
+                    this.x + ((c + 0.5) * pieceW - image.naturalWidth / 2) * scale,
+                    this.y + ((r + 0.5) * pieceH - image.naturalHeight / 2) * scale,
+                    image, c * pieceW, r * pieceH, sw, sh, sw * scale, sh * scale
+                );
+                const stains = new BloodStains();
+                stains.splatter({ count: 2, spread: Math.min(sw, sh) * scale * 0.45, life: Infinity, palette: this.bloodPalette, sizeMin: 1, sizeMax: 3, alpha: 0.9 });
+                piece.setStains(stains);
+                pieces.push(piece);
+            }
+            return pieces;
+        }
         const cell = s.cellSize;
         const scale = s.drawHeight / s.cropH;
 
@@ -177,6 +207,7 @@ export class MeleeEnemy extends Entity {
         this.justStepped = false;
         this.justAttacked = false;
         this.animTime++;
+        if (this.hitCooldown > 0) this.hitCooldown--;
 
         if (this.state === "dying") {
             // Travado no lugar (hit stop), piscando branco. Não se move, não
@@ -350,6 +381,21 @@ export class MeleeEnemy extends Entity {
     }
 
     draw(ctx) {
+        if (this.sprite.frameImages) {
+            const anim = this._currentAnim();
+            const frames = anim.frameImages;
+            const frame = this._currentFrameIndex(anim);
+            const image = frames?.[frame];
+            if (!image?.complete || image.naturalWidth === 0) return;
+            const scale = this.sprite.drawHeight / Math.max(image.naturalWidth, image.naturalHeight);
+            const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            if (this.facingLeft) ctx.scale(-1, 1);
+            ctx.drawImage(image, -width / 2, -height / 2, width, height);
+            ctx.restore();
+            return;
+        }
         if (!this.sheet || !this.sheet.complete || this.sheet.naturalWidth === 0) return;
 
         const s = this.sprite;

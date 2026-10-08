@@ -20,7 +20,7 @@ import { RoomPresets } from '../rooms/RoomPresets.js';
 import { RoomCatalog, doorSignature } from '../rooms/RoomCatalog.js';
 import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor } from '../config/GameConfig.js';
-import { demonConfig, bloodMonsterConfig, playerConfigs } from '../config/EntityConfig.js';
+import { demonConfig, bloodMonsterConfig, cleaveDemonConfig, frostGuardianConfig, playerConfigs } from '../config/EntityConfig.js';
 
 class RoomEditor {
     constructor() {
@@ -646,7 +646,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>${foe.type === "demon" ? "Demônio" : "Monstro Sangue"} (${foe.col}, ${foe.row})</span>
+                <span>${({ demon: "Demônio", bloodMonster: "Monstro Sangue", cleaveDemon: "Demônio Cleave", frostGuardian: "Guardião Gélido" })[foe.type] || "Demônio"} (${foe.col}, ${foe.row})</span>
                 <button class="btn btn-sm btn-danger" data-del-enemy="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -1112,7 +1112,19 @@ class RoomEditor {
             const cx = foe.col * tileW + tileW / 2;
             const cy = foe.row * tileW + tileW / 2;
 
-            if (foe.type === "demon") {
+            if (foe.type === "cleaveDemon" || foe.type === "frostGuardian") {
+                const config = foe.type === "cleaveDemon" ? cleaveDemonConfig(this.assets) : frostGuardianConfig(this.assets);
+                const sprite = config.rows.walk.frameImages[0];
+                const tint = foe.type === "cleaveDemon" ? "rgba(225, 75, 55, 0.25)" : "rgba(95, 190, 245, 0.25)";
+                ctx.fillStyle = tint;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy + 12, 26, 11, 0, 0, Math.PI * 2);
+                ctx.fill();
+                if (sprite?.complete && sprite.naturalWidth > 0) {
+                    const scale = 0.62;
+                    ctx.drawImage(sprite, cx - sprite.naturalWidth * scale / 2, cy - sprite.naturalHeight * scale / 2 - 4, sprite.naturalWidth * scale, sprite.naturalHeight * scale);
+                }
+            } else if (foe.type === "demon") {
                 // Demon config: cellSize: 100, cropX: 28, cropY: 34, cropW: 52, cropH: 26, row: 1
                 const sprite = this.assets.get("demon");
                 const sx = 28;
