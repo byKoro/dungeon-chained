@@ -60,7 +60,7 @@ export class CombatSystem {
             const dP2 = Math.hypot(enemy.x - p2.x, enemy.y - p2.y);
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
 
-            if (!nearPlayer && d < weapon.hitThreshold + enemy.hitRadius) {
+            if (!nearPlayer && d < weapon.hitThreshold + (enemy.weaponHitRadius || enemy.hitRadius)) {
                 if (enemy.startDying()) {
                     if (this.audio) this.audio.play("monsterHurt");
                     this.renderer.triggerShake(4);

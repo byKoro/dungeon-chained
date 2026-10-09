@@ -122,7 +122,8 @@ export class Game {
     }
 
     // ---- Bootstrap ----
-    start() {
+    async start() {
+        await this.assets.whenReady({ includeEnemyAnimations: false });
         this.players = this.playerFactory.create();
         [this.p1, this.p2] = this.players;
         this.newDungeon();

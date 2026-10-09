@@ -93,13 +93,21 @@ class RoomEditor {
         this.ctx = this.canvas.getContext("2d");
         this.container = document.getElementById("canvas-container");
 
+        this.resizeObserver = typeof ResizeObserver === "function"
+            ? new ResizeObserver(() => {
+                this._fitScreen();
+                if (this.tileset) this.render();
+            })
+            : null;
+        this.resizeObserver?.observe(this.container);
+
         // Inicialização
         this._initEvents();
         this._initAssets();
     }
 
     async _initAssets() {
-        await this.assets.whenReady();
+        await this.assets.whenReady({ includeEnemyAnimations: false });
         this.tileset = new Tileset(this.assets.tileset, 16, 10);
 
         // Carrega o catálogo de peças (/map) para o navegador de formas/variações.
@@ -115,6 +123,7 @@ class RoomEditor {
         }
         this._fitScreen();
         this.render();
+        this.assets.whenReady().then(() => this.render());
     }
 
     /* --------------------------------------------------------------------------
@@ -1121,7 +1130,7 @@ class RoomEditor {
                 ctx.ellipse(cx, cy + 12, 26, 11, 0, 0, Math.PI * 2);
                 ctx.fill();
                 if (sprite?.complete && sprite.naturalWidth > 0) {
-                    const scale = 0.62;
+                    const scale = (config.drawHeight / Math.max(sprite.naturalWidth, sprite.naturalHeight)) * (tileW / 64);
                     ctx.drawImage(sprite, cx - sprite.naturalWidth * scale / 2, cy - sprite.naturalHeight * scale / 2 - 4, sprite.naturalWidth * scale, sprite.naturalHeight * scale);
                 }
             } else if (foe.type === "demon") {
@@ -1459,9 +1468,7 @@ class RoomEditor {
     }
 
     _screenToTile(screenX, screenY) {
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = screenX - rect.left;
-        const mouseY = screenY - rect.top;
+        const { x: mouseX, y: mouseY } = this._screenToCanvas(screenX, screenY);
 
         const worldX = (mouseX - this.panX) / this.zoom;
         const worldY = (mouseY - this.panY) / this.zoom;
@@ -1472,6 +1479,14 @@ class RoomEditor {
         return { col, row, localX: worldX, localY: worldY };
     }
 
+    _screenToCanvas(screenX, screenY) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+            x: (screenX - rect.left) * (this.canvas.width / rect.width),
+            y: (screenY - rect.top) * (this.canvas.height / rect.height)
+        };
+    }
+
     _onMouseDown(e) {
         // Ignora cliques em elementos sobrepostos ao canvas (setas de forma/variação),
         // para que a navegação não dispare mutação na célula do grid por baixo.
@@ -1480,7 +1495,7 @@ class RoomEditor {
         if (e.button === 1 || e.shiftKey || e.altKey) {
             // Pan
             this.isPanning = true;
-            this.lastMouse = { x: e.clientX, y: e.clientY };
+            this.lastMouse = this._screenToCanvas(e.clientX, e.clientY);
             this.container.classList.add("panning");
             return;
         }
@@ -1493,11 +1508,12 @@ class RoomEditor {
 
     _onMouseMove(e) {
         if (this.isPanning) {
-            const dx = e.clientX - this.lastMouse.x;
-            const dy = e.clientY - this.lastMouse.y;
+            const mouse = this._screenToCanvas(e.clientX, e.clientY);
+            const dx = mouse.x - this.lastMouse.x;
+            const dy = mouse.y - this.lastMouse.y;
             this.panX += dx;
             this.panY += dy;
-            this.lastMouse = { x: e.clientX, y: e.clientY };
+            this.lastMouse = mouse;
             this.render();
             return;
         }
@@ -1533,9 +1549,7 @@ class RoomEditor {
 
     _onWheel(e) {
         e.preventDefault();
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
+        const { x: mouseX, y: mouseY } = this._screenToCanvas(e.clientX, e.clientY);
 
         const oldZoom = this.zoom;
         const factor = e.deltaY < 0 ? 1.15 : 0.85;

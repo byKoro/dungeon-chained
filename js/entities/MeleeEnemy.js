@@ -28,9 +28,11 @@ export class MeleeEnemy extends Entity {
         super(x, y, 18);
         this.sheet = sheet;
         this.sprite = spriteConfig;
+        this.weaponHitRadius = spriteConfig.weaponHitRadius || this.hitRadius;
         this.maxHealth = spriteConfig.health || 1;
         this.health = this.maxHealth;
         this.hitCooldown = 0;
+        this.hurtTimer = 0;
         this.isSkeleton = false; // compat. com código antigo de partículas
 
         // Movimento
@@ -99,14 +101,20 @@ export class MeleeEnemy extends Entity {
         if (this.state === "dying" || this.state === "dead" || this.hitCooldown > 0) return false;
         this.health--;
         if (this.health > 0) {
-            this.hitCooldown = 20;
+            this.hitCooldown = 60;
+            this.hurtTimer = this.sprite.rows.hurt
+                ? this.sprite.rows.hurt.frames * this.sprite.rows.hurt.fps
+                : 0;
+            this.animTime = 0;
             return true;
         }
         // Congela a pose atual (a "travada brusca" na posição em que apanhou).
         const anim = this._currentAnim();
         this._frozen = { anim, frame: this._currentFrameIndex(anim) };
         this.state = "dying";
-        this.dyingTimer = this.dyingDuration;
+        const deathAnim = this.sprite.frameImages && this.sprite.rows.death;
+        this.dyingTimer = deathAnim ? deathAnim.frames * deathAnim.fps : this.dyingDuration;
+        if (deathAnim) this.animTime = 0;
         this.vx = 0;
         this.vy = 0;
         this.pushVx = 0;
@@ -208,6 +216,7 @@ export class MeleeEnemy extends Entity {
         this.justAttacked = false;
         this.animTime++;
         if (this.hitCooldown > 0) this.hitCooldown--;
+        if (this.hurtTimer > 0) this.hurtTimer--;
 
         if (this.state === "dying") {
             // Travado no lugar (hit stop), piscando branco. Não se move, não
@@ -347,8 +356,9 @@ export class MeleeEnemy extends Entity {
     // Frame atual da animação da linha ativa
     _currentAnim() {
         const r = this.sprite.rows;
+        if (this.hurtTimer > 0 && r.hurt && this.state !== "dying" && this.state !== "dead") return r.hurt;
         switch (this.state) {
-            case "dying":  return (this._frozen && this._frozen.anim) || r.walk;
+            case "dying":  return this.sprite.frameImages ? r.death : ((this._frozen && this._frozen.anim) || r.walk);
             case "dead":   return r.death;
             case "attack": return r[this.currentAttack] || r.attack;
             case "windup":
@@ -359,7 +369,13 @@ export class MeleeEnemy extends Entity {
     }
 
     _currentFrameIndex(anim) {
+        if (this.hurtTimer > 0 && anim === this.sprite.rows.hurt) {
+            return Math.min(Math.floor(this.animTime / anim.fps), anim.frames - 1);
+        }
         if (this.state === "dying") {
+            if (this.sprite.frameImages) {
+                return Math.min(Math.floor(this.animTime / anim.fps), anim.frames - 1);
+            }
             // Pose congelada no momento do golpe (travada brusca)
             return this._frozen ? this._frozen.frame : 0;
         }
@@ -391,8 +407,18 @@ export class MeleeEnemy extends Entity {
             const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
             ctx.save();
             ctx.translate(this.x, this.y);
-            if (this.facingLeft) ctx.scale(-1, 1);
-            ctx.drawImage(image, -width / 2, -height / 2, width, height);
+            if (this.facingLeft !== !!this.sprite.flipFacing) ctx.scale(-1, 1);
+            const dx = -width / 2, dy = -height / 2;
+            ctx.drawImage(image, dx, dy, width, height);
+            if (this.hurtTimer > 0 && this.sprite.whiteHitFlash) {
+                ctx.save();
+                ctx.globalAlpha = 0.85;
+                ctx.filter = "brightness(0) invert(1)";
+                ctx.shadowColor = "rgba(255, 255, 255, 0.95)";
+                ctx.shadowBlur = 24;
+                ctx.drawImage(image, dx, dy, width, height);
+                ctx.restore();
+            }
             ctx.restore();
             return;
         }

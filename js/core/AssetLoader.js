@@ -21,25 +21,6 @@ export class AssetLoader {
         this.load("demon", "assets/enemies/demon.png");
         this.load("bloodMonster", "assets/enemies/blood_monster.png");
 
-        // Inimigos com animações em arquivos separados por frame.
-        const sequences = [
-            ["cleaveDemon", "assets/enemies/cleave_demon", [
-                ["idle", "01_demon_idle", "demon_idle", 6], ["walk", "02_demon_walk", "demon_walk", 12],
-                ["attack", "03_demon_cleave", "demon_cleave", 15], ["hurt", "04_demon_take_hit", "demon_take_hit", 5],
-                ["death", "05_demon_death", "demon_death", 22]
-            ]],
-            ["frostGuardian", "assets/enemies/frost_guardian", [
-                ["attack", "1_atk", "1_atk", 14], ["death", "death", "death", 16],
-                ["idle", "idle", "idle", 6], ["hurt", "take_hit", "take_hit", 7], ["walk", "walk", "walk", 10]
-            ]]
-        ];
-        for (const [key, root, animations] of sequences) {
-            for (const [anim, folder, prefix, count] of animations) {
-                this.images[`${key}_${anim}`] = Array.from({ length: count }, (_, i) =>
-                    this.load(`${key}_${anim}_${i + 1}`, `${root}/${folder}/${prefix}_${i + 1}.png`));
-            }
-        }
-
         // Tileset das salas (grade 10x10 de 16px)
         this.load("tileset", "assets/tileset/tileset.png");
 
@@ -63,6 +44,26 @@ export class AssetLoader {
             this.load(`candlestick1_${frame}`, `assets/torch/candlestick_1_${frame}.png`);
             this.load(`candlestick2_${frame}`, `assets/torch/candlestick_2_${frame}.png`);
         }
+
+        // Inimigos animados são carregados depois dos assets essenciais para
+        // não atrasar tileset e sprites de jogador no início do jogo.
+        const sequences = [
+            ["cleaveDemon", "assets/enemies/cleave_demon", [
+                ["idle", "01_demon_idle", "demon_idle", 6], ["walk", "02_demon_walk", "demon_walk", 12],
+                ["attack", "03_demon_cleave", "demon_cleave", 15], ["hurt", "04_demon_take_hit", "demon_take_hit", 5],
+                ["death", "05_demon_death", "demon_death", 22]
+            ]],
+            ["frostGuardian", "assets/enemies/frost_guardian", [
+                ["attack", "1_atk", "1_atk", 14], ["death", "death", "death", 16],
+                ["idle", "idle", "idle", 6], ["hurt", "take_hit", "take_hit", 7], ["walk", "walk", "walk", 10]
+            ]]
+        ];
+        for (const [key, root, animations] of sequences) {
+            for (const [anim, folder, prefix, count] of animations) {
+                this.images[`${key}_${anim}`] = Array.from({ length: count }, (_, i) =>
+                    this.load(`${key}_${anim}_${i + 1}`, `${root}/${folder}/${prefix}_${i + 1}.png`));
+            }
+        }
     }
 
     load(key, src) {
@@ -77,8 +78,11 @@ export class AssetLoader {
     }
 
     // Resolve quando todas as imagens tiverem carregado (ou falhado).
-    whenReady() {
-        const pending = Object.values(this.images).flatMap(value => Array.isArray(value) ? value : [value]).filter(img => img && !img.complete);
+    whenReady({ includeEnemyAnimations = true } = {}) {
+        const entries = Object.entries(this.images).filter(([key]) =>
+            includeEnemyAnimations || (!key.startsWith("cleaveDemon_") && !key.startsWith("frostGuardian_"))
+        );
+        const pending = entries.flatMap(([, value]) => Array.isArray(value) ? value : [value]).filter(img => img && !img.complete);
         if (pending.length === 0) return Promise.resolve();
         return Promise.all(pending.map(img => new Promise(res => {
             img.onload = img.onerror = () => res();

@@ -39,7 +39,7 @@ export function bloodMonsterConfig(assets) {
 
 function animatedEnemyConfig(animations, attackFrame, drawHeight = 84) {
     const rows = {};
-    for (const [key, fps] of [["walk", 6], ["attack", 5], ["death", 7]]) {
+    for (const [key, fps] of [["walk", 6], ["attack", 3], ["hurt", 4], ["death", 7]]) {
         const frames = animations[key];
         rows[key] = { frames: frames.length, fps, frameImages: frames };
     }
@@ -47,8 +47,18 @@ function animatedEnemyConfig(animations, attackFrame, drawHeight = 84) {
     return { img: animations.walk[0], frameImages: true, drawHeight, cropW: 100, cropH: 100, rows, gib: { gridCols: 5, gridRows: 4 }, health: 4, speedMultiplier: 2 };
 }
 
-export const cleaveDemonConfig = assets => animatedEnemyConfig(assets.cleaveDemon, 9, 92);
-export const frostGuardianConfig = assets => animatedEnemyConfig(assets.frostGuardian, 8, 92);
+// Os protagonistas usam drawHeight 73; estes inimigos têm quatro vezes essa escala.
+export const cleaveDemonConfig = assets => ({
+    ...animatedEnemyConfig(assets.cleaveDemon, 9, 400),
+    flipFacing: true,
+    whiteHitFlash: true,
+    weaponHitRadius: 50
+});
+export const frostGuardianConfig = assets => ({
+    ...animatedEnemyConfig(assets.frostGuardian, 8, 292),
+    flipFacing: true,
+    whiteHitFlash: true
+});
 
 // Lista de fábricas de config de inimigos melee disponíveis.
 export const MELEE_ENEMY_CONFIGS = [demonConfig, bloodMonsterConfig, cleaveDemonConfig, frostGuardianConfig];
