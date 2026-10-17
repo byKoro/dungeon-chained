@@ -5,40 +5,59 @@ import { Weapon } from './Weapon.js';
  *
  * Sprite: assets/saw/saw.png — grade 4x4 de frames 16x16 (resolução de pixel
  * art nativa do jogo), fundo transparente.
- *   - Linha 0: serra parada, limpa.
- *   - Linha 1: serra parada, ensanguentada.
- *   - Linha 2: serra girando (motion blur), limpa.
- *   - Linha 3: serra girando (motion blur), ensanguentada.
+ * UMA única serra (a maior) presa no meio da corrente.
+ *   - Linhas 0 e 1: disco de INÉRCIA (limpa e ensanguentada).
+ *   - Linhas 2 e 3: disco GIRANDO (limpa e ensanguentada).
  *
- * A serra só GIRA quando os jogadores andam. Um valor `spin` (0..1) persegue
- * suavemente a velocidade do movimento: perto de 0 mostramos a linha PARADA
- * (giro residual bem lento); acima de um limiar passamos para a linha GIRANDO,
- * cuja troca de frames é proporcional ao `spin` (mais devagar que antes).
+ * Ambos os discos ROTACIONAM de fato (ctx.rotate pelo ângulo acumulado
+ * `this.rotation`). A escolha do sprite é por VELOCIDADE de giro (`spin`,
+ * 0..1): com bastante velocidade usa-se o disco "girando"; ao perder
+ * velocidade troca-se para o disco de "inércia", que segue girando pelo
+ * ângulo residual até o `spin` chegar a 0 e parar.
  *
- * O giro vem da TROCA DE FRAMES (sem ctx.rotate): pixels sempre alinhados aos
- * eixos, mesma proporção do resto do jogo.
+ * A serra só ganha giro quando OS DOIS jogadores andam. O `spin` tem INÉRCIA
+ * (acelera devagar, desacelera ainda mais devagar). A troca de sprite é um
+ * CROSSFADE por alpha na faixa [BLEND_LO, BLEND_HI], sem corte seco. Como game
+ * feel, há um squash & stretch (pop de escala) no arranque e um tremor leve
+ * enquanto gira — feedback transiente que volta ao repouso.
  */
 
 const SAW_FRAME = { size: 16, cols: 4 };
-const ROW_IDLE_CLEAN = 0;
-const ROW_IDLE_BLOODY = 1;
+const ROW_INERTIA_CLEAN = 0;
+const ROW_INERTIA_BLOODY = 1;
 const ROW_SPIN_CLEAN = 2;
 const ROW_SPIN_BLOODY = 3;
 
-// Fatores de ampliação inteiros (pixels sempre quadrados):
-//   serra grande = 3x (48px), pequena = 2x (32px).
-const SAW_DRAW_LARGE = SAW_FRAME.size * 3; // 48
-const SAW_DRAW_SMALL = SAW_FRAME.size * 2; // 32
+// Fatores de ampliação do sprite (diâmetro em px de mundo).
+//   serra grande = 3.5x (56px), pequena = 2x (32px).
+const SAW_DRAW_LARGE = SAW_FRAME.size * 3.5; // 56
+const SAW_DRAW_SMALL = SAW_FRAME.size * 2;   // 32
 
 // Quantos passos de simulação a serra fica ensanguentada após um acerto.
 const BLOOD_DURATION = 90;
 
-// Dinâmica do giro.
-const SPIN_LERP = 0.12;        // suavidade da transição parado <-> girando
-const SPIN_SHOW_THRESHOLD = 0.12; // acima disto, mostra a linha "girando"
-// Velocidade da animação de giro (quanto MAIOR, mais LENTO). Antes era ~3;
-// subimos para desacelerar a troca de frames do giratório.
-const SPIN_FRAME_DIVISOR = 6;
+// Dinâmica do giro. Lerp assimétrico dá INÉRCIA: acelera devagar ao começar e
+// desacelera ainda mais devagar ao parar (a serra não trava de imediato).
+const SPIN_ACCEL = 0.045;      // suavidade ao GANHAR giro (começar a rodar)
+const SPIN_DECEL = 0.012;      // suavidade ao PERDER giro (parar) — bem lento
+// Faixa de transição INÉRCIA <-> GIRANDO por VELOCIDADE de giro. Abaixo de
+// BLEND_LO usa o disco de inércia; acima de BLEND_HI, o disco girando; no meio,
+// crossfade por alpha. Elevada para que o "girando" só apareça com bastante
+// velocidade — ao perder velocidade, volta ao disco de inércia (que segue
+// girando até parar).
+const BLEND_LO = 0.35;
+const BLEND_HI = 0.6;
+// Velocidade de ROTAÇÃO do sprite ao girar (rad por passo, no giro máximo).
+const SPIN_MAX_ROTATION = 0.45;
+// O disco de inércia (linhas 0/1) usa o ÚLTIMO frame da linha como sprite base
+// (o giro vem da rotação real, não da troca de frames).
+const INERTIA_FRAME = SAW_FRAME.cols - 1; // 3
+
+// Tremor da serra (vibração brusca em px de mundo).
+//  - SHAKE_SPIN: vibração constante enquanto gira (não some no giro alto).
+//  - SHAKE_TRANSITION: pico EXTRA e brusco durante a transição inércia<->giro.
+const SHAKE_SPIN = 4;
+const SHAKE_TRANSITION = 7;
 
 export class SawWeapon extends Weapon {
     constructor(sprite = null) {
@@ -46,24 +65,40 @@ export class SawWeapon extends Weapon {
         this.sprite = sprite;
         this.bloodTimer = 0;
         this.spin = 0;         // 0 = parada, 1 = girando a toda
-        this.framePhase = 0;   // fase contínua da animação de frames
+        this.rotation = 0;     // ângulo acumulado da rotação real (giro)
+        this.wasSpinning = false; // para detectar o instante do arranque
+        this.spinKick = 0;     // "pop" de escala ao engatar o giro (decai)
     }
 
     update(p1 = null, p2 = null) {
         if (this.bloodTimer > 0) this.bloodTimer--;
 
-        // Alvo de giro = quanto os jogadores estão se movendo (0..1).
+        // Alvo de giro: a serra só gira quando OS DOIS jogadores andam. Usamos
+        // o MENOR dos dois speedMag — se um está parado, o alvo cai para ~0.
         let target = 0;
         if (p1 && p2) {
             const speed = p1.speed || p2.speed || 4.2;
-            const mag = Math.max(p1.speedMag ?? 0, p2.speedMag ?? 0);
+            const mag = Math.min(p1.speedMag ?? 0, p2.speedMag ?? 0);
             target = Math.max(0, Math.min(1, mag / speed));
         }
-        this.spin += (target - this.spin) * SPIN_LERP;
+        // Inércia: lerp mais rápido para subir, bem mais lento para descer.
+        const lerp = target > this.spin ? SPIN_ACCEL : SPIN_DECEL;
+        this.spin += (target - this.spin) * lerp;
 
-        // Avanço da animação de frames, proporcional ao giro: rápido ao andar,
-        // desacelerando até quase travar conforme os jogadores param.
-        this.framePhase += this.spin / SPIN_FRAME_DIVISOR;
+        // Rotação real do sprite com easing IN-OUT no giro: começa lento e
+        // acelera conforme o `spin` sobe (smoothstep), até transicionar para o
+        // modo giratório. Assim o arranque não é brusco.
+        const s = Math.max(0, Math.min(1, this.spin));
+        const eased = s * s * (3 - 2 * s); // smoothstep
+        this.rotation += eased * SPIN_MAX_ROTATION;
+
+        // JUICE: squash & stretch no ARRANQUE. Ao cruzar para o giro, dispara um
+        // "pop" de escala que decai sozinho (feedback transiente, volta ao
+        // repouso — princípio de game feel).
+        const spinningNow = this.spin > BLEND_HI;
+        if (spinningNow && !this.wasSpinning) this.spinKick = 1;
+        this.wasSpinning = spinningNow;
+        if (this.spinKick > 0) this.spinKick = Math.max(0, this.spinKick - 0.08);
     }
 
     // Chamado pelo CombatSystem quando a serra abate/acerta um inimigo.
@@ -71,17 +106,23 @@ export class SawWeapon extends Weapon {
         this.bloodTimer = BLOOD_DURATION;
     }
 
+    // Velocidade de giro atual (0..1), para o Game modular a tremida de câmera.
+    get spinSpeed() {
+        return this.spin;
+    }
+
+    // true quando a serra está em velocidade ALTA (giro "a toda").
+    get isHighSpeed() {
+        return this.spin > BLEND_HI;
+    }
+
     getSawPositions(p1, p2) {
-        const numSaws = 3;
-        return Array.from({ length: numSaws }, (_, index) => {
-            const i = index + 1;
-            const t = i / (numSaws + 1);
-            return {
-                x: p1.x + (p2.x - p1.x) * t,
-                y: p1.y + (p2.y - p1.y) * t,
-                radius: i % 2 === 0 ? 14 : 11
-            };
-        });
+        // Uma única serra (a maior), no meio da corrente.
+        return [{
+            x: (p1.x + p2.x) / 2,
+            y: (p1.y + p2.y) / 2,
+            radius: 14
+        }];
     }
 
     hitsTarget(target, p1, p2) {
@@ -108,38 +149,67 @@ export class SawWeapon extends Weapon {
         const prevSmoothing = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = false;
 
-        const spinning = this.spin > SPIN_SHOW_THRESHOLD;
         const bloody = this.bloodTimer > 0;
-        const row = spinning
-            ? (bloody ? ROW_SPIN_BLOODY : ROW_SPIN_CLEAN)
-            : (bloody ? ROW_IDLE_BLOODY : ROW_IDLE_CLEAN);
-        const sy = row * SAW_FRAME.size;
+        const inertiaRow = (bloody ? ROW_INERTIA_BLOODY : ROW_INERTIA_CLEAN) * SAW_FRAME.size;
+        const spinRow = (bloody ? ROW_SPIN_BLOODY : ROW_SPIN_CLEAN) * SAW_FRAME.size;
+
+        // Blend 0..1 (smoothstep) ao longo da faixa de transição: 0 = só
+        // inércia, 1 = só girando. Entre os dois, crossfade por alpha.
+        const bt = Math.max(0, Math.min(1, (this.spin - BLEND_LO) / (BLEND_HI - BLEND_LO)));
+        const blend = bt * bt * (3 - 2 * bt);
+
+        // Tremor: vibração constante enquanto gira (não some no giro alto) MAIS
+        // um pico brusco no MEIO da transição (blend*(1-blend) tem máximo em
+        // 0.5). Assim a troca inércia<->giro "chacoalha" bem mais.
+        const spinning = this.spin > BLEND_LO;
+        const transPulse = blend * (1 - blend) * 4; // 0..1, pico no meio
+        const shake = (spinning ? SHAKE_SPIN : 0) + SHAKE_TRANSITION * transPulse;
+
+        // JUICE: "pop" de escala no arranque — estica ao engatar o giro e volta
+        // ao normal conforme o kick decai (ease-out).
+        const popScale = 1 + 0.22 * this.spinKick;
+
+        // Desenha o disco (rotação real) a partir de uma linha/frame da folha.
+        // Tanto a INÉRCIA quanto o GIRO rotacionam de fato — a diferença é só
+        // qual sprite usar. Assim, ao perder velocidade, o disco de inércia
+        // segue girando pelo `this.rotation` residual até o `spin` zerar.
+        const drawDisc = (x, y, draw, dir, sx, sy, alpha) => {
+            const jx = (Math.random() - 0.5) * 2 * shake;
+            const jy = (Math.random() - 0.5) * 2 * shake;
+            const sz = draw * popScale;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x + jx, y + jy);
+            ctx.rotate(this.rotation * dir);
+            ctx.drawImage(sprite, sx, sy, SAW_FRAME.size, SAW_FRAME.size, -sz / 2, -sz / 2, sz, sz);
+            ctx.restore();
+        };
+
+        const inertiaSx = INERTIA_FRAME * SAW_FRAME.size;
+        const spinSx = 0; // giro usa o 1º frame da linha; o giro vem da rotação
 
         this.getSawPositions(p1, p2).forEach(({ x, y, radius }, index) => {
+            const dir = index % 2 === 1 ? 1 : -1;
+            const draw = radius >= 14 ? SAW_DRAW_LARGE : SAW_DRAW_SMALL;
+
             if (spriteReady) {
-                // Giro por troca de frames. Serras alternadas avançam em
-                // sentidos opostos e defasadas, para não ficarem idênticas.
-                const dir = index % 2 === 1 ? 1 : -1;
-                const step = Math.floor(this.framePhase) * dir + index;
-                const frame = ((step % SAW_FRAME.cols) + SAW_FRAME.cols) % SAW_FRAME.cols;
-                const sx = frame * SAW_FRAME.size;
-
-                const draw = radius >= 14 ? SAW_DRAW_LARGE : SAW_DRAW_SMALL;
-                // Canto quantizado ao tamanho do pixel ampliado (sem sub-pixel).
-                const pix = draw / SAW_FRAME.size;
-                const dx = Math.round((x - draw / 2) / pix) * pix;
-                const dy = Math.round((y - draw / 2) / pix) * pix;
-
-                ctx.drawImage(
-                    sprite,
-                    sx, sy, SAW_FRAME.size, SAW_FRAME.size,
-                    dx, dy, draw, draw
-                );
+                // Crossfade por VELOCIDADE: giro rápido usa o sprite "girando";
+                // ao desacelerar, troca para o "inércia" (ambos rotacionando).
+                // Fora da faixa, desenha só um (nítido); dentro, sobrepõe.
+                if (blend <= 0) {
+                    drawDisc(x, y, draw, dir, inertiaSx, inertiaRow, 1);
+                } else if (blend >= 1) {
+                    drawDisc(x, y, draw, dir, spinSx, spinRow, 1);
+                } else {
+                    drawDisc(x, y, draw, dir, inertiaSx, inertiaRow, 1 - blend);
+                    drawDisc(x, y, draw, dir, spinSx, spinRow, blend);
+                }
+                ctx.globalAlpha = 1;
             } else {
                 // Fallback procedural (caso o sprite não carregue).
                 ctx.save();
                 ctx.translate(x, y);
-                ctx.rotate(this.framePhase * (index % 2 === 1 ? 1 : -1));
+                ctx.rotate(this.rotation * dir);
                 ctx.fillStyle = bloody ? "#9a2638" : "#c8ccd4";
                 ctx.beginPath();
                 for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
@@ -155,6 +225,7 @@ export class SawWeapon extends Weapon {
             }
         });
 
+        ctx.globalAlpha = 1;
         ctx.imageSmoothingEnabled = prevSmoothing;
         ctx.restore();
     }

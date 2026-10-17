@@ -68,7 +68,10 @@ export class CombatSystem {
                 enemy.startDying();
                 weapon.onHit?.();
                 if (this.audio) this.audio.play("monsterHurt");
-                this.renderer.triggerShake(4);
+                // IMPACT: tremida seca e forte no momento do corte, com um
+                // respingo de sangue extra no ponto de contato.
+                this.renderer.triggerShake(10);
+                this.particleSystem.triggerBlood(enemy.x, enemy.y, 10, 0.9);
             }
         }
     }

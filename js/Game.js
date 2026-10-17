@@ -371,6 +371,13 @@ export class Game {
             onSnap: () => this.renderer.triggerShake(9),
             onReconnect: () => this.renderer.triggerShake(4)
         });
+
+        // Serra em velocidade ALTA: tremida de câmera SECA e PEQUENA, contínua
+        // enquanto o disco gira a toda (sensação de vibração do motor).
+        const weapon = this.chain.weapon;
+        if (this.chain.isConnected && weapon?.isHighSpeed) {
+            this.renderer.triggerShake(1.6);
+        }
         this.enforceSeparationLimit();
 
         // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
@@ -531,11 +538,19 @@ export class Game {
         const enemies = rooms.current.enemies;
         enemies.forEach(e => renderer.drawRoundShadow(e.x, e.y, 13, 0));
 
-        // Arma / corrente: só desenha quando conectada (a Chain cuida disso).
+        // Profundidade pela SERRA: ela fica no meio da corrente (sawY). Quem
+        // está mais ACIMA (y <= sawY, "ao fundo") é desenhado ANTES e fica
+        // atrás da serra; quem está mais ABAIXO (y > sawY, "à frente") é
+        // desenhado DEPOIS e fica na frente dela. Tudo ordenado por Y.
+        const sawY = (this.p1.y + this.p2.y) / 2;
+        const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
+
+        drawables.filter(e => e.y <= sawY).forEach(e => e.draw(ctx));
+
+        // Arma / corrente: só aparece quando conectada (a Chain cuida disso).
         this.chain.draw(ctx, this.p1, this.p2);
 
-        const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
-        drawables.forEach(e => e.draw(ctx));
+        drawables.filter(e => e.y > sawY).forEach(e => e.draw(ctx));
 
         // Indicadores dos atiradores de flecha: montados nas paredes, por cima
         // das entidades (ficam na parede, não no chão).
