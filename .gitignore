@@ -33,5 +33,9 @@ Desktop.ini
 *.tmp
 *.bak
 
+# --- Artefatos gerados (não versionar) ---
 graphify-out/
+__pycache__/
+*.pyc
+
 GEMINI.md

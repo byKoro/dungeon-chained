@@ -24,9 +24,8 @@ import {
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
-    getPlayerSpawnPositions, HOLE_TILE
+    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS
 } from './config/GameConfig.js';
-import { AUDIO_CONFIG, MASTER_VOLUME } from './config/AudioConfig.js';
 
 /**
  * Game — orquestrador do jogo.
@@ -79,10 +78,13 @@ export class Game {
         this.bloodCanvas = new BloodCanvas(WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL);
         this.particleSystem = new ParticleSystem(this.bloodCanvas);
 
-        // Áudio: efeitos locais com variações/sobreposição. O navegador só
-        // libera reprodução após o primeiro gesto do usuário (o jogo começa
-        // com clique/tecla), então não há desbloqueio extra aqui.
-        this.audio = new AudioManager(AUDIO_CONFIG, MASTER_VOLUME);
+        // Áudio: gerenciado centralmente por AudioConfig. Permite alterar sons,
+        // volumes por caso de uso, pitch e volume master.
+        this.audio = new AudioManager(AUDIO_CONFIG);
+        if (typeof window !== "undefined") {
+            window.audio = this.audio;
+            window.audioConfig = AUDIO_CONFIG;
+        }
 
         // Entrada e armas
         this.input = new InputHandler();
