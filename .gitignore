@@ -16,7 +16,7 @@ package-lock.json
 .gemini/
 agent/
 skills-lock.json
-
+.aider-desk
 # --- Ambientes de editor / IDE ---
 .vscode/
 .idea/
@@ -39,3 +39,7 @@ __pycache__/
 *.pyc
 
 GEMINI.md
+
+data/
+
+skills-lock.json
