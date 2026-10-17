@@ -54,6 +54,8 @@ export class Arrow {
         ctx.rotate(this.angle);
         if (this.sprite && this.sprite.complete && this.sprite.naturalWidth > 0) {
             const length = cfg.length + 12;
+            // Compensa o eixo do sprite para que a ponta siga a direção do voo.
+            ctx.rotate(-Math.PI / 2);
             ctx.drawImage(this.sprite, -length / 2, -length / 2, length, length);
             ctx.restore();
             return;
@@ -118,7 +120,7 @@ export class ArrowTrap {
 
     update(onFire, deltaSeconds = 1 / 60) {
         this.elapsed += Math.max(0, deltaSeconds);
-        this.pulse += Math.max(0, deltaSeconds) * 12;
+        this.pulse += Math.max(0, deltaSeconds) * 3;
         if (this.elapsed >= this.intervalSeconds) {
             // Dispara em intervalos constantes, preservando o excedente do tick.
             this.elapsed %= this.intervalSeconds;
@@ -140,7 +142,11 @@ export class ArrowTrap {
         // Os sprites da parede apontam para cima por padrão.
         ctx.rotate(Math.atan2(this.dirY, this.dirX) + Math.PI / 2);
 
-        const spriteIndex = Math.floor(this.pulse * (warn ? 3 : 1)) % 4;
+        const warnProgress = this.warnSeconds > 0
+            ? Math.max(0, Math.min(0.999, (this.elapsed - (this.intervalSeconds - this.warnSeconds)) / this.warnSeconds))
+            : 0;
+        // A animação percorre os quadros uma vez no aviso; fora dele, fica no quadro de repouso.
+        const spriteIndex = warn ? Math.floor(warnProgress * 4) : 0;
         const sprite = this.sprites && this.sprites[spriteIndex];
         if (sprite && sprite.complete && sprite.naturalWidth > 0) {
             const width = cfg.indicatorSize * 1.6;

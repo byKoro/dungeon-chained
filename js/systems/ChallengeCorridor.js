@@ -114,11 +114,12 @@ export class ChallengeCorridor {
 
     // Dispara para dentro, na direção oposta à parede de montagem.
     _fireDirFromWall(side) {
+        // Dispara para dentro da sala, afastando-se da parede.
         switch (side) {
-            case "top": return { x: 0, y: -1 };
-            case "bottom": return { x: 0, y: 1 };
-            case "left": return { x: -1, y: 0 };
-            case "right": return { x: 1, y: 0 };
+            case "top": return { x: 0, y: 1 };
+            case "bottom": return { x: 0, y: -1 };
+            case "left": return { x: 1, y: 0 };
+            case "right": return { x: -1, y: 0 };
             default: return null;
         }
     }
