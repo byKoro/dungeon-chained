@@ -1,4 +1,4 @@
-import { holeTileFor, TORCHES } from '../config/GameConfig.js';
+import { holeTileFor, TORCHES, EMPTY_FLOOR_TILE, EMPTY_FLOOR_COLOR } from '../config/GameConfig.js';
 
 export class Renderer {
     constructor(canvas, ctx) {
@@ -208,6 +208,11 @@ export class Renderer {
                 let idx = tiles.floor[r][col];
                 const dx = rect.x + col * tile;
                 const dy = rect.y + r * tile;
+                if (idx === EMPTY_FLOOR_TILE) {
+                    c.fillStyle = EMPTY_FLOOR_COLOR;
+                    c.fillRect(dx, dy, tile, tile);
+                    continue;
+                }
                 if (idx < 0) idx = holeTileFor(tiles.floor, col, r);
                 this.tileset.draw(c, idx, dx, dy, tile, tile);
             }
@@ -240,6 +245,12 @@ export class Renderer {
             const torchSprites = this.assets && this.assets.torchSprites;
             const frame = Math.floor(performance.now() / 160) % 4;
             for (const t of tiles.torches) {
+                // A tocha abaixo da parede baixa continua iluminando, mas seu sprite fica oculto.
+                const behindLowWall = t.side === "S" && (tiles.walls || []).some(w =>
+                    w.col === t.col && w.row === t.row - 1 &&
+                    (w.side === "bottom" || (w.tile >= 41 && w.tile <= 44))
+                );
+                if (behindLowWall) continue;
                 const dx = rect.x + t.col * tile;
                 const dy = rect.y + t.row * tile;
                 const type = t.type || "torch";

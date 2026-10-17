@@ -19,7 +19,7 @@ import { RoomSocket, RoomTemplate } from '../rooms/RoomSocket.js';
 import { RoomPresets } from '../rooms/RoomPresets.js';
 import { RoomCatalog, doorSignature } from '../rooms/RoomCatalog.js';
 import { RoomTiles } from '../core/RoomTiles.js';
-import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor } from '../config/GameConfig.js';
+import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor, EMPTY_FLOOR_TILE, EMPTY_FLOOR_COLOR } from '../config/GameConfig.js';
 import { demonConfig, bloodMonsterConfig, playerConfigs } from '../config/EntityConfig.js';
 
 class RoomEditor {
@@ -47,6 +47,7 @@ class RoomEditor {
                 W: new RoomSocket({ dir: "W", offset: 3, span: 2 })
             },
             floor: [],            // matriz [r][c] de índices de tile
+            floorOverrides: {}, // tiles visuais personalizados do editor
             holes: new Set(),     // coordenadas "c,r" onde NÃO haverá piso (abismo)
             hazards: [],          // perigos { type, u, v, count, phase, wave, dir }
             walls: [],            // paredes sólidas { col, row, tile }
@@ -215,6 +216,7 @@ class RoomEditor {
             W: shape.doors.W ? new RoomSocket({ dir: "W", offset: midR - 1, span: 2 }) : null
         };
         this.room.holes = new Set();
+        this.room.floorOverrides = {};
         this.room.hazards = [];
         this.room.walls = [];
         this.room.enemies = [];
@@ -291,6 +293,7 @@ class RoomEditor {
             },
             holes: Array.from(this.room.holes),
             walls: this.room.walls,
+            floorOverrides: this.room.floorOverrides,
             floor: this.room.floor,
             hazards: this.room.hazards,
             enemies: this.room.enemies,
@@ -436,6 +439,11 @@ class RoomEditor {
         const rt = new RoomTiles(this.cols, this.rows, doors, 12345, this.room.kind === "room");
         this.room.floor = rt.floor;
 
+        // Aplica tiles visuais pintados pelo editor e, depois, os buracos.
+        for (const [key, tile] of Object.entries(this.room.floorOverrides || {})) {
+            const [c, r] = key.split(",").map(Number);
+            if (r >= 0 && r < this.rows && c >= 0 && c < this.cols) this.room.floor[r][c] = tile;
+        }
         // Aplica os buracos definidos
         for (const holeKey of this.room.holes) {
             const [c, r] = holeKey.split(",").map(Number);
@@ -798,7 +806,10 @@ class RoomEditor {
             for (let r = 0; r < this.rows; r++) {
                 for (let c = 0; c < this.cols; c++) {
                     const tileIdx = this.room.floor[r][c];
-                    if (tileIdx >= 0) {
+                    if (tileIdx === EMPTY_FLOOR_TILE) {
+                        ctx.fillStyle = EMPTY_FLOOR_COLOR;
+                        ctx.fillRect(c * tileW, r * tileW, tileW, tileW);
+                    } else if (tileIdx >= 0) {
                         this.tileset.draw(ctx, tileIdx, c * tileW, r * tileW, tileW, tileW);
                     }
                 }
@@ -1560,11 +1571,12 @@ class RoomEditor {
         }
 
         // Se estiver com mouse pressionado na aba de buracos, permite abrir/tapar buracos continuamente
-        if (this.isMouseDown && this.activeTab === "tab-holes") {
+        if (this.isMouseDown && (this.activeTab === "tab-holes" || this.activeTab === "tab-floor-tiles")) {
             const key = `${col},${row}`;
             if (this.lastToggledHole !== key) {
                 this.lastToggledHole = key;
-                this._toggleHole(col, row);
+                if (this.activeTab === "tab-holes") this._toggleHole(col, row);
+                else this._paintEmptyFloorTile(col, row);
             }
         } else {
             this.render();
@@ -1608,6 +1620,8 @@ class RoomEditor {
 
         if (this.activeTab === "tab-holes") {
             this._toggleHole(col, row);
+        } else if (this.activeTab === "tab-floor-tiles") {
+            this._paintEmptyFloorTile(col, row);
         } else if (this.activeTab === "tab-walls") {
             this._toggleWallAt(col, row);
         } else if (this.activeTab === "tab-torches") {
@@ -1649,6 +1663,16 @@ class RoomEditor {
         return "top";
     }
 
+    _paintEmptyFloorTile(col, row) {
+        const key = String(col) + "," + String(row);
+        if (this.room.walls.some(w => w.col === col && w.row === row)) return;
+        this.room.holes.delete(key);
+        this.room.floorOverrides[key] = EMPTY_FLOOR_TILE;
+        this._rebuildAutotile();
+        this._updateUIFromState();
+        this._updateCodeOutput();
+        this.render();
+    }
     _toggleHole(col, row) {
         // Tiles onde os jogadores nascem logo à frente da porta não podem ser buraco!
         const spawns = this._getPlayerSpawns();
@@ -1681,7 +1705,7 @@ class RoomEditor {
         // Flechas podem ser montadas nas paredes editáveis ou no contorno da sala.
         let arrowSide = null;
         if (type === "arrow") {
-            const mountedWall = (this.room.walls || []).find(w => w.col === col && w.row === row);
+            const mountedWall = (this.room.walls || []).find(w => Number(w.col) === col && Number(w.row) === row);
             if (mountedWall) {
                 arrowSide = mountedWall.side || this._wallSideForTile(mountedWall.tile);
             } else {
@@ -1758,10 +1782,16 @@ class RoomEditor {
         const mountedWall = (this.room.walls || []).find(w => w.col === col && w.row === row);
         if (mountedWall && type !== "candlestick_1" && type !== "candlestick_2") {
             const wallSide = mountedWall.side || this._wallSideForTile(mountedWall.tile);
-            const side = { top: "N", bottom: "S", left: "W", right: "E" }[wallSide] || "N";
-            const i = this.room.torches.findIndex(t => t.col === col && t.row === row);
+            const side = { top: "N", bottom: "S", left: "E", right: "W" }[wallSide] || "N";
+            const offsets = { top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] };
+            const [dc, dr] = offsets[wallSide] || [0, -1];
+            const torchCol = col + dc, torchRow = row + dr;
+            if (torchCol < 0 || torchCol >= this.cols || torchRow < 0 || torchRow >= this.rows) return;
+            const i = this.room.torches.findIndex(t => t.col === torchCol && t.row === torchRow);
             if (i >= 0) this.room.torches.splice(i, 1);
-            else this.room.torches.push({ col, row, side, type });
+            else if (!this.room.holes.has(`${torchCol},${torchRow}`)) {
+                this.room.torches.push({ col: torchCol, row: torchRow, side, type });
+            }
             this._updateTorchesListUI();
             this._updateCodeOutput();
             this.render();
@@ -2150,6 +2180,14 @@ class RoomEditor {
         this.room.scatterProps = data.scatterProps || { enabled: false, density: 0.08 };
         this.room.lock = data.lock || "auto";
         this.room.holes = new Set(data.holes || []);
+        this.room.floorOverrides = data.floorOverrides || {};
+        if (!data.floorOverrides && Array.isArray(data.floor)) {
+            for (let r = 0; r < data.floor.length; r++) {
+                for (let c = 0; c < (data.floor[r] || []).length; c++) {
+                    if (data.floor[r][c] === EMPTY_FLOOR_TILE) this.room.floorOverrides[String(c) + "," + String(r)] = EMPTY_FLOOR_TILE;
+                }
+            }
+        }
 
         this.room.sockets = { N: null, S: null, E: null, W: null };
         if (data.doors) {
