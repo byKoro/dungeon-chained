@@ -63,6 +63,8 @@ class RoomEditor {
         // Estado das Ferramentas
         this.activeTab = "tab-holes"; // tab-holes, tab-torches, tab-props, tab-challenges, tab-enemies, tab-spawns
         this.selectedHazard = "button";
+        this.spikeTiming = "normal";
+        this.spikeDelay = 0;
         this.selectedEnemy = "demon";
         this.selectedProp = 59;
         this.selectedTorchType = "torch";
@@ -1303,6 +1305,16 @@ class RoomEditor {
         document.querySelectorAll("[name='hazard-choice']").forEach(r => {
             r.onchange = () => { this.selectedHazard = r.value; };
         });
+        const spikeTimingSelect = document.getElementById("spike-timing");
+        if (spikeTimingSelect) {
+            this.spikeTiming = spikeTimingSelect.value || "normal";
+            spikeTimingSelect.onchange = () => { this.spikeTiming = spikeTimingSelect.value; };
+        }
+        const spikeDelayInput = document.getElementById("spike-delay");
+        if (spikeDelayInput) {
+            this.spikeDelay = Math.max(0, Number(spikeDelayInput.value) || 0);
+            spikeDelayInput.oninput = () => { this.spikeDelay = Math.max(0, Number(spikeDelayInput.value) || 0); };
+        }
         document.getElementById("btn-clear-hazards").onclick = () => {
             this.room.hazards = [];
             this._updateHazardsListUI();
@@ -1619,6 +1631,9 @@ class RoomEditor {
         if (occupied) return;
 
         const newHazard = { type, col, row };
+
+        if (type === "spike" || type === "spikeRow") newHazard.timing = this.spikeTiming || "normal";
+        if (type === "spike" || type === "spikeRow") newHazard.delay = this.spikeDelay || 0;
 
         if (type === "spikeRow") {
             newHazard.count = 4;

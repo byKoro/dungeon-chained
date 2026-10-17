@@ -370,13 +370,13 @@ export const HAZARDS = {
         indicatorWarnColor: "#ff5470"
     },
     arrow: {
-        speed: 7.5,            // px/frame
+        speed: 4.5,            // px/frame
         length: 26,            // comprimento da flecha (forma)
         width: 5,              // espessura
         hitRadius: 10,         // raio de colisão com o player
         color: "#f4e9c1",
         headColor: "#ff5470",
-        maxLifeFrames: 240     // tempo de vida máximo (fail-safe)
+        maxLifeFrames: 360     // tempo de vida máximo (fail-safe)
     },
 
     // ---- Botão de pressão (co-op) ----

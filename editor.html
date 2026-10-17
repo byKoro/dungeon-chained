@@ -175,6 +175,17 @@
                             </div>
 
                             <div class="panel-section">
+                                <label for="spike-timing" style="font-size:12px; display:block; margin-bottom:6px;">Tempo dos espinhos</label>
+                                <select id="spike-timing" style="width:100%; margin-bottom:8px;">
+                                    <option value="fast">Rápido</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="slow">Lento</option>
+                                </select>
+                                <label for="spike-delay" style="font-size:12px; display:block; margin:4px 0;">Delay da primeira ativação (segundos)</label>
+                                <input id="spike-delay" type="number" min="0" step="0.1" value="0" style="width:100%;">
+                            </div>
+
+                            <div class="panel-section">
                                 <div class="panel-title">Traps no Mapa (<span id="hazard-count">0</span>)</div>
                                 <div id="hazards-list" style="display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto;">
                                     <!-- Inserido dinamicamente -->

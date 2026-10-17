@@ -54,6 +54,8 @@ export class Arrow {
         ctx.rotate(this.angle);
         if (this.sprite && this.sprite.complete && this.sprite.naturalWidth > 0) {
             const length = cfg.length + 12;
+            // Compensa o eixo do sprite para que a ponta siga a direção do voo.
+            ctx.rotate(-Math.PI / 2);
             ctx.drawImage(this.sprite, -length / 2, -length / 2, length, length);
             ctx.restore();
             return;
@@ -109,6 +111,7 @@ export class ArrowTrap {
         this.intervalSeconds = this.cfg.intervalFrames / 60;
         this.warnSeconds = this.cfg.warnFrames / 60;
         this.elapsed = ((opts.phaseOffset || 0) % 1) * this.intervalSeconds;
+        this.hasFiredThisCycle = false;
         this.pulse = 0;
     }
 
@@ -117,14 +120,22 @@ export class ArrowTrap {
     }
 
     update(onFire, deltaSeconds = 1 / 60) {
-        this.elapsed += Math.max(0, deltaSeconds);
-        this.pulse += Math.max(0, deltaSeconds) * 12;
-        if (this.elapsed >= this.intervalSeconds) {
-            // Dispara em intervalos constantes, preservando o excedente do tick.
-            this.elapsed %= this.intervalSeconds;
+        const dt = Math.max(0, deltaSeconds);
+        this.elapsed += dt;
+        this.pulse += dt * 3;
+
+        // Dispara no início do último quadro, quando o sprite mostra a flecha saindo.
+        const launchAt = this.intervalSeconds - this.warnSeconds * 0.25;
+        if (!this.hasFiredThisCycle && this.elapsed >= launchAt) {
             const sx = this.x + this.dirX * 14;
             const sy = this.y + this.dirY * 14;
             onFire(new Arrow(sx, sy, this.dirX, this.dirY, this.arrowSprite));
+            this.hasFiredThisCycle = true;
+        }
+
+        if (this.elapsed >= this.intervalSeconds) {
+            this.elapsed %= this.intervalSeconds;
+            this.hasFiredThisCycle = false;
         }
     }
 
@@ -137,10 +148,15 @@ export class ArrowTrap {
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        // Os sprites da parede apontam para cima por padrão.
-        ctx.rotate(Math.atan2(this.dirY, this.dirX) + Math.PI / 2);
+        // Alinha o eixo da sequência do sprite com a direção do disparo.
+        ctx.rotate(Math.atan2(this.dirY, this.dirX) - Math.PI / 2);
 
-        const spriteIndex = Math.floor(this.pulse * (warn ? 3 : 1)) % 4;
+        const warnProgress = this.warnSeconds > 0
+            ? Math.max(0, Math.min(0.999, (this.elapsed - (this.intervalSeconds - this.warnSeconds)) / this.warnSeconds))
+            : 0;
+        // A animação sai do quadro vazio e avança até a flecha estendida durante o aviso.
+        const firingFrames = [1, 2, 3, 0]; // quadro vazio, flecha saindo, totalmente estendida
+        const spriteIndex = warn ? firingFrames[Math.floor(warnProgress * firingFrames.length)] : 1;
         const sprite = this.sprites && this.sprites[spriteIndex];
         if (sprite && sprite.complete && sprite.naturalWidth > 0) {
             const width = cfg.indicatorSize * 1.6;
