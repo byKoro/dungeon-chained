@@ -6,7 +6,6 @@ import { Tileset } from './core/Tileset.js';
 import { AssetLoader } from './core/AssetLoader.js';
 import { AudioManager } from './core/AudioManager.js';
 
-import { LaserWeapon } from './weapons/LaserWeapon.js';
 import { SawWeapon } from './weapons/SawWeapon.js';
 
 import { ParticleSystem } from './particles/ParticleSystem.js';
@@ -94,7 +93,7 @@ export class Game {
         // separar além do limite, ela ARREBENTA (empurrão elástico) e os
         // jogadores ficam DESARMADOS até se reaproximarem. Ajuste os "dials"
         // (tensão, ruptura, reconexão) aqui.
-        this.chain = new Chain([new LaserWeapon(), new SawWeapon()], {
+        this.chain = new Chain([new SawWeapon(this.assets.saw)], {
             rest: 130,
             stiffness: 0.02,
             breakDistance: 240,
@@ -157,15 +156,8 @@ export class Game {
     }
 
     _bindButtons() {
-        this.hud.btnWeapon.addEventListener("click", () => {
-            const w = this.chain.cycleWeapon();
-            // Só reflete a troca no botão quando a corrente está conectada; se
-            // estiver arrebentada, o updateHud mantém o aviso de arma quebrada.
-            if (this.chain.isConnected) {
-                this.hud.btnWeapon.innerText = `ARMA: ${w.name}`;
-                this.hud.btnWeapon.style.background = w.name === "SERRAS" ? "#ff5470" : "#e53170";
-            }
-        });
+        // Só existe uma arma (serras). O botão é apenas informativo; mantém o
+        // texto/estilo em sincronia via updateHud.
         this.hud.btnRestart.addEventListener("click", () => {
             this.floor = 1;
             this.players = this.playerFactory.create();
@@ -274,7 +266,7 @@ export class Game {
         // os jogadores que estão desarmados e precisam se reaproximar.
         if (this.chain.isConnected) {
             this.hud.btnWeapon.innerText = `ARMA: ${this.chain.name}`;
-            this.hud.btnWeapon.style.background = this.chain.name === "SERRAS" ? "#ff5470" : "#e53170";
+            this.hud.btnWeapon.style.background = "#8d99ae";
         } else {
             this.hud.btnWeapon.innerText = "ARMA QUEBRADA! APROXIMEM-SE";
             this.hud.btnWeapon.style.background = "#555";

@@ -7,8 +7,8 @@ import { Physics } from './Physics.js';
  *  - Manter a tensão elástica entre os jogadores.
  *  - Arrebentar quando eles insistem em se separar (empurrão elástico) e
  *    deixá-los DESARMADOS; reconectar ao se reaproximarem.
- *  - Portar a arma ativa (laser/serra), trocar entre elas e aplicar o dano
- *    aos inimigos apenas quando conectada.
+ *  - Portar a arma ativa (serras) e aplicar o dano aos inimigos apenas
+ *    quando conectada.
  *  - Desenhar a arma/corrente (só quando conectada).
  *
  * Ajuste o comportamento pelo objeto de configuração passado no construtor.
@@ -98,8 +98,9 @@ export class Chain {
             events.onReconnect?.();
         }
 
-        // Mantém a animação da arma (ex.: giro das serras) rodando
-        this.weapon.update();
+        // Mantém a animação da arma rodando. Passa os jogadores para que a
+        // arma possa reagir ao movimento (ex.: a serra só gira quando andam).
+        this.weapon.update(p1, p2);
     }
 
     /**

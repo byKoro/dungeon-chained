@@ -66,6 +66,7 @@ export class CombatSystem {
 
             if (!nearPlayer && d < weapon.hitThreshold + enemy.hitRadius) {
                 enemy.startDying();
+                weapon.onHit?.();
                 if (this.audio) this.audio.play("monsterHurt");
                 this.renderer.triggerShake(4);
             }
