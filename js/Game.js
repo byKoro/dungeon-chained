@@ -527,6 +527,9 @@ export class Game {
                 }
             }
         }
+        // Após resolver as colisões, garante que nenhum inimigo tenha sido
+        // empurrado para um tile não-caminhável (vindo da main).
+        for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
         // Confinamento: inimigos presos; players podem adentrar portas abertas
         enemies.forEach(e => rooms.clampEnemy(e, this.arenaBounds));

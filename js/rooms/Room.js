@@ -124,7 +124,9 @@ export class Room {
                 .map(foe => {
                     const ex = this.bounds.minX + foe.col * 64;
                     const ey = this.bounds.minY + foe.row * 64;
-                    return spawnSystem.createEnemy(ex, ey, floor, foe.type);
+                    const enemy = spawnSystem.createEnemy(ex, ey, floor, foe.type);
+                    enemy.setNavigationFloor(floorGrid, this.bounds);
+                    return enemy;
                 });
         }
 
