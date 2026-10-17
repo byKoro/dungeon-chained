@@ -1,3 +1,4 @@
+import { TILE } from '../config/GameConfig.js';
 import { Entity } from './Entity.js';
 import { GibPiece } from '../particles/GibPiece.js';
 import { BloodStains } from '../particles/BloodStains.js';
@@ -74,6 +75,73 @@ export class MeleeEnemy extends Entity {
         this.stepDistance = 0;
         this.justStepped = false;
         this.justAttacked = false;
+
+        this.navigationFloor = null;
+        this.navigationBounds = null;
+        this.lastSafePosition = { x, y };
+    }
+
+
+    setNavigationFloor(floor, bounds) {
+        this.navigationFloor = floor;
+        this.navigationBounds = bounds;
+        this.lastSafePosition = { x: this.x, y: this.y };
+    }
+
+    _tileAt(x, y) {
+        const col = Math.floor((x - this.navigationBounds.minX) / TILE) + 1;
+        const row = Math.floor((y - this.navigationBounds.minY) / TILE) + 1;
+        return { col, row };
+    }
+
+    _isWalkable(x, y) {
+        if (!this.navigationFloor || !this.navigationBounds) return true;
+        const { col, row } = this._tileAt(x, y);
+        return row > 0 && row < this.navigationFloor.length - 1 &&
+            col > 0 && col < (this.navigationFloor[row] || []).length - 1 &&
+            this.navigationFloor[row][col] !== -1;
+    }
+
+    _chaseWaypoint(target) {
+        if (!this.navigationFloor || !this.navigationBounds) return target;
+        const start = this._tileAt(this.x, this.y);
+        const goal = this._tileAt(target.x, target.y);
+        if (!this._isWalkable(this.x, this.y) || !this._isWalkable(target.x, target.y)) return null;
+        const key = (col, row) => String(col) + "," + String(row);
+        const startKey = key(start.col, start.row);
+        const goalKey = key(goal.col, goal.row);
+        const queue = [start];
+        const previous = new Map([[startKey, null]]);
+        const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (let q = 0; q < queue.length && !previous.has(goalKey); q++) {
+            const cell = queue[q];
+            for (const [dc, dr] of directions) {
+                const col = cell.col + dc, row = cell.row + dr;
+                if (row <= 0 || row >= this.navigationFloor.length - 1 || col <= 0 || col >= this.navigationFloor[row].length - 1) continue;
+                if (this.navigationFloor[row][col] === -1) continue;
+                const nextKey = key(col, row);
+                if (previous.has(nextKey)) continue;
+                previous.set(nextKey, key(cell.col, cell.row));
+                queue.push({ col, row });
+            }
+        }
+        if (!previous.has(goalKey)) return null;
+        let stepKey = goalKey;
+        let parentKey = previous.get(stepKey);
+        while (parentKey && parentKey !== startKey) { stepKey = parentKey; parentKey = previous.get(stepKey); }
+        if (stepKey === startKey) return target;
+        const [col, row] = stepKey.split(",").map(Number);
+        return { x: this.navigationBounds.minX + (col - 0.5) * TILE, y: this.navigationBounds.minY + (row - 0.5) * TILE };
+    }
+
+    ensureOnWalkableTile() {
+        if (this._isWalkable(this.x, this.y)) {
+            this.lastSafePosition = { x: this.x, y: this.y };
+            return;
+        }
+        this.x = this.lastSafePosition.x;
+        this.y = this.lastSafePosition.y;
+        this.vx = this.vy = this.pushVx = this.pushVy = 0;
     }
 
     get isDead() {
@@ -215,9 +283,15 @@ export class MeleeEnemy extends Entity {
         switch (this.state) {
             case "chase": {
                 // Persegue o alvo
-                const angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-                this.vx = this.vx * 0.85 + Math.cos(angle) * this.speed * 0.15;
-                this.vy = this.vy * 0.85 + Math.sin(angle) * this.speed * 0.15;
+                const waypoint = this._chaseWaypoint(this.target);
+                if (waypoint) {
+                    const angle = Math.atan2(waypoint.y - this.y, waypoint.x - this.x);
+                    this.vx = this.vx * 0.85 + Math.cos(angle) * this.speed * 0.15;
+                    this.vy = this.vy * 0.85 + Math.sin(angle) * this.speed * 0.15;
+                } else {
+                    this.vx *= 0.5;
+                    this.vy *= 0.5;
+                }
 
                 if (distToTarget <= this.attackRange) {
                     // Chegou perto: para e inicia o windup (telegrafo do golpe)
