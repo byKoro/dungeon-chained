@@ -28,6 +28,9 @@ export class AssetLoader {
         // começando em 13,13 — ver SawWeapon para o fatiamento).
         this.load("saw", "assets/saw/saw.png");
 
+        // Cabo/corrente que prende os jogadores (segmento tileável de 48x16).
+        this.load("cable", "assets/saw/image.png");
+
         // Spikes (4 sprites de 16x16; a sequência usa os índices 3, 1 e 2)
         this.load("peaks0", "assets/peaks/peaks_0.png");
         this.load("peaks1", "assets/peaks/peaks_1.png");
@@ -81,6 +84,7 @@ export class AssetLoader {
     get bloodMonster() { return this.images.bloodMonster; }
     get tileset() { return this.images.tileset; }
     get saw() { return this.images.saw; }
+    get cable() { return this.images.cable; }
     // Sprites dos spikes, indexados pelo nome do arquivo (0..3).
     get peaks() { return [this.images.peaks0, this.images.peaks1, this.images.peaks2, this.images.peaks3]; }
     get arrowTrap() { return [this.images.arrowTrap1, this.images.arrowTrap2, this.images.arrowTrap3, this.images.arrowTrap4]; }

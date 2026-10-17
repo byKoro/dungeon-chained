@@ -93,7 +93,7 @@ export class Game {
         // separar além do limite, ela ARREBENTA (empurrão elástico) e os
         // jogadores ficam DESARMADOS até se reaproximarem. Ajuste os "dials"
         // (tensão, ruptura, reconexão) aqui.
-        this.chain = new Chain([new SawWeapon(this.assets.saw)], {
+        this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], {
             rest: 130,
             stiffness: 0.02,
             breakDistance: 240,

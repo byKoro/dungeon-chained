@@ -33,6 +33,11 @@ const ROW_SPIN_BLOODY = 3;
 const SAW_DRAW_LARGE = SAW_FRAME.size * 4.025; // ~64
 const SAW_DRAW_SMALL = SAW_FRAME.size * 2;     // 32
 
+// Corrente (cabo) montada a partir do sprite tileável (assets/saw/image.png).
+//   LINK_WORLD_H = altura do elo em px de MUNDO (a escala é derivada disto,
+//   mantendo a proporção do sprite). O cabo é RETO (sem curva).
+const CABLE_LINK_WORLD_H = 32;
+
 // Quantos passos de simulação a serra fica ensanguentada após um acerto.
 const BLOOD_DURATION = 90;
 
@@ -60,9 +65,10 @@ const SHAKE_SPIN = 4;
 const SHAKE_TRANSITION = 3;
 
 export class SawWeapon extends Weapon {
-    constructor(sprite = null) {
+    constructor(sprite = null, cableSprite = null) {
         super("SERRAS", 14);
         this.sprite = sprite;
+        this.cableSprite = cableSprite; // segmento tileável da corrente
         this.bloodTimer = 0;
         this.onBlood = false;  // true enquanto o disco está sobre sangue no chão
         this.spin = 0;         // 0 = parada, 1 = girando a toda
@@ -177,16 +183,55 @@ export class SawWeapon extends Weapon {
     }
 
     // Corrente ligando os jogadores. Desenhada numa camada ao FUNDO (sempre
-    // atrás das entidades) — separada do disco, que entra na ordenação por
-    // profundidade.
+    // atrás das entidades), separada do disco.
+    //
+    // Montagem a partir do sprite `cableSprite` (um segmento tileável): o cabo
+    // CURVA como uma corda pendurada (catenária aproximada por parábola). O
+    // afundamento (sag) é maior quando a corrente está frouxa e some quando ela
+    // estica. Percorremos a curva em passos do tamanho do segmento, desenhando
+    // cada elo rotacionado na TANGENTE para acompanhar a curvatura.
     drawChain(ctx, p1, p2) {
+        const cable = this.cableSprite;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        // Fallback vetorizado se o sprite não carregou.
+        if (!cable || !cable.complete || !cable.naturalWidth) {
+            ctx.save();
+            ctx.strokeStyle = "#8d99ae";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
+
+        // Dimensões do elo em px de MUNDO: escala derivada da altura-alvo,
+        // preservando a proporção do sprite. O passo tilea o sprite ao longo da
+        // linha com leve sobreposição para encadear sem vãos.
+        const linkH = CABLE_LINK_WORLD_H;
+        const scale = linkH / cable.naturalHeight;
+        const linkW = cable.naturalWidth * scale;
+        const step = linkW * 0.78;
+
+        // Cabo RETO: um único ângulo de p1 a p2, tileando os elos na linha.
+        const ang = Math.atan2(dy, dx);
+        const segments = Math.max(1, Math.ceil(dist / step));
+
         ctx.save();
-        ctx.strokeStyle = "#8d99ae";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(p1.x, p1.y);
+        ctx.rotate(ang);
+        for (let i = 0; i < segments; i++) {
+            const cx = (i + 0.5) * (dist / segments);
+            ctx.drawImage(
+                cable, 0, 0, cable.naturalWidth, cable.naturalHeight,
+                cx - linkW / 2, -linkH / 2, linkW, linkH
+            );
+        }
         ctx.restore();
     }
 
