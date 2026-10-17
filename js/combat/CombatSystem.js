@@ -49,8 +49,12 @@ export class CombatSystem {
     /**
      * A arma é o segmento entre os dois players. Qualquer inimigo que o segmento
      * toque (fora da zona morta perto dos players) começa a morrer.
+     *
+     * @param {boolean} connected quando false (corrente arrebentada), a arma
+     *   está desarmada e NÃO causa dano. Default true para compatibilidade.
      */
-    resolveWeaponHits(weapon, enemies, p1, p2) {
+    resolveWeaponHits(weapon, enemies, p1, p2, connected = true) {
+        if (!connected) return;
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             if (enemy.state === "dying") continue;

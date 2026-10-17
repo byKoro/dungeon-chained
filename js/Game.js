@@ -1,5 +1,6 @@
 import { InputHandler } from './core/InputHandler.js';
 import { Physics } from './core/Physics.js';
+import { Chain } from './core/Chain.js';
 import { Renderer } from './core/Renderer.js';
 import { Tileset } from './core/Tileset.js';
 import { AssetLoader } from './core/AssetLoader.js';
@@ -25,7 +26,7 @@ import {
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
     getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS,
-    SIM_STEP, MAX_SIM_STEPS_PER_FRAME
+    SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE
 } from './config/GameConfig.js';
 
 /**
@@ -89,8 +90,20 @@ export class Game {
 
         // Entrada e armas
         this.input = new InputHandler();
-        this.weapons = [new LaserWeapon(), new SawWeapon()];
-        this.currentWeaponIndex = 0;
+        // A corrente une os jogadores e porta a arma ativa. Se insistirem em se
+        // separar além do limite, ela ARREBENTA (empurrão elástico) e os
+        // jogadores ficam DESARMADOS até se reaproximarem. Ajuste os "dials"
+        // (tensão, ruptura, reconexão) aqui.
+        this.chain = new Chain([new LaserWeapon(), new SawWeapon()], {
+            rest: 130,
+            stiffness: 0.02,
+            breakDistance: 240,
+            strainDistance: 165,
+            strainLimit: 30,
+            reconnectDistance: 110,
+            snapImpulse: 12,
+            playerSafeZone: PLAYER_SAFE_ZONE
+        });
 
         // Fábricas / sistemas
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
@@ -120,7 +133,7 @@ export class Game {
     }
 
     get currentWeapon() {
-        return this.weapons[this.currentWeaponIndex];
+        return this.chain.weapon;
     }
 
     // ---- Bootstrap ----
@@ -145,10 +158,13 @@ export class Game {
 
     _bindButtons() {
         this.hud.btnWeapon.addEventListener("click", () => {
-            this.currentWeaponIndex = (this.currentWeaponIndex + 1) % this.weapons.length;
-            const w = this.currentWeapon;
-            this.hud.btnWeapon.innerText = `ARMA: ${w.name}`;
-            this.hud.btnWeapon.style.background = w.name === "SERRAS" ? "#ff5470" : "#e53170";
+            const w = this.chain.cycleWeapon();
+            // Só reflete a troca no botão quando a corrente está conectada; se
+            // estiver arrebentada, o updateHud mantém o aviso de arma quebrada.
+            if (this.chain.isConnected) {
+                this.hud.btnWeapon.innerText = `ARMA: ${w.name}`;
+                this.hud.btnWeapon.style.background = w.name === "SERRAS" ? "#ff5470" : "#e53170";
+            }
         });
         this.hud.btnRestart.addEventListener("click", () => {
             this.floor = 1;
@@ -166,6 +182,9 @@ export class Game {
         this.transition = null;
         this.particleSystem.clear();
         this.gameOver = false;
+
+        // A corrente começa conectada a cada nova dungeon.
+        this.chain.reset();
 
         this.rooms.enter();
         this.arenaBounds = this.rooms.currentBounds;
@@ -250,6 +269,16 @@ export class Game {
         this.hud.floor.innerText = `DUNGEON ${this.floor} — ${tag}`;
         this.hud.p1.innerText = `P1 (Amarelo): ${"❤️".repeat(Math.max(0, this.p1.lives))}`;
         this.hud.p2.innerText = `P2 (Azul): ${"❤️".repeat(Math.max(0, this.p2.lives))}`;
+
+        // Botão de arma reflete o estado da corrente: quando arrebentada, avisa
+        // os jogadores que estão desarmados e precisam se reaproximar.
+        if (this.chain.isConnected) {
+            this.hud.btnWeapon.innerText = `ARMA: ${this.chain.name}`;
+            this.hud.btnWeapon.style.background = this.chain.name === "SERRAS" ? "#ff5470" : "#e53170";
+        } else {
+            this.hud.btnWeapon.innerText = "ARMA QUEBRADA! APROXIMEM-SE";
+            this.hud.btnWeapon.style.background = "#555";
+        }
     }
 
     // Limite físico de afastamento entre os players (teto rígido).
@@ -343,8 +372,13 @@ export class Game {
         this.effects.processPlayer(p1);
         this.effects.processPlayer(p2);
 
-        // Corrente elástica + teto rígido de afastamento
-        Physics.applyChainConstraint(p1, p2);
+        // Corrente: tensão elástica, ruptura (arrebenta e desarma) e reconexão.
+        // A própria Chain aplica o constraint elástico e atualiza a animação da
+        // arma. O teto rígido de afastamento continua valendo por cima.
+        this.chain.update(p1, p2, {
+            onSnap: () => this.renderer.triggerShake(9),
+            onReconnect: () => this.renderer.triggerShake(4)
+        });
         this.enforceSeparationLimit();
 
         // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
@@ -370,9 +404,9 @@ export class Game {
         // sem piso (-1), ele cai e morre. A posição já está confinada acima.
         this._checkHoleFalls([p1, p2]);
 
-        // Arma
-        this.currentWeapon.update();
-        this.combat.resolveWeaponHits(this.currentWeapon, enemies, p1, p2);
+        // Arma: a animação já é atualizada por chain.update(). O dano só é
+        // aplicado quando a corrente está conectada (desarmada = sem dano).
+        this.combat.resolveWeaponHits(this.chain.weapon, enemies, p1, p2, this.chain.isConnected);
         this.combat.resolveDeaths(room, this.gibs);
 
         // Corações de cura: atualiza, e qualquer player com vida < 3 que
@@ -505,7 +539,8 @@ export class Game {
         const enemies = rooms.current.enemies;
         enemies.forEach(e => renderer.drawRoundShadow(e.x, e.y, 13, 0));
 
-        this.currentWeapon.draw(ctx, this.p1, this.p2);
+        // Arma / corrente: só desenha quando conectada (a Chain cuida disso).
+        this.chain.draw(ctx, this.p1, this.p2);
 
         const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
         drawables.forEach(e => e.draw(ctx));
