@@ -22,6 +22,16 @@ export const CAM_MARGIN = 90;  // folga nas bordas (afasta a câmera do cenário
 
 export const TRANSITION_SPEED = 0.05; // ~10 frames por fase
 
+// Passo fixo da simulação (fixed timestep). A lógica de jogo roda sempre neste
+// ritmo (60Hz) independente da taxa de atualização do monitor, mantendo
+// velocidade/física/timers idênticos em 60Hz, 144Hz, 240Hz etc. O render
+// continua livre (requestAnimationFrame).
+export const SIM_HZ = 60;
+export const SIM_STEP = 1 / SIM_HZ; // segundos por passo lógico
+// Teto de passos por quadro: evita a "espiral da morte" se o quadro atrasar
+// muito (aba em segundo plano, stall). O tempo excedente é descartado.
+export const MAX_SIM_STEPS_PER_FRAME = 5;
+
 export const DOOR_STUB_TILES = 2;
 export const DOOR_ENTER_DEPTH = 70;
 

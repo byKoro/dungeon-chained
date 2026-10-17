@@ -24,7 +24,8 @@ import {
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
-    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS
+    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS,
+    SIM_STEP, MAX_SIM_STEPS_PER_FRAME
 } from './config/GameConfig.js';
 
 /**
@@ -113,6 +114,7 @@ export class Game {
         this.gibs = [];
         this.transition = null; // { phase: "out"|"in", t, door }
         this._lastFrameTimestamp = null;
+        this._simAccumulator = 0; // acumulador de tempo do fixed timestep (s)
 
         this._bindButtons();
     }
@@ -275,18 +277,44 @@ export class Game {
     }
 
     // ---- Loop ----
+    //
+    // Fixed timestep (acumulador): o render roda na taxa do monitor via
+    // requestAnimationFrame, mas a SIMULAÇÃO roda em passos fixos de SIM_STEP
+    // (1/60 s). Assim a velocidade de movimento, a física e os timers (contados
+    // em "frames" de 60fps no restante do código) ficam idênticos em qualquer
+    // taxa de atualização de tela (60Hz, 144Hz, 240Hz...).
     _loop(timestamp) {
-        const deltaSeconds = this._lastFrameTimestamp === null
+        const frameSeconds = this._lastFrameTimestamp === null
             ? 0
-            : Math.min(Math.max((timestamp - this._lastFrameTimestamp) / 1000, 0), 0.1);
+            : Math.min(Math.max((timestamp - this._lastFrameTimestamp) / 1000, 0), 0.25);
         this._lastFrameTimestamp = timestamp;
-        if (!this.gameOver && this.transition) {
-            this._updateTransition();
-        } else if (!this.gameOver) {
-            this._updateGameplay(deltaSeconds);
+
+        this._simAccumulator += frameSeconds;
+
+        // Teto de passos por quadro: se o quadro atrasou muito (aba em segundo
+        // plano, stall de GC), descarta o excesso para não travar numa "espiral
+        // da morte" tentando recuperar dezenas de passos de uma vez.
+        if (this._simAccumulator > SIM_STEP * MAX_SIM_STEPS_PER_FRAME) {
+            this._simAccumulator = SIM_STEP * MAX_SIM_STEPS_PER_FRAME;
         }
+
+        while (this._simAccumulator >= SIM_STEP) {
+            this._step(SIM_STEP);
+            this._simAccumulator -= SIM_STEP;
+        }
+
         this._render();
         requestAnimationFrame(this._loop);
+    }
+
+    // Um passo lógico de tamanho fixo (SIM_STEP segundos).
+    _step(deltaSeconds) {
+        if (this.gameOver) return;
+        if (this.transition) {
+            this._updateTransition();
+        } else {
+            this._updateGameplay(deltaSeconds);
+        }
     }
 
     _updateTransition() {
