@@ -392,6 +392,15 @@ export class Game {
         const liveEnemies = enemies.filter(e => e.state !== "dying");
         const allEntities = [p1, p2, ...liveEnemies];
         for (let it = 0; it < 3; it++) Physics.resolveEntityCollisions(allEntities);
+
+        // Colisão com paredes construídas no editor.
+        if (room.wallBoxes?.length) {
+            for (const entity of [p1, p2, ...room.enemies]) {
+                Physics.resolveBoxCollisions(entity, room.wallBoxes);
+            }
+        }
+
+
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
         // Confinamento: inimigos presos; players podem adentrar portas abertas

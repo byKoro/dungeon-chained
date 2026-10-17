@@ -73,6 +73,7 @@ export class RoomManager {
                         type: data.type || "start",
                         doors: data.doors || { N: false, S: false, E: false, W: false },
                         customFloor: data.floor,
+                        customWalls: data.walls || [],
                         customHazards: data.hazards,
                         customEnemies: data.enemies,
                         customTorches: data.torches,
@@ -161,6 +162,7 @@ export class RoomManager {
         if (!piece) return;
 
         if (Array.isArray(piece.floor)) cell.customFloor = piece.floor;
+        if (Array.isArray(piece.walls)) cell.customWalls = piece.walls;
         if (Array.isArray(piece.torches)) cell.customTorches = piece.torches;
         if (Array.isArray(piece.enemies) && piece.enemies.length) cell.customEnemies = piece.enemies;
         if (Array.isArray(piece.hazards) && piece.hazards.length) cell.customHazards = piece.hazards;

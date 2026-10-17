@@ -78,11 +78,12 @@ export class MeleeEnemy extends Entity {
 
         this.navigationFloor = null;
         this.navigationBounds = null;
+        this.navigationWalls = new Set();
         this.lastSafePosition = { x, y };
     }
 
 
-    setNavigationFloor(floor, bounds) {
+    setNavigationFloor(floor, bounds, walls = []) {
         this.navigationFloor = floor;
         this.navigationBounds = bounds;
         this.lastSafePosition = { x: this.x, y: this.y };
@@ -99,9 +100,21 @@ export class MeleeEnemy extends Entity {
         const { col, row } = this._tileAt(x, y);
         return row > 0 && row < this.navigationFloor.length - 1 &&
             col > 0 && col < (this.navigationFloor[row] || []).length - 1 &&
-            this.navigationFloor[row][col] !== -1;
+            this.navigationFloor[row][col] !== -1 &&
+            !this.navigationWalls.has(String(col) + "," + String(row));
     }
 
+
+    _hasClearWalkablePath(target) {
+        if (!this.navigationFloor || !this.navigationBounds) return true;
+        const dx = target.x - this.x, dy = target.y - this.y;
+        const steps = Math.ceil(Math.hypot(dx, dy) / (TILE / 4));
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            if (!this._isWalkable(this.x + dx * t, this.y + dy * t)) return false;
+        }
+        return true;
+    }
     _chaseWaypoint(target) {
         if (!this.navigationFloor || !this.navigationBounds) return target;
         const start = this._tileAt(this.x, this.y);
@@ -118,7 +131,7 @@ export class MeleeEnemy extends Entity {
             for (const [dc, dr] of directions) {
                 const col = cell.col + dc, row = cell.row + dr;
                 if (row <= 0 || row >= this.navigationFloor.length - 1 || col <= 0 || col >= this.navigationFloor[row].length - 1) continue;
-                if (this.navigationFloor[row][col] === -1) continue;
+                if (this.navigationFloor[row][col] === -1 || this.navigationWalls.has(String(col) + "," + String(row))) continue;
                 const nextKey = key(col, row);
                 if (previous.has(nextKey)) continue;
                 previous.set(nextKey, key(cell.col, cell.row));
@@ -293,7 +306,7 @@ export class MeleeEnemy extends Entity {
                     this.vy *= 0.5;
                 }
 
-                if (distToTarget <= this.attackRange) {
+                if (distToTarget <= this.attackRange && this._hasClearWalkablePath(this.target)) {
                     // Chegou perto: para e inicia o windup (telegrafo do golpe)
                     this.state = "windup";
                     this.stateTimer = this.windupFrames;
@@ -333,7 +346,7 @@ export class MeleeEnemy extends Entity {
                 const hitAt = (atk.hitFrame ?? Math.floor(atk.frames / 2)) * atk.fps;
                 if (!this.dealtHit && this.animTime >= hitAt) {
                     this.dealtHit = true;
-                    if (distToTarget <= this.hitRange) {
+                    if (distToTarget <= this.hitRange && this._hasClearWalkablePath(this.target)) {
                         if (this.target.takeDamage(this.x, this.y)) {
                             onPlayerHit(this.target);
                         }

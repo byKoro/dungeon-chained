@@ -213,6 +213,11 @@ export class Renderer {
             }
         }
 
+        // Paredes autorais (tile visual + colisão definida pela Room).
+        for (const wall of (tiles.walls || [])) {
+            this.tileset.draw(c, wall.tile, rect.x + wall.col * tile, rect.y + wall.row * tile, tile, tile);
+        }
+
         // Props decorativos (encostados nas paredes)
         for (const p of tiles.props) {
             const dx = rect.x + p.col * tile;

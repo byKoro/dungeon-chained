@@ -1,5 +1,5 @@
 import { RoomTiles } from '../core/RoomTiles.js';
-import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
+import { ROOM_COLS, ROOM_ROWS, TILE } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
 import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
 import { HeartPickup } from '../entities/HeartPickup.js';
@@ -45,6 +45,9 @@ export class Room {
                 this.tiles.floor = authorialFloor;
             }
         }
+
+        this.tiles.walls = Array.isArray(cell.customWalls) ? cell.customWalls : [];
+        this.wallBoxes = this.tiles.walls.map(wall => ({ x: bounds.minX - TILE + wall.col * TILE, y: bounds.minY - TILE + wall.row * TILE, w: TILE, h: TILE }));
 
         // Tochas (luz) e props (decoração) autorais: substituem o que o
         // RoomTiles traria (hoje vazio, já que não há mais geração procedural).
@@ -125,7 +128,7 @@ export class Room {
                     const ex = this.bounds.minX + foe.col * 64;
                     const ey = this.bounds.minY + foe.row * 64;
                     const enemy = spawnSystem.createEnemy(ex, ey, floor, foe.type);
-                    enemy.setNavigationFloor(floorGrid, this.bounds);
+                    enemy.setNavigationFloor(floorGrid, this.bounds, this.tiles.walls);
                     return enemy;
                 });
         }
