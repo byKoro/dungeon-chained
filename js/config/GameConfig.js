@@ -1,6 +1,8 @@
 export const TILE = 64;        // tamanho do tile no mundo (px)
 export const ROOM_COLS = 14;   // par: porta N/S de 2 tiles fica centralizada
 export const ROOM_ROWS = 9;
+export const EMPTY_FLOOR_TILE = -2;
+export const EMPTY_FLOOR_COLOR = "#25131a";
 export const GRID_COLS = 9;    // nº de células (salas) na grade do mundo
 export const GRID_ROWS = 7;
 export const WORLD_W = GRID_COLS * ROOM_COLS * TILE;

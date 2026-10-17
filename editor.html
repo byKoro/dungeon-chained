@@ -64,6 +64,55 @@
                     </div>
                 </section>
 
+                <!-- GRUPO: TILE DE PISO PERSONALIZADO -->
+                <section class="tool-group collapsed" data-group="tab-floor-tiles">
+                    <h2 class="group-title">Tiles de piso</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-floor-tiles">
+                            <div class="panel-section">
+                                <div class="panel-title">Pintar piso</div>
+                                <p style="font-size:11px; color:var(--text-muted); line-height:1.4;">Clique ou arraste para pintar. O tile Vazio é caminhável.</p>
+                                <div style="padding:8px; background:#25131a; color:#fff; border:1px solid #664653; text-align:center;">Vazio <span style="float:right;">#25131a</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <!-- GRUPO: PAREDES COM COLISÃO -->
+                <section class="tool-group collapsed" data-group="tab-walls">
+                    <h2 class="group-title">Paredes</h2>
+                    <div class="group-body">
+                        <div class="tab-panel" id="tab-walls">
+                            <div class="panel-section">
+                                <div class="panel-title">Construir paredes físicas</div>
+                                <p style="font-size:11px; color:var(--text-muted); line-height:1.4;">Escolha um bloco do tileset e clique num tile interno. As paredes bloqueiam jogadores e inimigos.</p>
+                                <label for="wall-tile" style="font-size:12px;">Bloco da parede</label>
+                                <select id="wall-tile" style="width:100%; margin-top:6px;">
+                                    <optgroup label="Lateral direita (0, 10, 20, 30, 40)">
+                                        <option value="0">0</option><option value="10">10</option><option value="20">20</option><option value="30">30</option><option value="40">40</option>
+                                    </optgroup>
+                                    <optgroup label="Topo (1–4)">
+                                        <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+                                    </optgroup>
+                                    <optgroup label="Lateral esquerda (5, 15, 25, 35, 45)">
+                                        <option value="5">5</option><option value="15">15</option><option value="25">25</option><option value="35">35</option><option value="45">45</option>
+                                    </optgroup>
+                                    <optgroup label="Parte baixa (41–44)">
+                                        <option value="41">41</option><option value="42">42</option><option value="43">43</option><option value="44">44</option>
+                                    </optgroup>
+                                    <optgroup label="Quinas superiores (50–55)">
+                                        <option value="50">50</option><option value="51">51</option><option value="52">52</option><option value="53">53</option><option value="54">54</option><option value="55">55</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="panel-section">
+                                <div class="control-row"><span style="font-size:12px;">Paredes colocadas</span><span id="wall-count" class="val-badge">0</span></div>
+                                <div id="walls-list" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto;"></div>
+                                <button class="btn btn-sm btn-danger" id="btn-clear-walls">Limpar Paredes</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- GRUPO: TOCHAS (PONTOS DE LUZ) -->
                 <section class="tool-group collapsed" data-group="tab-torches">
                     <h2 class="group-title">Tochas</h2>

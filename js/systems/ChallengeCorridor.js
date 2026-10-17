@@ -160,7 +160,13 @@ export class ChallengeCorridor {
                         : el.row === ROOM_ROWS - 1 ? "bottom"
                             : el.col === 0 ? "left"
                                 : el.col === ROOM_COLS - 1 ? "right" : null);
+                    // Flechas em paredes editáveis internas usam a face oposta
+                    // à convenção histórica das bordas para os lados E/W.
+                    const isCustomLateralWall = byTile && el.col > 0 && el.col < ROOM_COLS - 1 &&
+                        el.row > 0 && el.row < ROOM_ROWS - 1 &&
+                        (inferredSide === "left" || inferredSide === "right");
                     const dir = this._fireDirFromWall(inferredSide) || this._fireDir(el.dir || "across+");
+                    if (isCustomLateralWall) dir.x *= -1;
                     this.arrowTraps.push(new ArrowTrap(p.x, p.y, dir, { phaseOffset: el.phase || 0, sprites: arrowTrapSprites, arrowSprite }));
                     break;
                 }

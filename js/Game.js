@@ -527,8 +527,16 @@ export class Game {
                 }
             }
         }
+
+        // Colisão com paredes construídas no editor (vindo da branch paredes).
+        if (room.wallBoxes?.length) {
+            for (const entity of [p1, p2, ...room.enemies]) {
+                Physics.resolveBoxCollisions(entity, room.wallBoxes);
+            }
+        }
+
         // Após resolver as colisões, garante que nenhum inimigo tenha sido
-        // empurrado para um tile não-caminhável (vindo da main).
+        // empurrado para um tile não-caminhável.
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
         // Confinamento: inimigos presos; players podem adentrar portas abertas
