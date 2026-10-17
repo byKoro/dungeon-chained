@@ -125,7 +125,13 @@ export class Chain {
         }
     }
 
-    // Desenha a arma/corrente apenas quando conectada.
+    // Camada ao FUNDO da arma (corrente), sempre atrás das entidades. Só
+    // quando conectada.
+    drawChain(ctx, p1, p2) {
+        if (this.connected) this.weapon.drawChain(ctx, p1, p2);
+    }
+
+    // Desenha a arma (disco) apenas quando conectada.
     draw(ctx, p1, p2) {
         if (this.connected) this.weapon.draw(ctx, p1, p2);
     }

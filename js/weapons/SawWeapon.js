@@ -29,9 +29,9 @@ const ROW_SPIN_CLEAN = 2;
 const ROW_SPIN_BLOODY = 3;
 
 // Fatores de ampliação do sprite (diâmetro em px de mundo).
-//   serra grande = 3.5x (56px), pequena = 2x (32px).
-const SAW_DRAW_LARGE = SAW_FRAME.size * 3.5; // 56
-const SAW_DRAW_SMALL = SAW_FRAME.size * 2;   // 32
+//   serra grande = 4.025x (~64px, +15% sobre os 3.5x), pequena = 2x (32px).
+const SAW_DRAW_LARGE = SAW_FRAME.size * 4.025; // ~64
+const SAW_DRAW_SMALL = SAW_FRAME.size * 2;     // 32
 
 // Quantos passos de simulação a serra fica ensanguentada após um acerto.
 const BLOOD_DURATION = 90;
@@ -57,13 +57,14 @@ const INERTIA_FRAME = SAW_FRAME.cols - 1; // 3
 //  - SHAKE_SPIN: vibração constante enquanto gira (não some no giro alto).
 //  - SHAKE_TRANSITION: pico EXTRA e brusco durante a transição inércia<->giro.
 const SHAKE_SPIN = 4;
-const SHAKE_TRANSITION = 7;
+const SHAKE_TRANSITION = 3;
 
 export class SawWeapon extends Weapon {
     constructor(sprite = null) {
         super("SERRAS", 14);
         this.sprite = sprite;
         this.bloodTimer = 0;
+        this.onBlood = false;  // true enquanto o disco está sobre sangue no chão
         this.spin = 0;         // 0 = parada, 1 = girando a toda
         this.rotation = 0;     // ângulo acumulado da rotação real (giro)
         this.wasSpinning = false; // para detectar o instante do arranque
@@ -71,7 +72,10 @@ export class SawWeapon extends Weapon {
     }
 
     update(p1 = null, p2 = null) {
-        if (this.bloodTimer > 0) this.bloodTimer--;
+        // Enquanto está SOBRE sangue, mantém o estado ensanguentado (não deixa
+        // o timer expirar). O Game ajusta `onBlood` a cada frame.
+        if (this.onBlood) this.bloodTimer = BLOOD_DURATION;
+        else if (this.bloodTimer > 0) this.bloodTimer--;
 
         // Alvo de giro: a serra só gira quando OS DOIS jogadores andam. Usamos
         // o MENOR dos dois speedMag — se um está parado, o alvo cai para ~0.
@@ -106,6 +110,12 @@ export class SawWeapon extends Weapon {
         this.bloodTimer = BLOOD_DURATION;
     }
 
+    // O Game informa, a cada frame, se o disco está sobre sangue no chão.
+    // Enquanto estiver, o sprite ensanguentado é MANTIDO (independe do giro).
+    setOnBlood(flag) {
+        this.onBlood = !!flag;
+    }
+
     // Velocidade de giro atual (0..1), para o Game modular a tremida de câmera.
     get spinSpeed() {
         return this.spin;
@@ -114,6 +124,22 @@ export class SawWeapon extends Weapon {
     // true quando a serra está em velocidade ALTA (giro "a toda").
     get isHighSpeed() {
         return this.spin > BLEND_HI;
+    }
+
+    // Raio do disco em px de mundo (metade do diâmetro desenhado). Para emitir
+    // faíscas na borda.
+    get discRadius() {
+        return SAW_DRAW_LARGE / 2;
+    }
+
+    // true enquanto a serra está suja de sangue (após um acerto recente).
+    get isBloody() {
+        return this.bloodTimer > 0;
+    }
+
+    // Sentido do giro (+1 / -1). A serra única usa dir = -1 (index 0).
+    get spinDir() {
+        return -1;
     }
 
     getSawPositions(p1, p2) {
@@ -131,16 +157,22 @@ export class SawWeapon extends Weapon {
         );
     }
 
-    draw(ctx, p1, p2) {
+    // Corrente ligando os jogadores. Desenhada numa camada ao FUNDO (sempre
+    // atrás das entidades) — separada do disco, que entra na ordenação por
+    // profundidade.
+    drawChain(ctx, p1, p2) {
         ctx.save();
-
-        // Corrente ligando os jogadores.
         ctx.strokeStyle = "#8d99ae";
         ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    draw(ctx, p1, p2) {
+        ctx.save();
 
         const sprite = this.sprite;
         const spriteReady = sprite && sprite.complete && sprite.naturalWidth > 0;

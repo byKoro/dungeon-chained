@@ -251,6 +251,36 @@ export const TORCHES = {
 };
 
 /**
+ * DOOR_LIGHT — luz direcional registrada em cada vão de porta quando a sala
+ * está ABERTA (destravada). Serve de indicador visual: "esta porta está aberta,
+ * dá para passar". Enquanto a sala estiver TRANCADA (combate), as portas não
+ * emitem luz. A luz é alongada no eixo da passagem (N/S = horizontal larga,
+ * E/W = vertical larga) para "apontar" o caminho, e empurrada para DENTRO da
+ * sala pelo offset, de forma que o brilho nasça no vão.
+ */
+export const DOOR_LIGHT = {
+    enabled: true,
+    // ---- Formato: SPOT/CONE saindo da porta para dentro da sala ----
+    length: 180,            // alcance do feixe DENTRO da sala (px de MUNDO) no auge do flash
+    spread: 0.5,            // meia-abertura do cone (radianos). Maior = cone mais aberto.
+                            // O recuo do apex atrás da porta é DERIVADO desta abertura
+                            // + a largura do vão, p/ a boca do cone cobrir a porta inteira.
+    startFade: 0.22,        // fração do feixe (a partir da porta) em que o brilho SOBE
+                            // de 0 ao pico, suavizando o corte na soleira (luz "vindo do
+                            // outro lado"). 0 = corte seco; maior = entrada mais gradual.
+    pixelScale: 1.3,        // blocos pixelados da luz da porta
+    color: "255, 225, 90",  // AMARELO = porta aberta.
+
+    // ---- Flash temporário (NÃO é constante) ----
+    // Quando a porta abre, o efeito dispara uma vez: pulsa suavemente por um
+    // instante e depois enfraquece até sumir. Controlado por um timer no Game.
+    flashDuration: 1.6,     // duração total do efeito (segundos) até sumir
+    pulseSpeed: 10,         // velocidade do pulso suave (rad/s)
+    pulseDepth: 0.18,       // profundidade do pulso (0..1): quanto o brilho sobe/desce
+    fadeExponent: 1.6       // curva do enfraquecimento (>1 = segura o brilho e cai no fim)
+};
+
+/**
  * WIND — poeira/vento ambiente que atravessa a cena, dando um aspecto vivo de
  * ventania. Partículas finas (script) que cruzam a viewport na direção do
  * vento, com rajadas que variam a intensidade e a direção devagar.

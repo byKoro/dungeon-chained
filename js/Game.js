@@ -23,8 +23,8 @@ import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
-    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, WIND,
-    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS,
+    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, DOOR_LIGHT, WIND,
+    getPlayerSpawnPositions, HOLE_TILE, HOLE_TILES, holeTileFor, AUDIO_CONFIG, AUDIO_CLIPS,
     SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE
 } from './config/GameConfig.js';
 
@@ -125,6 +125,7 @@ export class Game {
         this.arenaBounds = null;
         this.gibs = [];
         this.transition = null; // { phase: "out"|"in", t, door }
+        this._doorFlashT = 0;    // segundos restantes do flash de "porta aberta"
         this._lastFrameTimestamp = null;
         this._simAccumulator = 0; // acumulador de tempo do fixed timestep (s)
 
@@ -252,7 +253,17 @@ export class Game {
 
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
+
+        // Entrou numa sala já ABERTA (sem combate / já limpa): dispara o flash
+        // amarelo das portas indicando que estão abertas.
+        if (!this.rooms.isLocked()) this._triggerDoorFlash();
+
         this.updateHud();
+    }
+
+    // Dispara o flash temporário de "porta aberta" (pulsa e enfraquece).
+    _triggerDoorFlash() {
+        this._doorFlashT = DOOR_LIGHT.flashDuration;
     }
 
     updateHud() {
@@ -378,6 +389,58 @@ export class Game {
         if (this.chain.isConnected && weapon?.isHighSpeed) {
             this.renderer.triggerShake(1.6);
         }
+
+        // Faíscas de "raspar o chão": o disco cospe centelhas pelas BORDAS,
+        // arremessadas no sentido do giro. A TAXA de emissão é contínua e
+        // proporcional a (giro × movimento), então as faíscas vão RAREANDO
+        // suavemente conforme a serra ou os jogadores desaceleram — sem corte
+        // seco. Um acumulador fracionário permite emitir menos de 1 por frame.
+        // Corrente desarmada: a serra não está em jogo — garante que não fique
+        // "presa" sobre sangue.
+        if (!this.chain.isConnected) weapon?.setOnBlood?.(false);
+
+        if (this.chain.isConnected && weapon) {
+            const spin = weapon.spinSpeed ?? 0;
+            const vx = (p1.vx + p2.vx) / 2;
+            const vy = (p1.vy + p2.vy) / 2;
+            const speed = Math.min(1, Math.hypot(vx, vy) / (p1.speed || 4.2));
+            // Intensidade 0..1 combinando giro e movimento (ambos precisam
+            // existir para raspar). Elevada ao quadrado para cair suave no fim.
+            const intensity = spin * speed;
+            // Pico de ~5 faíscas por frame no raspar máximo.
+            this._sparkAccum = (this._sparkAccum ?? 0) + intensity * 5;
+            const emit = Math.floor(this._sparkAccum);
+            const sawX = (p1.x + p2.x) / 2;
+            const sawY = (p1.y + p2.y) / 2;
+            if (emit > 0) {
+                this._sparkAccum -= emit;
+                this.particleSystem.triggerSparks(
+                    sawX, sawY, weapon.discRadius ?? 24, weapon.spinDir ?? 1, emit
+                );
+            }
+
+            // Serra SOBRE SANGUE: enquanto o disco está sobre uma poça/zona
+            // molhada do chão, mantém o sprite ensanguentado (mesmo parado) e,
+            // se estiver GIRANDO, chapinha lançando gotas EFÊMERAS pelas bordas
+            // — só visual, sem carimbar/criar sangue novo no chão.
+            const bc = this.particleSystem.bloodCanvas;
+            const overBlood = !!bc && bc.isBloodZone(sawX, sawY);
+            weapon.setOnBlood?.(overBlood);
+            if (overBlood && intensity > 0.05) {
+                const radius = weapon.discRadius ?? 24;
+                this._gorePickupAccum = (this._gorePickupAccum ?? 0) + intensity * 3;
+                let splats = Math.floor(this._gorePickupAccum);
+                if (splats > 0) {
+                    this._gorePickupAccum -= splats;
+                    while (splats-- > 0) {
+                        const a = Math.random() * Math.PI * 2;
+                        const bx = sawX + Math.cos(a) * radius;
+                        const by = sawY + Math.sin(a) * radius;
+                        this.particleSystem.triggerBloodDroplets(bx, by, 2, 0.6);
+                    }
+                }
+            }
+        }
         this.enforceSeparationLimit();
 
         // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
@@ -421,8 +484,16 @@ export class Game {
         // Pegadas / poeira
         this.effects.update();
 
-        // Sala limpa quando sem inimigos
-        rooms.tryClearCurrent();
+        // Flash de "porta aberta": decai ao longo do tempo até sumir.
+        if (this._doorFlashT > 0) {
+            this._doorFlashT = Math.max(0, this._doorFlashT - deltaSeconds);
+        }
+
+        // Sala limpa quando sem inimigos. No instante em que destrava, dispara
+        // o flash amarelo nas portas (pulsa um momento e enfraquece).
+        if (rooms.tryClearCurrent()) {
+            this._triggerDoorFlash();
+        }
 
         this.particleSystem.update([p1, p2], this.arenaBounds);
         this.wind.update(this.arenaBounds);
@@ -454,6 +525,26 @@ export class Game {
                 p.startFalling(cx, cy);
             }
         }
+    }
+
+    // Retângulos (mundo) dos tiles de MIOLO ESCURO de buraco na sala atual.
+    // Usados para FURAR o clip do sangue, garantindo que nenhuma mancha (gotas,
+    // poças, serra) apareça sobre a parte escura dos buracos. Bordas de buraco
+    // e piso (incl. espinhos) ficam de fora da exclusão, então recebem sangue.
+    _darkHoleRects() {
+        const tiles = this.rooms.currentTiles;
+        if (!tiles || !tiles.floor) return null;
+        const rect = this.rooms.cellRect();
+        const rects = [];
+        for (let r = 0; r < tiles.floor.length; r++) {
+            const line = tiles.floor[r];
+            for (let c = 0; c < line.length; c++) {
+                if (line[c] !== HOLE_TILE) continue;
+                if (holeTileFor(tiles.floor, c, r) !== HOLE_TILES[0]) continue; // só o miolo
+                rects.push({ x: rect.x + c * TILE, y: rect.y + r * TILE, w: TILE, h: TILE });
+            }
+        }
+        return rects.length ? rects : null;
     }
 
     // Atualiza os corações da sala e resolve a coleta pelos jogadores.
@@ -520,7 +611,7 @@ export class Game {
             renderer.drawDoorGradients(doors, doorHalf, TILE, DOOR_STUB_TILES);
         }
 
-        this.particleSystem.drawFloor(ctx, this.arenaBounds);
+        this.particleSystem.drawFloor(ctx, this.arenaBounds, this._darkHoleRects());
         this.effects.draw(ctx);
         this.particleSystem.drawSmoke(ctx);
 
@@ -538,17 +629,24 @@ export class Game {
         const enemies = rooms.current.enemies;
         enemies.forEach(e => renderer.drawRoundShadow(e.x, e.y, 13, 0));
 
-        // Profundidade pela SERRA: ela fica no meio da corrente (sawY). Quem
-        // está mais ACIMA (y <= sawY, "ao fundo") é desenhado ANTES e fica
-        // atrás da serra; quem está mais ABAIXO (y > sawY, "à frente") é
-        // desenhado DEPOIS e fica na frente dela. Tudo ordenado por Y.
+        // Corrente (linha) da arma: SEMPRE ao fundo, atrás de todas as
+        // entidades. Só o disco entra na ordenação por profundidade.
+        this.chain.drawChain(ctx, this.p1, this.p2);
+
+        // Profundidade pelo DISCO da serra: ele fica no meio da corrente
+        // (sawY). Quem está mais ACIMA (y <= sawY, "ao fundo") é desenhado
+        // ANTES e fica atrás do disco; quem está mais ABAIXO (y > sawY, "à
+        // frente") é desenhado DEPOIS e fica na frente dele. Ordenado por Y.
         const sawY = (this.p1.y + this.p2.y) / 2;
         const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
 
         drawables.filter(e => e.y <= sawY).forEach(e => e.draw(ctx));
 
-        // Arma / corrente: só aparece quando conectada (a Chain cuida disso).
+        // Disco da serra: só aparece quando conectada (a Chain cuida disso).
         this.chain.draw(ctx, this.p1, this.p2);
+
+        // Faíscas da serra: por cima do disco (centelhas saltando).
+        this.particleSystem.drawSparks(ctx);
 
         drawables.filter(e => e.y > sawY).forEach(e => e.draw(ctx));
 
@@ -604,6 +702,83 @@ export class Game {
                 const s = renderer.worldToScreen(wx, wy);
                 const px = Math.max(2, Math.round((TILE / 16) * s.zoom * tl.pixelScale));
                 this.postProcessor.addLight(s.x, s.y, tl.radius * s.zoom, px, tl.flatten, tl);
+            }
+        }
+
+        // Luz amarela TEMPORÁRIA das PORTAS: dispara quando a porta abre
+        // (sala destravada ou entrada numa sala já aberta), pulsa suavemente por
+        // um instante e enfraquece até sumir. Controlada pelo timer
+        // _doorFlashT (segundos restantes). O foco é empurrado para DENTRO da
+        // sala e o halo é alongado no eixo de projeção, de modo que a luz pareça
+        // SAIR do vão e se espalhar na direção contrária à parede.
+        if (DOOR_LIGHT.enabled && this._doorFlashT > 0 && open && doors && doors.length) {
+            const dl = DOOR_LIGHT;
+            // Progresso 0..1 do início ao fim do flash.
+            const prog = 1 - this._doorFlashT / dl.flashDuration;
+            // Envelope de enfraquecimento: começa cheio e cai até 0 no fim.
+            const fade = Math.pow(1 - prog, dl.fadeExponent);
+            // Pulso suave sobreposto ao fade (respira sem piscar bruscamente).
+            const pulse = 1 + Math.sin(prog * dl.flashDuration * dl.pulseSpeed) * dl.pulseDepth;
+            // O desvanecimento é por OPACIDADE (alpha), NÃO por tamanho: a
+            // GEOMETRIA do feixe (comprimento, boca, início) fica FIXA o flash
+            // todo, então ele não encolhe nem "anda para trás" — só perde brilho.
+            const alphaScale = Math.max(0, fade * pulse);
+            // Perfil neutro: cor amarela + falloff próprio, SEM flicker do
+            // PostProcessor (o pulso/fade já vêm do alphaScale).
+            const profile = {
+                color: dl.color,
+                flickerBase: 1, flickerSine: 0, flickerNoise: 0,
+                falloff: [
+                    { offset: 0.0, alpha: 0.9 },
+                    { offset: 0.4, alpha: 0.5 },
+                    { offset: 0.7, alpha: 0.2 },
+                    { offset: 0.9, alpha: 0.06 },
+                    { offset: 1.0, alpha: 0.0 }
+                ]
+            };
+            for (const door of doors) {
+                // Direção do feixe: para DENTRO da sala (contrária à parede).
+                //   N (topo)    -> aponta para baixo
+                //   S (base)    -> aponta para cima
+                //   W (esquerda)-> aponta para a direita
+                //   E (direita) -> aponta para a esquerda
+                let dx = 0, dy = 0;
+                if (door.dir === "N") dy = 1;
+                else if (door.dir === "S") dy = -1;
+                else if (door.dir === "W") dx = 1;
+                else if (door.dir === "E") dx = -1;
+
+                // Recuo do apex ATRÁS da porta derivado da LARGURA do vão: para
+                // a boca do cone cobrir a porta de ponta a ponta, a meia-largura
+                // do feixe no plano da porta deve ser = doorHalf. Como essa
+                // meia-largura ~= apexBehind * tan(spread), isolamos apexBehind.
+                const apexBehind = doorHalf / Math.tan(dl.spread);
+
+                // Apex ATRÁS da porta (lado de fora da sala): recua na direção
+                // OPOSTA ao feixe, de modo que o cone nasça atrás do vão, já
+                // tenha a largura da porta ao cruzar a soleira e se projete para
+                // dentro da sala.
+                const wx = door.x - dx * apexBehind;
+                const wy = door.y - dy * apexBehind;
+
+                const s = renderer.worldToScreen(wx, wy);
+                const px = Math.max(2, Math.round((TILE / 16) * s.zoom * dl.pixelScale));
+                // Comprimento = recuo atrás da porta + alcance dentro da sala,
+                // para render o mesmo alcance interno mesmo nascendo atrás do
+                // vão. intensity (pulso×fade) escala o comprimento: encolhe e
+                // some ao final do flash.
+                // Geometria FIXA (não escala com o fade): comprimento = recuo
+                // atrás da porta + alcance dentro da sala.
+                const beamLen = (dl.length + apexBehind) * s.zoom;
+                // O feixe só aparece A PARTIR do plano da porta (startDist =
+                // apexBehind): recorta a ponta atrás do vão. Como a boca fica no
+                // plano da porta, nasce já com a largura do vão.
+                const startDist = apexBehind * s.zoom;
+                // O desvanecer vai no alphaScale (opacidade), mantendo o tamanho.
+                // startFade suaviza o início do feixe na soleira da porta.
+                this.postProcessor.addSpotLight(
+                    s.x, s.y, dx, dy, beamLen, dl.spread, px, profile, startDist, alphaScale, dl.startFade
+                );
             }
         }
 

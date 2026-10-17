@@ -69,7 +69,31 @@ export class PostProcessor {
      *                   flickerNoise }. Útil p/ tochas terem cor/flicker próprios.
      */
     addLight(x, y, radius, pixel = 6, flatten = this.lighting.flatten, profile = null) {
-        this._lights.push({ x, y, radius, pixel, flatten, profile });
+        this._lights.push({ kind: "ellipse", x, y, radius, pixel, flatten, profile });
+    }
+
+    /**
+     * Registra um SPOT/CONE de luz para ESTE frame (coordenadas de tela). O
+     * feixe nasce ESTREITO no apex (x,y) e se abre na direção (dirX,dirY),
+     * clareando mais perto do apex e esmaecendo ao longo do comprimento e nas
+     * bordas laterais — como a luz saindo de uma porta para dentro da sala.
+     * @param {number} x,y        apex do cone (origem do feixe) na tela
+     * @param {number} dirX,dirY  direção para onde o feixe aponta (será normalizada)
+     * @param {number} length     comprimento do feixe (px de tela)
+     * @param {number} spread     meia-abertura do cone em radianos (0..~1.2)
+     * @param {number} [pixel=6]  tamanho do "pixel" de arte (serrilhado chunky)
+     * @param {object} [profile]  { color, falloff, flicker* } próprio do feixe
+     */
+    addSpotLight(x, y, dirX, dirY, length, spread, pixel = 6, profile = null, startDist = 0, alphaScale = 1, startFade = 0) {
+        const len = Math.hypot(dirX, dirY) || 1;
+        this._lights.push({
+            kind: "spot", x, y,
+            dx: dirX / len, dy: dirY / len,
+            length, spread, pixel, profile,
+            startDist, // distância do apex onde o feixe começa (recorta a ponta)
+            alphaScale, // multiplicador de OPACIDADE (p/ desvanecer sem encolher)
+            startFade  // fração do comprimento usada p/ a subida suave na boca
+        });
     }
 
     _ensureSize() {
@@ -108,7 +132,11 @@ export class PostProcessor {
                 + Math.sin(phase) * (p.flickerSine ?? this.lighting.flickerSine)
                 + (Math.random() - 0.5) * (p.flickerNoise ?? this.lighting.flickerNoise);
             const color = p.color ?? this.lighting.lightColor;
-            this._drawPixelEllipseLight(light, flick, color);
+            if (light.kind === "spot") {
+                this._drawPixelSpotLight(light, flick, color);
+            } else {
+                this._drawPixelEllipseLight(light, flick, color);
+            }
         }
 
         // Compõe o mapa de luz sobre a cena: multiply escurece onde o mapa é
@@ -172,6 +200,119 @@ export class PostProcessor {
         const dx = Math.round((light.x - dw / 2) / px) * px;
         const dy = Math.round((light.y - dh / 2) / px) * px;
         lctx.drawImage(this._loCanvas, 0, 0, loW, loH, dx, dy, dw, dh);
+    }
+
+    /**
+     * Desenha UMA luz como FEIXE PIXELADO no mapa de luz (lctx), de forma
+     * aditiva. A geometria é um cone a partir de um apex, mas a parte ANTES de
+     * 'startDist' é recortada: o feixe nasce com uma BOCA RETA larga nesse plano
+     * (não um bico pontudo) e se projeta até o fim. O decaimento vai da boca
+     * (forte) ao fim (transparente); a abertura é um setor (arc) e as bordas
+     * laterais são suavizadas por um leve blur no buffer lo-res (que o upscale
+     * nearest-neighbor converte em degraus chunky).
+     */
+    _drawPixelSpotLight(light, flick, lc) {
+        const px = Math.max(2, light.pixel | 0);
+        const len = Math.max(1, light.length * flick);       // comprimento total (apex->fim)
+        const spread = Math.max(0.05, light.spread);         // meia-abertura (rad)
+        // Distância do apex onde o feixe COMEÇA a aparecer (recorta a ponta).
+        // Clampada para não passar do fim.
+        const start = Math.max(0, Math.min(light.startDist || 0, len - 1));
+
+        // O buffer lo-res cobre só a parte VISÍVEL do feixe: de X=start até
+        // X=len (a ponta atrás de 'start' é descartada). A abertura total no
+        // fim é ±len*sin(spread); usamos isso como meia-altura do buffer.
+        const halfH = len * Math.sin(spread);
+        const pad = px * 2;
+        const visLen = len - start;                          // extensão visível em X
+        const loW = Math.max(1, Math.ceil((visLen + pad * 2) / px));
+        const loH = Math.max(1, Math.ceil((halfH * 2 + pad * 2) / px));
+
+        if (this._loCanvas.width < loW || this._loCanvas.height < loH) {
+            this._loCanvas.width = Math.max(this._loCanvas.width, loW);
+            this._loCanvas.height = Math.max(this._loCanvas.height, loH);
+        }
+        const loCtx = this._loCtx;
+        loCtx.imageSmoothingEnabled = false;
+        loCtx.clearRect(0, 0, loW, loH);
+
+        // Escala tela->lo-res.
+        const sc = 1 / px;
+        const lenLo = len * sc;
+        const startLo = start * sc;
+        // O apex (X=0 do cone) fica à ESQUERDA do buffer: o buffer começa em
+        // X=start, então o apex está em -start a partir da borda (+pad de folga).
+        const originXLo = pad * sc;           // X lo-res da borda do buffer == X=start do cone
+        const apexYLo = loH / 2;              // eixo central do feixe
+
+        loCtx.save();
+        loCtx.filter = "blur(0.8px)";         // suaviza as bordas laterais
+        // Leva a origem para o APEX do cone (X=0): recua 'start' a partir da borda.
+        loCtx.translate(originXLo - startLo, apexYLo);
+
+        // Recorta tudo que está ANTES do plano de início (X < start): some a
+        // ponta e o feixe passa a nascer com uma BOCA RETA larga em X=start.
+        loCtx.beginPath();
+        loCtx.rect(startLo, -halfH * sc, lenLo - startLo, halfH * 2 * sc);
+        loCtx.clip();
+
+        // Decaimento ao longo do feixe. createRadialGradient de start..len
+        // mapeia o perfil a esse trecho (offset 0 = boca; offset 1 = fim).
+        const g = loCtx.createRadialGradient(0, 0, startLo, 0, 0, lenLo);
+        const falloff = (light.profile && light.profile.falloff) || this.lighting.falloff;
+        const aScale = light.alphaScale ?? 1;   // opacidade global (desvanecer)
+
+        // RAMP DE ENTRADA: em vez de a boca já começar no pico (o que cria uma
+        // borda dura no plano da porta), a intensidade SOBE de 0 até o pico ao
+        // longo da fração 'startFade' logo após a porta. Isso disfarça o corte e
+        // dá a impressão de que a luz vem do outro lado, atravessando o vão.
+        const fadeFrac = Math.min(0.9, Math.max(0, light.startFade ?? 0));
+        const peak = falloff.length ? falloff[0].alpha : 0.9;
+        if (fadeFrac > 0.001) {
+            // Subida suave (ease-in) de 0 ao pico dentro de [0, fadeFrac].
+            const RAMP_STEPS = 4;
+            for (let i = 0; i <= RAMP_STEPS; i++) {
+                const u = i / RAMP_STEPS;                 // 0..1 ao longo do ramp
+                const off = u * fadeFrac;                 // offset no gradiente
+                const a = peak * (u * u) * aScale;        // ease-in quadrático
+                g.addColorStop(off, `rgba(${lc}, ${a})`);
+            }
+            // Restante do perfil comprimido em [fadeFrac, 1].
+            for (const stop of falloff) {
+                const off = fadeFrac + stop.offset * (1 - fadeFrac);
+                g.addColorStop(off, `rgba(${lc}, ${stop.alpha * aScale})`);
+            }
+        } else {
+            for (const stop of falloff) {
+                g.addColorStop(stop.offset, `rgba(${lc}, ${stop.alpha * aScale})`);
+            }
+        }
+        loCtx.fillStyle = g;
+        loCtx.beginPath();
+        loCtx.moveTo(0, 0);
+        loCtx.arc(0, 0, lenLo, -spread, spread);
+        loCtx.closePath();
+        loCtx.fill();
+        loCtx.restore();
+
+        // Compõe no mapa de luz, rotacionando o buffer para a direção real. O
+        // ponto do buffer que corresponde ao plano de início (X=start, no eixo)
+        // deve cair exatamente no ponto real 'start' à frente do apex.
+        const lctx = this._lightCtx;
+        lctx.imageSmoothingEnabled = false;
+        const ang = Math.atan2(light.dy, light.dx);
+        lctx.save();
+        // Posição real da BOCA do feixe (apex + direção * start).
+        const mouthX = light.x + light.dx * start;
+        const mouthY = light.y + light.dy * start;
+        lctx.translate(mouthX, mouthY);
+        lctx.rotate(ang);
+        // No buffer, a boca está em (originXLo, apexYLo) lo-res == (pad, loH*px/2) tela.
+        lctx.drawImage(
+            this._loCanvas, 0, 0, loW, loH,
+            -pad, -(loH * px) / 2, loW * px, loH * px
+        );
+        lctx.restore();
     }
 
     _buildVignette() {

@@ -1,5 +1,6 @@
 import { FloorDebris } from './FloorDebris.js';
 import { DustPuff } from './DustPuff.js';
+import { SparkParticle } from './SparkParticle.js';
 
 // 1 "pixel" de sangue no mundo (= 1 pixel de tile: tile 16px desenhado a 64px).
 const BLOOD_PX = 4;
@@ -11,11 +12,14 @@ const BLOOD_PX = 4;
 const AIR_BLOOD_COLORS = ["#5c0a18", "#6e0f1c", "#7d1420", "#4a0612", "#640d1a"];
 
 class AirParticle {
-    constructor(x, y, color, isBlood = false, spread = 1) {
+    constructor(x, y, color, isBlood = false, spread = 1, ephemeral = false) {
         this.x = x;
         this.y = y;
         this.color = color;
         this.isBlood = isBlood;
+        // Efêmera: ao assentar, apenas some — NÃO carimba sangue nem debris no
+        // chão (usada para respingo puramente visual, sem criar sangue novo).
+        this.ephemeral = ephemeral;
 
         // Tamanho sempre múltiplo do pixel de arte (1 ou 2 pixels de tile).
         this.size = BLOOD_PX * (1 + (Math.random() < 0.35 ? 1 : 0));
@@ -51,7 +55,9 @@ class AirParticle {
                 this.vx *= 0.6;
             } else {
                 this.settled = true;
-                if (this.isBlood && bloodCanvas) {
+                if (this.ephemeral) {
+                    // Efêmera: não deixa marca nenhuma (só desaparece).
+                } else if (this.isBlood && bloodCanvas) {
                     // Ao assentar, carimba um respingo pixelado no buffer de sangue.
                     bloodCanvas.stampSplat(this.x, this.y, 0.6 + Math.random() * 0.5);
                 } else if (debrisList) {
@@ -77,6 +83,7 @@ export class ParticleSystem {
         this.airParticles = [];
         this.floorDebris = [];
         this.smoke = [];                // baforadas de fumaça (poeira de corrida)
+        this.sparks = [];               // faíscas da serra raspando o chão
         this.bloodCanvas = bloodCanvas; // buffer offscreen do sangue de chão
     }
 
@@ -84,6 +91,7 @@ export class ParticleSystem {
         this.airParticles = [];
         this.floorDebris = [];
         this.smoke = [];
+        this.sparks = [];
         if (this.bloodCanvas) this.bloodCanvas.clear();
     }
 
@@ -100,6 +108,14 @@ export class ParticleSystem {
         }
     }
 
+    // Faíscas da serra raspando o chão. Nascem na BORDA do disco (raio) e são
+    // arremessadas no sentido do giro (spinDir: +1 horário, -1 anti-horário).
+    triggerSparks(cx, cy, radius = 24, spinDir = 1, amount = 2) {
+        for (let i = 0; i < amount; i++) {
+            this.sparks.push(new SparkParticle(cx, cy, radius, spinDir));
+        }
+    }
+
     // Jato de sangue focado (sem pedaços/ossos). Usado ao matar inimigos e
     // ao player receber dano. 'amount' controla a intensidade; as gotas saltam
     // e assentam espalhadas e aleatórias pelo chão.
@@ -109,6 +125,16 @@ export class ParticleSystem {
         for (let i = 0; i < count; i++) {
             const c = bloodColors[Math.floor(Math.random() * bloodColors.length)];
             this.airParticles.push(new AirParticle(x, y, c, true, spread));
+        }
+    }
+
+    // Gotas de sangue EFÊMERAS (só visual): voam e somem sem carimbar nada no
+    // chão. Para a serra girando SOBRE sangue — espirra sem criar sangue novo.
+    triggerBloodDroplets(x, y, amount = 2, spread = 1) {
+        const bloodColors = AIR_BLOOD_COLORS;
+        for (let i = 0; i < amount; i++) {
+            const c = bloodColors[Math.floor(Math.random() * bloodColors.length)];
+            this.airParticles.push(new AirParticle(x, y, c, true, spread, true));
         }
     }
 
@@ -156,16 +182,29 @@ export class ParticleSystem {
             this.smoke[i].update();
             if (this.smoke[i].done) this.smoke.splice(i, 1);
         }
+
+        // Atualiza faíscas e remove as que terminaram
+        for (let i = this.sparks.length - 1; i >= 0; i--) {
+            this.sparks[i].update();
+            if (this.sparks[i].done) this.sparks.splice(i, 1);
+        }
     }
 
     // 'clip' (opcional) {minX,maxX,minY,maxY}: restringe o sangue de chão à
     // área jogável, para não aparecer sobre as paredes do cenário.
-    drawFloor(ctx, clip) {
+    // 'holes' (opcional) [{x,y,w,h}]: retângulos a EXCLUIR do clip (ex.: miolo
+    // escuro dos buracos), para o sangue nunca aparecer sobre eles.
+    drawFloor(ctx, clip, holes = null) {
         ctx.save();
         if (clip) {
             ctx.beginPath();
             ctx.rect(clip.minX, clip.minY, clip.maxX - clip.minX, clip.maxY - clip.minY);
-            ctx.clip();
+            // Fura os buracos: com a regra "evenodd", os retângulos internos
+            // viram recortes (o sangue não é desenhado dentro deles).
+            if (holes) {
+                for (const h of holes) ctx.rect(h.x, h.y, h.w, h.h);
+            }
+            ctx.clip("evenodd");
         }
         if (this.bloodCanvas) this.bloodCanvas.draw(ctx);
         for (let i = 0; i < this.floorDebris.length; i++) {
@@ -178,6 +217,13 @@ export class ParticleSystem {
     drawSmoke(ctx) {
         for (let i = 0; i < this.smoke.length; i++) {
             this.smoke[i].draw(ctx);
+        }
+    }
+
+    // Faíscas da serra: camada aérea, por cima das entidades (centelhas vivas).
+    drawSparks(ctx) {
+        for (let i = 0; i < this.sparks.length; i++) {
+            this.sparks[i].draw(ctx);
         }
     }
 
