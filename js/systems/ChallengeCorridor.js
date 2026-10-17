@@ -133,7 +133,7 @@ export class ChallengeCorridor {
             switch (el.type) {
                 case "spike": {
                     const p = this._elemWorld(el);
-                    this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: el.phase || 0 }));
+                    this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: el.phase || 0, durations: el.durations, timing: el.timing, delay: el.delay }));
                     break;
                 }
                 case "spikeRow": {
@@ -149,7 +149,7 @@ export class ChallengeCorridor {
                             const v = (i + 0.5) / count;
                             p = this._toWorld(el.u, v);
                         }
-                        this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: phase }));
+                        this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: phase, durations: el.durations, timing: el.timing }));
                     }
                     break;
                 }

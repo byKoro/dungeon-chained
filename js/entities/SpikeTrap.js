@@ -26,10 +26,14 @@ export class SpikeTrap {
         this.cfg = opts.cfg || HAZARDS.spike;
 
         // Metade das durações anteriores; não depende da taxa do RAF.
-        this.durations = [1, 0.15, 0.15, 2];
+        const timingProfiles = { fast: [0.5, 0.1, 0.1, 0.8], normal: [1, 0.15, 0.15, 2], slow: [2, 0.3, 0.3, 3] };
+        this.durations = Array.isArray(opts.durations) && opts.durations.length === 4
+            ? opts.durations.map(value => Math.max(0.01, Number(value) || 0.01))
+            : [...(timingProfiles[opts.timing] || timingProfiles.normal)];
         this.cycle = this.durations.reduce((sum, seconds) => sum + seconds, 0);
         // Deslocamento de fase para criar ondas entre spikes vizinhos.
         this.elapsed = ((opts.phaseOffset || 0) * this.cycle) % this.cycle;
+        this.initialDelay = Math.max(0, Number(opts.delay) || 0);
 
         this.state = "hidden";
         this.extend = 0; // 0 (recolhido) .. 1 (totalmente para fora)
@@ -64,7 +68,16 @@ export class SpikeTrap {
     }
 
     update(players, deltaSeconds = 1 / 60) {
-        this._advance(Math.max(0, deltaSeconds));
+        let dt = Math.max(0, deltaSeconds);
+        if (this.initialDelay > 0) {
+            if (dt < this.initialDelay) {
+                this.initialDelay -= dt;
+                return;
+            }
+            dt -= this.initialDelay;
+            this.initialDelay = 0;
+        }
+        this._advance(dt);
         if (!this.isDangerous) return;
 
         const r = this.cfg.damageRadius;
