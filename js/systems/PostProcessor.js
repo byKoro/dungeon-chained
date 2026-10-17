@@ -53,6 +53,17 @@ export class PostProcessor {
 
         // Fase do flicker (avança por frame).
         this._flicker = 0;
+
+        // "Respiração" da vinheta: um nível 0..1 (ex.: tensão da corrente)
+        // modula uma oscilação suave na opacidade da vinheta — a tela "respira"
+        // mais forte conforme a tensão sobe. Fase própria, avança por frame.
+        this._vignetteBreath = 0;
+        this._breathPhase = 0;
+    }
+
+    // Define o nível de respiração da vinheta (0 = estável; 1 = pulso máximo).
+    setVignetteBreath(level) {
+        this._vignetteBreath = Math.max(0, Math.min(1, level || 0));
     }
 
     // Registra uma luz para ESTE frame (coordenadas de tela).
@@ -335,11 +346,22 @@ export class PostProcessor {
         if (!this._vgrad || this._vW !== canvas.width || this._vH !== canvas.height) {
             this._buildVignette();
         }
+
+        // RESPIRAÇÃO: oscila a opacidade da vinheta em torno de 1, com amplitude
+        // proporcional ao nível (tensão). A frequência também sobe um pouco com
+        // a tensão, dando a sensação de "respiração ofegante" perto da ruptura.
+        this._breathPhase += 0.04 + this._vignetteBreath * 0.1;
+        const amp = 0.35 * this._vignetteBreath; // até ±35% de opacidade
+        const breath = 1 + Math.sin(this._breathPhase) * amp;
+
         const prevOp = ctx.globalCompositeOperation;
+        const prevAlpha = ctx.globalAlpha;
         ctx.globalCompositeOperation = "multiply";
+        ctx.globalAlpha = Math.max(0, Math.min(1, breath));
         ctx.fillStyle = this._vgrad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.globalCompositeOperation = prevOp;
+        ctx.globalAlpha = prevAlpha;
     }
 
     /**

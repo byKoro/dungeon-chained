@@ -49,8 +49,9 @@ export class ParticleEffects {
         player.walkDustCooldown = player.speedMag > player.speed * 0.6 ? 7 : 12;
     }
 
-    // Rajada de poeira ao frear bruscamente: sai contra o sentido do movimento
-    // (os pés derrapando no chão). A quantidade acompanha a força da freada.
+    // Rajada de poeira ao frear bruscamente: um "puff" aos pés que espalha para
+    // os LADOS (pó levantado pela derrapagem) e um pouco para trás. A força
+    // acompanha a velocidade da freada.
     spawnBrakeDust(player) {
         // Direção do movimento no instante da freada (capturada no Player).
         const dirX = player.stopDirX, dirY = player.stopDirY;
@@ -58,10 +59,21 @@ export class ParticleEffects {
         const x = player.x - dirX * 10;
         const y = player.y + 15 - dirY * 10 * 0.4;
         // Intensidade proporcional à velocidade da freada (freada mais forte,
-        // mais poeira). A poeira é lançada no sentido CONTRÁRIO ao movimento.
+        // mais poeira).
         const strength = Math.min(1, player.stopSpeed / player.speed);
-        const amount = 6 + Math.round(strength * 10);
-        this.particleSystem.triggerDust(x, y, -dirX, -dirY, amount);
+
+        // 1) Baforada central para trás (o pó que o pé "chuta" ao travar).
+        const back = 7 + Math.round(strength * 9);
+        this.particleSystem.triggerDust(x, y, -dirX, -dirY, back);
+
+        // 2) Tufos LATERAIS (perpendicular ao movimento): o puff que abre para
+        //    os lados, vendendo a derrapagem. Só vale a pena em freadas fortes.
+        if (strength > 0.4) {
+            const perpX = -dirY, perpY = dirX;
+            const side = 2 + Math.round(strength * 4);
+            this.particleSystem.triggerDust(x, y + 1,  perpX,  perpY, side);
+            this.particleSystem.triggerDust(x, y + 1, -perpX, -perpY, side);
+        }
     }
 
     // Carimba uma pegada quando o jogador dá um passo (sangue se pisou em sangue).

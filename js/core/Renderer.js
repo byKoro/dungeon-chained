@@ -22,6 +22,28 @@ export class Renderer {
         // posição e a velocidade do sway em cada eixo.
         this.swayX = 0; this.swayY = 0;
         this._swayVX = 0; this._swayVY = 0;
+
+        // Zoom-punch: um "soco" de zoom (fração somada ao zoom) que decai a cada
+        // frame, dando um pulso rápido de câmera em eventos (limpar sala, abrir
+        // porta). Positivo = aproxima; negativo = afasta.
+        this._zoomPunch = 0;
+
+        // Fator de zoom da INTRO de sala: multiplica o zoom-alvo (fit) para
+        // aproximar a câmera durante a sequência de entrada. 1 = normal (fit),
+        // >1 = aproximado. O Game anima este valor; a suavização de updateCamera
+        // faz a transição ser macia.
+        this.introZoomFactor = 1;
+    }
+
+    // Define o fator de zoom da intro (1 = fit normal, >1 = aproxima).
+    setIntroZoomFactor(f) {
+        this.introZoomFactor = Math.max(0.1, f || 1);
+    }
+
+    // Dispara um pulso de zoom (fração; ex.: 0.08 = +8%). Usa o maior em módulo
+    // para pulsos sobrepostos não se cancelarem.
+    triggerZoomPunch(amount = 0.08) {
+        if (Math.abs(amount) > Math.abs(this._zoomPunch)) this._zoomPunch = amount;
     }
 
     // Zera o sway "drone" (posição e velocidade). Usado ao (re)entrar numa
@@ -89,11 +111,14 @@ export class Renderer {
         this.camX += (targetX - this.camX) * 0.12;
         this.camY += (targetY - this.camY) * 0.12;
         if (t.zoom) {
-            this.zoom += (t.zoom - this.zoom) * 0.08;
+            // O zoom-alvo (fit da sala) é multiplicado pelo fator de intro para
+            // aproximar/afastar durante a sequência de entrada.
+            const targetZoom = t.zoom * this.introZoomFactor;
+            this.zoom += (targetZoom - this.zoom) * 0.08;
             // Snap no alvo quando já está perto: evita a interpolação ficar
             // eternamente a frações de distância, o que mantinha a escala
             // mudando de leve a cada frame (tiles "respirando" no início).
-            if (Math.abs(t.zoom - this.zoom) < 0.001) this.zoom = t.zoom;
+            if (Math.abs(targetZoom - this.zoom) < 0.001) this.zoom = targetZoom;
         }
 
         // Clamp: mantém a câmera dentro dos limites da sala (não revela o vazio
@@ -158,7 +183,15 @@ export class Renderer {
         //     bordas de tiles vizinhos para lados diferentes (costura de 1px que
         //     não some nunca);
         //  2) a TRANSLAÇÃO final em tela cai em pixel inteiro (como já fazíamos).
-        const renderZoom = this._quantizeZoom(this.zoom);
+        // Aplica o zoom-punch (pulso) ao zoom base e decai o pulso. Como a
+        // quantização trava a grade, o pulso só "aparece" ao cruzar limiares de
+        // pixel inteiro por tile — por isso um punch de ~8% já dá o soco visível.
+        if (Math.abs(this._zoomPunch) > 0.0005) {
+            this._zoomPunch *= 0.82;
+            if (Math.abs(this._zoomPunch) < 0.0005) this._zoomPunch = 0;
+        }
+        const punchedZoom = this.zoom * (1 + this._zoomPunch);
+        const renderZoom = this._quantizeZoom(punchedZoom);
         const tx = Math.round(this.canvas.width / 2 - this.camX * renderZoom + shakeX);
         const ty = Math.round(this.canvas.height / 2 - this.camY * renderZoom + shakeY);
         this.ctx.setTransform(renderZoom, 0, 0, renderZoom, tx, ty);

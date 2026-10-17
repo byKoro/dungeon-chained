@@ -55,6 +55,12 @@ export class CombatSystem {
      */
     resolveWeaponHits(weapon, enemies, p1, p2, connected = true, onKill = null) {
         if (!connected) return;
+
+        // Centro e raio do DISCO da serra (no meio da curva). O dano do disco
+        // cobre todo o raio visual — encostar em qualquer parte dele mata.
+        const sawPos = weapon.getSawPositions ? weapon.getSawPositions(p1, p2)[0] : null;
+        const discR = (sawPos && weapon.discRadius) ? weapon.discRadius : 0;
+
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             if (enemy.state === "dying") continue;
@@ -64,7 +70,12 @@ export class CombatSystem {
             const dP2 = Math.hypot(enemy.x - p2.x, enemy.y - p2.y);
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
 
-            if (!nearPlayer && d < weapon.hitThreshold + enemy.hitRadius) {
+            // Acerta se tocar o CORPO da corda (segmento) OU o DISCO da serra.
+            const hitChain = !nearPlayer && d < weapon.hitThreshold + enemy.hitRadius;
+            const hitDisc = discR > 0 &&
+                Math.hypot(enemy.x - sawPos.x, enemy.y - sawPos.y) < discR + enemy.hitRadius;
+
+            if (hitChain || hitDisc) {
                 enemy.startDying();
                 weapon.onHit?.();
                 if (this.audio) this.audio.play("monsterHurt");
@@ -85,7 +96,7 @@ export class CombatSystem {
      * @param {Room} room    sala atual (dona da lista de inimigos)
      * @param {GibPiece[]} gibs  pool de gibs a ser alimentado (mutado)
      */
-    resolveDeaths(room, gibs) {
+    resolveDeaths(room, gibs, onKill = null) {
         const enemies = room.enemies;
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
@@ -104,6 +115,8 @@ export class CombatSystem {
 
             room.removeEnemyAt(i);
             this.renderer.triggerShake(7);
+            // Feedback de tela (sangue voando + flash vermelho).
+            onKill?.(enemy);
         }
     }
 }

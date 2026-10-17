@@ -17,15 +17,17 @@ import { ParticleEffects } from './systems/ParticleEffects.js';
 import { CombatSystem } from './combat/CombatSystem.js';
 import { RoomManager } from './rooms/RoomManager.js';
 import { PostProcessor } from './systems/PostProcessor.js';
+import { ScreenGore } from './systems/ScreenGore.js';
 import { WindSystem } from './systems/WindSystem.js';
+import { PlayerAI } from './systems/PlayerAI.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     MAX_PLAYER_SEPARATION, CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, DOOR_LIGHT, WIND,
-    getPlayerSpawnPositions, HOLE_TILE, HOLE_TILES, holeTileFor, AUDIO_CONFIG, AUDIO_CLIPS,
-    SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE, HIT_SLOWMO
+    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS,
+    SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE, HIT_SLOWMO, ROOM_INTRO
 } from './config/GameConfig.js';
 
 /**
@@ -58,6 +60,7 @@ export class Game {
             p1: document.getElementById("hud-p1"),
             p2: document.getElementById("hud-p2"),
             btnWeapon: document.getElementById("btn-weapon"),
+            btnTileset: document.getElementById("btn-tileset"),
             btnRestart: document.getElementById("btn-restart")
         };
 
@@ -65,12 +68,17 @@ export class Game {
         this.renderer = new Renderer(canvas, this.ctx);
         this.renderer.setTileset(new Tileset(this.assets.tileset, 16, 10));
         this.renderer.setAssets(this.assets);
+        // Alternador de tileset (tecla "T" / botão): índice da variante atual.
+        this._tilesetIndex = 0;
         // Informa o tamanho do tile no mundo para a quantização do zoom
         // (mantém a grade de tiles alinhada ao pixel de tela — tiles fixos).
         this.renderer.setTileWorldSize(TILE);
 
         // Pós-processamento de tela (vinheta de masmorra).
         this.postProcessor = new PostProcessor(canvas, this.ctx);
+
+        // Feedback de "kill" em espaço de tela (sangue voando + flash vermelho).
+        this.screenGore = new ScreenGore(canvas);
 
         // Poeira/vento ambiente (atmosfera viva).
         this.wind = new WindSystem();
@@ -89,6 +97,22 @@ export class Game {
 
         // Entrada e armas
         this.input = new InputHandler();
+        // IA opcional do Jogador 1 (apenas para testar o jogo sozinho). Fica
+        // DESLIGADA por padrão; alterna com a tecla "I" ou window.playerAI.
+        // Os getters resolvem p1/p2/sala em tempo real (são recriados no
+        // restart), então a IA sempre age sobre as instâncias atuais.
+        this.playerAI = new PlayerAI({
+            input: this.input,
+            getP1: () => this.p1,
+            getP2: () => this.p2,
+            getRoom: () => this.rooms?.current,
+            // Testa se um ponto do MUNDO cai sobre um buraco (ou fora da sala),
+            // para a IA desviar de abismos. Reaproveita a grade de tiles.
+            isHoleAt: (x, y) => this._isHoleAtWorld(x, y),
+            // Portas abertas da sala atual (para a IA acompanhar o humano ao
+            // atravessar). Vazio quando a sala está trancada.
+            getDoors: () => (this.rooms?.isLocked() ? [] : this.rooms.doorsOfCurrent())
+        });
         // A corrente une os jogadores e porta a arma ativa. Se insistirem em se
         // separar além do limite, ela ARREBENTA (empurrão elástico) e os
         // jogadores ficam DESARMADOS até se reaproximarem. Ajuste os "dials"
@@ -125,6 +149,7 @@ export class Game {
         this.arenaBounds = null;
         this.gibs = [];
         this.transition = null; // { phase: "out"|"in", t, door }
+        this.roomIntro = null;   // { phase, t } sequência de entrada na sala
         this._doorFlashT = 0;    // segundos restantes do flash de "porta aberta"
         this._lastFrameTimestamp = null;
         this._simAccumulator = 0; // acumulador de tempo do fixed timestep (s)
@@ -166,6 +191,24 @@ export class Game {
             [this.p1, this.p2] = this.players;
             this.newDungeon();
         });
+
+        // Alternador de TILESET (teste de texturas): tecla "T" ou botão da HUD
+        // ciclam entre o tileset padrão e as variantes carregadas. Listener
+        // dedicado de keydown (toggle por toque, não por frame). Auto-contido.
+        window.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "t" && !e.repeat) this.cycleTileset();
+        });
+        this.hud.btnTileset?.addEventListener("click", () => this.cycleTileset());
+    }
+
+    // Troca o tileset do mundo pela próxima variante disponível (ciclo). Como o
+    // Tileset desenha a partir de .img, basta trocar a imagem — sem recriar
+    // nada nem recarregar a sala.
+    cycleTileset() {
+        const variants = this.assets.tilesetVariants;
+        if (!variants || variants.length <= 1) return; // nada para alternar
+        this._tilesetIndex = (this._tilesetIndex + 1) % variants.length;
+        this.renderer.tileset.img = variants[this._tilesetIndex];
     }
 
     // Gera uma nova dungeon e posiciona os jogadores na sala inicial.
@@ -174,7 +217,10 @@ export class Game {
         this.gibs = [];
         this.effects.clear();
         this.transition = null;
+        this.roomIntro = null;
+        this.renderer.setIntroZoomFactor(1);
         this.particleSystem.clear();
+        this.screenGore.clear();
         this.gameOver = false;
 
         // A corrente começa conectada a cada nova dungeon.
@@ -256,16 +302,70 @@ export class Game {
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
 
-        // Entrou numa sala já ABERTA (sem combate / já limpa): dispara o flash
-        // amarelo das portas indicando que estão abertas.
-        if (!this.rooms.isLocked()) this._triggerDoorFlash();
+        // Sala de combate (tem inimigos a instanciar): dispara a SEQUÊNCIA DE
+        // INTRO (jogadores parados na porta -> zoom -> inimigos aparecem
+        // congelados -> zoom volta -> liberados). Caso contrário, entrou numa
+        // sala já aberta: dispara o flash amarelo das portas.
+        const room = this.rooms.current;
+        if (ROOM_INTRO.enabled && room.hasPendingEnemies) {
+            this._beginRoomIntro();
+        } else if (!this.rooms.isLocked()) {
+            this._triggerDoorFlash();
+        }
 
         this.updateHud();
     }
 
-    // Dispara o flash temporário de "porta aberta" (pulsa e enfraquece).
+    // Inicia a sequência de intro da sala atual. Enquanto ativa, o controle dos
+    // jogadores e o combate ficam suspensos (ver _updateRoomIntro).
+    _beginRoomIntro() {
+        this.roomIntro = { phase: "zoomIn", t: 0 };
+        // Cor da chama de aparição = cor da luz da tocha (âmbar do cenário),
+        // convertida de "r, g, b" para [r,g,b]. Calculada uma vez por intro.
+        this._introFlameColor = this._parseRgbTriplet(
+            TORCHES?.light?.color || "255, 190, 110"
+        );
+        // Garante que os jogadores comecem imóveis na porta.
+        this.p1.vx = this.p1.vy = 0;
+        this.p2.vx = this.p2.vy = 0;
+    }
+
+    // Converte uma cor "r, g, b" (string) em [r, g, b] (números). Fallback para
+    // o âmbar da tocha se o formato for inesperado.
+    _parseRgbTriplet(str) {
+        const parts = String(str).split(",").map(s => parseInt(s.trim(), 10));
+        if (parts.length === 3 && parts.every(n => Number.isFinite(n))) return parts;
+        return [255, 190, 110];
+    }
+
+    /**
+     * Distribui atrasos de aparição ALEATÓRIOS entre os inimigos recém-criados,
+     * para que surjam de forma desordenada (um aqui, outro ali, não todos de
+     * uma vez). Cada inimigo recebe um delay base crescente + jitter, embaralhado
+     * para a ordem não seguir a lista. Delays em frames (60 = 1s).
+     */
+    _scheduleStaggeredSpawns(enemies) {
+        if (!enemies || !enemies.length) return;
+        // Ordem embaralhada (Fisher–Yates) para o escalonamento ser desordenado.
+        const order = enemies.slice();
+        for (let i = order.length - 1; i > 0; i--) {
+            const j = (Math.random() * (i + 1)) | 0;
+            [order[i], order[j]] = [order[j], order[i]];
+        }
+        // Espaçamento entre aparições (frames) com jitter. O primeiro pode sair
+        // quase imediato; os demais escalonam.
+        let acc = (Math.random() * 6) | 0;
+        for (const e of order) {
+            e.beginFrozenSpawn(acc);
+            acc += 8 + ((Math.random() * 16) | 0); // ~0.13s..0.4s entre cada
+        }
+    }
+
+    // Dispara o flash temporário de "porta aberta" (pulsa e enfraquece) + um
+    // pulso de câmera sutil (zoom-punch) ao abrir a porta.
     _triggerDoorFlash() {
         this._doorFlashT = DOOR_LIGHT.flashDuration;
+        this.renderer.triggerZoomPunch(0.045);
     }
 
     // Dispara o slow-motion de abate: a simulação desacelera e volta suave ao
@@ -309,6 +409,10 @@ export class Game {
 
     // Limite físico de afastamento entre os players (teto rígido).
     enforceSeparationLimit() {
+        // O teto rígido só vale enquanto a corrente está CONECTADA. Se ela
+        // arrebentou, os jogadores ficam livres (desarmados) e não devem mais
+        // puxar um ao outro — a reconexão acontece ao se reaproximarem.
+        if (!this.chain.isConnected) return;
         const dx = this.p2.x - this.p1.x, dy = this.p2.y - this.p1.y;
         const dist = Math.hypot(dx, dy);
         if (dist > MAX_PLAYER_SEPARATION) {
@@ -362,6 +466,11 @@ export class Game {
             : Math.min(Math.max((timestamp - this._lastFrameTimestamp) / 1000, 0), 0.25);
         this._lastFrameTimestamp = timestamp;
 
+        // Lê os controles (Xbox/PlayStation) uma vez por quadro e traduz
+        // sticks/d-pad nas teclas virtuais que os players já consomem. Fica
+        // antes do loop de simulação para valer em todos os passos do quadro.
+        this.input.pollGamepads();
+
         // Slow-motion de abate: enquanto ativo, a SIMULAÇÃO roda em câmera
         // lenta e volta suave ao normal (sem travar seco). O timer corre em
         // tempo REAL; o fator de velocidade começa em minScale no pico e sobe
@@ -395,6 +504,8 @@ export class Game {
         if (this.gameOver) return;
         if (this.transition) {
             this._updateTransition();
+        } else if (this.roomIntro) {
+            this._updateRoomIntro(deltaSeconds);
         } else {
             this._updateGameplay(deltaSeconds);
         }
@@ -415,10 +526,97 @@ export class Game {
         this.updateHud();
     }
 
+    /**
+     * Sequência de ENTRADA na sala de combate. Enquanto ativa, os jogadores
+     * ficam parados na porta (sem controle) e o combate está suspenso. As fases:
+     *   zoomIn  — a câmera aproxima (introZoomFactor sobe até ROOM_INTRO.zoomFactor);
+     *             ao chegar, os inimigos SPAWNAM congelados com partícula.
+     *   hold    — os inimigos ficam visíveis e parados por um instante.
+     *   zoomOut — a câmera volta ao zoom normal (fator -> 1).
+     *   (fim)   — libera os inimigos (unfreeze) e devolve o controle.
+     */
+    _updateRoomIntro(deltaSeconds = SIM_STEP) {
+        const intro = this.roomIntro;
+        const room = this.rooms.current;
+        this.arenaBounds = this.rooms.currentBounds;
+
+        intro.t += deltaSeconds;
+
+        if (intro.phase === "zoomIn") {
+            const dur = ROOM_INTRO.zoomInTime || 0.0001;
+            const k = Math.min(1, intro.t / dur);
+            const eased = 1 - Math.pow(1 - k, 3); // easeOutCubic
+            this.renderer.setIntroZoomFactor(1 + (ROOM_INTRO.zoomFactor - 1) * eased);
+            if (k >= 1) {
+                // Pico do zoom: cria os inimigos CONGELADOS e os ESCALONA — cada
+                // um ganha um atraso de aparição aleatório, para surgirem de
+                // forma desordenada (não todos de uma vez). Cada um aparece do
+                // fogo (chama de tocha) quando sua vez chega (ver justAppeared).
+                const spawned = room.spawnEnemies(true);
+                this._scheduleStaggeredSpawns(spawned);
+                intro.phase = "hold";
+                intro.t = 0;
+            }
+        } else if (intro.phase === "hold") {
+            this.renderer.setIntroZoomFactor(ROOM_INTRO.zoomFactor);
+            // Só avança quando TODOS já apareceram (nenhum ainda escondido) E o
+            // tempo mínimo de contemplação passou.
+            const allAppeared = room.enemies.every(e => !e.isHidden);
+            if (allAppeared && intro.t >= (ROOM_INTRO.spawnHold || 0)) {
+                intro.phase = "zoomOut";
+                intro.t = 0;
+            }
+        } else if (intro.phase === "zoomOut") {
+            const dur = ROOM_INTRO.zoomOutTime || 0.0001;
+            const k = Math.min(1, intro.t / dur);
+            const eased = 1 - Math.pow(1 - k, 3);
+            this.renderer.setIntroZoomFactor(ROOM_INTRO.zoomFactor + (1 - ROOM_INTRO.zoomFactor) * eased);
+            if (k >= 1) {
+                // Fim da intro: zoom normal, libera os inimigos e o controle.
+                this.renderer.setIntroZoomFactor(1);
+                for (const e of room.enemies) e.unfreeze?.();
+                this.roomIntro = null;
+            }
+        }
+
+        // Os jogadores permanecem imóveis na porta durante toda a intro.
+        this.p1.vx = this.p1.vy = 0;
+        this.p2.vx = this.p2.vy = 0;
+
+        // Mantém os inimigos presos aos bounds e avança APENAS seu efeito de
+        // aparição (update congelado não move/ataca). Quando um inimigo chega a
+        // sua vez (justAppeared), uma CHAMA sobe no lugar dele com as cores da
+        // tocha e a câmera dá um soquinho. Partículas e ambiente continuam vivos
+        // para a cena não "congelar" por completo.
+        for (const e of room.enemies) {
+            e.update([this.p1, this.p2], () => {});
+            if (e.justAppeared) {
+                this.particleSystem.triggerFlameBurst(e.x, e.y + 6, this._introFlameColor, 24);
+                this.renderer.triggerShake(5);
+            }
+            this.rooms.clampEnemy(e, this.arenaBounds);
+        }
+
+        this.particleSystem.update([this.p1, this.p2], this.arenaBounds);
+        this.wind.update(this.arenaBounds);
+        this.effects.update();
+
+        if (this._doorFlashT > 0) {
+            this._doorFlashT = Math.max(0, this._doorFlashT - deltaSeconds);
+        }
+
+        this._updateCameraToCurrentRoom(deltaSeconds);
+        this.updateHud();
+    }
+
     _updateGameplay(deltaSeconds = 1 / 60) {
         const { p1, p2, rooms } = this;
         this.arenaBounds = rooms.currentBounds;
         const room = rooms.current;
+
+        // IA opcional do P1: injeta as teclas virtuais ANTES do update do
+        // jogador. Desligada, não faz nada (controle volta ao humano).
+        this.playerAI.update();
 
         p1.update(this.input, this.arenaBounds);
         p2.update(this.input, this.arenaBounds);
@@ -433,9 +631,10 @@ export class Game {
             onSnap: () => {
                 this.renderer.triggerShake(14);
                 // Ruptura: explosão exagerada de FAÍSCAS (radiais, com glow) +
-                // flash branco luminoso no ponto da serra.
-                const fx = (p1.x + p2.x) / 2;
-                const fy = (p1.y + p2.y) / 2;
+                // flash branco no ponto da serra (meio da curva da corda).
+                const sp = this.chain.weapon?.getSawPositions?.(p1, p2)?.[0];
+                const fx = sp ? sp.x : (p1.x + p2.x) / 2;
+                const fy = sp ? sp.y : (p1.y + p2.y) / 2;
                 const r = this.chain.weapon?.discRadius ?? 24;
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
@@ -470,8 +669,10 @@ export class Game {
             // Pico de ~5 faíscas por frame no raspar máximo.
             this._sparkAccum = (this._sparkAccum ?? 0) + intensity * 5;
             const emit = Math.floor(this._sparkAccum);
-            const sawX = (p1.x + p2.x) / 2;
-            const sawY = (p1.y + p2.y) / 2;
+            // Centro da serra = meio da CURVA da corda (ancoragem real).
+            const sawPos = weapon.getSawPositions(p1, p2)[0];
+            const sawX = sawPos.x;
+            const sawY = sawPos.y;
             if (emit > 0) {
                 this._sparkAccum -= emit;
                 this.particleSystem.triggerSparks(
@@ -519,11 +720,10 @@ export class Game {
         for (let it = 0; it < 3; it++) {
             Physics.resolveEntityCollisions(allEntities);
             if (sawR > 0) {
-                // Centro recalculado a cada iteração (segue o meio da corrente).
-                const cx = (p1.x + p2.x) / 2;
-                const cy = (p1.y + p2.y) / 2;
+                // Centro = meio da CURVA da corda, recalculado a cada iteração.
+                const sc = weapon.getSawPositions(p1, p2)[0];
                 for (const e of allEntities) {
-                    Physics.resolveCircleCollision(e, cx, cy, sawR);
+                    Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
                 }
             }
         }
@@ -556,7 +756,7 @@ export class Game {
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
             () => this.triggerHitSlowmo()
         );
-        this.combat.resolveDeaths(room, this.gibs);
+        this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger());
 
         // Corações de cura: atualiza, e qualquer player com vida < 3 que
         // encoste coleta (cura até o máximo de 3). Toca o som de pickup.
@@ -571,6 +771,9 @@ export class Game {
         // Pegadas / poeira
         this.effects.update();
 
+        // Feedback de "kill" em espaço de tela (flash + respingos).
+        this.screenGore.update();
+
         // Flash de "porta aberta": decai ao longo do tempo até sumir.
         if (this._doorFlashT > 0) {
             this._doorFlashT = Math.max(0, this._doorFlashT - deltaSeconds);
@@ -580,6 +783,9 @@ export class Game {
         // o flash amarelo nas portas (pulsa um momento e enfraquece).
         if (rooms.tryClearCurrent()) {
             this._triggerDoorFlash();
+            // Pulso de câmera mais forte ao LIMPAR a sala (alívio/recompensa):
+            // afasta de leve e volta.
+            this.renderer.triggerZoomPunch(-0.07);
         }
 
         this.particleSystem.update([p1, p2], this.arenaBounds);
@@ -614,10 +820,25 @@ export class Game {
         }
     }
 
-    // Retângulos (mundo) dos tiles de MIOLO ESCURO de buraco na sala atual.
-    // Usados para FURAR o clip do sangue, garantindo que nenhuma mancha (gotas,
-    // poças, serra) apareça sobre a parte escura dos buracos. Bordas de buraco
-    // e piso (incl. espinhos) ficam de fora da exclusão, então recebem sangue.
+    // Testa se um ponto do MUNDO (x, y) cai sobre um tile de buraco (-1) na
+    // sala atual, ou fora da grade de piso. Usado pela IA do P1 para desviar de
+    // abismos. Pontos dentro dos vãos de porta (fora dos bounds) são tratados
+    // como seguros, para a IA conseguir atravessar.
+    _isHoleAtWorld(x, y) {
+        const tiles = this.rooms.currentTiles;
+        if (!tiles || !tiles.floor) return false;
+        const rect = this.rooms.cellRect();
+        const col = Math.floor((x - rect.x) / TILE);
+        const row = Math.floor((y - rect.y) / TILE);
+        const line = tiles.floor[row];
+        if (!line || line[col] === undefined) return false; // fora da grade: trata como seguro (portas/corredores)
+        return line[col] === HOLE_TILE;
+    }
+
+    // Retângulos (mundo) dos tiles de BURACO na sala atual. Usados para FURAR
+    // o clip do sangue, garantindo que nenhuma mancha (gotas, poças, serra)
+    // apareça sobre os buracos. Exclui TODOS os tiles de buraco — tanto o miolo
+    // escuro quanto as bordas — pois o jogador percebe o tile inteiro como vão.
     _darkHoleRects() {
         const tiles = this.rooms.currentTiles;
         if (!tiles || !tiles.floor) return null;
@@ -626,8 +847,7 @@ export class Game {
         for (let r = 0; r < tiles.floor.length; r++) {
             const line = tiles.floor[r];
             for (let c = 0; c < line.length; c++) {
-                if (line[c] !== HOLE_TILE) continue;
-                if (holeTileFor(tiles.floor, c, r) !== HOLE_TILES[0]) continue; // só o miolo
+                if (line[c] !== HOLE_TILE) continue; // qualquer tile de buraco
                 rects.push({ x: rect.x + c * TILE, y: rect.y + r * TILE, w: TILE, h: TILE });
             }
         }
@@ -698,13 +918,15 @@ export class Game {
             renderer.drawDoorGradients(doors, doorHalf, TILE, DOOR_STUB_TILES);
         }
 
+        // Desafio co-op: botões e spikes ficam no CHÃO. São desenhados ANTES do
+        // sangue para que a mancha caia POR CIMA do piso onde eles estão (do
+        // contrário o sprite da spike taparia o sangue do próprio tile).
+        const challenge = rooms.current.challenge;
+        if (challenge) challenge.drawFloorLayer(ctx);
+
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this._darkHoleRects());
         this.effects.draw(ctx);
         this.particleSystem.drawSmoke(ctx);
-
-        // Desafio co-op: botões e spikes ficam no CHÃO (sob as entidades).
-        const challenge = rooms.current.challenge;
-        if (challenge) challenge.drawFloorLayer(ctx);
 
         // Corações de cura: desenhados no CHÃO, sob as entidades e suas sombras.
         rooms.current.hearts.forEach(h => h.draw(ctx));
@@ -714,7 +936,9 @@ export class Game {
         renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, p1Bounce);
         renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
         const enemies = rooms.current.enemies;
-        enemies.forEach(e => renderer.drawRoundShadow(e.x, e.y, 13, 0));
+        // Inimigos ainda escondidos (atraso de spawn da intro) não projetam
+        // sombra — ela denunciaria a posição antes de aparecerem.
+        enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
 
         // Corrente (linha) da arma: SEMPRE ao fundo, atrás de todas as
         // entidades. Só o disco entra na ordenação por profundidade.
@@ -724,7 +948,9 @@ export class Game {
         // (sawY). Quem está mais ACIMA (y <= sawY, "ao fundo") é desenhado
         // ANTES e fica atrás do disco; quem está mais ABAIXO (y > sawY, "à
         // frente") é desenhado DEPOIS e fica na frente dele. Ordenado por Y.
-        const sawY = (this.p1.y + this.p2.y) / 2;
+        const sawY = this.chain.weapon?.getSawPositions
+            ? this.chain.weapon.getSawPositions(this.p1, this.p2)[0].y
+            : (this.p1.y + this.p2.y) / 2;
         const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
 
         drawables.filter(e => e.y <= sawY).forEach(e => e.draw(ctx));
@@ -736,6 +962,10 @@ export class Game {
         this.particleSystem.drawSparks(ctx);
 
         drawables.filter(e => e.y > sawY).forEach(e => e.draw(ctx));
+
+        // Chamas de APARIÇÃO (intro): por cima das entidades, para o fogo subir
+        // na frente do inimigo que materializa.
+        this.particleSystem.drawFlames(ctx);
 
         // Indicadores dos atiradores de flecha: montados nas paredes, por cima
         // das entidades (ficam na parede, não no chão).
@@ -869,6 +1099,13 @@ export class Game {
             }
         }
 
+        // Vinheta "respira" no ritmo da TENSÃO da corrente: quanto mais perto
+        // de arrebentar, mais a tela pulsa (tensão/ansiedade). Sem tensão (ou
+        // desconectada), fica estável.
+        const strain = (this.chain.isConnected && this.chain.weapon)
+            ? (this.chain.weapon.strain ?? 0) : 0;
+        this.postProcessor.setVignetteBreath(strain);
+
         this.postProcessor.draw();
 
         // Poeira/vento em espaço de TELA (visível na cena toda, inclusive no
@@ -880,6 +1117,11 @@ export class Game {
 
     _renderOverlays() {
         const { ctx, canvas } = this;
+
+        // Feedback de "kill" (sangue voando + flash vermelho) por cima da cena,
+        // mas por baixo de transição/game over.
+        this.screenGore.draw(ctx);
+
         if (this.transition) {
             const t = this.transition;
             const a = t.phase === "out" ? t.t : (1 - t.t);

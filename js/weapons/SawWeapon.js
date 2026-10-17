@@ -33,10 +33,16 @@ const ROW_SPIN_BLOODY = 3;
 const SAW_DRAW_LARGE = SAW_FRAME.size * 4.025; // ~64
 const SAW_DRAW_SMALL = SAW_FRAME.size * 2;     // 32
 
-// Corrente (cabo) montada a partir do sprite tileável (assets/saw/image.png).
-//   LINK_WORLD_H = altura do elo em px de MUNDO (a escala é derivada disto,
-//   mantendo a proporção do sprite). O cabo é RETO (sem curva).
-const CABLE_LINK_WORLD_H = 32;
+// Corda montada a partir do sprite trançado tileável (assets/saw/rope.png).
+//   LINK_WORLD_H = espessura da corda em px de MUNDO (a escala é derivada
+//   disto, mantendo a proporção do sprite).
+//   O meio da corda é deslocado por um vetor de ARRASTO (oposto ao movimento),
+//   simulando a corda sendo puxada pelo chão. A serra fica ancorada nesse
+//   ponto médio deslocado. A textura flui de forma contínua ao longo do arco.
+//   16 = 4 px de arte x 4 (mesmo tamanho de pixel do resto do jogo).
+const CABLE_LINK_WORLD_H = 16;
+const CABLE_DRAG_GAIN = 7;   // quanto a velocidade vira "barriga" de arrasto
+const CABLE_DRAG_MAX = 46;   // deslocamento máximo do meio (px de mundo)
 
 // Quantos passos de simulação a serra fica ensanguentada após um acerto.
 const BLOOD_DURATION = 90;
@@ -78,6 +84,9 @@ export class SawWeapon extends Weapon {
         this.strain = 0;       // tensão da corrente 0..1 (ruptura iminente)
         this.flashPhase = 0;   // fase do piscar branco (avança conforme a tensão)
         this._flashCanvas = null; // offscreen para tingir o sprite de branco
+        this.textureOffset = 0;   // deslocamento da textura (fluxo contínuo)
+        this.dragX = 0;        // vetor de ARRASTO (oposto ao movimento),
+        this.dragY = 0;        // suavizado — curva a corda "sendo puxada".
     }
 
     update(p1 = null, p2 = null) {
@@ -98,6 +107,27 @@ export class SawWeapon extends Weapon {
             const mag = Math.min(p1.speedMag ?? 0, p2.speedMag ?? 0);
             target = Math.max(0, Math.min(1, mag / speed));
         }
+
+        // ARRASTO: a corda curva no sentido CONTRÁRIO ao movimento (o meio fica
+        // para trás, como se fosse arrastada pelo chão). Usamos a velocidade
+        // média dos jogadores, suavizada (inércia), limitada a um máximo.
+        if (p1 && p2) {
+            const vx = (p1.vx + p2.vx) / 2;
+            const vy = (p1.vy + p2.vy) / 2;
+            // Alvo = -velocidade escalada; limita o módulo ao máximo de barriga.
+            let tx = -vx * CABLE_DRAG_GAIN;
+            let ty = -vy * CABLE_DRAG_GAIN;
+            const m = Math.hypot(tx, ty);
+            if (m > CABLE_DRAG_MAX) { tx = tx / m * CABLE_DRAG_MAX; ty = ty / m * CABLE_DRAG_MAX; }
+            this.dragX += (tx - this.dragX) * 0.1;
+            this.dragY += (ty - this.dragY) * 0.1;
+        } else {
+            this.dragX *= 0.9;
+            this.dragY *= 0.9;
+        }
+
+        // A trama "corre" junto com o giro (corda sendo tracionada).
+        this.textureOffset += this.spin * 1.2;
         // Inércia: lerp mais rápido para subir, bem mais lento para descer.
         const lerp = target > this.spin ? SPIN_ACCEL : SPIN_DECEL;
         this.spin += (target - this.spin) * lerp;
@@ -167,13 +197,20 @@ export class SawWeapon extends Weapon {
         return -1;
     }
 
+    // Ponto na CURVA da corda em t∈[0,1]. Segue a reta p1→p2 e o MEIO é puxado
+    // pelo vetor de ARRASTO (this.dragX/Y, oposto ao movimento), simulando a
+    // corda sendo arrastada pelo chão. 4*t*(1-t) tem pico 1 no meio (t=0.5).
+    cablePoint(p1, p2, t) {
+        const bx = p1.x + (p2.x - p1.x) * t;
+        const by = p1.y + (p2.y - p1.y) * t;
+        const bulge = 4 * t * (1 - t);
+        return { x: bx + this.dragX * bulge, y: by + this.dragY * bulge };
+    }
+
     getSawPositions(p1, p2) {
-        // Uma única serra (a maior), no meio da corrente.
-        return [{
-            x: (p1.x + p2.x) / 2,
-            y: (p1.y + p2.y) / 2,
-            radius: 14
-        }];
+        // Uma única serra (a maior), ANCORADA no meio da curva da corda.
+        const mid = this.cablePoint(p1, p2, 0.5);
+        return [{ x: mid.x, y: mid.y, radius: 14 }];
     }
 
     hitsTarget(target, p1, p2) {
@@ -182,55 +219,83 @@ export class SawWeapon extends Weapon {
         );
     }
 
-    // Corrente ligando os jogadores. Desenhada numa camada ao FUNDO (sempre
-    // atrás das entidades), separada do disco.
+    // Corda ligando os jogadores. Desenhada numa camada ao FUNDO (sempre atrás
+    // das entidades), separada do disco.
     //
-    // Montagem a partir do sprite `cableSprite` (um segmento tileável): o cabo
-    // CURVA como uma corda pendurada (catenária aproximada por parábola). O
-    // afundamento (sag) é maior quando a corrente está frouxa e some quando ela
-    // estica. Percorremos a curva em passos do tamanho do segmento, desenhando
-    // cada elo rotacionado na TANGENTE para acompanhar a curvatura.
+    // O meio da corda é puxado pelo vetor de ARRASTO (oposto ao movimento),
+    // simulando ser arrastada pelo chão. A TEXTURA é contínua: amostramos a
+    // curva em sub-trechos e mapeamos cada um numa faixa do sprite pelo
+    // comprimento de arco (com wrap), sem emendas nem distorção.
     drawChain(ctx, p1, p2) {
         const cable = this.cableSprite;
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const dist = Math.hypot(dx, dy) || 1;
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
 
-        // Fallback vetorizado se o sprite não carregou.
+        // Fallback vetorizado (segue a mesma curva) se o sprite não carregou.
         if (!cable || !cable.complete || !cable.naturalWidth) {
             ctx.save();
-            ctx.strokeStyle = "#8d99ae";
+            ctx.strokeStyle = "#1a1a1e";
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
+            const start = this.cablePoint(p1, p2, 0);
+            ctx.moveTo(start.x, start.y);
+            for (let i = 1; i <= 16; i++) {
+                const q = this.cablePoint(p1, p2, i / 16);
+                ctx.lineTo(q.x, q.y);
+            }
             ctx.stroke();
             ctx.restore();
             return;
         }
 
-        // Dimensões do elo em px de MUNDO: escala derivada da altura-alvo,
-        // preservando a proporção do sprite. O passo tilea o sprite ao longo da
-        // linha com leve sobreposição para encadear sem vãos.
+        // Espessura (altura) da corda e escala do sprite.
         const linkH = CABLE_LINK_WORLD_H;
         const scale = linkH / cable.naturalHeight;
-        const linkW = cable.naturalWidth * scale;
-        const step = linkW * 0.78;
+        // Largura (em px de mundo) de UMA repetição completa da trama.
+        const tileW = cable.naturalWidth * scale;
 
-        // Cabo RETO: um único ângulo de p1 a p2, tileando os elos na linha.
-        const ang = Math.atan2(dy, dx);
-        const segments = Math.max(1, Math.ceil(dist / step));
+        // TEXTURA CONTÍNUA: amostramos a curva em muitos sub-trechos finos; a
+        // cada trecho avançamos uma coordenada de textura `u` pelo COMPRIMENTO
+        // DE ARCO real, recortando a faixa correspondente do sprite (com wrap).
+        // Assim a trama flui sem emendas e sem distorção, acompanhando a curva.
+        const SUB = 48;                 // nº de sub-trechos (quanto mais, mais liso)
+        const drawW = (Math.hypot(p2.x - p1.x, p2.y - p1.y) + Math.hypot(this.dragX, this.dragY) * 2) / SUB + 1;
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        ctx.translate(p1.x, p1.y);
-        ctx.rotate(ang);
-        for (let i = 0; i < segments; i++) {
-            const cx = (i + 0.5) * (dist / segments);
-            ctx.drawImage(
-                cable, 0, 0, cable.naturalWidth, cable.naturalHeight,
-                cx - linkW / 2, -linkH / 2, linkW, linkH
-            );
+        let prev = this.cablePoint(p1, p2, 0);
+        let u = this.textureOffset % tileW; // posição inicial na textura
+        for (let i = 1; i <= SUB; i++) {
+            const cur = this.cablePoint(p1, p2, i / SUB);
+            const segLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+            const mx = (prev.x + cur.x) / 2;
+            const my = (prev.y + cur.y) / 2;
+            const ang = Math.atan2(cur.y - prev.y, cur.x - prev.x);
+
+            // Faixa do sprite para este trecho: mapeia o arco [u, u+segLen] em
+            // coordenadas de pixel do sprite (0..naturalWidth), com wrap.
+            const su = ((u % tileW) / tileW) * cable.naturalWidth;
+            const sw = (segLen / tileW) * cable.naturalWidth;
+
+            ctx.save();
+            ctx.translate(mx, my);
+            ctx.rotate(ang);
+            if (su + sw <= cable.naturalWidth) {
+                ctx.drawImage(cable, su, 0, sw, cable.naturalHeight,
+                    -segLen / 2 - 0.5, -linkH / 2, segLen + 1, linkH);
+            } else {
+                // A faixa cruza a borda da textura: desenha em duas partes.
+                const sw1 = cable.naturalWidth - su;
+                const frac = sw1 / sw;
+                const w1 = (segLen + 1) * frac;
+                ctx.drawImage(cable, su, 0, sw1, cable.naturalHeight,
+                    -segLen / 2 - 0.5, -linkH / 2, w1, linkH);
+                ctx.drawImage(cable, 0, 0, sw - sw1, cable.naturalHeight,
+                    -segLen / 2 - 0.5 + w1, -linkH / 2, (segLen + 1) - w1, linkH);
+            }
+            ctx.restore();
+
+            u += segLen;
+            prev = cur;
         }
         ctx.restore();
     }

@@ -26,6 +26,9 @@ export class Room {
         this.hearts = [];
         this.cleared = false;
         this.populated = false;
+        // Inimigos criados sob demanda pela intro de sala (não em populate()).
+        // Enquanto false, os inimigos autorais ainda não foram instanciados.
+        this.enemiesSpawned = false;
 
         // Corredor-desafio co-op (perigos + botões), criado sob demanda em
         // populate() se a célula estiver marcada como desafio.
@@ -108,6 +111,13 @@ export class Room {
         if (this.populated) return;
         this.populated = true;
 
+        // Guarda os parâmetros de spawn para instanciar os inimigos SOB DEMANDA
+        // (ver spawnEnemies). A criação é adiada para a intro de sala poder
+        // mostrá-los aparecendo com partícula, congelados, só depois do zoom.
+        this._spawnSystem = spawnSystem;
+        this._spawnFloor = floor;
+        this._spawnAssets = assets;
+
         // 1) Instancia o CONTEÚDO (independente de trancar ou não).
         // Perigos autorais (spikes/flechas/botões) -> ChallengeCorridor, que os
         // mantém ativos (ferindo). Só vêm da peça desenhada — nada procedural.
@@ -116,22 +126,8 @@ export class Room {
             this.challenge = new ChallengeCorridor(layout, this.bounds, this.cell.doors, assets);
         }
 
-        // Inimigos autorais (podem coexistir com perigos). Pula tiles de buraco.
-        if (this.cell.customEnemies && this.cell.customEnemies.length > 0) {
-            const floorGrid = this.tiles.floor;
-            this.enemies = this.cell.customEnemies
-                .filter(foe => {
-                    const row = floorGrid[foe.row];
-                    return !row || row[foe.col] !== -1;
-                })
-                .map(foe => {
-                    const ex = this.bounds.minX + foe.col * 64;
-                    const ey = this.bounds.minY + foe.row * 64;
-                    const enemy = spawnSystem.createEnemy(ex, ey, floor, foe.type);
-                    enemy.setNavigationFloor(floorGrid, this.bounds, this.tiles.walls);
-                    return enemy;
-                });
-        }
+        // NOTA: os inimigos autorais NÃO são criados aqui. A intro de sala chama
+        // spawnEnemies() no momento certo (após o zoom). Até lá, enemies == [].
 
         // Corações iniciais: a peça autoral pode semear `heartCount` corações
         // espalhados pelo centro da sala (mesmo espalhamento do design original).
@@ -151,11 +147,54 @@ export class Room {
         const rule = this.lockRule;
         if (rule === "buttons" && this.challenge) {
             this.cleared = false;
-        } else if (rule === "enemies" && this.enemies.length > 0) {
+        } else if (rule === "enemies" && this.hasPendingEnemies) {
+            // Inimigos ainda não foram instanciados (spawnEnemies), mas a peça
+            // tem inimigos autorais: a sala nasce TRANCADA e não-limpa.
             this.cleared = false;
         } else {
             this.cleared = true;
         }
+    }
+
+    // Inimigos autorais válidos (fora de buracos) ainda a instanciar.
+    get _validAuthoredEnemies() {
+        if (!this.cell.customEnemies || !this.cell.customEnemies.length) return [];
+        const floorGrid = this.tiles.floor;
+        return this.cell.customEnemies.filter(foe => {
+            const row = floorGrid[foe.row];
+            return !row || row[foe.col] !== -1;
+        });
+    }
+
+    // true se a sala tem inimigos autorais que ainda não foram spawnados.
+    get hasPendingEnemies() {
+        return !this.enemiesSpawned && this._validAuthoredEnemies.length > 0;
+    }
+
+    /**
+     * Instancia os inimigos autorais da sala (idempotente). Chamado pela intro
+     * de sala no momento da "aparição". Se `frozen` for true, cada inimigo nasce
+     * congelado (parado, sem IA) tocando o efeito de spawn — a intro os libera
+     * depois via unfreeze(). Devolve a lista criada (para o Game posicionar
+     * partículas de spawn em cada um).
+     */
+    spawnEnemies(frozen = false) {
+        if (this.enemiesSpawned) return this.enemies;
+        this.enemiesSpawned = true;
+
+        const spawnSystem = this._spawnSystem;
+        if (!spawnSystem) return this.enemies; // populate() não rodou ainda
+
+        const floorGrid = this.tiles.floor;
+        this.enemies = this._validAuthoredEnemies.map(foe => {
+            const ex = this.bounds.minX + foe.col * 64;
+            const ey = this.bounds.minY + foe.row * 64;
+            const enemy = spawnSystem.createEnemy(ex, ey, this._spawnFloor, foe.type);
+            enemy.setNavigationFloor(floorGrid, this.bounds, this.tiles.walls);
+            if (frozen) enemy.beginFrozenSpawn();
+            return enemy;
+        });
+        return this.enemies;
     }
 
     // A sala está trancada (portas fechadas) conforme a regra de trancamento.
@@ -166,7 +205,9 @@ export class Room {
         if (this.cleared) return false;
         const rule = this.lockRule;
         if (rule === "buttons") return this.challenge ? this.challenge.locked : false;
-        if (rule === "enemies") return this.enemies.length > 0;
+        // "enemies": trancada enquanto houver inimigos vivos OU inimigos autorais
+        // ainda não instanciados (durante a intro, antes de spawnEnemies).
+        if (rule === "enemies") return this.enemies.length > 0 || this.hasPendingEnemies;
         return false;
     }
 
@@ -183,7 +224,9 @@ export class Room {
             return false;
         }
         if (rule === "enemies") {
-            if (this.enemies.length === 0) {
+            // Só pode limpar depois de os inimigos terem sido instanciados
+            // (fim da intro) e todos mortos.
+            if (this.enemiesSpawned && this.enemies.length === 0) {
                 this.cleared = true;
                 return true;
             }

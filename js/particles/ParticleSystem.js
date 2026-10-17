@@ -2,6 +2,7 @@ import { FloorDebris } from './FloorDebris.js';
 import { DustPuff } from './DustPuff.js';
 import { SparkParticle } from './SparkParticle.js';
 import { FlashParticle } from './FlashParticle.js';
+import { FlameParticle } from './FlameParticle.js';
 
 // 1 "pixel" de sangue no mundo (= 1 pixel de tile: tile 16px desenhado a 64px).
 const BLOOD_PX = 4;
@@ -86,6 +87,7 @@ export class ParticleSystem {
         this.smoke = [];                // baforadas de fumaça (poeira de corrida)
         this.sparks = [];               // faíscas da serra raspando o chão
         this.flashes = [];              // flash branco ao arrebentar a corrente
+        this.flames = [];               // chamas de aparição dos inimigos (intro)
         this.bloodCanvas = bloodCanvas; // buffer offscreen do sangue de chão
     }
 
@@ -95,6 +97,7 @@ export class ParticleSystem {
         this.smoke = [];
         this.sparks = [];
         this.flashes = [];
+        this.flames = [];
         if (this.bloodCanvas) this.bloodCanvas.clear();
     }
 
@@ -108,6 +111,18 @@ export class ParticleSystem {
             const ox = (Math.random() - 0.5) * 8;
             const oy = (Math.random() - 0.5) * 6;
             this.smoke.push(new DustPuff(x + ox, y + oy, dirX, dirY));
+        }
+    }
+
+    // CHAMA de APARIÇÃO (spawn de inimigo na intro): uma labareda SOBE do ponto
+    // de spawn com as cores da tocha, dando a sensação de que o inimigo
+    // "surge do fogo". `baseColor` é o RGB da chama ([r,g,b]); `amount` é a
+    // quantidade de línguas de fogo. Puramente visual.
+    triggerFlameBurst(x, y, baseColor = [255, 190, 110], amount = 22) {
+        for (let i = 0; i < amount; i++) {
+            // Potência variada: algumas sobem mais alto (chama irregular).
+            const power = 0.7 + Math.random() * 0.8;
+            this.flames.push(new FlameParticle(x, y, baseColor, power));
         }
     }
 
@@ -212,6 +227,12 @@ export class ParticleSystem {
             this.flashes[i].update();
             if (this.flashes[i].done) this.flashes.splice(i, 1);
         }
+
+        // Atualiza chamas de aparição e remove as que terminaram
+        for (let i = this.flames.length - 1; i >= 0; i--) {
+            this.flames[i].update();
+            if (this.flames[i].done) this.flames.splice(i, 1);
+        }
     }
 
     // 'clip' (opcional) {minX,maxX,minY,maxY}: restringe o sangue de chão à
@@ -258,6 +279,14 @@ export class ParticleSystem {
     drawAir(ctx) {
         for (let i = 0; i < this.airParticles.length; i++) {
             this.airParticles[i].draw(ctx);
+        }
+    }
+
+    // Chamas de aparição (intro): camada aérea, por cima das entidades, para o
+    // fogo "subir na frente" do inimigo que está materializando.
+    drawFlames(ctx) {
+        for (let i = 0; i < this.flames.length; i++) {
+            this.flames[i].draw(ctx);
         }
     }
 }

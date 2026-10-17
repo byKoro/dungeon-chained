@@ -63,6 +63,22 @@ export const HIT_SLOWMO = {
     minScale: 0.25
 };
 
+// Intro de sala de combate: ao entrar numa sala com inimigos, os jogadores
+// ficam PARADOS na porta (sem controle), a câmera dá um ZOOM na sala, os
+// inimigos SPAWNAM com partícula (congelados), o zoom VOLTA ao normal e só
+// então os inimigos são liberados para atacar. Todas as durações em segundos.
+//   zoomFactor — quanto a câmera aproxima no pico (1.35 = +35% sobre o fit).
+//   zoomInTime  — tempo aproximando até o pico.
+//   spawnHold   — tempo com os inimigos parados visíveis (aparição).
+//   zoomOutTime — tempo voltando ao zoom normal.
+export const ROOM_INTRO = {
+    enabled: true,
+    zoomFactor: 1.35,
+    zoomInTime: 0.5,
+    spawnHold: 0.7,
+    zoomOutTime: 0.45
+};
+
 export const DOOR_STUB_TILES = 2;
 export const DOOR_ENTER_DEPTH = 70;
 
@@ -374,7 +390,7 @@ export const POST_PROCESSING = {
     // ---- Iluminação dinâmica (ambiente escuro + halos de luz) ----
     lighting: {
         enabled: true,
-        ambient: "26, 22, 34",       // cor do ambiente escuro (menor = + sombrio)
+        ambient: "34, 29, 44",       // cor do ambiente escuro (menor = + sombrio) — +30% de luz ambiente
         lightColor: "255, 220, 150", // cor da luz (âmbar quente de tocha)
         flatten: 1,               // achatamento vertical da elipse (1 = círculo)
 

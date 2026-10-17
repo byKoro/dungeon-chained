@@ -80,6 +80,44 @@ export class MeleeEnemy extends Entity {
         this.navigationBounds = null;
         this.navigationWalls = new Set();
         this.lastSafePosition = { x, y };
+
+        // Congelamento de INTRO: enquanto `frozen` é true o inimigo fica parado
+        // (sem IA, sem mover, sem atacar). Usado na sequência de entrada da sala:
+        // os inimigos aparecem com partícula e só "ganham vida" quando a intro
+        // termina e o Game chama unfreeze(). `spawnFx` é um timer (frames) do
+        // efeito de aparição, usado no draw para um fade-in/sobe suave.
+        this.frozen = false;
+        this.spawnFxDuration = 26; // ~0.43s a 60fps
+        this.spawnFx = 0;
+        // Atraso (frames) antes de o inimigo APARECER. Enquanto > 0 ele fica
+        // invisível e inerte: permite escalonar o spawn (cada inimigo surge num
+        // instante diferente, de forma desordenada). `justAppeared` fica true no
+        // único frame em que o delay zera — o Game usa isso para disparar a
+        // chama de aparição na posição do inimigo.
+        this.spawnDelay = 0;
+        this.justAppeared = false;
+    }
+
+    // Começa congelado (intro de sala). `delay` (frames) adia a aparição: o
+    // inimigo fica invisível/inerte até lá e só então toca o efeito de spawn.
+    beginFrozenSpawn(delay = 0) {
+        this.frozen = true;
+        this.spawnDelay = Math.max(0, delay | 0);
+        // Só arma o fade-in agora se não houver atraso; com atraso, o fade-in
+        // começa quando o delay zera (ver update).
+        this.spawnFx = this.spawnDelay > 0 ? 0 : this.spawnFxDuration;
+        this.justAppeared = this.spawnDelay === 0;
+        this.vx = this.vy = this.pushVx = this.pushVy = 0;
+    }
+
+    // true enquanto o inimigo ainda não apareceu (está no atraso de spawn).
+    get isHidden() {
+        return this.spawnDelay > 0;
+    }
+
+    // Libera o inimigo para agir (fim da intro).
+    unfreeze() {
+        this.frozen = false;
     }
 
 
@@ -257,6 +295,28 @@ export class MeleeEnemy extends Entity {
     update(players, onPlayerHit) {
         this.justStepped = false;
         this.justAttacked = false;
+
+        // Congelado na intro: fica totalmente parado (sem IA, sem dano) e só
+        // avança o timer do efeito de aparição. Não anima o ciclo de andar
+        // (fica na pose parada) nem persegue/ataca.
+        if (this.frozen) {
+            this.vx = this.vy = this.pushVx = this.pushVy = 0;
+            this.justAppeared = false;
+            if (this.spawnDelay > 0) {
+                // Ainda esperando a vez de aparecer (invisível).
+                this.spawnDelay--;
+                if (this.spawnDelay === 0) {
+                    // Chegou a vez: materializa agora (arma o fade-in e sinaliza
+                    // ao Game para soltar a chama neste frame).
+                    this.spawnFx = this.spawnFxDuration;
+                    this.justAppeared = true;
+                }
+                return;
+            }
+            if (this.spawnFx > 0) this.spawnFx--;
+            return;
+        }
+
         this.animTime++;
 
         if (this.state === "dying") {
@@ -438,6 +498,8 @@ export class MeleeEnemy extends Entity {
 
     draw(ctx) {
         if (!this.sheet || !this.sheet.complete || this.sheet.naturalWidth === 0) return;
+        // Ainda no atraso de spawn (intro): invisível até chegar sua vez.
+        if (this.isHidden) return;
 
         const s = this.sprite;
         const anim = this._currentAnim();
@@ -472,12 +534,22 @@ export class MeleeEnemy extends Entity {
         // centro da célula, tornando o espelhamento simétrico.
         const cropCenterOffset = ((s.cropX + cw / 2) - cell / 2) * scale;
 
+        // Efeito de APARIÇÃO (spawn na intro): o inimigo materializa de baixo
+        // para cima com um fade-in. `t` vai de 0 (recém-aparecido) a 1 (pronto).
+        let fxAlpha = 1, fxRiseY = 0;
+        if (this.spawnFx > 0 && this.spawnFxDuration > 0) {
+            const t = 1 - this.spawnFx / this.spawnFxDuration; // 0 -> 1
+            fxAlpha = t;                 // some translúcido -> opaco
+            fxRiseY = (1 - t) * 10;      // sobe ~10px conforme materializa
+        }
+
         ctx.save();
-        ctx.translate(this.x, this.y);
+        ctx.translate(this.x, this.y + fxRiseY);
         if (this.facingLeft) ctx.scale(-1, 1);
         // Alinha sprite e manchas ao centro real do boneco na célula
         ctx.translate(cropCenterOffset, 0);
 
+        if (fxAlpha < 1) ctx.globalAlpha = fxAlpha;
         ctx.drawImage(
             this.sheet,
             srcX, srcY, cw, ch,
