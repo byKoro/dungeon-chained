@@ -21,11 +21,11 @@ import { WindSystem } from './systems/WindSystem.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
-    MAX_PLAYER_SEPARATION, CAM_MARGIN, TRANSITION_SPEED,
+    MAX_PLAYER_SEPARATION, CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, HOLE_TILE, HOLE_TILES, holeTileFor, AUDIO_CONFIG, AUDIO_CLIPS,
-    SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE
+    SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE, HIT_SLOWMO
 } from './config/GameConfig.js';
 
 /**
@@ -128,6 +128,7 @@ export class Game {
         this._doorFlashT = 0;    // segundos restantes do flash de "porta aberta"
         this._lastFrameTimestamp = null;
         this._simAccumulator = 0; // acumulador de tempo do fixed timestep (s)
+        this._slowmoT = 0;        // segundos restantes de slow-motion de abate
 
         this._bindButtons();
     }
@@ -198,6 +199,7 @@ export class Game {
         const center = this.rooms.cellCenter();
         this.renderer.camX = center.x;
         this.renderer.camY = center.y;
+        this.renderer.resetSway();
 
         this.updateHud();
     }
@@ -266,6 +268,27 @@ export class Game {
         this._doorFlashT = DOOR_LIGHT.flashDuration;
     }
 
+    // Dispara o slow-motion de abate: a simulação desacelera e volta suave ao
+    // normal, dando peso ao golpe sem travar. Reinicia o timer para o cheio, de
+    // modo que mortes em sequência renovem (não encurtem) o efeito.
+    triggerHitSlowmo() {
+        this._slowmoT = HIT_SLOWMO.duration;
+    }
+
+    // Fator de velocidade atual da simulação (0..1). Em slow-motion começa em
+    // HIT_SLOWMO.minScale (quando o timer está cheio) e sobe suavemente até 1
+    // conforme o timer esvazia, usando easeOutCubic (desacelera a recuperação
+    // perto do fim, deixando a volta ao normal bem macia). Sem efeito ativo
+    // retorna 1 (velocidade cheia).
+    _slowmoTimeScale() {
+        if (this._slowmoT <= 0) return 1;
+        const duration = HIT_SLOWMO.duration || 1;
+        // progress: 0 no início do efeito (mais lento) -> 1 no fim (normal).
+        const progress = 1 - this._slowmoT / duration;
+        const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        return HIT_SLOWMO.minScale + (1 - HIT_SLOWMO.minScale) * eased;
+    }
+
     updateHud() {
         const c = this.rooms.currentCell;
         const tag = c.kind === "corridor" ? "CORREDOR" : (c.type === "boss" ? "SALA DO CHEFE" : "SALA");
@@ -297,12 +320,30 @@ export class Game {
     }
 
     // Centra a câmera na sala atual com zoom que faz a célula inteira caber.
-    _updateCameraToCurrentRoom() {
+    // Além do centro fixo, aplica o sway "drone": a câmera pende na direção do
+    // movimento dos jogadores e balança como um pêndulo ao virar/parar.
+    _updateCameraToCurrentRoom(dt = SIM_STEP) {
         const rect = this.rooms.cellRect();
         const fitZoom = Math.min(
             this.canvas.width / (rect.w + CAM_MARGIN * 2),
             this.canvas.height / (rect.h + CAM_MARGIN * 2)
         );
+
+        // Sway drone: alvo de deslocamento = velocidade média dos jogadores,
+        // normalizada por responseVel (satura em 1) e escalada por maxOffset.
+        // Enquanto correm, a câmera pende à frente; ao parar/virar, a mola
+        // amortecida devolve o sway ao centro oscilando (pêndulo).
+        if (CAMERA_DRONE.enabled) {
+            const avgVX = (this.p1.vx + this.p2.vx) / 2;
+            const avgVY = (this.p1.vy + this.p2.vy) / 2;
+            const sat = CAMERA_DRONE.responseVel || 1;
+            const targetSwayX = Math.max(-1, Math.min(1, avgVX / sat)) * CAMERA_DRONE.maxOffset;
+            const targetSwayY = Math.max(-1, Math.min(1, avgVY / sat)) * CAMERA_DRONE.maxOffset;
+            this.renderer.applyDroneSway(
+                targetSwayX, targetSwayY, CAMERA_DRONE.stiffness, CAMERA_DRONE.damping, dt
+            );
+        }
+
         this.renderer.updateCamera({
             x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, zoom: fitZoom
         });
@@ -321,7 +362,17 @@ export class Game {
             : Math.min(Math.max((timestamp - this._lastFrameTimestamp) / 1000, 0), 0.25);
         this._lastFrameTimestamp = timestamp;
 
-        this._simAccumulator += frameSeconds;
+        // Slow-motion de abate: enquanto ativo, a SIMULAÇÃO roda em câmera
+        // lenta e volta suave ao normal (sem travar seco). O timer corre em
+        // tempo REAL; o fator de velocidade começa em minScale no pico e sobe
+        // até 1 com easing. Só o tempo ESCALADO alimenta o acumulador, então o
+        // mundo desacelera sem perder a independência de framerate.
+        const timeScale = this._slowmoTimeScale();
+        if (this._slowmoT > 0) {
+            this._slowmoT = Math.max(0, this._slowmoT - frameSeconds);
+        }
+
+        this._simAccumulator += frameSeconds * timeScale;
 
         // Teto de passos por quadro: se o quadro atrasou muito (aba em segundo
         // plano, stall de GC), descarta o excesso para não travar numa "espiral
@@ -379,7 +430,16 @@ export class Game {
         // A própria Chain aplica o constraint elástico e atualiza a animação da
         // arma. O teto rígido de afastamento continua valendo por cima.
         this.chain.update(p1, p2, {
-            onSnap: () => this.renderer.triggerShake(9),
+            onSnap: () => {
+                this.renderer.triggerShake(14);
+                // Ruptura: explosão exagerada de FAÍSCAS (radiais, com glow) +
+                // flash branco luminoso no ponto da serra.
+                const fx = (p1.x + p2.x) / 2;
+                const fy = (p1.y + p2.y) / 2;
+                const r = this.chain.weapon?.discRadius ?? 24;
+                this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
+                this.particleSystem.triggerFlash(fx, fy, 12, 1);
+            },
             onReconnect: () => this.renderer.triggerShake(4)
         });
 
@@ -453,7 +513,20 @@ export class Game {
         // Colisões entre entidades (3 iterações)
         const liveEnemies = enemies.filter(e => e.state !== "dying");
         const allEntities = [p1, p2, ...liveEnemies];
-        for (let it = 0; it < 3; it++) Physics.resolveEntityCollisions(allEntities);
+        // Raio sólido do disco da serra (só quando conectada): impede que os
+        // jogadores (e inimigos vivos) fiquem em cima/atrás do disco.
+        const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
+        for (let it = 0; it < 3; it++) {
+            Physics.resolveEntityCollisions(allEntities);
+            if (sawR > 0) {
+                // Centro recalculado a cada iteração (segue o meio da corrente).
+                const cx = (p1.x + p2.x) / 2;
+                const cy = (p1.y + p2.y) / 2;
+                for (const e of allEntities) {
+                    Physics.resolveCircleCollision(e, cx, cy, sawR);
+                }
+            }
+        }
 
         // Confinamento: inimigos presos; players podem adentrar portas abertas
         enemies.forEach(e => rooms.clampEnemy(e, this.arenaBounds));
@@ -468,7 +541,10 @@ export class Game {
 
         // Arma: a animação já é atualizada por chain.update(). O dano só é
         // aplicado quando a corrente está conectada (desarmada = sem dano).
-        this.combat.resolveWeaponHits(this.chain.weapon, enemies, p1, p2, this.chain.isConnected);
+        this.combat.resolveWeaponHits(
+            this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
+            () => this.triggerHitSlowmo()
+        );
         this.combat.resolveDeaths(room, this.gibs);
 
         // Corações de cura: atualiza, e qualquer player com vida < 3 que
@@ -501,7 +577,7 @@ export class Game {
         if (p1.lives <= 0 || p2.lives <= 0) this.gameOver = true;
 
         this._checkDoorTransition(doors);
-        this._updateCameraToCurrentRoom();
+        this._updateCameraToCurrentRoom(deltaSeconds);
         this.updateHud();
     }
 

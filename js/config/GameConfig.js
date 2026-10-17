@@ -20,6 +20,23 @@ export const MAX_PLAYER_SEPARATION = 620;
 
 export const CAM_MARGIN = 90;  // folga nas bordas (afasta a câmera do cenário)
 
+// Câmera "drone": em vez de ficar cravada no centro da sala, ela PENDE na
+// direção em que os jogadores se movem e BALANÇA (como um drone pendurado ou
+// um pêndulo) ao virar/parar, assentando suave de volta. É um deslocamento
+// (sway) somado ao centro, resolvido por uma mola amortecida — não altera o
+// enquadramento (o clamp da sala continua valendo por cima).
+//   maxOffset  — deslocamento máximo (px de mundo) no auge do movimento.
+//   responseVel— velocidade média dos jogadores que satura o deslocamento.
+//   stiffness  — rigidez da mola (maior = persegue o alvo mais rápido).
+//   damping    — amortecimento (menor = balança mais, mais "pêndulo").
+export const CAMERA_DRONE = {
+    enabled: true,
+    maxOffset: 70,
+    responseVel: 4.2,
+    stiffness: 42,
+    damping: 7.5
+};
+
 export const TRANSITION_SPEED = 0.05; // ~10 frames por fase
 
 // Passo fixo da simulação (fixed timestep). A lógica de jogo roda sempre neste
@@ -31,6 +48,18 @@ export const SIM_STEP = 1 / SIM_HZ; // segundos por passo lógico
 // Teto de passos por quadro: evita a "espiral da morte" se o quadro atrasar
 // muito (aba em segundo plano, stall). O tempo excedente é descartado.
 export const MAX_SIM_STEPS_PER_FRAME = 5;
+
+// Slow-motion de abate: no instante em que um inimigo é morto, a SIMULAÇÃO
+// desacelera por um instante e volta suave ao normal (dá peso ao golpe, mas
+// sem travar seco). O render continua livre.
+//   duration  — quanto tempo (segundos reais) dura o efeito do início até
+//               recuperar a velocidade cheia.
+//   minScale  — fator de velocidade no pico do efeito (0..1). Ex.: 0.25 = o
+//               jogo roda a 25% da velocidade no instante do abate.
+export const HIT_SLOWMO = {
+    duration: 0.22,
+    minScale: 0.25
+};
 
 export const DOOR_STUB_TILES = 2;
 export const DOOR_ENTER_DEPTH = 70;

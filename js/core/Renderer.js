@@ -16,6 +16,37 @@ export class Renderer {
         // Câmera: ponto do MUNDO que fica no centro da tela.
         this.camX = canvas.width / 2;
         this.camY = canvas.height / 2;
+
+        // Sway "drone/pêndulo": deslocamento (px de mundo) somado ao alvo da
+        // câmera, resolvido por mola amortecida (ver applyDroneSway). Guarda a
+        // posição e a velocidade do sway em cada eixo.
+        this.swayX = 0; this.swayY = 0;
+        this._swayVX = 0; this._swayVY = 0;
+    }
+
+    // Zera o sway "drone" (posição e velocidade). Usado ao (re)entrar numa
+    // dungeon para a câmera não começar deslocada/balançando.
+    resetSway() {
+        this.swayX = 0; this.swayY = 0;
+        this._swayVX = 0; this._swayVY = 0;
+    }
+
+    /**
+     * Avança o sway "drone" por um passo de tempo dt (segundos). O alvo
+     * (targetX, targetY) é o deslocamento DESEJADO da câmera na direção do
+     * movimento dos jogadores. Uma mola amortecida persegue esse alvo:
+     *   a = stiffness*(alvo - pos) - damping*vel
+     * Com damping baixo em relação à rigidez, a câmera ULTRAPASSA e volta,
+     * criando o balanço de pêndulo ao virar/parar. Integração semi-implícita
+     * (atualiza velocidade e depois posição) para estabilidade.
+     */
+    applyDroneSway(targetX, targetY, stiffness, damping, dt) {
+        const ax = stiffness * (targetX - this.swayX) - damping * this._swayVX;
+        const ay = stiffness * (targetY - this.swayY) - damping * this._swayVY;
+        this._swayVX += ax * dt;
+        this._swayVY += ay * dt;
+        this.swayX += this._swayVX * dt;
+        this.swayY += this._swayVY * dt;
     }
 
     // Informa o tamanho do tile no mundo (px) para a quantização do zoom.
@@ -51,8 +82,12 @@ export class Renderer {
      * @param {object} t { x, y, zoom, bounds } — bounds da sala (opcional)
      */
     updateCamera(t) {
-        this.camX += (t.x - this.camX) * 0.12;
-        this.camY += (t.y - this.camY) * 0.12;
+        // O sway "drone" é somado ao alvo: a câmera persegue o centro da sala
+        // DESLOCADO na direção do movimento (o balanço vive em swayX/swayY).
+        const targetX = t.x + this.swayX;
+        const targetY = t.y + this.swayY;
+        this.camX += (targetX - this.camX) * 0.12;
+        this.camY += (targetY - this.camY) * 0.12;
         if (t.zoom) {
             this.zoom += (t.zoom - this.zoom) * 0.08;
             // Snap no alvo quando já está perto: evita a interpolação ficar

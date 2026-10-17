@@ -98,8 +98,21 @@ export class Chain {
             events.onReconnect?.();
         }
 
+        // Nível de tensão 0..1 para o feedback visual (pisca/treme antes de
+        // arrebentar). Combina a "insistência" acumulada com o quão perto a
+        // distância está do ponto de ruptura.
+        let strainLevel = 0;
+        if (this.connected) {
+            const byStrain = this.strain / this.strainLimit;
+            const span = this.breakDistance - this.strainDistance;
+            const byDist = span > 0 ? (dist - this.strainDistance) / span : 0;
+            strainLevel = Math.max(0, Math.min(1, Math.max(byStrain, byDist)));
+        }
+
         // Mantém a animação da arma rodando. Passa os jogadores para que a
-        // arma possa reagir ao movimento (ex.: a serra só gira quando andam).
+        // arma possa reagir ao movimento (ex.: a serra só gira quando andam) e
+        // o nível de tensão para o feedback de ruptura iminente.
+        this.weapon.setStrain?.(strainLevel);
         this.weapon.update(p1, p2);
     }
 

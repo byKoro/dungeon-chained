@@ -87,6 +87,31 @@ export class Physics {
         }
     }
 
+    // Colisão com um CÍRCULO sólido (ex.: o disco da serra). Empurra a entidade
+    // para fora do círculo e converte parte da sobreposição em empurrão de
+    // velocidade. (cx,cy) é o centro; `radius` o raio sólido.
+    static resolveCircleCollision(entity, cx, cy, radius, impulse = 0.35) {
+        const r = radius + (entity.hitRadius ?? 0);
+        let dx = entity.x - cx;
+        let dy = entity.y - cy;
+        let dist = Math.hypot(dx, dy);
+        if (dist >= r) return;
+
+        // Se cair exatamente no centro, escolhe uma direção qualquer.
+        if (dist === 0) { dx = 1; dy = 0; dist = 1; }
+
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const overlap = r - dist;
+
+        // Reposiciona na borda do círculo.
+        entity.x = cx + nx * r;
+        entity.y = cy + ny * r;
+
+        // Empurrão como velocidade (sensação de ser repelido).
+        Physics._addImpulse(entity, nx * overlap * impulse, ny * overlap * impulse);
+    }
+
     // Aplica um impulso de empurrão. Se a entidade tiver um canal de empurrão
     // dedicado (pushVx/pushVy), usa-o; senão soma direto em vx/vy.
     static _addImpulse(e, ix, iy) {

@@ -1,6 +1,7 @@
 import { FloorDebris } from './FloorDebris.js';
 import { DustPuff } from './DustPuff.js';
 import { SparkParticle } from './SparkParticle.js';
+import { FlashParticle } from './FlashParticle.js';
 
 // 1 "pixel" de sangue no mundo (= 1 pixel de tile: tile 16px desenhado a 64px).
 const BLOOD_PX = 4;
@@ -84,6 +85,7 @@ export class ParticleSystem {
         this.floorDebris = [];
         this.smoke = [];                // baforadas de fumaça (poeira de corrida)
         this.sparks = [];               // faíscas da serra raspando o chão
+        this.flashes = [];              // flash branco ao arrebentar a corrente
         this.bloodCanvas = bloodCanvas; // buffer offscreen do sangue de chão
     }
 
@@ -92,6 +94,7 @@ export class ParticleSystem {
         this.floorDebris = [];
         this.smoke = [];
         this.sparks = [];
+        this.flashes = [];
         if (this.bloodCanvas) this.bloodCanvas.clear();
     }
 
@@ -108,11 +111,26 @@ export class ParticleSystem {
         }
     }
 
+    // Flash branco (procedural, com glow sutil) ao arrebentar a corrente/serra.
+    // 'power' escala levemente a velocidade/alcance.
+    triggerFlash(x, y, amount = 14, power = 1) {
+        for (let i = 0; i < amount; i++) {
+            this.flashes.push(new FlashParticle(x, y, power));
+        }
+    }
+
     // Faíscas da serra raspando o chão. Nascem na BORDA do disco (raio) e são
     // arremessadas no sentido do giro (spinDir: +1 horário, -1 anti-horário).
     triggerSparks(cx, cy, radius = 24, spinDir = 1, amount = 2) {
         for (let i = 0; i < amount; i++) {
             this.sparks.push(new SparkParticle(cx, cy, radius, spinDir));
+        }
+    }
+
+    // Explosão de faíscas EXAGERADAS (radiais, com glow) ao arrebentar.
+    triggerSparkBurst(cx, cy, radius = 24, amount = 24, power = 1.5) {
+        for (let i = 0; i < amount; i++) {
+            this.sparks.push(new SparkParticle(cx, cy, radius, 1, { burst: true, power }));
         }
     }
 
@@ -188,6 +206,12 @@ export class ParticleSystem {
             this.sparks[i].update();
             if (this.sparks[i].done) this.sparks.splice(i, 1);
         }
+
+        // Atualiza flashes e remove os que terminaram
+        for (let i = this.flashes.length - 1; i >= 0; i--) {
+            this.flashes[i].update();
+            if (this.flashes[i].done) this.flashes.splice(i, 1);
+        }
     }
 
     // 'clip' (opcional) {minX,maxX,minY,maxY}: restringe o sangue de chão à
@@ -224,6 +248,10 @@ export class ParticleSystem {
     drawSparks(ctx) {
         for (let i = 0; i < this.sparks.length; i++) {
             this.sparks[i].draw(ctx);
+        }
+        // Flashes de ruptura: desenhados junto, por cima de tudo no mundo.
+        for (let i = 0; i < this.flashes.length; i++) {
+            this.flashes[i].draw(ctx);
         }
     }
 

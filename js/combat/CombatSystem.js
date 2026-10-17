@@ -53,7 +53,7 @@ export class CombatSystem {
      * @param {boolean} connected quando false (corrente arrebentada), a arma
      *   está desarmada e NÃO causa dano. Default true para compatibilidade.
      */
-    resolveWeaponHits(weapon, enemies, p1, p2, connected = true) {
+    resolveWeaponHits(weapon, enemies, p1, p2, connected = true, onKill = null) {
         if (!connected) return;
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
@@ -72,6 +72,9 @@ export class CombatSystem {
                 // respingo de sangue extra no ponto de contato.
                 this.renderer.triggerShake(10);
                 this.particleSystem.triggerBlood(enemy.x, enemy.y, 10, 0.9);
+                // Slow-motion: desacelera o gameplay por um instante no abate,
+                // dando peso ao golpe. O Game controla a câmera lenta de fato.
+                onKill?.(enemy);
             }
         }
     }

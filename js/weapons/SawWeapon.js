@@ -69,6 +69,9 @@ export class SawWeapon extends Weapon {
         this.rotation = 0;     // ângulo acumulado da rotação real (giro)
         this.wasSpinning = false; // para detectar o instante do arranque
         this.spinKick = 0;     // "pop" de escala ao engatar o giro (decai)
+        this.strain = 0;       // tensão da corrente 0..1 (ruptura iminente)
+        this.flashPhase = 0;   // fase do piscar branco (avança conforme a tensão)
+        this._flashCanvas = null; // offscreen para tingir o sprite de branco
     }
 
     update(p1 = null, p2 = null) {
@@ -76,6 +79,10 @@ export class SawWeapon extends Weapon {
         // o timer expirar). O Game ajusta `onBlood` a cada frame.
         if (this.onBlood) this.bloodTimer = BLOOD_DURATION;
         else if (this.bloodTimer > 0) this.bloodTimer--;
+
+        // Pisca de ruptura iminente: a fase avança mais rápido quanto maior a
+        // tensão, então o piscar acelera progressivamente até arrebentar.
+        this.flashPhase += 0.15 + this.strain * 0.6;
 
         // Alvo de giro: a serra só gira quando OS DOIS jogadores andam. Usamos
         // o MENOR dos dois speedMag — se um está parado, o alvo cai para ~0.
@@ -116,6 +123,12 @@ export class SawWeapon extends Weapon {
         this.onBlood = !!flag;
     }
 
+    // A Chain informa, a cada frame, o nível de tensão (0..1). Dirige o piscar
+    // branco progressivo e o tremor extra antes de arrebentar.
+    setStrain(level) {
+        this.strain = Math.max(0, Math.min(1, level || 0));
+    }
+
     // Velocidade de giro atual (0..1), para o Game modular a tremida de câmera.
     get spinSpeed() {
         return this.spin;
@@ -130,6 +143,12 @@ export class SawWeapon extends Weapon {
     // faíscas na borda.
     get discRadius() {
         return SAW_DRAW_LARGE / 2;
+    }
+
+    // Raio SÓLIDO de colisão: 50% do raio do disco (centro da serra). Impede
+    // que os jogadores fiquem em cima/atrás do disco.
+    get collisionRadius() {
+        return this.discRadius * 0.5;
     }
 
     // true enquanto a serra está suja de sangue (após um acerto recente).
@@ -195,7 +214,19 @@ export class SawWeapon extends Weapon {
         // 0.5). Assim a troca inércia<->giro "chacoalha" bem mais.
         const spinning = this.spin > BLEND_LO;
         const transPulse = blend * (1 - blend) * 4; // 0..1, pico no meio
-        const shake = (spinning ? SHAKE_SPIN : 0) + SHAKE_TRANSITION * transPulse;
+        // Tensão adiciona um tremor leve (cresce com a iminência da ruptura).
+        const strainShake = this.strain * this.strain * 3.5;
+        const shake = (spinning ? SHAKE_SPIN : 0) + SHAKE_TRANSITION * transPulse + strainShake;
+
+        // Flash de ruptura iminente: oscilação (0..1) cuja AMPLITUDE e PISO
+        // crescem com a tensão. Perto do limite fica quase sempre branco.
+        let flash = 0;
+        if (this.strain > 0.02) {
+            const osc = 0.5 + 0.5 * Math.sin(this.flashPhase); // 0..1
+            const env = this.strain * this.strain;             // ease-in
+            // mistura: oscila cedo, satura em branco perto da ruptura.
+            flash = Math.min(1, osc * env * 1.4 + env * env * 0.6);
+        }
 
         // JUICE: "pop" de escala no arranque — estica ao engatar o giro e volta
         // ao normal conforme o kick decai (ease-out).
@@ -205,6 +236,29 @@ export class SawWeapon extends Weapon {
         // Tanto a INÉRCIA quanto o GIRO rotacionam de fato — a diferença é só
         // qual sprite usar. Assim, ao perder velocidade, o disco de inércia
         // segue girando pelo `this.rotation` residual até o `spin` zerar.
+        // Offscreen que guarda o recorte do frame tingido de BRANCO (usando o
+        // próprio alfa do sprite como máscara). Reaproveitado entre frames.
+        const whiteTint = (sx, sy) => {
+            const S = SAW_FRAME.size;
+            if (!this._flashCanvas) {
+                this._flashCanvas = document.createElement("canvas");
+                this._flashCanvas.width = S;
+                this._flashCanvas.height = S;
+            }
+            const fc = this._flashCanvas;
+            const fx = fc.getContext("2d");
+            fx.imageSmoothingEnabled = false;
+            fx.clearRect(0, 0, S, S);
+            fx.globalCompositeOperation = "source-over";
+            fx.drawImage(sprite, sx, sy, S, S, 0, 0, S, S);
+            // Pinta de branco só onde há sprite (preserva o recorte/alfa).
+            fx.globalCompositeOperation = "source-atop";
+            fx.fillStyle = "#ffffff";
+            fx.fillRect(0, 0, S, S);
+            fx.globalCompositeOperation = "source-over";
+            return fc;
+        };
+
         const drawDisc = (x, y, draw, dir, sx, sy, alpha) => {
             const jx = (Math.random() - 0.5) * 2 * shake;
             const jy = (Math.random() - 0.5) * 2 * shake;
@@ -214,6 +268,11 @@ export class SawWeapon extends Weapon {
             ctx.translate(x + jx, y + jy);
             ctx.rotate(this.rotation * dir);
             ctx.drawImage(sprite, sx, sy, SAW_FRAME.size, SAW_FRAME.size, -sz / 2, -sz / 2, sz, sz);
+            // Pisca branco por cima (ruptura iminente).
+            if (flash > 0) {
+                ctx.globalAlpha = alpha * flash;
+                ctx.drawImage(whiteTint(sx, sy), -sz / 2, -sz / 2, sz, sz);
+            }
             ctx.restore();
         };
 
@@ -223,6 +282,23 @@ export class SawWeapon extends Weapon {
         this.getSawPositions(p1, p2).forEach(({ x, y, radius }, index) => {
             const dir = index % 2 === 1 ? 1 : -1;
             const draw = radius >= 14 ? SAW_DRAW_LARGE : SAW_DRAW_SMALL;
+
+            // GLOW do pisca (ruptura iminente): halo luminoso aditivo atrás do
+            // disco, pulsando junto com o flash. Blur contido para não borrar
+            // demais sobre o pixel art.
+            if (flash > 0.01) {
+                ctx.save();
+                ctx.globalCompositeOperation = "lighter";
+                ctx.globalAlpha = flash * 0.7;
+                ctx.shadowColor = "#eaf2ff";
+                ctx.shadowBlur = 8 * flash;
+                ctx.fillStyle = "#eaf2ff";
+                ctx.beginPath();
+                ctx.arc(x, y, draw * 0.28, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
 
             if (spriteReady) {
                 // Crossfade por VELOCIDADE: giro rápido usa o sprite "girando";
