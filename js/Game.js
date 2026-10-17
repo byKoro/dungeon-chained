@@ -454,6 +454,7 @@ export class Game {
         const liveEnemies = enemies.filter(e => e.state !== "dying");
         const allEntities = [p1, p2, ...liveEnemies];
         for (let it = 0; it < 3; it++) Physics.resolveEntityCollisions(allEntities);
+        for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
         // Confinamento: inimigos presos; players podem adentrar portas abertas
         enemies.forEach(e => rooms.clampEnemy(e, this.arenaBounds));
