@@ -1839,13 +1839,16 @@ class RoomEditor {
 
 
     _toggleWallAt(col, row) {
-        if (col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1) return;
+        // Nas bordas, só permite substituir parede existente
+        const onBorder = col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1;
         const key = String(col) + "," + String(row);
-        const spawns = this._getPlayerSpawns();
-        if (spawns.some(sp => (sp.p1.col === col && sp.p1.row === row) || (sp.p2.col === col && sp.p2.row === row))) return;
-        const existing = this.room.walls.findIndex(w => String(w.col) + "," + String(w.row) === key);
-        if (existing >= 0) {
-            this.room.walls.splice(existing, 1);
+        const existingWall = this.room.walls.find(w => String(w.col) + "," + String(w.row) === key);
+        if (onBorder && !existingWall) return; // Só substitui, não cria nova
+        if (existingWall) {
+            // Substitui a parede existente pelo tipo selecionado
+            const tile = Number(document.getElementById("wall-tile")?.value || 0);
+            existingWall.tile = tile;
+            existingWall.side = this._wallSideForTile(tile);
         } else {
             if (this.room.holes.has(key)) return;
             const tile = Number(document.getElementById("wall-tile")?.value || 0);
