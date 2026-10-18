@@ -673,11 +673,11 @@ export class BossWallShot extends RushShot {
         }
         // Rachaduras de luz: silhueta clara (linha 0) piscando por cima.
         if (B.crack > 0.01) {
+            // Pulso suave (sem piscar aleatório) e teto baixo: brilha sem
+            // estourar a caveira num bloco branco chapado.
             ctx.globalCompositeOperation = 'lighter';
-            for (let i = 0; i < 2; i++) {
-                ctx.globalAlpha = clamp01(B.crack * (0.45 + 0.55 * Math.random()));
-                ctx.drawImage(img, 0, 0, 100, 100, -52.5, -ANCHOR_Y, 100, 100);
-            }
+            ctx.globalAlpha = clamp01(B.crack * 0.5 * (0.8 + 0.2 * Math.sin(A.t * 14)));
+            ctx.drawImage(img, 0, 0, 100, 100, -52.5, -ANCHOR_Y, 100, 100);
         }
         ctx.restore();
 
