@@ -704,6 +704,7 @@ class RoomEditor {
         this._updatePropsListUI();
         this._syncScatterUI();
         this._updateSpawnsListUI();
+        this._updateTestSpawnUI();
 
         // Segurança de spawn (no-op com guard) e persistência da cena.
         this._checkSpawnSafety();
@@ -972,6 +973,7 @@ class RoomEditor {
         // 5. Renderiza Spawns dos Jogadores (P1 & P2 nas entradas)
         if (this.showPlayerSpawns) {
             this._renderPlayerSpawns(ctx, tileW);
+            this._renderTestSpawn(ctx, tileW);
         }
 
         // 6. Renderiza Destaques de Portas nas Bordas
@@ -1609,6 +1611,18 @@ class RoomEditor {
             };
         }
 
+        // Spawn do teste (Centro / portas / Personalizado)
+        const testSpawnSel = document.getElementById("test-spawn-mode");
+        if (testSpawnSel) {
+            testSpawnSel.onchange = (e) => {
+                // Mantém os tiles personalizados ao alternar, para poder voltar.
+                this.testSpawn = { ...this.testSpawn, mode: e.target.value };
+                this._saveTestSpawn();
+                this._updateTestSpawnUI();
+                this.render();
+            };
+        }
+
         // Alternadores de Exibição
         document.getElementById("toggle-grid").onchange = (e) => { this.showGrid = e.target.checked; this.render(); };
         document.getElementById("toggle-doors").onchange = (e) => { this.showDoors = e.target.checked; this.render(); };
@@ -1777,6 +1791,8 @@ class RoomEditor {
             this._addHazardAt(col, row);
         } else if (this.activeTab === "tab-enemies") {
             this._addEnemyAt(col, row);
+        } else if (this.activeTab === "tab-spawns") {
+            this._setCustomTestSpawn(col, row);
         }
     }
 
@@ -2383,6 +2399,13 @@ class RoomEditor {
             scatterProps: this.room.scatterProps
         };
         if (this.room.lock && this.room.lock !== "auto") playtestData.lock = this.room.lock;
+
+        // Spawn escolhido na aba "Spawns Players" (tiles locais da sala).
+        const sp = this._resolveTestSpawn();
+        playtestData.testSpawn = {
+            p1: { col: sp.p1.col, row: sp.p1.row },
+            p2: { col: sp.p2.col, row: sp.p2.row }
+        };
 
         sessionStorage.setItem("editor_custom_room", JSON.stringify(playtestData));
         // Garante que a cena do editor fique salva antes de sair para o teste.

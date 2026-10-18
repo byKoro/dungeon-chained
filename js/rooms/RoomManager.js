@@ -43,12 +43,22 @@ export class RoomManager {
     // Gera uma nova dungeon do zero ou carrega a sala do editor se estiver em modo playtest.
     reset() {
         let customGraph = null;
+        // Spawn escolhido no editor para o teste ({ p1:{col,row}, p2:{col,row} }).
+        this.playtestSpawn = null;
         if (typeof window !== "undefined" && window.sessionStorage) {
             const isPlaytest = window.location.search.includes("playtest=true");
             const raw = window.sessionStorage.getItem("editor_custom_room");
             if (isPlaytest && raw) {
                 try {
                     const data = JSON.parse(raw);
+                    const ts = data.testSpawn;
+                    const validTile = (t) => t && Number.isInteger(t.col) && Number.isInteger(t.row);
+                    if (ts && validTile(ts.p1) && validTile(ts.p2)) {
+                        this.playtestSpawn = {
+                            p1: { col: ts.p1.col, row: ts.p1.row },
+                            p2: { col: ts.p2.col, row: ts.p2.row }
+                        };
+                    }
                     const midGx = (GRID_COLS / 2) | 0;
                     const midGy = (GRID_ROWS / 2) | 0;
                     const cells = new Map();

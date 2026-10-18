@@ -270,12 +270,20 @@ export class Game {
 
         const rect = this.rooms.cellRect();
         const spawns = getPlayerSpawnPositions("CENTER", rect.x, rect.y, TILE);
+        // Teste do editor: usa o spawn escolhido na aba "Spawns Players".
+        const custom = this.playtest ? this.rooms.playtestSpawn : null;
+        if (custom) {
+            for (const key of ["p1", "p2"]) {
+                spawns[key].x = rect.x + (custom[key].col + 0.5) * TILE;
+                spawns[key].y = rect.y + (custom[key].row + 0.5) * TILE;
+            }
+        }
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
 
-        // No modo de teste do editor, o spawn central pode cair sobre um buraco
+        // No modo de teste do editor, o spawn pode cair sobre um buraco
         // (morte instantânea em loop). Reposiciona cada player no tile de piso
-        // seguro mais próximo do centro.
+        // seguro mais próximo.
         if (this.playtest) {
             this.tiles.ensureSafeSpawn(this.p1, rect);
             this.tiles.ensureSafeSpawn(this.p2, rect);
