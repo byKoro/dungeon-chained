@@ -46,6 +46,9 @@ js/trailer/
   scenes/frenzy/FrenzyScene.js + FrenzyBeats.js + HordeDirector.js
   scenes/montage/ZigZagShot.js, SnapShot.js, SplitShot.js
   scenes/mapgen/MapGenScene.js + mapLayout.js + mapBake.js
+  kit/rushKit.js        RushShot (base), dressRoom (cenografia), handheld (tremido do drone)
+  fx/ArrowWipe.js       cortina de flechas em tela (transição via stage.overlay)
+  scenes/rush/ArrowRunShot.js, HoleRunShot.js, ButtonDoorShot.js, GiantSawShot.js
 ```
 
 ### Contrato de cena (TrailerPlayer)
@@ -94,7 +97,11 @@ opcionais `reset()`, `reachedEnd`, `cutIn = 'impact'`.
 | 3 | ZigZagShot | 3.4s | impacto |
 | 4 | SnapShot | até 11s (termina ~0.7s após cruzar a horda) | impacto |
 | 5 | SplitShot | 6.4s | impacto |
-| 6 | MapGenScene | infinita; `reachedEnd` em 14.2s → COMEÇAR | impacto |
+| 6 | MapGenScene | 14.15s (termina no mergulho) | impacto |
+| 7 | ArrowRunShot | até a cortina de flechas cobrir (~5.1s) | contínua (clarão do mergulho via overlay) |
+| 8 | HoleRunShot | 4.0s | contínua (revelada pela cortina) |
+| 9 | ButtonDoorShot | ~6.1s (0.25s após a serra pousar) | impacto |
+| 10 | GiantSawShot | infinita; `reachedEnd` ~8.5s → COMEÇAR | impacto |
 
 ### 0 — IntroScene (sala padrão, porta S, iluminação sombria)
 
@@ -210,7 +217,7 @@ no corte, subclasse implementa `setup(A)`.
   frente (freiam + pulam) ou atrás (arrancam). Após 6s param ofegantes;
   corta em 6.4s para a geração de mapas.
 
-### 6 — MapGenScene (geração de mapas, última cena)
+### 6 — MapGenScene (geração de mapas)
 
 Não usa ActionArena nem o Renderer: câmera própria (pos/zoom/rotação contínuos,
 sem quantização) direto no canvas do stage, PostProcessor próprio.
@@ -236,6 +243,10 @@ sem quantização) direto no canvas do stage, PostProcessor próprio.
   cada corredor assa a versão GLOBAL das células que ele muda (`cover` = piso
   + 8 vizinhos) e é desenhado por cima das salas. Nada de props/tochas nas
   células `cover`.
+- Fim: `DIVE_AT 13.0` + `DIVE_DUR 1.15` — mergulho (zoom acelerando, gira até
+  0.32 rad, riscos saindo do centro) na sala retangular de nível 1-2 mais perto
+  do centro (`diveRoom`); clarão branco 0.8 que segue como `stage.overlay`
+  (`whiteFade`) por cima da cena 7. Luz de tocha só com tile ≥14 px na tela.
 - Roteiro (`POPS`): panorâmica da sala do centro até 3.0s; pops em 3.0 / 6.6 /
   10.2 (`POP_DUR 0.8`: antecipa +6%, recua com easeOutBack em escala log,
   riscos de velocidade, shake 16, clarão). Salas do nível nascem escalonadas
@@ -248,6 +259,46 @@ sem quantização) direto no canvas do stage, PostProcessor próprio.
   inimigos vagando (`_wander`: alvo aleatório com caminho livre, pausa, às
   vezes ensaia um golpe). Ambiente escurece de perto e clareia de longe
   (`AMBIENT_DARK → AMBIENT_MAP` pelo tamanho do tile na tela).
+
+### 7–10 — Sequência "desespero" (RushShot)
+
+`RushShot` = `ArenaShot` com `smoothZoom` (zoom contínuo, sem quantizar —
+o SeamlessTileset segura as frestas), `camClose 1.0` (zooms das cenas já
+colados: ~1.7–2.9 × zoomRef), vinheta 0.88, ambiente `32,22,36`. Cenografia
+por `dressRoom(A, {seed, crates, rubble, loot, banners, blood, avoid})`
+(props/castiçais só na 1ª vez; sangue velho recarimbado a cada start).
+Drone: `handheld(t, amp)` somado a x/y/rot em todo `focus`.
+
+Extensões da ActionArena usadas aqui: `red`/`redHz` (luz vermelha pulsando +
+vinheta vermelha), `doorOpen[dir]` 0..1 (porta fechada que abre recolhendo
+as folhas; S por cima da parede frontal), `freeSaw {x,y,vx,vy}` (serra solta,
+corta sozinha), `sawScale` (serra gigante, desenhada à mão sem o tremor do
+jogo, mata todo o disco), `arrowsKill`, flechas com `stopX`/`stuckDur`
+(cravam no chão), `killEnemy(e)`, `inHole(x,y)` (inimigos não pisam em
+buraco), `setCam` (zoom absoluto p/ mergulhos), ganchos `onDrawFloor/onDrawTop`.
+`stage.overlay {update, draw, done}` é desenhado pelo TrailerPlayer por cima
+de qualquer cena (atravessa cortes).
+
+- 7 ArrowRunShot (46×11, porta O): continua o mergulho (sala inteira → colado
+  em 1.0s), correm para a esquerda, câmera à frente com o lado direito livre;
+  flechas de trás cada vez mais densas (5→27/s, 60/s no fim), 42% cravam no
+  chão, passa-raspando a cada ~0.5s (pulinho, careta, olhada), 4 demônios
+  espetados por flechas. Em `WIPE_AT 3.9` (simulação) cria a `ArrowWipe`
+  (cobre em 0.42s, segura 0.12s, revela em 0.5s) e termina quando cobre.
+- 8 HoleRunShot (18×30, porta N): ponte em zigue-zague (meia largura 2.7
+  tiles) num abismo, beiradas de 2 tiles nas paredes, 2 fendas atravessando a
+  ponte (pulam com `hop 6.6`, câmera lenta no 1º salto). Inimigos: 6 nas
+  beiradas acompanhando, 5 na ponte à frente (bote), 4 atrás (param na fenda).
+- 9 ButtonDoorShot (16×11, portas N e S fechadas, sem serra): cada um corre a
+  um botão e pisam juntos (garantia 2.2s) → porta N treme e abre, 10 inimigos
+  saem, recuam até a parede de baixo → porta S arrebenta (+2.25s) e a serra
+  solta entra, persegue o inimigo mais próximo (16 px/passo) e serra todos;
+  depois pousa entre os dois.
+- 10 GiantSawShot (20×13, porta L): fogem da horda (15) e esbarram na parede
+  O; horda fecha semicírculo (raios 175–259, ±1.25 rad); closes rápidos
+  (raiva / fúria); esticam a corda (ropeLen 720, `setStrain` pisca); serra
+  cresce até `BIG 8.6` (raio ~275) em 0.85s matando todos (garantia no auge);
+  mergulho de 1.7s até o disco encher a tela (1.05 × diagonal). Última cena.
 
 ## Convenções e armadilhas
 

@@ -10,9 +10,9 @@
     "semantic_hash": "abf42298b04a4a728c47c657dd937a32"
   },
   "js/config/EntityConfig.js": {
-    "mtime": 1791168618.9195936,
-    "ast_hash": "439a7743981598b13e64e1a631a52e00",
-    "semantic_hash": "439a7743981598b13e64e1a631a52e00"
+    "mtime": 1792355176.842936,
+    "ast_hash": "51990011ba2a55957d14db58057e850b",
+    "semantic_hash": "51990011ba2a55957d14db58057e850b"
   },
   "js/config/GameConfig.js": {
     "mtime": 1792344858.6296632,
@@ -20,9 +20,9 @@
     "semantic_hash": "a431c52e1fc18f92c94502a5a2921b9d"
   },
   "js/core/AssetLoader.js": {
-    "mtime": 1792344039.6441417,
-    "ast_hash": "045e80793bf85f2202d65426fea79198",
-    "semantic_hash": "045e80793bf85f2202d65426fea79198"
+    "mtime": 1792355176.8439362,
+    "ast_hash": "aecc6264c6ef42a1d6edeb0d7f14f13a",
+    "semantic_hash": "aecc6264c6ef42a1d6edeb0d7f14f13a"
   },
   "js/core/AudioManager.js": {
     "mtime": 1792344039.6456456,
@@ -65,9 +65,9 @@
     "semantic_hash": "65ec45b2e97c96c6048bf9e72100ab90"
   },
   "js/editor/EditorApp.js": {
-    "mtime": 1792350919.8060696,
-    "ast_hash": "03298f7d214ac35a2db32fe522be673c",
-    "semantic_hash": "03298f7d214ac35a2db32fe522be673c"
+    "mtime": 1792357324.382903,
+    "ast_hash": "537c3c8ba7807be5180e310710007919",
+    "semantic_hash": "537c3c8ba7807be5180e310710007919"
   },
   "js/entities/ArrowTrap.js": {
     "mtime": 1792258551.0167255,
@@ -90,9 +90,9 @@
     "semantic_hash": "fa4a8a1393446caa461711f8b90ad7b6"
   },
   "js/entities/MeleeEnemy.js": {
-    "mtime": 1792290943.0350668,
-    "ast_hash": "168d07b50e72e8efc445cf91e5c59967",
-    "semantic_hash": "168d07b50e72e8efc445cf91e5c59967"
+    "mtime": 1792355176.8469417,
+    "ast_hash": "52a624515cae5e6a1c936b5b5944afa9",
+    "semantic_hash": "52a624515cae5e6a1c936b5b5944afa9"
   },
   "js/entities/Player.js": {
     "mtime": 1792344039.6491566,
@@ -205,9 +205,9 @@
     "semantic_hash": "7e021c78346f8b42170557bf556fe47c"
   },
   "js/systems/SpawnSystem.js": {
-    "mtime": 1791168618.9421432,
-    "ast_hash": "bc871c4b5ae4231b3ae557b244dee5f8",
-    "semantic_hash": "bc871c4b5ae4231b3ae557b244dee5f8"
+    "mtime": 1792355176.8479445,
+    "ast_hash": "b5c750f4219e3aa53fccefbcda2ad132",
+    "semantic_hash": "b5c750f4219e3aa53fccefbcda2ad132"
   },
   "js/systems/WindSystem.js": {
     "mtime": 1791168618.9426427,
@@ -736,14 +736,14 @@
     "semantic_hash": "ec463806b1cb228e3af5836c33f94437"
   },
   "js/trailer.js": {
-    "mtime": 1792345620.7728584,
-    "ast_hash": "3e9b8ded5ab7b3ab7138804ea403d66f",
-    "semantic_hash": "3e9b8ded5ab7b3ab7138804ea403d66f"
+    "mtime": 1792357430.6108885,
+    "ast_hash": "f430bd3acab010f4914cabc05239bceb",
+    "semantic_hash": "f430bd3acab010f4914cabc05239bceb"
   },
   "js/trailer/TrailerPlayer.js": {
-    "mtime": 1792353516.6490026,
-    "ast_hash": "ecb7d9645da6a87aa11da8272030e7fa",
-    "semantic_hash": "ecb7d9645da6a87aa11da8272030e7fa"
+    "mtime": 1792354095.628507,
+    "ast_hash": "cf32429311f51a59ac7d770ca1d2b5b7",
+    "semantic_hash": "cf32429311f51a59ac7d770ca1d2b5b7"
   },
   "js/trailer/TrailerStage.js": {
     "mtime": 1792353513.547137,
@@ -786,14 +786,14 @@
     "semantic_hash": "2e02fb0072a8577e94ba7aa1d8157ee0"
   },
   "js/trailer/kit/arenaRender.js": {
-    "mtime": 1792353499.614023,
-    "ast_hash": "babd72b7949956e2f9c5d5b2135a1e5e",
-    "semantic_hash": "babd72b7949956e2f9c5d5b2135a1e5e"
+    "mtime": 1792355176.8499448,
+    "ast_hash": "e85dd737f7486eb0338e3b00b77aad42",
+    "semantic_hash": "e85dd737f7486eb0338e3b00b77aad42"
   },
   "js/trailer/kit/rushKit.js": {
-    "mtime": 1792353768.1588397,
-    "ast_hash": "fc0d5aa9287de2c21c51cc2f4441d1fc",
-    "semantic_hash": "fc0d5aa9287de2c21c51cc2f4441d1fc"
+    "mtime": 1792355176.8509445,
+    "ast_hash": "e7159743d6b02906184c5315957e99d8",
+    "semantic_hash": "e7159743d6b02906184c5315957e99d8"
   },
   "js/trailer/scenes/IntroScene.js": {
     "mtime": 1792344039.6736412,
@@ -821,9 +821,9 @@
     "semantic_hash": "c184f7c50847f30e40458ee8ab628696"
   },
   "js/trailer/scenes/mapgen/MapGenScene.js": {
-    "mtime": 1792346132.180931,
-    "ast_hash": "dc656dcecdad54602d472e6b498c076c",
-    "semantic_hash": "dc656dcecdad54602d472e6b498c076c"
+    "mtime": 1792357220.6154912,
+    "ast_hash": "90d7fa299c17a2dfcd6f51373b146c0c",
+    "semantic_hash": "90d7fa299c17a2dfcd6f51373b146c0c"
   },
   "js/trailer/scenes/mapgen/mapBake.js": {
     "mtime": 1792345487.0410147,
@@ -851,19 +851,19 @@
     "semantic_hash": "ebc1fa8f8f288fb407a61ba0302ad6e2"
   },
   "js/trailer/scenes/rush/ArrowRunShot.js": {
-    "mtime": 1792353734.7812903,
-    "ast_hash": "c369be93058993ca183c5b9e317dc6cb",
-    "semantic_hash": "c369be93058993ca183c5b9e317dc6cb"
+    "mtime": 1792355176.8519444,
+    "ast_hash": "4994ded75985262fbb18c912f5f49194",
+    "semantic_hash": "4994ded75985262fbb18c912f5f49194"
   },
   "js/trailer/scenes/rush/ButtonDoorShot.js": {
-    "mtime": 1792353911.0652387,
-    "ast_hash": "45b3502b8acf485ce8bfeef0321f8d15",
-    "semantic_hash": "45b3502b8acf485ce8bfeef0321f8d15"
+    "mtime": 1792355280.1405969,
+    "ast_hash": "086b0252e11bdad62b63688f37a33e6b",
+    "semantic_hash": "086b0252e11bdad62b63688f37a33e6b"
   },
   "js/trailer/scenes/rush/HoleRunShot.js": {
-    "mtime": 1792353827.9069567,
-    "ast_hash": "3543ef13ea54c2a18dd5ed6fe36230d6",
-    "semantic_hash": "3543ef13ea54c2a18dd5ed6fe36230d6"
+    "mtime": 1792355188.743944,
+    "ast_hash": "3b0902a4f4bbac021f68f1cce3cf6fed",
+    "semantic_hash": "3b0902a4f4bbac021f68f1cce3cf6fed"
   },
   "js/ui/LoadingScreen.js": {
     "mtime": 1792344039.6812882,
@@ -1214,5 +1214,20 @@
     "mtime": 1791168638.8835957,
     "ast_hash": "3308b49b94bbf44b3d253f5304ddc77b",
     "semantic_hash": "3308b49b94bbf44b3d253f5304ddc77b"
+  },
+  "js/config/TinyRpgEnemies.js": {
+    "mtime": 1792354950.190863,
+    "ast_hash": "5d509dba69b68916fc362b43f3a58b0e",
+    "semantic_hash": "5d509dba69b68916fc362b43f3a58b0e"
+  },
+  "js/trailer/scenes/rush/GiantSawShot.js": {
+    "mtime": 1792355734.0927129,
+    "ast_hash": "8f2783160e2376f9249e68f8d8357739",
+    "semantic_hash": "8f2783160e2376f9249e68f8d8357739"
+  },
+  "tools/build_tinyrpg_enemies.py": {
+    "mtime": 1792354948.127231,
+    "ast_hash": "5cde63fa575dcaff3398d76a9c3ff794",
+    "semantic_hash": "5cde63fa575dcaff3398d76a9c3ff794"
   }
 }
