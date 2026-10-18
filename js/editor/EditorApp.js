@@ -67,6 +67,8 @@ class RoomEditor {
         this.selectedHazard = "button";
         this.spikeTiming = "normal";
         this.spikeDelay = 0;
+        this.spikeRowDir = "right";   // direção da onda da fileira (right/left/down/up)
+        this.spikeRowCount = 4;       // quantidade de tiles da fileira
         this.selectedEnemy = "demon";
         this.selectedProp = 59;
         this.selectedTorchType = "torch";
@@ -787,7 +789,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>${this._hazardLabel(h.type)} (col:${h.col ?? '-'}, lin:${h.row ?? '-'})</span>
+                <span>${this._hazardLabel(h.type)} (col:${h.col ?? '-'}, lin:${h.row ?? '-'})${h.type === "spikeRow" ? ` · ${h.count || 4} tiles ${this._waveDirArrow(h.dir)}` : ""}</span>
                 <button class="btn btn-sm btn-danger" data-del-hazard="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -1260,6 +1262,7 @@ class RoomEditor {
                         ctx.fill();
                     }
                 }
+                if (h.type === "spikeRow") this._renderWaveArrow(ctx, h, tiles, tileW);
             } else if (h.type === "arrow") {
                 const t = tiles[0];
                 const dx = t.col * tileW;
@@ -1287,22 +1290,56 @@ class RoomEditor {
     }
 
     /**
-     * Lista de tiles {col,row} que um perigo ocupa. spikeRow ocupa uma fileira
-     * horizontal de `count` tiles a partir de (col,row); os demais, 1 tile.
+     * Lista de tiles {col,row} que um perigo ocupa. spikeRow ocupa `count`
+     * tiles a partir de (col,row): para a direita (horizontal) ou para baixo
+     * (vertical, quando a onda vai para cima/baixo); os demais, 1 tile.
      */
     _hazardTiles(h) {
         const col = h.col ?? 0;
         const row = h.row ?? 0;
         if (h.type === "spikeRow") {
             const count = h.count || 4;
+            const vertical = h.dir === "up" || h.dir === "down";
             const tiles = [];
             for (let i = 0; i < count; i++) {
-                const c = Math.min(this.cols - 2, Math.max(1, col + i));
-                tiles.push({ col: c, row });
+                if (vertical) tiles.push({ col, row: Math.min(this.rows - 2, Math.max(1, row + i)) });
+                else tiles.push({ col: Math.min(this.cols - 2, Math.max(1, col + i)), row });
             }
             return tiles;
         }
         return [{ col, row }];
+    }
+
+    // Seta da direção da onda. Peças antigas (sem `dir`) correm para a esquerda.
+    _waveDirArrow(dir) {
+        return { right: "→", left: "←", down: "↓", up: "↑" }[dir || "left"] || "←";
+    }
+
+    // Desenha sobre a fileira uma seta no sentido em que a onda se propaga.
+    _renderWaveArrow(ctx, h, tiles, tileW) {
+        if (!tiles.length) return;
+        const dir = h.dir || "left";
+        const [dx, dy] = { right: [1, 0], left: [-1, 0], down: [0, 1], up: [0, -1] }[dir] || [-1, 0];
+        const forward = dir === "right" || dir === "down";
+        const a = forward ? tiles[0] : tiles[tiles.length - 1];
+        const b = forward ? tiles[tiles.length - 1] : tiles[0];
+        const off = tileW * 0.3, head = tileW * 0.18;
+        const sx = (a.col + 0.5) * tileW - dx * off, sy = (a.row + 0.5) * tileW - dy * off;
+        const ex = (b.col + 0.5) * tileW + dx * off, ey = (b.row + 0.5) * tileW + dy * off;
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 137, 6, 0.95)";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        // Ponta da seta: duas abas na perpendicular (-dy, dx).
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - dx * head - dy * head, ey - dy * head + dx * head);
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - dx * head + dy * head, ey - dy * head - dx * head);
+        ctx.stroke();
+        ctx.restore();
     }
 
     /**
@@ -1563,6 +1600,17 @@ class RoomEditor {
         if (spikeDelayInput) {
             this.spikeDelay = Math.max(0, Number(spikeDelayInput.value) || 0);
             spikeDelayInput.oninput = () => { this.spikeDelay = Math.max(0, Number(spikeDelayInput.value) || 0); };
+        }
+        const spikeRowDirSelect = document.getElementById("spike-row-dir");
+        if (spikeRowDirSelect) {
+            this.spikeRowDir = spikeRowDirSelect.value || "right";
+            spikeRowDirSelect.onchange = () => { this.spikeRowDir = spikeRowDirSelect.value; };
+        }
+        const spikeRowCountInput = document.getElementById("spike-row-count");
+        if (spikeRowCountInput) {
+            const readCount = () => Math.max(1, Math.round(Number(spikeRowCountInput.value) || 4));
+            this.spikeRowCount = readCount();
+            spikeRowCountInput.oninput = () => { this.spikeRowCount = readCount(); };
         }
         document.getElementById("btn-clear-hazards").onclick = () => {
             this.room.hazards = [];
@@ -1957,28 +2005,33 @@ class RoomEditor {
             return;
         }
 
-        // Impede dois perigos no mesmo tile.
-        const occupied = this.room.hazards.some(h =>
-            this._hazardTiles(h).some(t => t.col === col && t.row === row)
-        );
-        if (occupied) return;
-
         const newHazard = { type, col, row };
 
         if (type === "spike" || type === "spikeRow") newHazard.timing = this.spikeTiming || "normal";
         if (type === "spike" || type === "spikeRow") newHazard.delay = this.spikeDelay || 0;
 
         if (type === "spikeRow") {
-            newHazard.count = 4;
+            const dir = this.spikeRowDir || "right";
+            const vertical = dir === "up" || dir === "down";
+            const maxLen = (vertical ? this.rows : this.cols) - 2;
+            newHazard.dir = dir;
+            newHazard.count = Math.max(1, Math.min(this.spikeRowCount || 4, maxLen));
             newHazard.phase = 0.0;
             newHazard.wave = 0.12;
-            // Evita a fileira estourar a parede direita.
-            newHazard.col = Math.min(col, this.cols - 1 - newHazard.count);
-            if (newHazard.col < 1) newHazard.col = 1;
+            // Ancora no tile clicado e recua para a fileira não atravessar a parede.
+            if (vertical) newHazard.row = Math.max(1, Math.min(row, this.rows - 1 - newHazard.count));
+            else newHazard.col = Math.max(1, Math.min(col, this.cols - 1 - newHazard.count));
         } else if (type === "arrow") {
             newHazard.side = arrowSide || (row === 0 ? "top" : row === this.rows - 1 ? "bottom" : col === 0 ? "left" : "right");
             newHazard.phase = 0.0;
         }
+
+        // Impede dois perigos no mesmo tile (considera todos os tiles da fileira).
+        const newTiles = this._hazardTiles(newHazard);
+        const occupied = this.room.hazards.some(h =>
+            this._hazardTiles(h).some(t => newTiles.some(n => n.col === t.col && n.row === t.row))
+        );
+        if (occupied) return;
 
         this.room.hazards.push(newHazard);
         this._updateHazardsListUI();

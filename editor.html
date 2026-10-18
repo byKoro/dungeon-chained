@@ -232,6 +232,15 @@
                                 </select>
                                 <label for="spike-delay" style="font-size:12px; display:block; margin:4px 0;">Delay da primeira ativação (segundos)</label>
                                 <input id="spike-delay" type="number" min="0" step="0.1" value="0" style="width:100%;">
+                                <label for="spike-row-dir" style="font-size:12px; display:block; margin:8px 0 4px;">Direção da onda (Fileira de Espinhos)</label>
+                                <select id="spike-row-dir" style="width:100%; margin-bottom:8px;">
+                                    <option value="right" selected>→ Direita (horizontal)</option>
+                                    <option value="left">← Esquerda (horizontal)</option>
+                                    <option value="down">↓ Baixo (vertical)</option>
+                                    <option value="up">↑ Cima (vertical)</option>
+                                </select>
+                                <label for="spike-row-count" style="font-size:12px; display:block; margin:4px 0;">Tamanho da fileira (tiles)</label>
+                                <input id="spike-row-count" type="number" min="1" max="12" step="1" value="4" style="width:100%;">
                             </div>
 
                             <div class="panel-section">

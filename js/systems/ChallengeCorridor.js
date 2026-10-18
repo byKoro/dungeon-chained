@@ -140,18 +140,26 @@ export class ChallengeCorridor {
                 }
                 case "spikeRow": {
                     const count = el.count || 4;
+                    // Direção da onda. Sem `dir` (peças antigas): fileira
+                    // horizontal com a onda correndo para a esquerda, como antes.
+                    const dir = el.dir || "left";
+                    const vertical = dir === "up" || dir === "down";
+                    // Fase maior = espinho adiantado no ciclo. Para a onda ir
+                    // para a direita/baixo, a fase diminui ao longo da fileira.
+                    const step = (dir === "right" || dir === "down") ? -(el.wave || 0) : (el.wave || 0);
                     for (let i = 0; i < count; i++) {
-                        const phase = ((el.phase || 0) + i * (el.wave || 0)) % 1;
+                        const phase = ((((el.phase || 0) + i * step) % 1) + 1) % 1;
                         let p;
                         if (byTile) {
-                            // Tiles consecutivos a partir de (col,row).
-                            p = this._tileToWorld(el.col + i, el.row);
+                            // Tiles consecutivos a partir de (col,row): para a
+                            // direita (horizontal) ou para baixo (vertical).
+                            p = vertical ? this._tileToWorld(el.col, el.row + i) : this._tileToWorld(el.col + i, el.row);
                         } else {
                             // Distribui ao longo do eixo "através" (v de 0..1).
                             const v = (i + 0.5) / count;
                             p = this._toWorld(el.u, v);
                         }
-                        this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: phase, durations: el.durations, timing: el.timing }));
+                        this.spikes.push(new SpikeTrap(p.x, p.y, peaks, { phaseOffset: phase, durations: el.durations, timing: el.timing, delay: el.delay }));
                     }
                     break;
                 }
