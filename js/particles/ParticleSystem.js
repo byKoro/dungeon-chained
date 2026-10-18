@@ -13,6 +13,20 @@ const BLOOD_PX = 4;
 // "vida" ao impacto sem o vermelho berrante que destoava do cenário escuro.
 const AIR_BLOOD_COLORS = ["#5c0a18", "#6e0f1c", "#7d1420", "#4a0612", "#640d1a"];
 
+// Atualiza todas as partículas da lista e remove as terminadas (p.done) numa
+// ÚNICA passada, compactando in-place. Substitui o splice(i, 1) dentro do
+// loop, que custava O(n) por remoção (O(n²) no pior caso com muitas
+// partículas). Preserva a ordem (logo, a ordem de desenho também).
+function updateAndCompact(list, a, b) {
+    let w = 0;
+    for (let r = 0; r < list.length; r++) {
+        const p = list[r];
+        p.update(a, b);
+        if (!p.done) list[w++] = p;
+    }
+    list.length = w;
+}
+
 class AirParticle {
     constructor(x, y, color, isBlood = false, spread = 1, ephemeral = false) {
         this.x = x;
@@ -39,6 +53,11 @@ class AirParticle {
         this.bounces = 0;
         this.maxBounces = 1 + Math.floor(Math.random() * 2);
         this.settled = false;
+    }
+
+    // Interface comum com as demais partículas (usada por updateAndCompact).
+    get done() {
+        return this.settled;
     }
 
     update(debrisList, bloodCanvas) {
@@ -206,37 +225,13 @@ export class ParticleSystem {
             this.floorDebris[i].update(players, bounds);
         }
 
-        // Atualiza partículas voando. Ao assentar, o sangue é carimbado no buffer.
-        for (let i = this.airParticles.length - 1; i >= 0; i--) {
-            this.airParticles[i].update(this.floorDebris, this.bloodCanvas);
-            if (this.airParticles[i].settled) {
-                this.airParticles.splice(i, 1);
-            }
-        }
-
-        // Atualiza baforadas de fumaça e remove as que terminaram
-        for (let i = this.smoke.length - 1; i >= 0; i--) {
-            this.smoke[i].update();
-            if (this.smoke[i].done) this.smoke.splice(i, 1);
-        }
-
-        // Atualiza faíscas e remove as que terminaram
-        for (let i = this.sparks.length - 1; i >= 0; i--) {
-            this.sparks[i].update();
-            if (this.sparks[i].done) this.sparks.splice(i, 1);
-        }
-
-        // Atualiza flashes e remove os que terminaram
-        for (let i = this.flashes.length - 1; i >= 0; i--) {
-            this.flashes[i].update();
-            if (this.flashes[i].done) this.flashes.splice(i, 1);
-        }
-
-        // Atualiza chamas de aparição e remove as que terminaram
-        for (let i = this.flames.length - 1; i >= 0; i--) {
-            this.flames[i].update();
-            if (this.flames[i].done) this.flames.splice(i, 1);
-        }
+        // Partículas voando. Ao assentar, o sangue é carimbado no buffer.
+        updateAndCompact(this.airParticles, this.floorDebris, this.bloodCanvas);
+        // Fumaça, faíscas, flashes e chamas: atualiza e remove as terminadas.
+        updateAndCompact(this.smoke);
+        updateAndCompact(this.sparks);
+        updateAndCompact(this.flashes);
+        updateAndCompact(this.flames);
     }
 
     // 'clip' (opcional) {minX,maxX,minY,maxY}: restringe o sangue de chão à
@@ -262,22 +257,37 @@ export class ParticleSystem {
         ctx.restore();
     }
 
+    // Estado do ctx (globalAlpha, blend) é salvo/restaurado UMA vez por
+    // camada, não por partícula: as partículas só ajustam alpha/fillStyle.
+
     // Fumaça (poeira de corrida): desenhada na camada de chão, sob as entidades.
     drawSmoke(ctx) {
+        if (this.smoke.length === 0) return;
+        ctx.save();
         for (let i = 0; i < this.smoke.length; i++) {
             this.smoke[i].draw(ctx);
         }
+        ctx.restore();
     }
 
     // Faíscas da serra: camada aérea, por cima das entidades (centelhas vivas).
     drawSparks(ctx) {
+        if (this.sparks.length === 0 && this.flashes.length === 0) return;
+        ctx.save();
         for (let i = 0; i < this.sparks.length; i++) {
             this.sparks[i].draw(ctx);
         }
-        // Flashes de ruptura: desenhados junto, por cima de tudo no mundo.
-        for (let i = 0; i < this.flashes.length; i++) {
-            this.flashes[i].draw(ctx);
+        // Flashes de ruptura: desenhados junto, por cima de tudo no mundo,
+        // com glow ADITIVO (modo ligado uma vez para todos).
+        if (this.flashes.length > 0) {
+            // Escala atual do ctx: o glow é calibrado em px de tela.
+            const zoom = ctx.getTransform().a || 1;
+            ctx.globalCompositeOperation = "lighter";
+            for (let i = 0; i < this.flashes.length; i++) {
+                this.flashes[i].draw(ctx, zoom);
+            }
         }
+        ctx.restore();
     }
 
     drawAir(ctx) {
@@ -289,8 +299,12 @@ export class ParticleSystem {
     // Chamas de aparição (intro): camada aérea, por cima das entidades, para o
     // fogo "subir na frente" do inimigo que está materializando.
     drawFlames(ctx) {
+        if (this.flames.length === 0) return;
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
         for (let i = 0; i < this.flames.length; i++) {
             this.flames[i].draw(ctx);
         }
+        ctx.restore();
     }
 }

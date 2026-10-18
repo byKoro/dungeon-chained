@@ -17,7 +17,7 @@ export class SparkParticle {
     constructor(cx, cy, radius = 24, spinDir = 1, opts = {}) {
         const burst = !!opts.burst;      // modo RUPTURA: radial e exagerado
         const power = opts.power ?? 1;
-        this.glow = false;               // sem glow borrado (pixel art nítido)
+        // Sem glow borrado (pixel art nítido): bloco sólido com fade.
 
         // Ângulo aleatório na borda do disco.
         const a = Math.random() * Math.PI * 2;
@@ -69,26 +69,15 @@ export class SparkParticle {
         this.life--;
     }
 
+    // O CHAMADOR (ParticleSystem) salva/restaura o estado do ctx uma vez para
+    // a camada inteira; aqui só se ajusta globalAlpha/fillStyle.
     draw(ctx) {
         const t = this.life / this.maxLife; // 1 -> 0
         const s = Math.max(1, Math.round(this.size * (0.4 + t * 0.6)));
         const px = Math.round(this.x - s / 2);
         const py = Math.round(this.y - s / 2);
-        if (this.glow) {
-            // Centelha de ruptura: brilho aditivo (soma luz).
-            ctx.save();
-            ctx.globalCompositeOperation = "lighter";
-            ctx.globalAlpha = Math.max(0, t);
-            ctx.shadowColor = "#ffd34d";
-            ctx.shadowBlur = 8 * t;
-            ctx.fillStyle = this.color;
-            ctx.fillRect(px, py, s, s);
-            ctx.restore();
-        } else {
-            ctx.globalAlpha = Math.max(0, t);
-            ctx.fillStyle = this.color;
-            ctx.fillRect(px, py, s, s);
-            ctx.globalAlpha = 1;
-        }
+        ctx.globalAlpha = Math.max(0, t);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(px, py, s, s);
     }
 }

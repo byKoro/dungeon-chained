@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Chained Roguelike 2D - Modular POO</title>
+    <title>Dungeon Chained</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -23,6 +23,24 @@
 
     <div id="instructions">
         [P1 Amarelo]: WASD | [P2 Azul]: SETAS
+    </div>
+
+    <!-- Trailer de abertura: PULAR (canto) e COMEÇAR (no fim). -->
+    <div id="trailer-overlay" class="hidden">
+        <button class="tr-skip" id="btn-skip" type="button">PULAR ▶</button>
+        <button class="tr-start" id="btn-start" type="button">COMEÇAR</button>
+    </div>
+
+    <!-- Tela de carregamento (js/ui/LoadingScreen.js). Começa visível para
+         cobrir o canvas enquanto os módulos e as texturas carregam. -->
+    <div id="loading-screen" role="status" aria-live="polite">
+        <div class="ls-box">
+            <div class="ls-title">DUNGEON CHAINED</div>
+            <div class="ls-label">Carregando…</div>
+            <div class="ls-bar" aria-hidden="true"><div class="ls-bar-fill"></div></div>
+            <div class="ls-pct">0%</div>
+            <div class="ls-tip"></div>
+        </div>
     </div>
 
     <script type="module" src="js/main.js"></script>

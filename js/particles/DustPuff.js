@@ -51,6 +51,8 @@ export class DustPuff {
         this.life--;
     }
 
+    // O CHAMADOR (ParticleSystem) salva/restaura o estado do ctx uma vez para
+    // a camada inteira; aqui só se ajusta globalAlpha/fillStyle.
     draw(ctx) {
         const t = this.life / this.maxLife; // 1 -> 0
         // Fade: opacidade cai ao longo da vida
@@ -58,6 +60,5 @@ export class DustPuff {
         ctx.fillStyle = this.color;
         const s = Math.round(this.size);
         ctx.fillRect(Math.round(this.x - s / 2), Math.round(this.y - s / 2), s, s);
-        ctx.globalAlpha = 1;
     }
 }

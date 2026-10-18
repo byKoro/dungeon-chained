@@ -65,6 +65,27 @@ export class AudioManager {
     }
 
     /**
+     * Resolve quando os clipes estiverem prontos para tocar (canplaythrough)
+     * ou falharem — com um teto de tempo, para nunca prender o carregamento.
+     * @param {number} [timeoutMs=4000]
+     * @param {(done:number, total:number) => void} [onProgress]
+     */
+    whenReady(timeoutMs = 4000, onProgress = null) {
+        const clips = Object.values(this.clips).flat();
+        const total = clips.length;
+        let done = 0;
+        onProgress?.(0, total);
+        const each = clips.map(a => new Promise(res => {
+            const fin = () => { done++; onProgress?.(done, total); res(); };
+            if (a.readyState >= 4) return fin();
+            a.addEventListener('canplaythrough', fin, { once: true });
+            a.addEventListener('error', fin, { once: true });
+        }));
+        const timeout = new Promise(res => setTimeout(res, timeoutMs));
+        return Promise.race([Promise.all(each), timeout]);
+    }
+
+    /**
      * Ajusta o volume de um caso de uso específico.
      * @param {string} cueName Nome do caso de uso (ex: "playerStep", "playerHurt")
      * @param {number} volume Valor entre 0.0 e 1.0

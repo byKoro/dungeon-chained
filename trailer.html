@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Dungeon Chained — Trailer (Simulador de Gameplay)</title>
+    <link rel="stylesheet" href="css/style.css">
     <style>
         html, body {
             margin: 0;
@@ -45,29 +46,15 @@
             background: #2cb67d;
             border-color: #1e8a5e;
         }
-        /* Tela de carregamento enquanto os assets não terminam. */
-        #trailer-loading {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #a7a9be;
-            background: #05040a;
-            font-size: 15px;
-            letter-spacing: 2px;
-            z-index: 20;
-        }
     </style>
 </head>
 <body>
     <canvas id="trailerCanvas"></canvas>
 
-    <div id="trailer-loading">CARREGANDO O CALABOUÇO…</div>
 
     <div id="trailer-ui">
         <button class="t-btn" id="btn-replay">↻ REPETIR CENA</button>
-        <a href="index.html" class="t-btn secondary" style="text-decoration:none;">▶ JOGAR</a>
+        <a href="index.html?skipTrailer" class="t-btn secondary" style="text-decoration:none;">▶ JOGAR</a>
     </div>
 
     <script type="module" src="js/trailer.js"></script>

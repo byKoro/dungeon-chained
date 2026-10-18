@@ -108,13 +108,12 @@ export class FlameParticle {
         const px = Math.round(this.x / FLAME_PX) * FLAME_PX;
         const py = Math.round(this.y / FLAME_PX) * FLAME_PX;
 
-        ctx.save();
         // Glow aditivo: o fogo soma luz sobre a cena escura. SEM shadowBlur —
         // o blur deixava o bloco difuso/realista, destoando do pixel art.
-        ctx.globalCompositeOperation = "lighter";
+        // O modo "lighter" e o save/restore são feitos UMA vez pela camada
+        // (ParticleSystem.drawFlames), não por partícula.
         ctx.globalAlpha = Math.max(0, t) * 0.85;
         ctx.fillStyle = this._colorFor(t);
         ctx.fillRect(px - s / 2, py - s / 2, s, s);
-        ctx.restore();
     }
 }

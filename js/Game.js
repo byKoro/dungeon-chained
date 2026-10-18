@@ -54,7 +54,9 @@ export class Game {
         this.roomCatalog = opts.roomCatalog || null;
 
         // Assets e tela
-        this.assets = new AssetLoader();
+        // Pode receber um loader já carregado (ex.: o mesmo do trailer), para
+        // não baixar/decodificar as texturas de novo ao começar.
+        this.assets = opts.assets || new AssetLoader();
         this._bindResize();
 
         // HUD (DOM)

@@ -73,12 +73,30 @@ export class AssetLoader {
         return this.images[key];
     }
 
-    // Resolve quando todas as imagens tiverem carregado (ou falhado).
-    whenReady() {
-        const pending = Object.values(this.images).filter(img => !img.complete);
-        if (pending.length === 0) return Promise.resolve();
-        return Promise.all(pending.map(img => new Promise(res => {
-            img.onload = img.onerror = () => res();
+    /**
+     * Resolve quando TODAS as imagens registradas tiverem carregado (ou
+     * falhado — variantes opcionais ausentes não travam) e já estiverem
+     * DECODIFICADAS. Decodificar antes evita o engasgo do primeiro desenho
+     * de cada textura quando o jogo começa.
+     * @param {(done:number, total:number) => void} [onProgress]
+     */
+    async whenReady(onProgress = null) {
+        const imgs = Object.values(this.images);
+        const total = imgs.length;
+        let done = 0;
+        const tick = () => { done++; onProgress?.(done, total); };
+        onProgress?.(0, total);
+        await Promise.all(imgs.map(img => new Promise(res => {
+            const finish = () => {
+                const ok = img.naturalWidth > 0;
+                (ok && img.decode ? img.decode().catch(() => {}) : Promise.resolve())
+                    .then(() => { tick(); res(); });
+            };
+            if (img.complete) finish();
+            else {
+                img.addEventListener('load', finish, { once: true });
+                img.addEventListener('error', finish, { once: true });
+            }
         })));
     }
 
