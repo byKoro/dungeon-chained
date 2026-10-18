@@ -71,6 +71,11 @@ class RoomEditor {
         this.selectedProp = 59;
         this.selectedTorchType = "torch";
 
+        // Spawn usado SÓ pelo botão "Testar" (não vai para o JSON da peça).
+        // mode: "CENTER" | "N" | "S" | "E" | "W" | "custom". Em "custom",
+        // p1/p2 guardam os tiles escolhidos com clique no canvas.
+        this.testSpawn = this._loadTestSpawn();
+
         // Navegador de formas/variações
         this.shapeIndex = 0;        // forma atual (ver _allShapes)
         this.variantIndex = 0;      // variação atual (0..n-1 = existentes; n = nova)

@@ -280,6 +280,18 @@
                     <div class="group-body">
                         <div class="tab-panel" id="tab-spawns">
                             <div class="panel-section">
+                                <div class="panel-title">Spawn ao Testar</div>
+                                <label for="test-spawn-mode" style="font-size:12px;">Onde os players nascem no botão "Testar"</label>
+                                <select id="test-spawn-mode" class="styled-select" style="width:100%; margin-top:6px;">
+                                    <!-- Opções inseridas dinamicamente conforme as portas da sala -->
+                                </select>
+                                <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top:6px;">
+                                    Com esta aba aberta, <strong>clique num tile de piso</strong> para posicionar o P1 ali (o P2 fica no tile vizinho livre). Isso troca para "Personalizado".
+                                </p>
+                                <div id="test-spawn-info" style="font-size:11px; color:#2cb67d; font-weight:600;"></div>
+                            </div>
+
+                            <div class="panel-section">
                                 <div class="panel-title">Onde os Players vão Nascer</div>
                                 <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
                                     Mostra a posição exata onde os jogadores aparecem ao entrar nesta sala por cada uma das portas. Use como referência de segurança para <strong>não colocar armadilhas ou buracos</strong> logo na entrada!
