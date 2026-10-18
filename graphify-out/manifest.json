@@ -1,536 +1,1218 @@
 {
   "js/Game.js": {
-    "mtime": 1791243520.4395268,
-    "seen": 1791244080.6143434,
-    "ast_hash": "d1ba0729b44674a4992916213ea895a0",
-    "semantic_hash": "d1ba0729b44674a4992916213ea895a0"
+    "mtime": 1792352655.087912,
+    "ast_hash": "cdd792bc77bcd1f784f968f79c75d289",
+    "semantic_hash": "cdd792bc77bcd1f784f968f79c75d289"
   },
   "js/combat/CombatSystem.js": {
-    "mtime": 1791243483.1906037,
-    "seen": 1791244080.6143477,
-    "ast_hash": "9ca132c3b819ab6fd0aeccc94097a642",
-    "semantic_hash": "9ca132c3b819ab6fd0aeccc94097a642"
+    "mtime": 1792278288.0190077,
+    "ast_hash": "abf42298b04a4a728c47c657dd937a32",
+    "semantic_hash": "abf42298b04a4a728c47c657dd937a32"
   },
   "js/config/EntityConfig.js": {
-    "mtime": 1791241702.903268,
-    "seen": 1791241872.228552,
+    "mtime": 1791168618.9195936,
     "ast_hash": "439a7743981598b13e64e1a631a52e00",
     "semantic_hash": "439a7743981598b13e64e1a631a52e00"
   },
   "js/config/GameConfig.js": {
-    "mtime": 1791243439.419242,
-    "seen": 1791244080.6146047,
-    "ast_hash": "cc4f9e823b6a87f42b17db76cf65cb47",
-    "semantic_hash": "cc4f9e823b6a87f42b17db76cf65cb47"
+    "mtime": 1792344858.6296632,
+    "ast_hash": "a431c52e1fc18f92c94502a5a2921b9d",
+    "semantic_hash": "a431c52e1fc18f92c94502a5a2921b9d"
   },
   "js/core/AssetLoader.js": {
-    "mtime": 1791241702.903268,
-    "seen": 1791241872.2285564,
-    "ast_hash": "85546b4999d1353a6ea39f3ae85ca294",
-    "semantic_hash": "85546b4999d1353a6ea39f3ae85ca294"
+    "mtime": 1792344039.6441417,
+    "ast_hash": "045e80793bf85f2202d65426fea79198",
+    "semantic_hash": "045e80793bf85f2202d65426fea79198"
   },
   "js/core/AudioManager.js": {
-    "mtime": 1791243466.089199,
-    "seen": 1791244080.6147711,
-    "ast_hash": "ec3a6f0ce604ef1051958177483c3d0b",
-    "semantic_hash": "ec3a6f0ce604ef1051958177483c3d0b"
+    "mtime": 1792344039.6456456,
+    "ast_hash": "9189a08bca15b2d0b5b3b1b51654a78d",
+    "semantic_hash": "9189a08bca15b2d0b5b3b1b51654a78d"
   },
   "js/core/Dungeon.js": {
-    "mtime": 1791241702.903268,
-    "seen": 1791241872.228559,
+    "mtime": 1791168618.9221032,
     "ast_hash": "e59056a58d851d38db9fcbeb7aa85240",
     "semantic_hash": "e59056a58d851d38db9fcbeb7aa85240"
   },
   "js/core/DungeonGraph.js": {
-    "mtime": 1791241702.905273,
-    "seen": 1791241872.2285602,
+    "mtime": 1791168638.8861043,
     "ast_hash": "c4ac55c762ed55796f324ce096415923",
     "semantic_hash": "c4ac55c762ed55796f324ce096415923"
   },
   "js/core/InputHandler.js": {
-    "mtime": 1790723381.4471135,
-    "seen": 1791241872.2285614,
-    "ast_hash": "97acd62e979c7e480d815475e5b2524f",
-    "semantic_hash": "97acd62e979c7e480d815475e5b2524f"
+    "mtime": 1792279609.8795693,
+    "ast_hash": "c9e32272a64dfc102da29c8e9d84864b",
+    "semantic_hash": "c9e32272a64dfc102da29c8e9d84864b"
   },
   "js/core/Physics.js": {
-    "mtime": 1790723381.4471135,
-    "seen": 1791241872.2285624,
-    "ast_hash": "dc0509cf6bbad8fa310944151d153956",
-    "semantic_hash": "dc0509cf6bbad8fa310944151d153956"
+    "mtime": 1792267497.8505073,
+    "ast_hash": "0a0b537ea8034a10770124292b4e7b97",
+    "semantic_hash": "0a0b537ea8034a10770124292b4e7b97"
   },
   "js/core/Renderer.js": {
-    "mtime": 1791241702.905273,
-    "seen": 1791241872.2285638,
-    "ast_hash": "945879c46e95b62ca46aa41ccc5c90a4",
-    "semantic_hash": "945879c46e95b62ca46aa41ccc5c90a4"
+    "mtime": 1792292605.9206066,
+    "ast_hash": "fbedd9a83e69e03c71f77b1836506710",
+    "semantic_hash": "fbedd9a83e69e03c71f77b1836506710"
   },
   "js/core/RoomTiles.js": {
-    "mtime": 1791241702.905273,
-    "seen": 1791241872.228565,
+    "mtime": 1791168618.923604,
     "ast_hash": "8ac43b895b36d52360076f636b2a71b6",
     "semantic_hash": "8ac43b895b36d52360076f636b2a71b6"
   },
   "js/core/Tileset.js": {
-    "mtime": 1790984234.918328,
-    "seen": 1791241872.228566,
+    "mtime": 1791168618.924608,
     "ast_hash": "65ec45b2e97c96c6048bf9e72100ab90",
     "semantic_hash": "65ec45b2e97c96c6048bf9e72100ab90"
   },
   "js/editor/EditorApp.js": {
-    "mtime": 1791241702.905273,
-    "seen": 1791241872.2285671,
-    "ast_hash": "106f1a507716aa15436a5c1390a46507",
-    "semantic_hash": "106f1a507716aa15436a5c1390a46507"
+    "mtime": 1792350919.8060696,
+    "ast_hash": "03298f7d214ac35a2db32fe522be673c",
+    "semantic_hash": "03298f7d214ac35a2db32fe522be673c"
   },
   "js/entities/ArrowTrap.js": {
-    "mtime": 1791241702.908254,
-    "seen": 1791241872.228568,
-    "ast_hash": "baa89240edceb04da52b6e519920e3cf",
-    "semantic_hash": "baa89240edceb04da52b6e519920e3cf"
+    "mtime": 1792258551.0167255,
+    "ast_hash": "31a127fc62e921c219393166c8b21655",
+    "semantic_hash": "31a127fc62e921c219393166c8b21655"
   },
   "js/entities/Enemy.js": {
-    "mtime": 1790723381.4491184,
-    "seen": 1791241872.228569,
+    "mtime": 1790304009.6239815,
     "ast_hash": "3d19840e68d1c2e989c0cce30f7d85fe",
     "semantic_hash": "3d19840e68d1c2e989c0cce30f7d85fe"
   },
   "js/entities/Entity.js": {
-    "mtime": 1790723381.4491184,
-    "seen": 1791241872.2285702,
+    "mtime": 1790304009.6239815,
     "ast_hash": "2e133658852a10e998a8ccd30f9e8114",
     "semantic_hash": "2e133658852a10e998a8ccd30f9e8114"
   },
   "js/entities/HeartPickup.js": {
-    "mtime": 1791241702.908254,
-    "seen": 1791241872.2285712,
+    "mtime": 1791168638.886604,
     "ast_hash": "fa4a8a1393446caa461711f8b90ad7b6",
     "semantic_hash": "fa4a8a1393446caa461711f8b90ad7b6"
   },
   "js/entities/MeleeEnemy.js": {
-    "mtime": 1791241702.908254,
-    "seen": 1791241872.2285721,
-    "ast_hash": "d7c68b04bcd12ed18d3b834ad9d240f0",
-    "semantic_hash": "d7c68b04bcd12ed18d3b834ad9d240f0"
+    "mtime": 1792290943.0350668,
+    "ast_hash": "168d07b50e72e8efc445cf91e5c59967",
+    "semantic_hash": "168d07b50e72e8efc445cf91e5c59967"
   },
   "js/entities/Player.js": {
-    "mtime": 1791241702.908254,
-    "seen": 1791241872.228573,
-    "ast_hash": "fcc4fe53096e665c0660917bb5859025",
-    "semantic_hash": "fcc4fe53096e665c0660917bb5859025"
+    "mtime": 1792344039.6491566,
+    "ast_hash": "8aa009c9c62edc92cdee3c78ec95d2ab",
+    "semantic_hash": "8aa009c9c62edc92cdee3c78ec95d2ab"
   },
   "js/entities/PlayerFactory.js": {
-    "mtime": 1790984234.919264,
-    "seen": 1791241872.2285743,
+    "mtime": 1791168618.9286125,
     "ast_hash": "8944a92be5a8da3a3df4c0841049877a",
     "semantic_hash": "8944a92be5a8da3a3df4c0841049877a"
   },
   "js/entities/PressureButton.js": {
-    "mtime": 1790984234.920269,
-    "seen": 1791241872.2285752,
-    "ast_hash": "75f8fb06adf87d7a20eab6c358f8dc1d",
-    "semantic_hash": "75f8fb06adf87d7a20eab6c358f8dc1d"
+    "mtime": 1792344039.6501582,
+    "ast_hash": "830cad0e050b26b8a6f7d263825b409c",
+    "semantic_hash": "830cad0e050b26b8a6f7d263825b409c"
   },
   "js/entities/SpikeTrap.js": {
-    "mtime": 1791241702.908254,
-    "seen": 1791241872.2285767,
-    "ast_hash": "e4e4dd842b0df88e6ee31e8c164b742e",
-    "semantic_hash": "e4e4dd842b0df88e6ee31e8c164b742e"
+    "mtime": 1792258551.0177262,
+    "ast_hash": "d3b547eb0c37a92ce3423c78132aec6e",
+    "semantic_hash": "d3b547eb0c37a92ce3423c78132aec6e"
   },
   "js/main.js": {
-    "mtime": 1791241702.908254,
-    "seen": 1791241872.2285779,
-    "ast_hash": "8261b91eee7514b090f5f63b755fb360",
-    "semantic_hash": "8261b91eee7514b090f5f63b755fb360"
+    "mtime": 1792344039.651157,
+    "ast_hash": "67671360d4a37818a7b661f95d9b8e81",
+    "semantic_hash": "67671360d4a37818a7b661f95d9b8e81"
   },
   "js/particles/BloodCanvas.js": {
-    "mtime": 1790984234.921269,
-    "seen": 1791241872.2285788,
+    "mtime": 1791168618.9311173,
     "ast_hash": "badf731cd5a30d15ce4bbc95260f2645",
     "semantic_hash": "badf731cd5a30d15ce4bbc95260f2645"
   },
   "js/particles/BloodStains.js": {
-    "mtime": 1790984234.921269,
-    "seen": 1791241872.2285795,
+    "mtime": 1791168618.9316182,
     "ast_hash": "6ba56988520701b6328aff5afdd0e351",
     "semantic_hash": "6ba56988520701b6328aff5afdd0e351"
   },
   "js/particles/DustPuff.js": {
-    "mtime": 1790723381.451123,
-    "seen": 1791241872.2285807,
-    "ast_hash": "56fe948ba154cd9c39b62aa8bc946c0a",
-    "semantic_hash": "56fe948ba154cd9c39b62aa8bc946c0a"
+    "mtime": 1792344039.652157,
+    "ast_hash": "8a3e76dd6f798e16f81f252db37e8d23",
+    "semantic_hash": "8a3e76dd6f798e16f81f252db37e8d23"
   },
   "js/particles/FloorDebris.js": {
-    "mtime": 1790723381.451123,
-    "seen": 1791241872.2285817,
+    "mtime": 1790312516.6347048,
     "ast_hash": "03e6821c634a422fdd6b5ff945e3994f",
     "semantic_hash": "03e6821c634a422fdd6b5ff945e3994f"
   },
   "js/particles/Footprint.js": {
-    "mtime": 1790723381.451123,
-    "seen": 1791241872.2285826,
-    "ast_hash": "fdc514ccc3dbb87a5dcf390d290aa567",
-    "semantic_hash": "fdc514ccc3dbb87a5dcf390d290aa567"
+    "mtime": 1790446687.4986494,
+    "ast_hash": "9a5fc86121956c946967a44db9d80091",
+    "semantic_hash": "9a5fc86121956c946967a44db9d80091"
   },
   "js/particles/GibPiece.js": {
-    "mtime": 1790723381.451123,
-    "seen": 1791241872.2285836,
-    "ast_hash": "b2b305acb156f637b4cc201547e7f5bc",
-    "semantic_hash": "b2b305acb156f637b4cc201547e7f5bc"
+    "mtime": 1790447710.1258001,
+    "ast_hash": "bb9b0c87c84d54abf94debf2cbed05d2",
+    "semantic_hash": "bb9b0c87c84d54abf94debf2cbed05d2"
   },
   "js/particles/ParticleSystem.js": {
-    "mtime": 1790984234.9226985,
-    "seen": 1791241872.2285848,
-    "ast_hash": "eed1c7e57f0afb86b3d9f3c92456015f",
-    "semantic_hash": "eed1c7e57f0afb86b3d9f3c92456015f"
+    "mtime": 1792344039.655158,
+    "ast_hash": "e78e2e1a73652ed027d799bfde89a1b8",
+    "semantic_hash": "e78e2e1a73652ed027d799bfde89a1b8"
   },
   "js/rooms/ModularGrid.js": {
-    "mtime": 1791241702.910889,
-    "seen": 1791241872.2285855,
+    "mtime": 1791168618.933617,
     "ast_hash": "14e002b71b0c9215157ede4fd7102df5",
     "semantic_hash": "14e002b71b0c9215157ede4fd7102df5"
   },
   "js/rooms/Room.js": {
-    "mtime": 1791241702.910889,
-    "seen": 1791241872.2285867,
-    "ast_hash": "112dcc86f92a89c06e5fa6ef5c8ca027",
-    "semantic_hash": "112dcc86f92a89c06e5fa6ef5c8ca027"
+    "mtime": 1792344039.6584163,
+    "ast_hash": "651b4667b3096a87fac3ba699bb924c4",
+    "semantic_hash": "651b4667b3096a87fac3ba699bb924c4"
   },
   "js/rooms/RoomArchetypes.js": {
-    "mtime": 1791241702.910889,
-    "seen": 1791241872.2285879,
+    "mtime": 1791168618.934623,
     "ast_hash": "6fa5996db2c8c87c87d257e500e5bbdd",
     "semantic_hash": "6fa5996db2c8c87c87d257e500e5bbdd"
   },
   "js/rooms/RoomCatalog.js": {
-    "mtime": 1791241702.910889,
-    "seen": 1791241872.2285886,
+    "mtime": 1791168618.93613,
     "ast_hash": "8d94bf4a34ba6dae78e686a8903fac0e",
     "semantic_hash": "8d94bf4a34ba6dae78e686a8903fac0e"
   },
   "js/rooms/RoomManager.js": {
-    "mtime": 1791241702.9128945,
-    "seen": 1791241872.2285895,
-    "ast_hash": "2bd6e5bb9a1b4ca2b279e829497705a8",
-    "semantic_hash": "2bd6e5bb9a1b4ca2b279e829497705a8"
+    "mtime": 1792350937.9405246,
+    "ast_hash": "4ca8477b99eb1282c6aafdff3ac51d10",
+    "semantic_hash": "4ca8477b99eb1282c6aafdff3ac51d10"
   },
   "js/rooms/RoomPresets.js": {
-    "mtime": 1791241702.9128945,
-    "seen": 1791241872.2285905,
+    "mtime": 1791168618.93813,
     "ast_hash": "868c1b75f3e0be9e412402cc1ea6a54b",
     "semantic_hash": "868c1b75f3e0be9e412402cc1ea6a54b"
   },
   "js/rooms/RoomSocket.js": {
-    "mtime": 1791241702.9128945,
-    "seen": 1791241872.228592,
+    "mtime": 1791168618.9386306,
     "ast_hash": "03cb93866879c0dde45c1468c3e75ca7",
     "semantic_hash": "03cb93866879c0dde45c1468c3e75ca7"
   },
   "js/systems/ChallengeCorridor.js": {
-    "mtime": 1791241702.9128945,
-    "seen": 1791241872.2285929,
-    "ast_hash": "cc2a18ed2ed1baf4b7f8e20548a97bf0",
-    "semantic_hash": "cc2a18ed2ed1baf4b7f8e20548a97bf0"
+    "mtime": 1792344039.6604156,
+    "ast_hash": "fb5312a7084950fdfa9e38a8ff39cd48",
+    "semantic_hash": "fb5312a7084950fdfa9e38a8ff39cd48"
   },
   "js/systems/ParticleEffects.js": {
-    "mtime": 1791243496.769329,
-    "seen": 1791244080.618804,
-    "ast_hash": "1b4ad845f692c3a631027ad5dc6493b5",
-    "semantic_hash": "1b4ad845f692c3a631027ad5dc6493b5"
+    "mtime": 1792344039.6624148,
+    "ast_hash": "9bde0ab514556143458ccb3feded4985",
+    "semantic_hash": "9bde0ab514556143458ccb3feded4985"
   },
   "js/systems/PostProcessor.js": {
-    "mtime": 1790984234.9247177,
-    "seen": 1791241872.228595,
-    "ast_hash": "762bc00ddd8d5927e8eef03a02b2ac07",
-    "semantic_hash": "762bc00ddd8d5927e8eef03a02b2ac07"
+    "mtime": 1792294491.3366163,
+    "ast_hash": "7e021c78346f8b42170557bf556fe47c",
+    "semantic_hash": "7e021c78346f8b42170557bf556fe47c"
   },
   "js/systems/SpawnSystem.js": {
-    "mtime": 1791241702.9147613,
-    "seen": 1791241872.228596,
+    "mtime": 1791168618.9421432,
     "ast_hash": "bc871c4b5ae4231b3ae557b244dee5f8",
     "semantic_hash": "bc871c4b5ae4231b3ae557b244dee5f8"
   },
   "js/systems/WindSystem.js": {
-    "mtime": 1790984234.9257188,
-    "seen": 1791241872.228597,
+    "mtime": 1791168618.9426427,
     "ast_hash": "1c6c66aa70321d07d79ec1a90eebabb7",
     "semantic_hash": "1c6c66aa70321d07d79ec1a90eebabb7"
   },
-  "js/weapons/LaserWeapon.js": {
-    "mtime": 1790723381.4528685,
-    "seen": 1791241872.2285988,
-    "ast_hash": "bee068e90cdacc8df3e00d7ca5726ba4",
-    "semantic_hash": "bee068e90cdacc8df3e00d7ca5726ba4"
-  },
   "js/weapons/SawWeapon.js": {
-    "mtime": 1791241702.9147613,
-    "seen": 1791241872.2285998,
-    "ast_hash": "a77b0a0c0fd68f755b20ff279fdf210d",
-    "semantic_hash": "a77b0a0c0fd68f755b20ff279fdf210d"
+    "mtime": 1792344039.6842911,
+    "ast_hash": "5b070dbcd532221fb4748e9fbd9a6049",
+    "semantic_hash": "5b070dbcd532221fb4748e9fbd9a6049"
   },
   "js/weapons/Weapon.js": {
-    "mtime": 1791241702.9147613,
-    "seen": 1791241872.2286007,
-    "ast_hash": "726cc0dbfac172dcfe83ed51aa27f636",
-    "semantic_hash": "726cc0dbfac172dcfe83ed51aa27f636"
+    "mtime": 1792266988.7373655,
+    "ast_hash": "73289916b2e6c369e5e1a299e47b2b98",
+    "semantic_hash": "73289916b2e6c369e5e1a299e47b2b98"
   },
   "map/corredor_ne_01.json": {
     "mtime": 1791241702.9167666,
     "seen": 1791241872.228602,
-    "ast_hash": "2f5cf6d793d3cc16db5fbe88f6e29a4b",
-    "semantic_hash": "2f5cf6d793d3cc16db5fbe88f6e29a4b"
-  },
-  "map/corridor_esw_0.json": {
-    "mtime": 1791241702.9167666,
-    "seen": 1791241872.228603,
-    "ast_hash": "5d2089cade1df7748ace64052146aba7",
-    "semantic_hash": "5d2089cade1df7748ace64052146aba7"
-  },
-  "map/corridor_horizontal_ew_0.json": {
-    "mtime": 1791241702.9167666,
-    "seen": 1791241872.2286038,
-    "ast_hash": "c69dabe94e6ee6fbd28c7d1598ca513a",
-    "semantic_hash": "c69dabe94e6ee6fbd28c7d1598ca513a"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/corridor_horizontal_ew_1.json": {
     "mtime": 1791241702.9167666,
     "seen": 1791241872.228605,
-    "ast_hash": "97921c2fdce4a0088a754089aa8883f5",
-    "semantic_hash": "97921c2fdce4a0088a754089aa8883f5"
-  },
-  "map/corridor_nsw_0.json": {
-    "mtime": 1791241702.9167666,
-    "seen": 1791241872.2286057,
-    "ast_hash": "16dada45ad7ff5f849cf0c3c97eec652",
-    "semantic_hash": "16dada45ad7ff5f849cf0c3c97eec652"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/corridor_vertical_ns_0.json": {
     "mtime": 1791241702.9167666,
     "seen": 1791241872.2286067,
-    "ast_hash": "7d4d422fc0bf07faeaa7c356719a8791",
-    "semantic_hash": "7d4d422fc0bf07faeaa7c356719a8791"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/corridor_vertical_ns_1.json": {
     "mtime": 1791241702.9167666,
     "seen": 1791241872.2286077,
-    "ast_hash": "63d55ce8686ab8e8faf693c19fcaaaea",
-    "semantic_hash": "63d55ce8686ab8e8faf693c19fcaaaea"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/index.json": {
     "mtime": 1791241702.9167666,
     "seen": 1791241872.2286088,
-    "ast_hash": "3d7c49040b25f23819da33136d3da70e",
-    "semantic_hash": "3d7c49040b25f23819da33136d3da70e"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/room_corner_ne_0.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.2286098,
-    "ast_hash": "1d376844a105c3bde26743a4845148dc",
-    "semantic_hash": "1d376844a105c3bde26743a4845148dc"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/room_corner_se_0.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.2286108,
-    "ast_hash": "d7b637a9ea8c896edff9d617870843a9",
-    "semantic_hash": "d7b637a9ea8c896edff9d617870843a9"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/room_cross_4way_0.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.228612,
-    "ast_hash": "367f8eb8e665fd410e44621c4003a776",
-    "semantic_hash": "367f8eb8e665fd410e44621c4003a776"
-  },
-  "map/room_esw_0.json": {
-    "mtime": 1791241702.9199388,
-    "seen": 1791241872.228613,
-    "ast_hash": "83267f53366a44933c9825071fbc3217",
-    "semantic_hash": "83267f53366a44933c9825071fbc3217"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/room_nes_0.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.2286136,
-    "ast_hash": "82018668a88e7c28c1b979c5d670acdc",
-    "semantic_hash": "82018668a88e7c28c1b979c5d670acdc"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/room_nesw_0.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.2286146,
-    "ast_hash": "ea5bdccb70dc5775f4e1701901045b86",
-    "semantic_hash": "ea5bdccb70dc5775f4e1701901045b86"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "map/room_start_hub_2.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.2286158,
-    "ast_hash": "a091c04c9e8d44a1fd88e0a97c942a77",
-    "semantic_hash": "a091c04c9e8d44a1fd88e0a97c942a77"
-  },
-  "map/room_t_junction_n_0.json": {
-    "mtime": 1791241702.9218764,
-    "seen": 1791241872.2286172,
-    "ast_hash": "d9239de072f9ce8b29c184adef280b9b",
-    "semantic_hash": "d9239de072f9ce8b29c184adef280b9b"
+    "ast_hash": "",
+    "semantic_hash": ""
   },
   "serve.py": {
-    "mtime": 1791242210.9634533,
-    "seen": 1791242257.3205028,
+    "mtime": 1792251676.6014605,
     "ast_hash": "36ff64899ff58876382eb3f2ac9ae6f4",
     "semantic_hash": "36ff64899ff58876382eb3f2ac9ae6f4"
   },
   "tests/test_modular_grid.js": {
-    "mtime": 1791241702.9218764,
-    "seen": 1791241872.2286193,
+    "mtime": 1791168618.956165,
     "ast_hash": "043c3fd6319aa2a36b5b97ffb9d69aae",
     "semantic_hash": "043c3fd6319aa2a36b5b97ffb9d69aae"
   },
   "tests/test_player_spawns.js": {
-    "mtime": 1791241702.9235485,
-    "seen": 1791241872.2286203,
+    "mtime": 1791168618.9571648,
     "ast_hash": "dc9732caece44941b638b1bc781ee95d",
     "semantic_hash": "dc9732caece44941b638b1bc781ee95d"
   },
   "tools/gen_map_pieces.mjs": {
-    "mtime": 1791241702.9240522,
-    "seen": 1791241872.2286215,
+    "mtime": 1791168618.9596648,
     "ast_hash": "05a14297912a7766a340f334c94bd32a",
     "semantic_hash": "05a14297912a7766a340f334c94bd32a"
   },
   "tools/make_preview.py": {
-    "mtime": 1791241702.9240522,
-    "seen": 1791241872.2286227,
+    "mtime": 1791168618.9606671,
     "ast_hash": "efdd22ef8adbea66ad2c6f225231da03",
     "semantic_hash": "efdd22ef8adbea66ad2c6f225231da03"
   },
   "assets/audio/enemy-attack-01.wav": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286236,
+    "mtime": 1791168638.8630457,
     "ast_hash": "9a170bfdc0abf1ee5cfa05131cb29248",
     "semantic_hash": "9a170bfdc0abf1ee5cfa05131cb29248"
   },
   "assets/audio/enemy-attack-02.wav": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286243,
+    "mtime": 1791168638.8635466,
     "ast_hash": "3aedabda14dfe15093d9e3001890b6c9",
     "semantic_hash": "3aedabda14dfe15093d9e3001890b6c9"
   },
   "assets/audio/enemy-attack-03.wav": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286253,
+    "mtime": 1791168638.8650546,
     "ast_hash": "5a672d09b0851849752f1041433a9cfb",
     "semantic_hash": "5a672d09b0851849752f1041433a9cfb"
   },
   "assets/audio/footstep-stone-01.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286267,
+    "mtime": 1791168638.8655558,
     "ast_hash": "5e4ce2a9a8da359e25ebacefe6085207",
     "semantic_hash": "5e4ce2a9a8da359e25ebacefe6085207"
   },
   "assets/audio/footstep-stone-02.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.228628,
+    "mtime": 1791168638.8660562,
     "ast_hash": "42a68b509a5b55bacf421a53b8498ac9",
     "semantic_hash": "42a68b509a5b55bacf421a53b8498ac9"
   },
   "assets/audio/footstep-stone-03.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286289,
+    "mtime": 1791168638.8665552,
     "ast_hash": "096249de9851a4dd5cff284df6e2cfbe",
     "semantic_hash": "096249de9851a4dd5cff284df6e2cfbe"
   },
   "assets/audio/footstep-stone-04.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.22863,
+    "mtime": 1791168638.8670552,
     "ast_hash": "2bbf2dc2c4fd5dab1471565a7717c26d",
     "semantic_hash": "2bbf2dc2c4fd5dab1471565a7717c26d"
   },
   "assets/audio/footstep-stone-05.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286313,
+    "mtime": 1791168638.868057,
     "ast_hash": "9c86cbb9d876a664616768b928f09c41",
     "semantic_hash": "9c86cbb9d876a664616768b928f09c41"
   },
   "assets/audio/footstep-stone-06.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286322,
+    "mtime": 1791168638.8685586,
     "ast_hash": "1ad77a09007eecfe72c27d6979372fb9",
     "semantic_hash": "1ad77a09007eecfe72c27d6979372fb9"
   },
   "assets/audio/monster-attack-01.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286334,
+    "mtime": 1791168638.8695574,
     "ast_hash": "6d3da9c3c65b82d67568463a7cca42ce",
     "semantic_hash": "6d3da9c3c65b82d67568463a7cca42ce"
   },
   "assets/audio/monster-attack-02.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286346,
+    "mtime": 1791168638.8705635,
     "ast_hash": "3d276ff03c0ddc2e555f3ad2089f78aa",
     "semantic_hash": "3d276ff03c0ddc2e555f3ad2089f78aa"
   },
   "assets/audio/monster-attack-03.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286355,
+    "mtime": 1791168638.8715699,
     "ast_hash": "64c47f00966358c01799a3aa82d1af20",
     "semantic_hash": "64c47f00966358c01799a3aa82d1af20"
   },
   "assets/audio/monster-hurt-01.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.2286367,
+    "mtime": 1791168638.8725696,
     "ast_hash": "86e52e8286fcaed875ac71ad01a589b6",
     "semantic_hash": "86e52e8286fcaed875ac71ad01a589b6"
   },
   "assets/audio/monster-hurt-02.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.228638,
+    "mtime": 1791168638.8735702,
     "ast_hash": "75dc74bf2095adeb8300f1178ee7dd43",
     "semantic_hash": "75dc74bf2095adeb8300f1178ee7dd43"
   },
   "assets/audio/monster-hurt-03.ogg": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.228639,
+    "mtime": 1791168638.8735702,
     "ast_hash": "2ec3a577576e99bf1219da810943bc0a",
     "semantic_hash": "2ec3a577576e99bf1219da810943bc0a"
   },
   "assets/audio/player-hurt-01.wav": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.22864,
+    "mtime": 1791168638.876081,
     "ast_hash": "6b29f8cc5c6bd844369d08f2d032d0d7",
     "semantic_hash": "6b29f8cc5c6bd844369d08f2d032d0d7"
   },
   "assets/audio/player-hurt-02.wav": {
-    "mtime": 1791241702.8505085,
-    "seen": 1791241872.228641,
+    "mtime": 1791168638.8780797,
     "ast_hash": "0974066707cf05895a64ffac633bd3b1",
     "semantic_hash": "0974066707cf05895a64ffac633bd3b1"
   },
   "assets/audio/player-hurt-03.wav": {
-    "mtime": 1791241702.8642185,
-    "seen": 1791241872.228642,
+    "mtime": 1791168638.8795798,
     "ast_hash": "c507607b2598a1a64736f8a6a413b278",
     "semantic_hash": "c507607b2598a1a64736f8a6a413b278"
   },
   "assets/audio/player-hurt-04.wav": {
-    "mtime": 1791241702.8657224,
-    "seen": 1791241872.2286432,
+    "mtime": 1791168638.8810904,
     "ast_hash": "879231a09218f174412add375d95b154",
     "semantic_hash": "879231a09218f174412add375d95b154"
   },
   "assets/audio/player-hurt-05.wav": {
-    "mtime": 1791241702.8667,
-    "seen": 1791241872.2286456,
+    "mtime": 1791168638.8820896,
     "ast_hash": "7b235c0c8e8556cfa06968552bf85348",
     "semantic_hash": "7b235c0c8e8556cfa06968552bf85348"
   },
   "assets/audio/player-hurt-06.wav": {
-    "mtime": 1791241702.8681889,
-    "seen": 1791241872.228647,
+    "mtime": 1791168638.8835957,
     "ast_hash": "3308b49b94bbf44b3d253f5304ddc77b",
     "semantic_hash": "3308b49b94bbf44b3d253f5304ddc77b"
   },
   "js/config/AudioConfig.js": {
-    "mtime": 1791243427.9004395,
-    "seen": 1791244080.61435,
-    "ast_hash": "c13224551698a567dd8b662cca7d9292",
-    "semantic_hash": "c13224551698a567dd8b662cca7d9292"
+    "mtime": 1792344039.6421397,
+    "ast_hash": "77a52488b030682636bf7047b93bbb5a",
+    "semantic_hash": "77a52488b030682636bf7047b93bbb5a"
+  },
+  ".agents/skills/diagnosing-bugs/scripts/hitl-loop.template.sh": {
+    "mtime": 1792252245.0125544,
+    "ast_hash": "798a4f0d6a526f8dda2494b6f6d39d79",
+    "semantic_hash": "798a4f0d6a526f8dda2494b6f6d39d79"
+  },
+  ".agents/skills/git-guardrails-claude-code/scripts/block-dangerous-git.sh": {
+    "mtime": 1792252245.0498862,
+    "ast_hash": "8cdf6c38e301f8c7c60f75e5c45fa023",
+    "semantic_hash": "8cdf6c38e301f8c7c60f75e5c45fa023"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/CesiumFlythrough.tsx": {
+    "mtime": 1792252607.7728655,
+    "ast_hash": "a6e99286955bf88a46a78da73395d6cc",
+    "semantic_hash": "a6e99286955bf88a46a78da73395d6cc"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/example-Root.tsx": {
+    "mtime": 1792252607.7738652,
+    "ast_hash": "218b33e931cffcdc9c10bc627f651263",
+    "semantic_hash": "218b33e931cffcdc9c10bc627f651263"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/cesium/assets/flight-path.ts": {
+    "mtime": 1792252607.7748654,
+    "ast_hash": "bb24132a979beb0c2bf81874b276121b",
+    "semantic_hash": "bb24132a979beb0c2bf81874b276121b"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs": {
+    "mtime": 1792252607.777377,
+    "ast_hash": "afee6ffa89d5567c6eb72bd980ae8d4c",
+    "semantic_hash": "afee6ffa89d5567c6eb72bd980ae8d4c"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/CountryLabel.tsx": {
+    "mtime": 1792252607.782377,
+    "ast_hash": "ee71c97d9f5e18441659265a2b32919c",
+    "semantic_hash": "ee71c97d9f5e18441659265a2b32919c"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts": {
+    "mtime": 1792252607.782377,
+    "ast_hash": "7cb9b7a20f09efe947146dbb637232ab",
+    "semantic_hash": "7cb9b7a20f09efe947146dbb637232ab"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx": {
+    "mtime": 1792252607.783376,
+    "ast_hash": "aad76f49824a10ca081cede29776e845",
+    "semantic_hash": "aad76f49824a10ca081cede29776e845"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/example-Root.tsx": {
+    "mtime": 1792252607.783376,
+    "ast_hash": "1930828302fcc97d2a6eb5f07f6c711a",
+    "semantic_hash": "1930828302fcc97d2a6eb5f07f6c711a"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/maptiler/assets/tokens.ts": {
+    "mtime": 1792252607.786887,
+    "ast_hash": "ccaf45a3acefd82d96320b8e3d80eea4",
+    "semantic_hash": "ccaf45a3acefd82d96320b8e3d80eea4"
+  },
+  ".agents/skills/remotion-best-practices/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs": {
+    "mtime": 1792252607.7898872,
+    "ast_hash": "11427d020822a39e68e8b10f1525169f",
+    "semantic_hash": "11427d020822a39e68e8b10f1525169f"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/CesiumFlythrough.tsx": {
+    "mtime": 1792252607.8059008,
+    "ast_hash": "a6e99286955bf88a46a78da73395d6cc",
+    "semantic_hash": "a6e99286955bf88a46a78da73395d6cc"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/example-Root.tsx": {
+    "mtime": 1792252607.8079054,
+    "ast_hash": "218b33e931cffcdc9c10bc627f651263",
+    "semantic_hash": "218b33e931cffcdc9c10bc627f651263"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/assets/flight-path.ts": {
+    "mtime": 1792252607.8079054,
+    "ast_hash": "bb24132a979beb0c2bf81874b276121b",
+    "semantic_hash": "bb24132a979beb0c2bf81874b276121b"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs": {
+    "mtime": 1792252607.8109047,
+    "ast_hash": "afee6ffa89d5567c6eb72bd980ae8d4c",
+    "semantic_hash": "afee6ffa89d5567c6eb72bd980ae8d4c"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/CountryLabel.tsx": {
+    "mtime": 1792252607.8149054,
+    "ast_hash": "ee71c97d9f5e18441659265a2b32919c",
+    "semantic_hash": "ee71c97d9f5e18441659265a2b32919c"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts": {
+    "mtime": 1792252607.8149054,
+    "ast_hash": "7cb9b7a20f09efe947146dbb637232ab",
+    "semantic_hash": "7cb9b7a20f09efe947146dbb637232ab"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx": {
+    "mtime": 1792252607.8159068,
+    "ast_hash": "aad76f49824a10ca081cede29776e845",
+    "semantic_hash": "aad76f49824a10ca081cede29776e845"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/example-Root.tsx": {
+    "mtime": 1792252607.8159068,
+    "ast_hash": "1930828302fcc97d2a6eb5f07f6c711a",
+    "semantic_hash": "1930828302fcc97d2a6eb5f07f6c711a"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/tokens.ts": {
+    "mtime": 1792252607.819294,
+    "ast_hash": "ccaf45a3acefd82d96320b8e3d80eea4",
+    "semantic_hash": "ccaf45a3acefd82d96320b8e3d80eea4"
+  },
+  ".agents/skills/remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs": {
+    "mtime": 1792252607.8222926,
+    "ast_hash": "11427d020822a39e68e8b10f1525169f",
+    "semantic_hash": "11427d020822a39e68e8b10f1525169f"
+  },
+  ".agents/skills/remotion-maps/techniques/cesium/assets/CesiumFlythrough.tsx": {
+    "mtime": 1792252607.8543403,
+    "ast_hash": "a6e99286955bf88a46a78da73395d6cc",
+    "semantic_hash": "a6e99286955bf88a46a78da73395d6cc"
+  },
+  ".agents/skills/remotion-maps/techniques/cesium/assets/example-Root.tsx": {
+    "mtime": 1792252607.8558457,
+    "ast_hash": "218b33e931cffcdc9c10bc627f651263",
+    "semantic_hash": "218b33e931cffcdc9c10bc627f651263"
+  },
+  ".agents/skills/remotion-maps/techniques/cesium/assets/flight-path.ts": {
+    "mtime": 1792252607.8558457,
+    "ast_hash": "bb24132a979beb0c2bf81874b276121b",
+    "semantic_hash": "bb24132a979beb0c2bf81874b276121b"
+  },
+  ".agents/skills/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs": {
+    "mtime": 1792252607.8578508,
+    "ast_hash": "afee6ffa89d5567c6eb72bd980ae8d4c",
+    "semantic_hash": "afee6ffa89d5567c6eb72bd980ae8d4c"
+  },
+  ".agents/skills/remotion-maps/techniques/maptiler/assets/CountryLabel.tsx": {
+    "mtime": 1792252607.861852,
+    "ast_hash": "ee71c97d9f5e18441659265a2b32919c",
+    "semantic_hash": "ee71c97d9f5e18441659265a2b32919c"
+  },
+  ".agents/skills/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts": {
+    "mtime": 1792252607.8628528,
+    "ast_hash": "7cb9b7a20f09efe947146dbb637232ab",
+    "semantic_hash": "7cb9b7a20f09efe947146dbb637232ab"
+  },
+  ".agents/skills/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx": {
+    "mtime": 1792252607.8628528,
+    "ast_hash": "aad76f49824a10ca081cede29776e845",
+    "semantic_hash": "aad76f49824a10ca081cede29776e845"
+  },
+  ".agents/skills/remotion-maps/techniques/maptiler/assets/example-Root.tsx": {
+    "mtime": 1792252607.8638527,
+    "ast_hash": "1930828302fcc97d2a6eb5f07f6c711a",
+    "semantic_hash": "1930828302fcc97d2a6eb5f07f6c711a"
+  },
+  ".agents/skills/remotion-maps/techniques/maptiler/assets/tokens.ts": {
+    "mtime": 1792252607.866357,
+    "ast_hash": "ccaf45a3acefd82d96320b8e3d80eea4",
+    "semantic_hash": "ccaf45a3acefd82d96320b8e3d80eea4"
+  },
+  ".agents/skills/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs": {
+    "mtime": 1792252607.869359,
+    "ast_hash": "11427d020822a39e68e8b10f1525169f",
+    "semantic_hash": "11427d020822a39e68e8b10f1525169f"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/cesium/assets/CesiumFlythrough.tsx": {
+    "mtime": 1792252607.8859122,
+    "ast_hash": "a6e99286955bf88a46a78da73395d6cc",
+    "semantic_hash": "a6e99286955bf88a46a78da73395d6cc"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/cesium/assets/example-Root.tsx": {
+    "mtime": 1792252607.8869188,
+    "ast_hash": "218b33e931cffcdc9c10bc627f651263",
+    "semantic_hash": "218b33e931cffcdc9c10bc627f651263"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/cesium/assets/flight-path.ts": {
+    "mtime": 1792252607.8879182,
+    "ast_hash": "bb24132a979beb0c2bf81874b276121b",
+    "semantic_hash": "bb24132a979beb0c2bf81874b276121b"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs": {
+    "mtime": 1792252607.8899171,
+    "ast_hash": "afee6ffa89d5567c6eb72bd980ae8d4c",
+    "semantic_hash": "afee6ffa89d5567c6eb72bd980ae8d4c"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/maptiler/assets/CountryLabel.tsx": {
+    "mtime": 1792252607.8949194,
+    "ast_hash": "ee71c97d9f5e18441659265a2b32919c",
+    "semantic_hash": "ee71c97d9f5e18441659265a2b32919c"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts": {
+    "mtime": 1792252607.8949194,
+    "ast_hash": "7cb9b7a20f09efe947146dbb637232ab",
+    "semantic_hash": "7cb9b7a20f09efe947146dbb637232ab"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx": {
+    "mtime": 1792252607.8959193,
+    "ast_hash": "aad76f49824a10ca081cede29776e845",
+    "semantic_hash": "aad76f49824a10ca081cede29776e845"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/maptiler/assets/example-Root.tsx": {
+    "mtime": 1792252607.896426,
+    "ast_hash": "1930828302fcc97d2a6eb5f07f6c711a",
+    "semantic_hash": "1930828302fcc97d2a6eb5f07f6c711a"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/maptiler/assets/tokens.ts": {
+    "mtime": 1792252607.8994286,
+    "ast_hash": "ccaf45a3acefd82d96320b8e3d80eea4",
+    "semantic_hash": "ccaf45a3acefd82d96320b8e3d80eea4"
+  },
+  ".agents/skills/remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs": {
+    "mtime": 1792252607.9024289,
+    "ast_hash": "11427d020822a39e68e8b10f1525169f",
+    "semantic_hash": "11427d020822a39e68e8b10f1525169f"
+  },
+  ".agents/skills/setup-ts-deep-modules/dependency-cruiser.config.cjs": {
+    "mtime": 1792252245.0423784,
+    "ast_hash": "053d4151fd4407aa12dc3efbc9545756",
+    "semantic_hash": "053d4151fd4407aa12dc3efbc9545756"
+  },
+  ".agents/skills/wizard/template.sh": {
+    "mtime": 1792252245.0368743,
+    "ast_hash": "5149c2db478df96bb8b6de06485621e3",
+    "semantic_hash": "5149c2db478df96bb8b6de06485621e3"
+  },
+  ".aider-desk/skills/diagnosing-bugs/scripts/hitl-loop.template.sh": {
+    "mtime": 1792252245.0125544,
+    "ast_hash": "798a4f0d6a526f8dda2494b6f6d39d79",
+    "semantic_hash": "798a4f0d6a526f8dda2494b6f6d39d79"
+  },
+  ".aider-desk/skills/git-guardrails-claude-code/scripts/block-dangerous-git.sh": {
+    "mtime": 1792252245.0498862,
+    "ast_hash": "8cdf6c38e301f8c7c60f75e5c45fa023",
+    "semantic_hash": "8cdf6c38e301f8c7c60f75e5c45fa023"
+  },
+  ".aider-desk/skills/setup-ts-deep-modules/dependency-cruiser.config.cjs": {
+    "mtime": 1792252245.0423784,
+    "ast_hash": "053d4151fd4407aa12dc3efbc9545756",
+    "semantic_hash": "053d4151fd4407aa12dc3efbc9545756"
+  },
+  ".aider-desk/skills/wizard/template.sh": {
+    "mtime": 1792252245.0368743,
+    "ast_hash": "5149c2db478df96bb8b6de06485621e3",
+    "semantic_hash": "5149c2db478df96bb8b6de06485621e3"
+  },
+  "data/skills/diagnosing-bugs/scripts/hitl-loop.template.sh": {
+    "mtime": 1792252245.0125544,
+    "ast_hash": "798a4f0d6a526f8dda2494b6f6d39d79",
+    "semantic_hash": "798a4f0d6a526f8dda2494b6f6d39d79"
+  },
+  "data/skills/git-guardrails-claude-code/scripts/block-dangerous-git.sh": {
+    "mtime": 1792252245.0498862,
+    "ast_hash": "8cdf6c38e301f8c7c60f75e5c45fa023",
+    "semantic_hash": "8cdf6c38e301f8c7c60f75e5c45fa023"
+  },
+  "data/skills/setup-ts-deep-modules/dependency-cruiser.config.cjs": {
+    "mtime": 1792252245.0423784,
+    "ast_hash": "053d4151fd4407aa12dc3efbc9545756",
+    "semantic_hash": "053d4151fd4407aa12dc3efbc9545756"
+  },
+  "data/skills/wizard/template.sh": {
+    "mtime": 1792252245.0368743,
+    "ast_hash": "5149c2db478df96bb8b6de06485621e3",
+    "semantic_hash": "5149c2db478df96bb8b6de06485621e3"
+  },
+  "js/core/Chain.js": {
+    "mtime": 1792344039.6471527,
+    "ast_hash": "b554e54687d763a1ec65687865fb797b",
+    "semantic_hash": "b554e54687d763a1ec65687865fb797b"
+  },
+  "js/core/GameLoop.js": {
+    "mtime": 1792292967.626299,
+    "ast_hash": "527be8aa17d40baa212ad09c01d0f6e9",
+    "semantic_hash": "527be8aa17d40baa212ad09c01d0f6e9"
+  },
+  "js/particles/FlameParticle.js": {
+    "mtime": 1792344039.6531575,
+    "ast_hash": "ed0b04cecb825b5866330b1c31868738",
+    "semantic_hash": "ed0b04cecb825b5866330b1c31868738"
+  },
+  "js/particles/FlashParticle.js": {
+    "mtime": 1792344039.6541562,
+    "ast_hash": "9a3f2d101e4ca2e38c86141b08b4828e",
+    "semantic_hash": "9a3f2d101e4ca2e38c86141b08b4828e"
+  },
+  "js/particles/SparkParticle.js": {
+    "mtime": 1792344039.6561565,
+    "ast_hash": "2e0bd4076e3f4ad6f07cc5747234a7bb",
+    "semantic_hash": "2e0bd4076e3f4ad6f07cc5747234a7bb"
+  },
+  "js/rooms/DungeonTileQuery.js": {
+    "mtime": 1792344861.6501255,
+    "ast_hash": "2a42a4630dcea178f966513e26a79177",
+    "semantic_hash": "2a42a4630dcea178f966513e26a79177"
+  },
+  "js/rooms/SafeSpawn.js": {
+    "mtime": 1792344039.6594155,
+    "ast_hash": "23036d386f266ac25a3e84f1c08cf2fd",
+    "semantic_hash": "23036d386f266ac25a3e84f1c08cf2fd"
+  },
+  "js/systems/LightingRenderer.js": {
+    "mtime": 1792344039.6614153,
+    "ast_hash": "79cffe998ec2f04c8a12993d64f7473e",
+    "semantic_hash": "79cffe998ec2f04c8a12993d64f7473e"
+  },
+  "js/systems/PlayerAI.js": {
+    "mtime": 1792280266.4953947,
+    "ast_hash": "6f13ec5d256209f99965471fcf6bf252",
+    "semantic_hash": "6f13ec5d256209f99965471fcf6bf252"
+  },
+  "js/systems/ScreenGore.js": {
+    "mtime": 1792344039.6634142,
+    "ast_hash": "ec463806b1cb228e3af5836c33f94437",
+    "semantic_hash": "ec463806b1cb228e3af5836c33f94437"
+  },
+  "js/trailer.js": {
+    "mtime": 1792345620.7728584,
+    "ast_hash": "3e9b8ded5ab7b3ab7138804ea403d66f",
+    "semantic_hash": "3e9b8ded5ab7b3ab7138804ea403d66f"
+  },
+  "js/trailer/TrailerPlayer.js": {
+    "mtime": 1792353516.6490026,
+    "ast_hash": "ecb7d9645da6a87aa11da8272030e7fa",
+    "semantic_hash": "ecb7d9645da6a87aa11da8272030e7fa"
+  },
+  "js/trailer/TrailerStage.js": {
+    "mtime": 1792353513.547137,
+    "ast_hash": "4c2838c6f493175a4ffb10b2df936a08",
+    "semantic_hash": "4c2838c6f493175a4ffb10b2df936a08"
+  },
+  "js/trailer/anim.js": {
+    "mtime": 1792344039.6664152,
+    "ast_hash": "81d9dcc093ad80ee24f805f3f058f6a8",
+    "semantic_hash": "81d9dcc093ad80ee24f805f3f058f6a8"
+  },
+  "js/trailer/fx/ArrowWipe.js": {
+    "mtime": 1792353680.1109478,
+    "ast_hash": "ec84f83fbaa06f77be0b89e70782a7de",
+    "semantic_hash": "ec84f83fbaa06f77be0b89e70782a7de"
+  },
+  "js/trailer/fx/BloodScreen.js": {
+    "mtime": 1792344039.6674154,
+    "ast_hash": "f56116f91b356ee5096b9650d4ab15db",
+    "semantic_hash": "f56116f91b356ee5096b9650d4ab15db"
+  },
+  "js/trailer/fx/LensSplatter.js": {
+    "mtime": 1792344039.66864,
+    "ast_hash": "50e13024fd0958295b5627bffb039aea",
+    "semantic_hash": "50e13024fd0958295b5627bffb039aea"
+  },
+  "js/trailer/kit/ActionArena.js": {
+    "mtime": 1792353460.1024096,
+    "ast_hash": "f2aba3147e355460a308ea0dd893b63b",
+    "semantic_hash": "f2aba3147e355460a308ea0dd893b63b"
+  },
+  "js/trailer/kit/ArenaShot.js": {
+    "mtime": 1792344039.67064,
+    "ast_hash": "624bb2e2d383dec6a335749cb90d8fdc",
+    "semantic_hash": "624bb2e2d383dec6a335749cb90d8fdc"
+  },
+  "js/trailer/kit/SeamlessTileset.js": {
+    "mtime": 1792344039.6716397,
+    "ast_hash": "2e02fb0072a8577e94ba7aa1d8157ee0",
+    "semantic_hash": "2e02fb0072a8577e94ba7aa1d8157ee0"
+  },
+  "js/trailer/kit/arenaRender.js": {
+    "mtime": 1792353499.614023,
+    "ast_hash": "babd72b7949956e2f9c5d5b2135a1e5e",
+    "semantic_hash": "babd72b7949956e2f9c5d5b2135a1e5e"
+  },
+  "js/trailer/kit/rushKit.js": {
+    "mtime": 1792353768.1588397,
+    "ast_hash": "fc0d5aa9287de2c21c51cc2f4441d1fc",
+    "semantic_hash": "fc0d5aa9287de2c21c51cc2f4441d1fc"
+  },
+  "js/trailer/scenes/IntroScene.js": {
+    "mtime": 1792344039.6736412,
+    "ast_hash": "357b1c217ac474b01b617c263b3a445a",
+    "semantic_hash": "357b1c217ac474b01b617c263b3a445a"
+  },
+  "js/trailer/scenes/TitleBloodScene.js": {
+    "mtime": 1792344039.6747816,
+    "ast_hash": "bee5ecd8147e76f29c1a77d43efd3a2e",
+    "semantic_hash": "bee5ecd8147e76f29c1a77d43efd3a2e"
+  },
+  "js/trailer/scenes/frenzy/FrenzyBeats.js": {
+    "mtime": 1792344039.6757815,
+    "ast_hash": "7c38524afe2027141a962bad61567fe2",
+    "semantic_hash": "7c38524afe2027141a962bad61567fe2"
+  },
+  "js/trailer/scenes/frenzy/FrenzyScene.js": {
+    "mtime": 1792344039.6772852,
+    "ast_hash": "d4cde0cbcbf4930df4421c86e4d1dd0a",
+    "semantic_hash": "d4cde0cbcbf4930df4421c86e4d1dd0a"
+  },
+  "js/trailer/scenes/frenzy/HordeDirector.js": {
+    "mtime": 1792344039.6782892,
+    "ast_hash": "c184f7c50847f30e40458ee8ab628696",
+    "semantic_hash": "c184f7c50847f30e40458ee8ab628696"
+  },
+  "js/trailer/scenes/mapgen/MapGenScene.js": {
+    "mtime": 1792346132.180931,
+    "ast_hash": "dc656dcecdad54602d472e6b498c076c",
+    "semantic_hash": "dc656dcecdad54602d472e6b498c076c"
+  },
+  "js/trailer/scenes/mapgen/mapBake.js": {
+    "mtime": 1792345487.0410147,
+    "ast_hash": "d336ac6864a5d8e1ca692d98dca46177",
+    "semantic_hash": "d336ac6864a5d8e1ca692d98dca46177"
+  },
+  "js/trailer/scenes/mapgen/mapLayout.js": {
+    "mtime": 1792345464.7797818,
+    "ast_hash": "9cbff0d5d7a295f014dbc04099ef298b",
+    "semantic_hash": "9cbff0d5d7a295f014dbc04099ef298b"
+  },
+  "js/trailer/scenes/montage/SnapShot.js": {
+    "mtime": 1792344039.6792881,
+    "ast_hash": "8b35caf93169af4cf15c32e8e6297f65",
+    "semantic_hash": "8b35caf93169af4cf15c32e8e6297f65"
+  },
+  "js/trailer/scenes/montage/SplitShot.js": {
+    "mtime": 1792346132.1734128,
+    "ast_hash": "3549c0e6b12f58f20033364ba38735cc",
+    "semantic_hash": "3549c0e6b12f58f20033364ba38735cc"
+  },
+  "js/trailer/scenes/montage/ZigZagShot.js": {
+    "mtime": 1792344039.680288,
+    "ast_hash": "ebc1fa8f8f288fb407a61ba0302ad6e2",
+    "semantic_hash": "ebc1fa8f8f288fb407a61ba0302ad6e2"
+  },
+  "js/trailer/scenes/rush/ArrowRunShot.js": {
+    "mtime": 1792353734.7812903,
+    "ast_hash": "c369be93058993ca183c5b9e317dc6cb",
+    "semantic_hash": "c369be93058993ca183c5b9e317dc6cb"
+  },
+  "js/trailer/scenes/rush/ButtonDoorShot.js": {
+    "mtime": 1792353911.0652387,
+    "ast_hash": "45b3502b8acf485ce8bfeef0321f8d15",
+    "semantic_hash": "45b3502b8acf485ce8bfeef0321f8d15"
+  },
+  "js/trailer/scenes/rush/HoleRunShot.js": {
+    "mtime": 1792353827.9069567,
+    "ast_hash": "3543ef13ea54c2a18dd5ed6fe36230d6",
+    "semantic_hash": "3543ef13ea54c2a18dd5ed6fe36230d6"
+  },
+  "js/ui/LoadingScreen.js": {
+    "mtime": 1792344039.6812882,
+    "ast_hash": "26a81fb29d503145d4f01ec338b4ed80",
+    "semantic_hash": "26a81fb29d503145d4f01ec338b4ed80"
+  },
+  "js/ui/PixelFont.js": {
+    "mtime": 1792344039.6822882,
+    "ast_hash": "6323d5e0b1de65a4d49b7f68addfcc7e",
+    "semantic_hash": "6323d5e0b1de65a4d49b7f68addfcc7e"
+  },
+  "js/ui/SpeechBubble.js": {
+    "mtime": 1792344039.6822882,
+    "ast_hash": "0b5b6971ccd66e5ff9518358f4da2cb4",
+    "semantic_hash": "0b5b6971ccd66e5ff9518358f4da2cb4"
+  },
+  "package.json": {
+    "mtime": 1790921993.8589015,
+    "ast_hash": "d54307d7f04924928a14c90136452010",
+    "semantic_hash": "d54307d7f04924928a14c90136452010"
+  },
+  "pitch/video/eslint.config.mjs": {
+    "mtime": 1792138160.0,
+    "ast_hash": "e20d59bb6b64567da14d80c3da2c6b15",
+    "semantic_hash": "e20d59bb6b64567da14d80c3da2c6b15"
+  },
+  "pitch/video/package.json": {
+    "mtime": 1792256304.5392332,
+    "ast_hash": "d05381fa5f332158abee816a82885ce0",
+    "semantic_hash": "d05381fa5f332158abee816a82885ce0"
+  },
+  "pitch/video/remotion.config.ts": {
+    "mtime": 1792138160.0,
+    "ast_hash": "6338a93bfb160c9897d382735436172e",
+    "semantic_hash": "6338a93bfb160c9897d382735436172e"
+  },
+  "pitch/video/src/PitchVideo.tsx": {
+    "mtime": 1792256545.1872718,
+    "ast_hash": "c68cde8c9aa0440112c1d70d068a5059",
+    "semantic_hash": "c68cde8c9aa0440112c1d70d068a5059"
+  },
+  "pitch/video/src/Root.tsx": {
+    "mtime": 1792256559.7831554,
+    "ast_hash": "123630f6a294e8ea4a5f8694cc9cd1e6",
+    "semantic_hash": "123630f6a294e8ea4a5f8694cc9cd1e6"
+  },
+  "pitch/video/src/components/Camera.tsx": {
+    "mtime": 1792259705.5541472,
+    "ast_hash": "832149b51f8a8c50831b79aa14b31b18",
+    "semantic_hash": "832149b51f8a8c50831b79aa14b31b18"
+  },
+  "pitch/video/src/components/ChainSaw.tsx": {
+    "mtime": 1792260905.181274,
+    "ast_hash": "fb0b243e882ec82f01ae8b19f7493b86",
+    "semantic_hash": "fb0b243e882ec82f01ae8b19f7493b86"
+  },
+  "pitch/video/src/components/DungeonBg.tsx": {
+    "mtime": 1792256202.6441078,
+    "ast_hash": "b4c787cd8bdd34af8a735bbaf8d0f987",
+    "semantic_hash": "b4c787cd8bdd34af8a735bbaf8d0f987"
+  },
+  "pitch/video/src/components/DungeonRoom.tsx": {
+    "mtime": 1792257457.6623008,
+    "ast_hash": "9287e9530f94b5aaa8dbd731d2bbf7ca",
+    "semantic_hash": "9287e9530f94b5aaa8dbd731d2bbf7ca"
+  },
+  "pitch/video/src/components/Effects.tsx": {
+    "mtime": 1792257486.0644078,
+    "ast_hash": "da83cc1e6af6cd4cb93dc9f005e8596f",
+    "semantic_hash": "da83cc1e6af6cd4cb93dc9f005e8596f"
+  },
+  "pitch/video/src/components/GameName.tsx": {
+    "mtime": 1792256218.563138,
+    "ast_hash": "f7063a9e7cfb675e47fd9b531fbebb69",
+    "semantic_hash": "f7063a9e7cfb675e47fd9b531fbebb69"
+  },
+  "pitch/video/src/components/GibExplosion.tsx": {
+    "mtime": 1792257904.8092644,
+    "ast_hash": "98c45e381c10fb90ec4d548720807639",
+    "semantic_hash": "98c45e381c10fb90ec4d548720807639"
+  },
+  "pitch/video/src/components/Hud.tsx": {
+    "mtime": 1792256210.0582364,
+    "ast_hash": "a0a9ff154d96dda1a99c8726d13ebbc1",
+    "semantic_hash": "a0a9ff154d96dda1a99c8726d13ebbc1"
+  },
+  "pitch/video/src/components/OnScreenText.tsx": {
+    "mtime": 1792256191.4305458,
+    "ast_hash": "639086b0e5c7cbae5e9d8ca55aa86d07",
+    "semantic_hash": "639086b0e5c7cbae5e9d8ca55aa86d07"
+  },
+  "pitch/video/src/components/PixelSprite.tsx": {
+    "mtime": 1792257764.9312425,
+    "ast_hash": "a2f44b1fc32e580eaee94c01bfe2907d",
+    "semantic_hash": "a2f44b1fc32e580eaee94c01bfe2907d"
+  },
+  "pitch/video/src/components/PlayerPair.tsx": {
+    "mtime": 1792260430.909477,
+    "ast_hash": "3ba627db6ad93555a6a395fa6ddab7d2",
+    "semantic_hash": "3ba627db6ad93555a6a395fa6ddab7d2"
+  },
+  "pitch/video/src/components/Prop.tsx": {
+    "mtime": 1792261782.6902156,
+    "ast_hash": "fadc3eed0bf6fadcd90b7f371c2053c0",
+    "semantic_hash": "fadc3eed0bf6fadcd90b7f371c2053c0"
+  },
+  "pitch/video/src/components/RoomWorld.tsx": {
+    "mtime": 1792260971.953328,
+    "ast_hash": "7c3e7cb6e3f58895723dea4397462b6b",
+    "semantic_hash": "7c3e7cb6e3f58895723dea4397462b6b"
+  },
+  "pitch/video/src/components/SawShatter.tsx": {
+    "mtime": 1792277094.6203547,
+    "ast_hash": "22c574e5cdd6b627f9e87dbe89b88469",
+    "semantic_hash": "22c574e5cdd6b627f9e87dbe89b88469"
+  },
+  "pitch/video/src/components/SpriteSheet.tsx": {
+    "mtime": 1792257417.4089468,
+    "ast_hash": "567a77b6ce437e0a6840d1956f6bf35e",
+    "semantic_hash": "567a77b6ce437e0a6840d1956f6bf35e"
+  },
+  "pitch/video/src/components/useShake.ts": {
+    "mtime": 1792256179.4953701,
+    "ast_hash": "e3da8afb8ca4f3ab105e419e76ee514d",
+    "semantic_hash": "e3da8afb8ca4f3ab105e419e76ee514d"
+  },
+  "pitch/video/src/fonts.ts": {
+    "mtime": 1792256309.9232638,
+    "ast_hash": "cce4665cb3bcf0dbf4b0f6387d24bafb",
+    "semantic_hash": "cce4665cb3bcf0dbf4b0f6387d24bafb"
+  },
+  "pitch/video/src/index.ts": {
+    "mtime": 1792138160.0,
+    "ast_hash": "d92d9dee1ab16aa44a75ae7fbfb843ca",
+    "semantic_hash": "d92d9dee1ab16aa44a75ae7fbfb843ca"
+  },
+  "pitch/video/src/scenes/Scene01_Forge.tsx": {
+    "mtime": 1792276994.6920302,
+    "ast_hash": "5c16afe29b9e4abaa22f31fedc702dc1",
+    "semantic_hash": "5c16afe29b9e4abaa22f31fedc702dc1"
+  },
+  "pitch/video/src/scenes/Scene02_Hela.tsx": {
+    "mtime": 1792257582.0892577,
+    "ast_hash": "0ee80b88c37dea96dc8230541f8e11e4",
+    "semantic_hash": "0ee80b88c37dea96dc8230541f8e11e4"
+  },
+  "pitch/video/src/scenes/Scene03_SawBorn.tsx": {
+    "mtime": 1792257629.2841947,
+    "ast_hash": "3aced435aea76be200c30469beff2334",
+    "semantic_hash": "3aced435aea76be200c30469beff2334"
+  },
+  "pitch/video/src/scenes/Scene04_Gameplay.tsx": {
+    "mtime": 1792257653.4744487,
+    "ast_hash": "956fa01a4f6e958b48f9383e9dd8413a",
+    "semantic_hash": "956fa01a4f6e958b48f9383e9dd8413a"
+  },
+  "pitch/video/src/scenes/Scene05_Couch.tsx": {
+    "mtime": 1792257689.308284,
+    "ast_hash": "8f31a25bf9429f5d7b3317978b283271",
+    "semantic_hash": "8f31a25bf9429f5d7b3317978b283271"
+  },
+  "pitch/video/src/scenes/Scene06_Saw.tsx": {
+    "mtime": 1792257724.4968405,
+    "ast_hash": "70bcd2da808e3df695a4529fdf932444",
+    "semantic_hash": "70bcd2da808e3df695a4529fdf932444"
+  },
+  "pitch/video/src/scenes/Scene07_Chaos1.tsx": {
+    "mtime": 1792257755.841459,
+    "ast_hash": "07ada27a3ff0ecb565a232618e472660",
+    "semantic_hash": "07ada27a3ff0ecb565a232618e472660"
+  },
+  "pitch/video/src/scenes/Scene08_Chaos2.tsx": {
+    "mtime": 1792257795.511639,
+    "ast_hash": "d87a36d53b8ecd00499660f4d84ea5cb",
+    "semantic_hash": "d87a36d53b8ecd00499660f4d84ea5cb"
+  },
+  "pitch/video/src/scenes/Scene09_Inspirations.tsx": {
+    "mtime": 1792256471.6808379,
+    "ast_hash": "115182db4040a1e67cf8bbd8b0c41a87",
+    "semantic_hash": "115182db4040a1e67cf8bbd8b0c41a87"
+  },
+  "pitch/video/src/scenes/Scene10_Business.tsx": {
+    "mtime": 1792256488.0172029,
+    "ast_hash": "d84d915d833751fd57a2b052254afef9",
+    "semantic_hash": "d84d915d833751fd57a2b052254afef9"
+  },
+  "pitch/video/src/scenes/Scene11_Roadmap.tsx": {
+    "mtime": 1792256507.8069842,
+    "ast_hash": "89cc30ac8008074fea2958040c95ec03",
+    "semantic_hash": "89cc30ac8008074fea2958040c95ec03"
+  },
+  "pitch/video/src/scenes/Scene12_CTA.tsx": {
+    "mtime": 1792257844.4283051,
+    "ast_hash": "2e2be747aa0677c79a7b8fb3fbfaf9ea",
+    "semantic_hash": "2e2be747aa0677c79a7b8fb3fbfaf9ea"
+  },
+  "pitch/video/src/sprites.ts": {
+    "mtime": 1792257432.013075,
+    "ast_hash": "a70edc5affc6fe27dffb555c3b510329",
+    "semantic_hash": "a70edc5affc6fe27dffb555c3b510329"
+  },
+  "pitch/video/src/theme.ts": {
+    "mtime": 1792261600.9333434,
+    "ast_hash": "6dc9071f32af1906e15a91b4a613c672",
+    "semantic_hash": "6dc9071f32af1906e15a91b4a613c672"
+  },
+  "pitch/video/tsconfig.json": {
+    "mtime": 1792138160.0,
+    "ast_hash": "3f9d94814358aa5e8a039f53ae3eee99",
+    "semantic_hash": "3f9d94814358aa5e8a039f53ae3eee99"
+  },
+  "tests/test_hole_resistance.js": {
+    "mtime": 1792350690.1790335,
+    "ast_hash": "3548c50ed2442402f7dac27ffabb520d",
+    "semantic_hash": "3548c50ed2442402f7dac27ffabb520d"
+  },
+  "tests/test_safe_spawn.js": {
+    "mtime": 1792344039.6872897,
+    "ast_hash": "8e5b777585a50b34b88cb9f0edd7e540",
+    "semantic_hash": "8e5b777585a50b34b88cb9f0edd7e540"
+  },
+  "tools/export_scene_pngs.py": {
+    "mtime": 1792293296.0527203,
+    "ast_hash": "40387111ab39130467b3ab4c02bcb372",
+    "semantic_hash": "40387111ab39130467b3ab4c02bcb372"
+  },
+  "tools/export_scene_room.py": {
+    "mtime": 1792293461.007838,
+    "ast_hash": "3697e88506160eafce2bc21f0dd1304a",
+    "semantic_hash": "3697e88506160eafce2bc21f0dd1304a"
+  },
+  "tools/gen_expressions.py": {
+    "mtime": 1792297937.3006318,
+    "ast_hash": "d0a9dbe8a89b22c22b2cc2e9a6edef2d",
+    "semantic_hash": "d0a9dbe8a89b22c22b2cc2e9a6edef2d"
+  },
+  "tools/gen_fall.py": {
+    "mtime": 1792350495.5524158,
+    "ast_hash": "4c93af3b78395bae91fc4d678ce2a0e6",
+    "semantic_hash": "4c93af3b78395bae91fc4d678ce2a0e6"
+  },
+  "tools/sprites_to_gif.py": {
+    "mtime": 1792291914.7636273,
+    "ast_hash": "be4b8bafebebd3e3a04581d7f7602733",
+    "semantic_hash": "be4b8bafebebd3e3a04581d7f7602733"
+  },
+  "pitch/video/public/assets/audio/enemy-attack-01.wav": {
+    "mtime": 1791168638.8630457,
+    "ast_hash": "9a170bfdc0abf1ee5cfa05131cb29248",
+    "semantic_hash": "9a170bfdc0abf1ee5cfa05131cb29248"
+  },
+  "pitch/video/public/assets/audio/enemy-attack-02.wav": {
+    "mtime": 1791168638.8635466,
+    "ast_hash": "3aedabda14dfe15093d9e3001890b6c9",
+    "semantic_hash": "3aedabda14dfe15093d9e3001890b6c9"
+  },
+  "pitch/video/public/assets/audio/enemy-attack-03.wav": {
+    "mtime": 1791168638.8650546,
+    "ast_hash": "5a672d09b0851849752f1041433a9cfb",
+    "semantic_hash": "5a672d09b0851849752f1041433a9cfb"
+  },
+  "pitch/video/public/assets/audio/footstep-stone-01.ogg": {
+    "mtime": 1791168638.8655558,
+    "ast_hash": "5e4ce2a9a8da359e25ebacefe6085207",
+    "semantic_hash": "5e4ce2a9a8da359e25ebacefe6085207"
+  },
+  "pitch/video/public/assets/audio/footstep-stone-02.ogg": {
+    "mtime": 1791168638.8660562,
+    "ast_hash": "42a68b509a5b55bacf421a53b8498ac9",
+    "semantic_hash": "42a68b509a5b55bacf421a53b8498ac9"
+  },
+  "pitch/video/public/assets/audio/footstep-stone-03.ogg": {
+    "mtime": 1791168638.8665552,
+    "ast_hash": "096249de9851a4dd5cff284df6e2cfbe",
+    "semantic_hash": "096249de9851a4dd5cff284df6e2cfbe"
+  },
+  "pitch/video/public/assets/audio/footstep-stone-04.ogg": {
+    "mtime": 1791168638.8670552,
+    "ast_hash": "2bbf2dc2c4fd5dab1471565a7717c26d",
+    "semantic_hash": "2bbf2dc2c4fd5dab1471565a7717c26d"
+  },
+  "pitch/video/public/assets/audio/footstep-stone-05.ogg": {
+    "mtime": 1791168638.868057,
+    "ast_hash": "9c86cbb9d876a664616768b928f09c41",
+    "semantic_hash": "9c86cbb9d876a664616768b928f09c41"
+  },
+  "pitch/video/public/assets/audio/footstep-stone-06.ogg": {
+    "mtime": 1791168638.8685586,
+    "ast_hash": "1ad77a09007eecfe72c27d6979372fb9",
+    "semantic_hash": "1ad77a09007eecfe72c27d6979372fb9"
+  },
+  "pitch/video/public/assets/audio/monster-attack-01.ogg": {
+    "mtime": 1791168638.8695574,
+    "ast_hash": "6d3da9c3c65b82d67568463a7cca42ce",
+    "semantic_hash": "6d3da9c3c65b82d67568463a7cca42ce"
+  },
+  "pitch/video/public/assets/audio/monster-attack-02.ogg": {
+    "mtime": 1791168638.8705635,
+    "ast_hash": "3d276ff03c0ddc2e555f3ad2089f78aa",
+    "semantic_hash": "3d276ff03c0ddc2e555f3ad2089f78aa"
+  },
+  "pitch/video/public/assets/audio/monster-attack-03.ogg": {
+    "mtime": 1791168638.8715699,
+    "ast_hash": "64c47f00966358c01799a3aa82d1af20",
+    "semantic_hash": "64c47f00966358c01799a3aa82d1af20"
+  },
+  "pitch/video/public/assets/audio/monster-hurt-01.ogg": {
+    "mtime": 1791168638.8725696,
+    "ast_hash": "86e52e8286fcaed875ac71ad01a589b6",
+    "semantic_hash": "86e52e8286fcaed875ac71ad01a589b6"
+  },
+  "pitch/video/public/assets/audio/monster-hurt-02.ogg": {
+    "mtime": 1791168638.8735702,
+    "ast_hash": "75dc74bf2095adeb8300f1178ee7dd43",
+    "semantic_hash": "75dc74bf2095adeb8300f1178ee7dd43"
+  },
+  "pitch/video/public/assets/audio/monster-hurt-03.ogg": {
+    "mtime": 1791168638.8735702,
+    "ast_hash": "2ec3a577576e99bf1219da810943bc0a",
+    "semantic_hash": "2ec3a577576e99bf1219da810943bc0a"
+  },
+  "pitch/video/public/assets/audio/player-hurt-01.wav": {
+    "mtime": 1791168638.876081,
+    "ast_hash": "6b29f8cc5c6bd844369d08f2d032d0d7",
+    "semantic_hash": "6b29f8cc5c6bd844369d08f2d032d0d7"
+  },
+  "pitch/video/public/assets/audio/player-hurt-02.wav": {
+    "mtime": 1791168638.8780797,
+    "ast_hash": "0974066707cf05895a64ffac633bd3b1",
+    "semantic_hash": "0974066707cf05895a64ffac633bd3b1"
+  },
+  "pitch/video/public/assets/audio/player-hurt-03.wav": {
+    "mtime": 1791168638.8795798,
+    "ast_hash": "c507607b2598a1a64736f8a6a413b278",
+    "semantic_hash": "c507607b2598a1a64736f8a6a413b278"
+  },
+  "pitch/video/public/assets/audio/player-hurt-04.wav": {
+    "mtime": 1791168638.8810904,
+    "ast_hash": "879231a09218f174412add375d95b154",
+    "semantic_hash": "879231a09218f174412add375d95b154"
+  },
+  "pitch/video/public/assets/audio/player-hurt-05.wav": {
+    "mtime": 1791168638.8820896,
+    "ast_hash": "7b235c0c8e8556cfa06968552bf85348",
+    "semantic_hash": "7b235c0c8e8556cfa06968552bf85348"
+  },
+  "pitch/video/public/assets/audio/player-hurt-06.wav": {
+    "mtime": 1791168638.8835957,
+    "ast_hash": "3308b49b94bbf44b3d253f5304ddc77b",
+    "semantic_hash": "3308b49b94bbf44b3d253f5304ddc77b"
   }
 }
