@@ -1,7 +1,7 @@
 {
   "js/Game.js": {
-    "mtime": 1792363512.788898,
-    "ast_hash": "4b5568b0447170cee605a56ea53254ae",
+    "mtime": 1792364677.3190885,
+    "ast_hash": "ad48fc6323210e365c475ead58cd3d26",
     "semantic_hash": ""
   },
   "js/combat/CombatSystem.js": {
@@ -1171,8 +1171,8 @@
     "semantic_hash": "5cde63fa575dcaff3398d76a9c3ff794"
   },
   "js/trailer/fx/FxParticles.js": {
-    "mtime": 1792362277.5742161,
-    "ast_hash": "ecf9b3f68dfd569030b9c63a48128490",
+    "mtime": 1792364820.5276618,
+    "ast_hash": "00ba475dd30ae58328f3698367e2c535",
     "semantic_hash": ""
   },
   "js/trailer/fx/SawIris.js": {
@@ -1181,8 +1181,8 @@
     "semantic_hash": ""
   },
   "js/trailer/scenes/rush/BossWallShot.js": {
-    "mtime": 1792363941.8786905,
-    "ast_hash": "e4819a3936d9df2b0561a85912c3e6ab",
+    "mtime": 1792364835.6779416,
+    "ast_hash": "05712ff831d317eca48ea1015a3a218a",
     "semantic_hash": ""
   },
   "js/ui/VtuberHud.js": {
@@ -3301,8 +3301,8 @@
     "semantic_hash": ""
   },
   ".kiro/steering/trailer.md": {
-    "mtime": 1792363492.2562344,
-    "ast_hash": "6cd0443cbc5967cfadec7e0d3777fb28",
+    "mtime": 1792364930.5448794,
+    "ast_hash": "a4ce892a78ff037c5af911d63b134428",
     "semantic_hash": ""
   },
   "agent/skills/caveman/README.md": {
@@ -3821,8 +3821,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792362085.5854652,
-    "ast_hash": "cbdaba4668dc5c752ae04b22cc679c08",
+    "mtime": 1792364645.948068,
+    "ast_hash": "17dc5cd9e9f6d02070ba5e4664c73b3e",
     "semantic_hash": ""
   },
   "map/README.md": {
@@ -5123,6 +5123,21 @@
   "assets/audio/hit_sound.mp3": {
     "mtime": 1792362453.1492543,
     "ast_hash": "b9209009e216085c8b799d94f3d1075e",
+    "semantic_hash": ""
+  },
+  "js/ui/DeathScreen.js": {
+    "mtime": 1792364638.5451517,
+    "ast_hash": "080e7a2905f0f68555f0cec24c4ee5b8",
+    "semantic_hash": ""
+  },
+  "tools/gen_explosion.py": {
+    "mtime": 1792364585.66972,
+    "ast_hash": "96b413cc1408df226110946b3dc327c6",
+    "semantic_hash": ""
+  },
+  "assets/fx/explosion.png": {
+    "mtime": 1792364706.6522899,
+    "ast_hash": "69d1fbbfcb2c4a094df5c52b17c68fbe",
     "semantic_hash": ""
   }
 }

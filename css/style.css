@@ -27,6 +27,72 @@ html, body {
 }
 
 /* ---------------------------------------------------------------------------
+   Tela de morte (js/ui/DeathScreen.js): véu de sangue + botão pixel art
+   --------------------------------------------------------------------------- */
+#death-screen {
+    --px: 5px; /* 1 pixel de arte do botão (definido pelo JS) */
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(60, 6, 14, 0.55) 0%, rgba(20, 3, 7, 0.82) 45%, rgba(4, 2, 6, 0.95) 100%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* Saída rápida (ao reiniciar). */
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+#death-screen.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    /* Entrada com atraso: deixa o golpe final e a HUD reagirem antes. */
+    transition: opacity 0.6s ease 0.35s, visibility 0s linear 0s;
+}
+.death-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    transform: scale(0);
+}
+.death-btn canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+#death-screen.visible .death-btn {
+    animation: death-pop 0.45s cubic-bezier(0.34, 1.7, 0.64, 1) 0.75s both;
+}
+/* "Respira" em degraus de 1 pixel de arte (sem sub-pixel). */
+#death-screen.visible .death-btn canvas {
+    animation: death-idle 1.4s steps(1, end) 1.4s infinite;
+}
+.death-btn:focus { outline: none; }
+/* Foco por teclado/controle: contorno de 1 pixel de arte nos 4 lados. */
+.death-btn:focus-visible canvas {
+    filter:
+        drop-shadow(var(--px) 0 0 #efe3c2)
+        drop-shadow(calc(var(--px) * -1) 0 0 #efe3c2)
+        drop-shadow(0 var(--px) 0 #efe3c2)
+        drop-shadow(0 calc(var(--px) * -1) 0 #efe3c2);
+}
+@keyframes death-pop {
+    from { transform: scale(0.2); }
+    to { transform: scale(1); }
+}
+@keyframes death-idle {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(calc(var(--px) * -1)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #death-screen.visible .death-btn { animation: none; transform: none; }
+    #death-screen.visible .death-btn canvas { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
    Tela de carregamento (js/ui/LoadingScreen.js)
    --------------------------------------------------------------------------- */
 #loading-screen {

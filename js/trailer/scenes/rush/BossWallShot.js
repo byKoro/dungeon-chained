@@ -125,7 +125,9 @@ export class BossWallShot extends RushShot {
             ambient: '46, 24, 28', vignette: 0.8, torches
         }, 99);
         this.cutIn = null;          // contínua: o disco da cena 10 se abre (SawIris)
-        this.fx = new FxParticles();        // mundo (fogo, brasas, pedaços)
+        // Explosão em pixel art na paleta do boss (tools/gen_explosion.py).
+        const boom = stage.assets.get('fxExplosion') || stage.assets.load('fxExplosion', 'assets/fx/explosion.png');
+        this.fx = new FxParticles(boom);    // mundo (fogo, brasas, pedaços)
         this.fxScreen = new FxParticles();  // tela (brasas do plano final)
         this.bossImg = stage.assets.get('ghostfire');
         this.leapLT = -1;

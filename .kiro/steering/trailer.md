@@ -49,7 +49,11 @@ js/trailer/
   kit/rushKit.js        RushShot (base), dressRoom (cenografia), handheld (tremido do drone)
   fx/ArrowWipe.js       cortina de flechas em tela (transição via stage.overlay)
   fx/SawIris.js         disco da serra abrindo em espiral (transição 10 → 11 via stage.overlay)
-  fx/FxParticles.js     brasas, bolas de fogo e pedaços de tile (emissivos, mundo ou tela)
+  fx/FxParticles.js     brasas, explosões e pedaços de tile (emissivos, mundo ou tela).
+                        Explosão = brilho suave aditivo + folha pixel art
+                        assets/fx/explosion.png (32x32, 10 frames x 3 variações,
+                        paleta do fogo do ghostfire; gerada por tools/gen_explosion.py),
+                        desenhada na grade de pixel (px = round(r·2.15/32))
   scenes/rush/ArrowRunShot.js, HoleRunShot.js, ButtonDoorShot.js, GiantSawShot.js
   scenes/rush/BossWallShot.js  boss parede de fogo (ghostfire) + plano final
 ```

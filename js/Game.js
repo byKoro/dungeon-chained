@@ -24,6 +24,7 @@ import { WindSystem } from './systems/WindSystem.js';
 import { PlayerAI } from './systems/PlayerAI.js';
 import { LightingRenderer } from './systems/LightingRenderer.js';
 import { VtuberHud } from './ui/VtuberHud.js';
+import { DeathScreen } from './ui/DeathScreen.js';
 import { HeartPickup } from './entities/HeartPickup.js';
 import { playerConfigs } from './config/EntityConfig.js';
 
@@ -72,6 +73,9 @@ export class Game {
             spriteConfigs: cfgs.map(c => c.sprite),
             colors: cfgs.map(c => c.color)
         });
+        // Tela de morte (DOM): véu de sangue + botão REINICIAR em pixel art.
+        this.deathScreen = new DeathScreen({ onRestart: () => this.restart() });
+
         // Sprite do item de cura (versão chunky, no pixel do cenário).
         HeartPickup.sheet = this.assets.get("heartPickup");
 
@@ -235,7 +239,10 @@ export class Game {
             const k = e.key.toLowerCase();
             if (k === "t") this.cycleTileset();
             else if (k === "r") this.restart();
-            else if (this.gameOver && (k === "enter" || k === " ")) this.restart();
+            // Com o botão da tela de morte em foco, Enter/Espaço já disparam
+            // o clique dele — não reinicia duas vezes.
+            else if (this.gameOver && (k === "enter" || k === " ") &&
+                document.activeElement !== this.deathScreen.button) this.restart();
         });
     }
 
@@ -281,6 +288,7 @@ export class Game {
         this.particleSystem.clear();
         this.screenGore.clear();
         this.gameOver = false;
+        this.deathScreen.hide();
 
         // A corrente começa conectada a cada nova dungeon.
         this.chain.reset();
@@ -796,7 +804,10 @@ export class Game {
         this.particleSystem.update([p1, p2], this.arenaBounds);
         this.wind.update(this.arenaBounds);
 
-        if (p1.lives <= 0 || p2.lives <= 0) this.gameOver = true;
+        if (p1.lives <= 0 || p2.lives <= 0) {
+            this.gameOver = true;
+            this.deathScreen.show();
+        }
 
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
@@ -1011,21 +1022,9 @@ export class Game {
         }
 
         // HUD "vtuber" por cima do fade de transição (os retratos reagem à
-        // sala nova enquanto a tela escurece), mas sob o fim de jogo.
+        // sala nova enquanto a tela escurece); a tela de morte (DOM) fica acima.
         this.hud.draw(ctx, canvas.width, canvas.height);
 
-        if (this.gameOver) {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#e53170";
-            ctx.font = "bold 44px monospace";
-            ctx.textAlign = "center";
-            ctx.fillText("FIM DE JOGO!", canvas.width / 2, canvas.height / 2 - 20);
-            ctx.fillStyle = "#fffffe";
-            ctx.font = "20px monospace";
-            ctx.fillText(`Vocês exploraram a Dungeon ${this.floor}`, canvas.width / 2, canvas.height / 2 + 25);
-            ctx.fillText("Pressione R, Enter ou START para tentar novamente", canvas.width / 2, canvas.height / 2 + 60);
-            ctx.textAlign = "start";
-        }
+        // Fim de jogo: a tela de morte (DOM, js/ui/DeathScreen.js) cobre a cena.
     }
 }
