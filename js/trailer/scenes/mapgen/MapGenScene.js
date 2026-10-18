@@ -659,7 +659,8 @@ export class MapGenScene {
                 const c = ws(o.cx, o.cy);
                 pp.addLight(c.x, c.y, o.w * 0.7 * z * s, pix(1.4), 0.7, LIGHT.fill);
             }
-            if (tilePx < 5) continue;
+            // Tochas só quando dá para vê-las (centenas de luzes no mapa inteiro pesam).
+            if (tilePx < 14) continue;
             for (const T of R.torches) {
                 let wx = T.gx * TILE + TILE / 2, wy = T.gy * TILE + TILE / 2, ax = 0, ay = 0;
                 if (T.side === 'N') { wy += tl.offsetY; ay = area.pushIn; }

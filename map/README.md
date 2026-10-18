@@ -45,7 +45,7 @@ não lista pastas sozinho, então toda peça nova precisa ser adicionada aqui.
     "density": 0.08           // fração dos tiles de chão livre (0..0.4)
   },
   "lock": "none",             // (opcional) regra das portas: ver abaixo
-  "enemies": [                // inimigos posicionados por você
+  "enemies": [                // inimigos posicionados por você (type = chave de ENEMY_TYPES em js/config/EntityConfig.js)
     { "type": "demon", "col": 6, "row": 4 }
   ],
   "hazards": [                // perigos (traps) por tile

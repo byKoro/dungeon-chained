@@ -78,7 +78,8 @@ export class ButtonDoorShot extends RushShot {
                 A.renderer.triggerShake(16);
                 A.renderer.triggerZoomPunch(0.06);
                 A.impactFlash = 0.35;
-                A.both(p => { A.hop(p, 3.5); A.exprFor(p, 'espantado', 0.35); p.goal = null; });
+                // Continuam em cima dos botões até a porta despejar a horda.
+                A.both(p => { A.hop(p, 3.5); A.exprFor(p, 'espantado', 0.35); });
                 A.particles.triggerDust(b1.x, b1.y + 10, 0, 1, 8);
                 A.particles.triggerDust(b2.x, b2.y + 10, 0, 1, 8);
             }
@@ -164,7 +165,7 @@ export class ButtonDoorShot extends RushShot {
         const h = handheld(t, 1.2);
         const m = A.mid;
         if (this.phase === 'run') {
-            A.focus({ x: m.x + h.x, y: m.y + 10 + h.y, zoom: 2.9, rot: lerp(0.3, 0.12, clamp01(t / 1.4)) + h.r, k: 0.14, fit: [p1, p2], pad: 60 });
+            A.focus({ x: m.x + h.x, y: m.y + 10 + h.y, zoom: 2.4, rot: lerp(0.3, 0.12, clamp01(t / 1.4)) + h.r, k: 0.14, fit: [p1, p2], pad: 60 });
         } else if (this.phase === 'pressed' && t - tP < 2.1) {
             // Olha para a porta de cima com os dois no quadro.
             A.focus({ x: m.x + h.x, y: lerp(m.y, doorN.y, 0.45) + h.y, zoom: 2.4, rot: -0.22 + h.r, k: 0.12, fit: [p1, p2, doorN], pad: 90 });
