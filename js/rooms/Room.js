@@ -3,6 +3,7 @@ import { ROOM_COLS, ROOM_ROWS, TILE } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
 import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
 import { HeartPickup } from '../entities/HeartPickup.js';
+import { findSafeFloorCell } from './SafeSpawn.js';
 
 /**
  * Room — uma sala concreta da dungeon.
@@ -156,19 +157,19 @@ export class Room {
         }
     }
 
-    // Inimigos autorais válidos (fora de buracos) ainda a instanciar.
-    get _validAuthoredEnemies() {
+    // Inimigos autorais a instanciar. Antes esta lista DESCARTAVA quem estivesse
+    // sobre um buraco (o inimigo simplesmente sumia). Agora NÃO descartamos:
+    // todos os inimigos autorais contam (inclusive para trancar a sala); quem
+    // cair sobre buraco/parede é reposicionado no piso seguro mais próximo na
+    // hora de nascer (ver spawnEnemies / findSafeFloorCell).
+    get _authoredEnemies() {
         if (!this.cell.customEnemies || !this.cell.customEnemies.length) return [];
-        const floorGrid = this.tiles.floor;
-        return this.cell.customEnemies.filter(foe => {
-            const row = floorGrid[foe.row];
-            return !row || row[foe.col] !== -1;
-        });
+        return this.cell.customEnemies;
     }
 
     // true se a sala tem inimigos autorais que ainda não foram spawnados.
     get hasPendingEnemies() {
-        return !this.enemiesSpawned && this._validAuthoredEnemies.length > 0;
+        return !this.enemiesSpawned && this._authoredEnemies.length > 0;
     }
 
     /**
@@ -186,19 +187,33 @@ export class Room {
         if (!spawnSystem) return this.enemies; // populate() não rodou ainda
 
         const floorGrid = this.tiles.floor;
-        this.enemies = this._validAuthoredEnemies.map(foe => {
-            // Posição = CENTRO do tile (col+0.5, row+0.5). A entidade usa (x,y)
-            // como centro, igual ao player (getPlayerSpawnPositions) e ao desenho
-            // do editor (col*tile + tile/2). Sem o +0.5 o inimigo nascia no canto
-            // superior-esquerdo do tile e caía na borda de um buraco adjacente,
-            // ficando preso.
-            const ex = this.bounds.minX + (foe.col + 0.5) * 64;
-            const ey = this.bounds.minY + (foe.row + 0.5) * 64;
+        this.enemies = [];
+        for (const foe of this._authoredEnemies) {
+            // Força o inimigo a nascer SEMPRE sobre piso: se a célula autoral for
+            // buraco (-1) ou parede de borda, escorrega para o tile de piso
+            // seguro mais próximo. Se a sala não tiver piso seguro algum (caso
+            // degenerado), não spawna este inimigo.
+            const safe = findSafeFloorCell(floorGrid, foe.col, foe.row);
+            if (!safe.found) continue;
+
+            // Posição = CENTRO do tile na MESMA convenção da navegação do inimigo
+            // (MeleeEnemy._tileAt / _chaseWaypoint): a coluna/linha da grade
+            // `floor` INCLUI a moldura de parede (col 0 = parede), mas
+            // `this.bounds` já começa DEPOIS da parede. Logo, o centro do tile
+            // de grade (col,row) no mundo é bounds.min + (idx - 0.5) * TILE.
+            //
+            // Antes usávamos (idx + 0.5), o que deslocava o inimigo 1 tile para
+            // dentro: findSafeFloorCell garantia a célula X, mas a entidade
+            // nascia (e era lida pela navegação) na célula X+1 — se essa fosse
+            // buraco, o inimigo caía no abismo mesmo "corrigido". Alinhar as duas
+            // convenções é o que faz o spawn seguro realmente valer.
+            const ex = this.bounds.minX + (safe.col - 0.5) * TILE;
+            const ey = this.bounds.minY + (safe.row - 0.5) * TILE;
             const enemy = spawnSystem.createEnemy(ex, ey, this._spawnFloor, foe.type);
             enemy.setNavigationFloor(floorGrid, this.bounds, this.tiles.walls);
             if (frozen) enemy.beginFrozenSpawn();
-            return enemy;
-        });
+            this.enemies.push(enemy);
+        }
         return this.enemies;
     }
 

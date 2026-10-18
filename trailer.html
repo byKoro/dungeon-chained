@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Dungeon Chained — Trailer (Simulador de Gameplay)</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #05040a;
+            overflow: hidden;
+            font-family: monospace;
+        }
+        #trailerCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        /* Botão de reiniciar/avançar a cena do trailer. */
+        #trailer-ui {
+            position: fixed;
+            left: 50%;
+            bottom: 22px;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+            opacity: 0.85;
+        }
+        .t-btn {
+            cursor: pointer;
+            border: 2px solid #5a37c7;
+            background: #7f5af0;
+            color: #fffffe;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 8px 14px;
+            border-radius: 6px;
+        }
+        .t-btn.secondary {
+            background: #2cb67d;
+            border-color: #1e8a5e;
+        }
+        /* Tela de carregamento enquanto os assets não terminam. */
+        #trailer-loading {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a7a9be;
+            background: #05040a;
+            font-size: 15px;
+            letter-spacing: 2px;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="trailerCanvas"></canvas>
+
+    <div id="trailer-loading">CARREGANDO O CALABOUÇO…</div>
+
+    <div id="trailer-ui">
+        <button class="t-btn" id="btn-replay">↻ REPETIR CENA</button>
+        <a href="index.html" class="t-btn secondary" style="text-decoration:none;">▶ JOGAR</a>
+    </div>
+
+    <script type="module" src="js/trailer.js"></script>
+</body>
+</html>
