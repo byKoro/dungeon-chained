@@ -294,6 +294,11 @@ export class Game {
         this.renderer.camY = center.y;
         this.renderer.resetSway();
 
+        // A sala inicial também pode ter inimigos autorais (sempre no teste do
+        // editor). Antes eles só nasciam ao ENTRAR por uma porta, então a sala
+        // de teste ficava vazia — e trancada para sempre na regra "enemies".
+        this._activateRoomEnemies();
+
         this.updateHud();
     }
 
@@ -320,14 +325,22 @@ export class Game {
         // INTRO (jogadores parados na porta -> zoom -> inimigos aparecem
         // congelados -> zoom volta -> liberados). Caso contrário, entrou numa
         // sala já aberta: dispara o flash amarelo das portas.
-        const room = this.rooms.current;
-        if (ROOM_INTRO.enabled && room.hasPendingEnemies) {
-            this._beginRoomIntro();
-        } else if (!this.rooms.isLocked()) {
+        if (!this._activateRoomEnemies() && !this.rooms.isLocked()) {
             this._triggerDoorFlash();
         }
 
         this.updateHud();
+    }
+
+    // Instancia os inimigos autorais pendentes da sala atual. Com a intro
+    // ligada, dispara a sequência (zoom -> aparição -> liberação); sem ela,
+    // cria os inimigos já ativos. Devolve true se havia inimigos a criar.
+    _activateRoomEnemies() {
+        const room = this.rooms.current;
+        if (!room.hasPendingEnemies) return false;
+        if (ROOM_INTRO.enabled) this._beginRoomIntro();
+        else room.spawnEnemies(false);
+        return true;
     }
 
     // Inicia a sequência de intro da sala atual. Enquanto ativa, o controle dos
