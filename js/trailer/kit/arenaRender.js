@@ -88,6 +88,15 @@ export function renderArena(A, w, h) {
     A.screenGore.draw(ctx);
     A.lens.draw(ctx);
 
+    // Gancho de desenho EMISSIVO no mundo (depois da luz: não escurece).
+    // Ex.: o boss de fogo e as explosões da cena 11. A serra vem por cima.
+    if (A.onDrawOver) {
+        ctx.save();
+        ctx.setTransform(worldTf);
+        A.onDrawOver(ctx);
+        ctx.restore();
+    }
+
     // Serra por cima de tudo (destaque) + anel de choque da reconexão.
     ctx.save();
     ctx.setTransform(worldTf);
@@ -314,6 +323,8 @@ function renderLights(A) {
     }
     for (const f of A.killFlashes) {
         const s = ws(f.x, f.y);
-        pp.addLight(s.x, s.y, 130 * f.life * s.zoom, pix(s.zoom), 0.8, LIGHT.kill);
+        pp.addLight(s.x, s.y, 130 * f.life * (f.scale ?? 1) * s.zoom, pix(s.zoom), 0.8, LIGHT.kill);
     }
+    // Luzes extras da cena (ex.: boss de fogo, raio).
+    A.onLights?.(pp, ws, pix);
 }

@@ -26,64 +26,6 @@ html, body {
     image-rendering: crisp-edges;
 }
 
-/* HUD sobreposto ao topo do jogo. */
-#ui-bar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 10;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    background: rgba(20, 18, 30, 0.72);
-    padding: 8px 18px;
-    pointer-events: none; /* deixa o clique passar, exceto nos botões */
-}
-
-.hud-item {
-    font-size: 16px;
-    font-weight: bold;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-}
-
-.btn {
-    pointer-events: auto; /* botões continuam clicáveis */
-    background: #e53170;
-    color: #fff;
-    border: 2px solid #a81c4e;
-    padding: 6px 14px;
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: bold;
-    border-radius: 4px;
-    transition: 0.1s transform, 0.1s background;
-}
-
-.btn:hover {
-    background: #ff4b8b;
-    transform: scale(1.05);
-}
-
-.btn:active {
-    transform: scale(0.95);
-}
-
-/* Instruções sobrepostas na base. */
-#instructions {
-    position: fixed;
-    bottom: 6px;
-    left: 0;
-    right: 0;
-    z-index: 10;
-    text-align: center;
-    font-size: 13px;
-    color: #a7a9be;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-    pointer-events: none;
-}
-
 /* ---------------------------------------------------------------------------
    Tela de carregamento (js/ui/LoadingScreen.js)
    --------------------------------------------------------------------------- */
@@ -151,10 +93,6 @@ html, body {
 /* ---------------------------------------------------------------------------
    Trailer na abertura (index.html): botões PULAR / COMEÇAR
    --------------------------------------------------------------------------- */
-body.trailer-mode #ui-bar,
-body.trailer-mode #instructions {
-    display: none;
-}
 #trailer-overlay {
     position: fixed;
     inset: 0;

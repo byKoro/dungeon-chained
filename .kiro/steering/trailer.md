@@ -21,7 +21,7 @@ combate). Não é vídeo: é código roteirizado. Tudo em `js/trailer/`.
 - `trailer.html` + `js/trailer.js`: página de edição. `?cena=N` começa na cena N,
   botão `↻ REPETIR CENA`/Espaço/Enter repete, `window.trailer` exposto no
   console. Não passa `showTimer` (o cronômetro só existe via `index.html?timer`).
-  - Índices de `?cena=N` vão de 0 a 6 (listados no topo de `trailer.js`).
+  - Índices de `?cena=N` vão de 0 a 11 (listados no topo de `trailer.js`).
 - CSS do overlay: `css/style.css` (`body.trailer-mode`, `#trailer-overlay`,
   `.tr-skip`, `.tr-start`).
 
@@ -48,7 +48,10 @@ js/trailer/
   scenes/mapgen/MapGenScene.js + mapLayout.js + mapBake.js
   kit/rushKit.js        RushShot (base), dressRoom (cenografia), handheld (tremido do drone)
   fx/ArrowWipe.js       cortina de flechas em tela (transição via stage.overlay)
+  fx/SawIris.js         disco da serra abrindo em espiral (transição 10 → 11 via stage.overlay)
+  fx/FxParticles.js     brasas, bolas de fogo e pedaços de tile (emissivos, mundo ou tela)
   scenes/rush/ArrowRunShot.js, HoleRunShot.js, ButtonDoorShot.js, GiantSawShot.js
+  scenes/rush/BossWallShot.js  boss parede de fogo (ghostfire) + plano final
 ```
 
 ### Contrato de cena (TrailerPlayer)
@@ -101,7 +104,8 @@ opcionais `reset()`, `reachedEnd`, `cutIn = 'impact'`.
 | 7 | ArrowRunShot | até a cortina de flechas cobrir (~5.1s) | contínua (clarão do mergulho via overlay) |
 | 8 | HoleRunShot | 4.0s | contínua (revelada pela cortina) |
 | 9 | ButtonDoorShot | ~6.1s (0.25s após a serra pousar) | impacto |
-| 10 | GiantSawShot | infinita; `reachedEnd` ~8.5s → COMEÇAR | impacto |
+| 10 | GiantSawShot | ~8.2s (termina com o disco enchendo a tela) | impacto |
+| 11 | BossWallShot | infinita; `reachedEnd` ~21s reais → COMEÇAR | contínua (SawIris abre o disco) |
 
 ### 0 — IntroScene (sala padrão, porta S, iluminação sombria)
 
@@ -298,7 +302,51 @@ de qualquer cena (atravessa cortes).
   O; horda fecha semicírculo (raios 175–259, ±1.25 rad); closes rápidos
   (raiva / fúria); esticam a corda (ropeLen 720, `setStrain` pisca); serra
   cresce até `BIG 8.6` (raio ~275) em 0.85s matando todos (garantia no auge);
-  mergulho de 1.7s até o disco encher a tela (1.05 × diagonal). Última cena.
+  mergulho de 1.7s até o disco encher a tela (1.05 × diagonal). `isDone` logo
+  depois do mergulho (+0.05s).
+
+### 11 — BossWallShot (boss "parede de fogo", última cena)
+
+Estilo Wall of Flesh. `RushShot` com `cutIn = null`; no `start()` cria
+`stage.overlay = SawIris` (o disco da cena 10 gira e abre um buraco em
+catavento de 3 braços em 0.8s). Sala 72×14 sem portas, tochas só na parede N;
+câmera nunca mostra pontas L/O nem a parede S (`CAM_Y 300`, `FIGHT_ZOOM 1.12`).
+Faixa de jogo em Y: `Y_TOP 175 … Y_BOT 520`, meio `Y_MID 345`.
+
+- Boss = `ghostfire` escalado `BS = 21` (px de mundo por px de sprite, ~85% da
+  altura da tela). Objeto `this.B` { side 'R'|'L', x, tx (base que avança
+  `ADV 0.8`/passo), y (= linha da boca/raio), act, actT, row, frame, alpha,
+  stretch, crack }. Âncora na célula: y 42 (linha do raio), x 52.5 nos frames
+  0–2 e 39.5 nos frames 3+ da linha 3 (a caveira recua no sprite). Sprite olha
+  para a direita: lado R espelha.
+- Folha (100×100): linha 1 idle, 2 cuspe (spit), 3 raio (f0–2 carga, f3 aviso
+  fino, f4 raio grosso, f5 apagando, f6 recupera), 4 morte, 0 silhueta clara
+  (usada nas rachaduras). Raio prolongado = coluna 99 do frame esticada
+  `BEAM_EXT 150` px de sprite + brilho aditivo.
+- Desenho emissivo via ganchos novos da ActionArena: `A.onDrawOver(ctx)`
+  (mundo, depois de luz/névoa/respingos, antes da serra) e
+  `A.onLights(pp, ws, pix)`. `killFlashes` aceitam `scale`.
+- Linha do tempo `T` (simulação): calma 0–0.8 (brasas da direita, tremor) →
+  `slam 0.8` (entra em `SLAM_IN 0.18`s, clarão, shake 42, onda empurra os dois)
+  → `roar 1.25` → `spit1 1.8` (5) → `beam1 3.3` → `spit2 4.95` (6) →
+  `vanish1 6.3` → `appearL 6.75` → `beam2 7.1` → `spit3 8.75` (5) →
+  `beam3 9.95` → `vanish2 11.6` → `appearR 12.05` → `beam4 12.4` (final).
+  Raio: `BEAM` carga 0.4 (mira o meio da corda) / aviso 0.42 (trava, os dois
+  correm lado a lado 175px fora da linha) / disparo 0.5 (mata minions na linha,
+  slowmo) / apaga 0.15 / recupera 0.15.
+- Modos dos jogadores: `calm, shock, shock2, fight` (investem 400 / recuam 730
+  da parede em ciclos de 1.5s, formação vertical ±95), `dodge, charge` (serra
+  cresce até `SAW_BIG 2.6`), `impale` (seguram a serra cravada; rachaduras
+  0.75s, slowmo), `blown` (morte, linha 4, 14 estouros em cascata pelo quadro).
+  Minions (`hellbat`, `demonessA`, `demonessB`) perseguem o meio da corda,
+  dão 1 bote e morrem ao encostar no disco (garantia).
+- Câmera: boss a ~85% da largura (`x = tx + away·0.7·hw`); durante o sumiço a
+  câmera já vai para o lado onde ele ressurge.
+- Plano final em TELA (`_drawLeap`, tempo real `leapLT`): fundo em câmera lenta
+  0.12 até congelar em `FREEZE_AT 2.0`; os dois crescem de 10% a 42% da altura
+  (frame de passada, `furia`, inclinados para fora), corda desenhada no espaço
+  escalado, serra no meio girando; título em `TITLE_AT 1.9` (com sombra);
+  brasas de tela seguem em loop.
 
 ## Convenções e armadilhas
 

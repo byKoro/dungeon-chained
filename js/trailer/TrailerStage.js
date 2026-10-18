@@ -76,8 +76,10 @@ export class TrailerStage {
             const s = p.sprite;
             s.expressions = {};
             for (const name of TRAILER_EXPRESSIONS) {
+                // O AssetLoader já registra as expressões; reaproveita a imagem.
+                const key = `${dir}_expr_${name}`;
                 s.expressions[name] = {
-                    img: this.assets.load(`${dir}_expr_${name}`, `assets/${dir}/expressions/${name}.png`),
+                    img: this.assets.get(key) || this.assets.load(key, `assets/${dir}/expressions/${name}.png`),
                     frameCount: s.frameCount, cellSize: s.cellSize,
                     cropX: s.cropX, cropY: s.cropY, cropW: s.cropW, cropH: s.cropH
                 };

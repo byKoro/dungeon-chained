@@ -141,6 +141,8 @@ export class ActionArena {
         this.script = null;
         this.onKill = this.onWallHit = this.onYank = this.onBump = null;
         this.onDrawFloor = this.onDrawTop = null;   // ganchos de desenho (mundo)
+        this.onDrawOver = null;  // desenho emissivo (mundo) depois da luz
+        this.onLights = null;    // (pp, ws, pix) luzes extras
         this.freeSaw = null;     // {x,y,vx,vy}: serra solta, voando sozinha
         this.sawScale = 1;       // serra gigante (>1)
         this.arrowsKill = false; // flechas perfuram inimigos

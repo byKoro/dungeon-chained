@@ -6,9 +6,8 @@
  * outro com fúria. Eles esticam a corda ao máximo em direções opostas (a
  * serra pisca de tensão) e a serra CRESCE até engolir o semicírculo inteiro,
  * serrando todos de uma vez. Por fim o drone mergulha na serra gigante, que
- * enche a tela — gancho para a próxima cena.
- *
- * Última cena (por enquanto): fica em loop na serra girando.
+ * enche a tela — gancho para a cena 11 (BossWallShot), que abre o disco
+ * em espiral.
  */
 import { RushShot, dressRoom, handheld } from '../../kit/rushKit.js';
 import { lerp, clamp01, easeIn, easeInOut } from '../../anim.js';
@@ -25,8 +24,10 @@ export class GiantSawShot extends RushShot {
         super(stage, { cols: 20, rows: 13, doors: { E: true }, seed: 91, ropeLen: 230 }, 99);
     }
 
-    get isDone() { return false; }
-    get reachedEnd() { return this._zoomT !== undefined && this.arena.t > this._zoomT + ZOOM_DUR + 0.3; }
+    // Termina quando o disco enche a tela: a cena 11 (boss) continua dali,
+    // abrindo o disco em espiral (SawIris).
+    get isDone() { return this._zoomT !== undefined && this.arena.t > this._zoomT + ZOOM_DUR + 0.05; }
+    get reachedEnd() { return this.isDone; }
 
     setup(A) {
         const { p1, p2 } = A;

@@ -41,6 +41,18 @@ const DOOR_BEAM_PROFILE = {
     ]
 };
 
+// Luz vermelho-sangue dos corações de cura (item coletável no chão).
+const HEART_PROFILE = {
+    color: "255, 77, 109",
+    flickerBase: 1, flickerSine: 0.04, flickerNoise: 0.02,
+    falloff: [
+        { offset: 0.0, alpha: 0.85 },
+        { offset: 0.3, alpha: 0.45 },
+        { offset: 0.6, alpha: 0.18 },
+        { offset: 1.0, alpha: 0.0 }
+    ]
+};
+
 // Luz quente e contida dos botões de pressão (tom da tampa, dessaturado).
 // A intensidade por frame é aplicada escalando os alphas do falloff.
 const BUTTON_PROFILE = {
@@ -95,8 +107,9 @@ export class LightingRenderer {
      * @param {boolean} scene.open             sala destravada (portas visíveis)
      * @param {number} scene.doorFlashT        segundos restantes do flash de porta
      */
-    render({ players, chain, sawPos, arenaBounds, tiles, rect, doors, doorHalf, open, doorFlashT, buttons = [] }) {
+    render({ players, chain, sawPos, arenaBounds, tiles, rect, doors, doorHalf, open, doorFlashT, buttons = [], hearts = [] }) {
         this._renderButtonLights(buttons);
+        this._renderHeartLights(hearts);
         this._renderPlayerLights(players);
         this._renderDroppedBladeLight(chain);
         this._renderActiveBladeLight(chain, sawPos);
@@ -121,6 +134,19 @@ export class LightingRenderer {
                 ...BUTTON_PROFILE,
                 falloff: BUTTON_PROFILE.falloff.map(f => ({ ...f, alpha: f.alpha * strength }))
             });
+        }
+    }
+
+    // Luz VERMELHA dos corações de cura no chão: como a serra largada, o item
+    // ilumina o entorno e "respira" com a flutuação.
+    _renderHeartLights(hearts) {
+        for (const h of hearts) {
+            const info = h.lightInfo?.();
+            if (!info) continue;
+            const s = this.renderer.worldToScreen(info.x, info.y);
+            const px = this._lightPixel(s.zoom);
+            const breathe = 0.85 + info.hover * 0.15;
+            this.postProcessor.addLight(s.x, s.y, 120 * breathe * s.zoom, px, 1, HEART_PROFILE);
         }
     }
 

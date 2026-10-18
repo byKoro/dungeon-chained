@@ -11,8 +11,8 @@
  *
  * Atalhos: ?cena=N começa na cena N (0 = intro, 1 = cartela, 2 = frenesi,
  * 3 = zigue-zague, 4 = corda arrebenta, 5 = tela dividida, 6 = geração de
- * mapas, 7 = chuva de flechas, 8 = buracos, 9 = botões, 10 = serra gigante);
- * o número também
+ * mapas, 7 = chuva de flechas, 8 = buracos, 9 = botões, 10 = serra gigante,
+ * 11 = boss parede de fogo); o número também
  * aparece no cronômetro discreto do rodapé.
  * botão/Espaço/Enter repete. `window.trailer` fica exposto para o console.
  */

@@ -7,6 +7,14 @@
  */
 import { TINY_RPG_ENEMIES } from '../config/TinyRpgEnemies.js';
 
+// Expressões faciais dos jogadores (folhas de 8 frames geradas por
+// tools/gen_expressions.py, em assets/player_0X/expressions/<nome>.png).
+export const PLAYER_EXPRESSIONS = [
+    'neutro', 'assustado', 'espantado', 'raiva', 'furia', 'preocupado',
+    'desconfiado', 'olhando_esquerda', 'olhando_direita', 'olhando_cima',
+    'olhos_fechados'
+];
+
 export class AssetLoader {
     constructor() {
         this.images = {};
@@ -18,6 +26,19 @@ export class AssetLoader {
         this.load("p2", "assets/player_02/player_walk.png");
         this.load("p2Hurt", "assets/player_02/player_hurt.png");
         this.load("p2Scared", "assets/player_02/player_walk_scared.png");
+        // Expressões faciais (mesmo layout da player_walk.png). Usadas pelos
+        // retratos "vtuber" da HUD e pelo trailer (chave player_0X_expr_<nome>).
+        for (const dir of ["player_01", "player_02"]) {
+            for (const name of PLAYER_EXPRESSIONS) {
+                this.load(`${dir}_expr_${name}`, `assets/${dir}/expressions/${name}.png`);
+            }
+        }
+
+        // Coração (HUD e item de cura): folha 64x16, 4 frames de 16x16
+        // (cheio, vazio, metade esq., metade dir.) — tools/gen_heart.py.
+        this.load("heart", "assets/heart/heart.png");
+        // Item de cura no chão: versão 12x12 mais chunky (pixel do cenário).
+        this.load("heartPickup", "assets/heart/heart_pickup.png");
 
         // Inimigos
         this.load("demon", "assets/enemies/demon.png");
@@ -119,6 +140,7 @@ export class AssetLoader {
     get p2Scared() { return this.images.p2Scared; }
     get demon() { return this.images.demon; }
     get bloodMonster() { return this.images.bloodMonster; }
+    get heart() { return this.images.heart; }
     get tileset() { return this.images.tileset; }
     get saw() { return this.images.saw; }
     get cable() { return this.images.cable; }

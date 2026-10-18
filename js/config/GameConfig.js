@@ -140,6 +140,17 @@ export { AUDIO_CONFIG, AUDIO_CLIPS } from './AudioConfig.js';
 // Zona morta perto dos players onde a arma não fere inimigos.
 export const PLAYER_SAFE_ZONE = 46;
 
+// Drop de coração de cura ao matar um inimigo.
+//   chance   — % por abate (o campo autoral `heartDropChance` da célula, se
+//              existir, substitui este valor).
+//   maxLives — vida cheia. Só dropa se ALGUM jogador estiver abaixo disso, e
+//              nunca mais corações no chão do que as vidas que faltam somadas
+//              (ninguém precisa = nada cai; não dá para "estocar" cura).
+export const HEART_DROP = {
+    chance: 15,
+    maxLives: 3
+};
+
 // ---- Fundo ----
 export const BACKGROUND_TILE = 78; // tile que preenche o vazio fora da sala
 

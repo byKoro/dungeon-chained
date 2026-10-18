@@ -23,10 +23,11 @@ import { ArrowRunShot } from './scenes/rush/ArrowRunShot.js';
 import { HoleRunShot } from './scenes/rush/HoleRunShot.js';
 import { ButtonDoorShot } from './scenes/rush/ButtonDoorShot.js';
 import { GiantSawShot } from './scenes/rush/GiantSawShot.js';
+import { BossWallShot } from './scenes/rush/BossWallShot.js';
 
 const SCENES = [
     IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene,
-    ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot
+    ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot, BossWallShot
 ];
 
 const IMPACT_INVERT = 0.06;   // s de imagem invertida (quadro de impacto)

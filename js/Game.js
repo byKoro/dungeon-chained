@@ -23,6 +23,9 @@ import { ScreenGore } from './systems/ScreenGore.js';
 import { WindSystem } from './systems/WindSystem.js';
 import { PlayerAI } from './systems/PlayerAI.js';
 import { LightingRenderer } from './systems/LightingRenderer.js';
+import { VtuberHud } from './ui/VtuberHud.js';
+import { HeartPickup } from './entities/HeartPickup.js';
+import { playerConfigs } from './config/EntityConfig.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
@@ -59,15 +62,18 @@ export class Game {
         this.assets = opts.assets || new AssetLoader();
         this._bindResize();
 
-        // HUD (DOM)
-        this.hud = {
-            floor: document.getElementById("hud-floor"),
-            p1: document.getElementById("hud-p1"),
-            p2: document.getElementById("hud-p2"),
-            btnWeapon: document.getElementById("btn-weapon"),
-            btnTileset: document.getElementById("btn-tileset"),
-            btnRestart: document.getElementById("btn-restart")
-        };
+        // HUD no canvas: retratos "vtuber" (P1 à esquerda, P2 à direita) com os
+        // corações voltados para o centro. Os getters resolvem os jogadores
+        // atuais (recriados no restart).
+        const cfgs = playerConfigs(this.assets);
+        this.hud = new VtuberHud({
+            assets: this.assets,
+            getPlayers: () => [this.p1, this.p2],
+            spriteConfigs: cfgs.map(c => c.sprite),
+            colors: cfgs.map(c => c.color)
+        });
+        // Sprite do item de cura (versão chunky, no pixel do cenário).
+        HeartPickup.sheet = this.assets.get("heartPickup");
 
         // Subsistemas de render / mundo
         this.renderer = new Renderer(canvas, this.ctx);
@@ -150,7 +156,7 @@ export class Game {
         // Laço principal: fixed timestep + slow-motion. Os callbacks resolvem
         // leitura de controles, um passo de simulação e o render do quadro.
         this.gameLoop = new GameLoop({
-            onFrameStart: () => this.input.pollGamepads(),
+            onFrameStart: () => { this.input.pollGamepads(); this._pollRestartPad(); },
             onStep: (dt) => this._step(dt),
             onRender: () => this._render()
         });
@@ -184,7 +190,6 @@ export class Game {
         this.players = this.playerFactory.create();
         [this.p1, this.p2] = this.players;
         this.newDungeon();
-        this.updateHud();
         this.gameLoop.start();
     }
 
@@ -222,22 +227,37 @@ export class Game {
     }
 
     _bindButtons() {
-        // Só existe uma arma (serras). O botão é apenas informativo; mantém o
-        // texto/estilo em sincronia via updateHud.
-        this.hud.btnRestart.addEventListener("click", () => {
-            this.floor = 1;
-            this.players = this.playerFactory.create();
-            [this.p1, this.p2] = this.players;
-            this.newDungeon();
-        });
-
-        // Alternador de TILESET (teste de texturas): tecla "T" ou botão da HUD
-        // ciclam entre o tileset padrão e as variantes carregadas. Listener
-        // dedicado de keydown (toggle por toque, não por frame). Auto-contido.
+        // Sem barra de botões: atalhos de teclado (toggle por toque, não por
+        // frame). "R" reinicia a qualquer momento; Enter/Espaço reiniciam na
+        // tela de fim de jogo. "T" cicla o tileset (teste de texturas).
         window.addEventListener("keydown", (e) => {
-            if (e.key.toLowerCase() === "t" && !e.repeat) this.cycleTileset();
+            if (e.repeat) return;
+            const k = e.key.toLowerCase();
+            if (k === "t") this.cycleTileset();
+            else if (k === "r") this.restart();
+            else if (this.gameOver && (k === "enter" || k === " ")) this.restart();
         });
-        this.hud.btnTileset?.addEventListener("click", () => this.cycleTileset());
+    }
+
+    // Recomeça do andar 1 com jogadores novos (a HUD detecta a troca e zera).
+    restart() {
+        this.floor = 1;
+        this.players = this.playerFactory.create();
+        [this.p1, this.p2] = this.players;
+        this.newDungeon();
+    }
+
+    // Fim de jogo: botão START (9) de qualquer controle reinicia (borda de
+    // subida, para não reiniciar em loop enquanto segura).
+    _pollRestartPad() {
+        if (typeof navigator === "undefined" || !navigator.getGamepads) return;
+        const pads = navigator.getGamepads() || [];
+        let pressed = false;
+        for (const pad of pads) {
+            if (pad && this.input.isButtonPressed(pad, 9)) pressed = true;
+        }
+        if (pressed && !this._padStartHeld && this.gameOver) this.restart();
+        this._padStartHeld = pressed;
     }
 
     // Troca o tileset do mundo pela próxima variante disponível (ciclo). Como o
@@ -298,8 +318,6 @@ export class Game {
         // editor). Antes eles só nasciam ao ENTRAR por uma porta, então a sala
         // de teste ficava vazia — e trancada para sempre na regra "enemies".
         this._activateRoomEnemies();
-
-        this.updateHud();
     }
 
     // Move para a sala vizinha através de uma porta, reposicionando cada player em um tile logo à frente da porta.
@@ -325,11 +343,13 @@ export class Game {
         // INTRO (jogadores parados na porta -> zoom -> inimigos aparecem
         // congelados -> zoom volta -> liberados). Caso contrário, entrou numa
         // sala já aberta: dispara o flash amarelo das portas.
-        if (!this._activateRoomEnemies() && !this.rooms.isLocked()) {
+        const combat = this._activateRoomEnemies();
+        if (!combat && !this.rooms.isLocked()) {
             this._triggerDoorFlash();
         }
 
-        this.updateHud();
+        // Retratos da HUD reagem à sala nova (combate = espanto -> raiva).
+        this.hud.onRoomEnter(combat);
     }
 
     // Instancia os inimigos autorais pendentes da sala atual. Com a intro
@@ -399,24 +419,6 @@ export class Game {
     // GameLoop, dono do tempo da simulação.
     triggerHitSlowmo() {
         this.gameLoop.triggerHitSlowmo();
-    }
-
-    updateHud() {
-        const c = this.rooms.currentCell;
-        const tag = c.kind === "corridor" ? "CORREDOR" : (c.type === "boss" ? "SALA DO CHEFE" : "SALA");
-        this.hud.floor.innerText = `DUNGEON ${this.floor} — ${tag}`;
-        this.hud.p1.innerText = `P1 (Amarelo): ${"❤️".repeat(Math.max(0, this.p1.lives))}`;
-        this.hud.p2.innerText = `P2 (Azul): ${"❤️".repeat(Math.max(0, this.p2.lives))}`;
-
-        // Botão de arma reflete o estado da corrente: quando arrebentada, avisa
-        // os jogadores que estão desarmados e precisam se reaproximar.
-        if (this.chain.isConnected) {
-            this.hud.btnWeapon.innerText = `ARMA: ${this.chain.name}`;
-            this.hud.btnWeapon.style.background = "#8d99ae";
-        } else {
-            this.hud.btnWeapon.innerText = "ARMA QUEBRADA! APROXIMEM-SE";
-            this.hud.btnWeapon.style.background = "#555";
-        }
     }
 
     // Limite físico de afastamento entre os players (teto rígido).
@@ -494,7 +496,6 @@ export class Game {
         }
         this.wind.update(this.arenaBounds); // poeira continua viva durante o fade
         this._updateCameraToCurrentRoom();
-        this.updateHud();
     }
 
     /**
@@ -589,7 +590,6 @@ export class Game {
         }
 
         this._updateCameraToCurrentRoom(deltaSeconds);
-        this.updateHud();
     }
 
     _updateGameplay(deltaSeconds = 1 / 60) {
@@ -750,7 +750,7 @@ export class Game {
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
             () => this.triggerHitSlowmo()
         );
-        this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger());
+        this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger(), [p1, p2]);
 
         // Corações de cura: atualiza, e qualquer player com vida < 3 que
         // encoste coleta (cura até o máximo de 3). Toca o som de pickup.
@@ -790,6 +790,7 @@ export class Game {
             // Pulso de câmera mais forte ao LIMPAR a sala (alívio/recompensa):
             // afasta de leve e volta.
             this.renderer.triggerZoomPunch(-0.07);
+            this.hud.onRoomCleared();
         }
 
         this.particleSystem.update([p1, p2], this.arenaBounds);
@@ -799,7 +800,6 @@ export class Game {
 
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
-        this.updateHud();
     }
 
     // Atualiza os corações da sala e resolve a coleta pelos jogadores.
@@ -879,8 +879,9 @@ export class Game {
         if (challenge) challenge.drawButtons(ctx);
         this.particleSystem.drawSmoke(ctx);
 
-        // Corações de cura: desenhados no CHÃO, sob as entidades e suas sombras.
-        rooms.current.hearts.forEach(h => h.draw(ctx));
+        // Corações de cura: só a SOMBRA vai no chão; o coração em si é
+        // desenhado depois do pós-processamento (ver _render, abaixo).
+        rooms.current.hearts.forEach(h => h.drawShadow(ctx));
 
         const p1Bounce = this.p1.speedMag > 0.15 ? Math.abs(Math.sin(this.p1.animTimer)) : 0;
         const p2Bounce = this.p2.speedMag > 0.15 ? Math.abs(Math.sin(this.p2.animTimer)) : 0;
@@ -965,7 +966,8 @@ export class Game {
             doorHalf,
             open,
             doorFlashT: this._doorFlashT,
-            buttons: this.rooms.current?.challenge?.buttons ?? []
+            buttons: this.rooms.current?.challenge?.buttons ?? [],
+            hearts: this.rooms.current?.hearts ?? []
         });
 
         // Vinheta "respira" no ritmo da TENSÃO da corrente: quanto mais perto
@@ -976,6 +978,16 @@ export class Game {
         this.postProcessor.setVignetteBreath(strain);
 
         this.postProcessor.draw();
+
+        // Corações de cura POR CIMA de todos os efeitos (luz, vinheta, sangue,
+        // fumaça, partículas): sprite + brilho + feixe diagonal, no transform
+        // do mundo — como um item "pega-me" que nunca some no escuro.
+        const hearts = rooms.current.hearts;
+        if (hearts.length) {
+            renderer.beginOverlayWorld();
+            hearts.forEach(h => h.drawOverlay(ctx));
+            renderer.endOverlayWorld();
+        }
 
         // Poeira/vento em espaço de TELA (visível na cena toda, inclusive no
         // escuro). Só quando WIND.layer === "screen".
@@ -998,6 +1010,10 @@ export class Game {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
+        // HUD "vtuber" por cima do fade de transição (os retratos reagem à
+        // sala nova enquanto a tela escurece), mas sob o fim de jogo.
+        this.hud.draw(ctx, canvas.width, canvas.height);
+
         if (this.gameOver) {
             ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1008,7 +1024,7 @@ export class Game {
             ctx.fillStyle = "#fffffe";
             ctx.font = "20px monospace";
             ctx.fillText(`Vocês exploraram a Dungeon ${this.floor}`, canvas.width / 2, canvas.height / 2 + 25);
-            ctx.fillText("Pressione 'REINICIAR' para tentar novamente", canvas.width / 2, canvas.height / 2 + 60);
+            ctx.fillText("Pressione R, Enter ou START para tentar novamente", canvas.width / 2, canvas.height / 2 + 60);
             ctx.textAlign = "start";
         }
     }

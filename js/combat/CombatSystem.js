@@ -1,5 +1,5 @@
 import { Physics } from '../core/Physics.js';
-import { PLAYER_SAFE_ZONE, MAX_ACTIVE_GIBS } from '../config/GameConfig.js';
+import { PLAYER_SAFE_ZONE, MAX_ACTIVE_GIBS, HEART_DROP } from '../config/GameConfig.js';
 
 /**
  * CombatSystem — centraliza a resolução de combate.
@@ -95,8 +95,10 @@ export class CombatSystem {
      * removendo-os da sala. Devolve os novos gibs para o pool do chamador.
      * @param {Room} room    sala atual (dona da lista de inimigos)
      * @param {GibPiece[]} gibs  pool de gibs a ser alimentado (mutado)
+     * @param {Function} [onKill]
+     * @param {Player[]} [players] jogadores (decidem se um coração pode cair)
      */
-    resolveDeaths(room, gibs, onKill = null) {
+    resolveDeaths(room, gibs, onKill = null, players = []) {
         const enemies = room.enemies;
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
@@ -107,16 +109,30 @@ export class CombatSystem {
             gibs.push(...enemy.explodeIntoGibs());
             while (gibs.length > MAX_ACTIVE_GIBS) gibs.shift();
 
-            // Chance de dropar um coração de cura no lugar do inimigo. Usa o
-            // campo autoral da célula (0..100%); sem ele, 40% por padrão.
-            const chanceField = room.cell.heartDropChance;
-            const dropChance = Number.isFinite(chanceField) ? chanceField / 100 : 40 / 100;
-            if (Math.random() < dropChance) room.addHeart(enemy.x, enemy.y);
+            // Chance de dropar um coração de cura no lugar do inimigo — só
+            // quando alguém precisa (ver canDropHeart). Usa o campo autoral da
+            // célula (0..100%); sem ele, HEART_DROP.chance.
+            if (this.canDropHeart(room, players)) {
+                const chanceField = room.cell.heartDropChance;
+                const pct = Number.isFinite(chanceField) ? chanceField : HEART_DROP.chance;
+                if (Math.random() < pct / 100) room.addHeart(enemy.x, enemy.y);
+            }
 
             room.removeEnemyAt(i);
             this.renderer.triggerShake(7);
             // Feedback de tela (sangue voando + flash vermelho).
             onKill?.(enemy);
         }
+    }
+
+    /**
+     * Um coração só pode cair se ALGUM jogador estiver sem vida cheia, e se
+     * ainda houver vida faltando que os corações já no chão não cubram.
+     */
+    canDropHeart(room, players) {
+        const missing = players.reduce(
+            (sum, p) => sum + Math.max(0, HEART_DROP.maxLives - (p?.lives ?? HEART_DROP.maxLives)), 0
+        );
+        return missing > (room.hearts?.length ?? 0);
     }
 }
