@@ -295,6 +295,8 @@ export function buildFrenzyBeats(S) {
             onKill() {
                 if (S._firstChargeKill) return;
                 S._firstChargeKill = true;
+                // Corte seco para a montagem logo depois do primeiro abate.
+                S._cutAt = S.beatT + 0.3;
                 S._slowmo(0.55, 0.3);
                 h().renderer.triggerZoomPunch(0.05);
             },

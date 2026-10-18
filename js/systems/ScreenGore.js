@@ -1,15 +1,18 @@
 /**
  * ScreenGore — feedback de "kill" em espaço de TELA (overlay sobre tudo).
  *
- * Ao abater um inimigo dispara dois efeitos sobrepostos, moderados:
+ * Dois efeitos independentes, moderados:
  *   1) FLASH vermelho leve na tela inteira, em PULSO (sobe e desce suave).
+ *      Disparado SÓ quando um jogador recebe dano (triggerFlash).
  *   2) RESPINGOS de sangue (gotas pixeladas) voando pela tela, que escorrem
- *      um pouco e somem. São puramente visuais e vivem em px de TELA, então
- *      não interferem no mundo nem no sangue de chão.
+ *      um pouco e somem, ao abater um inimigo (trigger). São puramente
+ *      visuais e vivem em px de TELA, então não interferem no mundo nem no
+ *      sangue de chão.
  *
  * Uso:
  *   const gore = new ScreenGore(canvas);
  *   // ao matar: gore.trigger();
+ *   // ao levar dano: gore.triggerFlash();
  *   // no loop:  gore.update();   // (pode chamar junto do render)
  *   // no draw:  gore.draw(ctx);  // por cima de tudo, antes da UI
  */
@@ -38,15 +41,21 @@ export class ScreenGore {
     }
 
     /**
-     * Dispara o feedback de um abate. `intensity` 0..1 escala a força (vários
-     * kills seguidos acumulam o flash, com teto).
+     * Flash vermelho de DANO (jogador perdeu vida). `intensity` 0..1 escala a
+     * força; golpes seguidos acumulam o pico, com teto.
      */
-    trigger(intensity = 1) {
-        // (Re)inicia o PULSO do flash. O pico empilha com kills seguidos, mas é
-        // limitado para não "lavar" a tela. Reiniciar a fase reacende o pulso.
+    triggerFlash(intensity = 1) {
+        // (Re)inicia o PULSO do flash. O pico empilha com golpes seguidos, mas
+        // é limitado para não "lavar" a tela. Reiniciar a fase reacende o pulso.
         this.pulsePeak = Math.min(0.3, this.pulsePeak + 0.16 * intensity);
         this.pulseT = 0;
+    }
 
+    /**
+     * Feedback de um ABATE: só os respingos de sangue na tela (sem flash
+     * vermelho — ele fica reservado para o dano no jogador).
+     */
+    trigger() {
         // Poucos respingos (dá pra ver, sem exagero). Nascem nas BORDAS da tela
         // e voam para dentro, como sangue salpicado na "câmera".
         const w = this.canvas.width, h = this.canvas.height;

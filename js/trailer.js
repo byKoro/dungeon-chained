@@ -9,7 +9,9 @@
  *   scenes/frenzy/*         frenesi (roteiro, IA da horda)
  *   fx/*                    efeitos de tela (sangue, respingos)
  *
- * Atalhos: ?cena=N começa na cena N (0 = intro, 1 = cartela, 2 = frenesi);
+ * Atalhos: ?cena=N começa na cena N (0 = intro, 1 = cartela, 2 = frenesi,
+ * 3 = zigue-zague, 4 = corda arrebenta, 5 = tela dividida); o número também
+ * aparece no cronômetro discreto do rodapé.
  * botão/Espaço/Enter repete. `window.trailer` fica exposto para o console.
  */
 import { AssetLoader } from './core/AssetLoader.js';

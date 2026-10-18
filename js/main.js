@@ -29,7 +29,8 @@ async function bootstrap() {
     let trailer = null;
     if (!skipTrailer) {
         document.body.classList.add('trailer-mode');
-        trailer = new TrailerPlayer(canvas, assets, { onEnd: () => ui.showStart() });
+        // ?timer mostra o cronômetro do trailer (para revisar; fora do itch.io).
+        trailer = new TrailerPlayer(canvas, assets, { onEnd: () => ui.showStart(), showTimer: params.has('timer') });
     }
 
     await loading.run('Carregando o calabouço…', [

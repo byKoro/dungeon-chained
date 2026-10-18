@@ -129,6 +129,7 @@ export class FrenzyScene {
         this.hordeSpawned = 0;
         this.charging = false;
         this.aimRope = false;   // horda mira o meio da corda (da investida em diante)
+        this._cutAt = null;
         this._loneDeadAt = Infinity;
         this.horde.reset(this.door);
         this.lens.clear();
@@ -262,7 +263,13 @@ export class FrenzyScene {
     // ------------------------------------------------------------------
     // O frenesi nunca "termina": o último beat (respiro) fica em loop. Quando
     // ele já rolou um pouco, o trailer considera que chegou ao fim (COMEÇAR).
-    get isDone() { return false; }
+    // Termina (corte seco para a montagem) logo depois do primeiro abate da
+    // investida; se a investida acabar sem abate, termina no beat seguinte.
+    get isDone() {
+        const charge = this.beats.length - 2;
+        return (this.beat === charge && this._cutAt != null && this.beatT >= this._cutAt)
+            || this.beat > charge;
+    }
     get reachedEnd() {
         return this.beat === this.beats.length - 1 && this.beatT > 3.5;
     }

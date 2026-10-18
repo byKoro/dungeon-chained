@@ -576,7 +576,12 @@ export class Game {
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
-            onReconnect: () => this.renderer.triggerShake(4),
+            onReconnect: () => {
+                this.renderer.triggerShake(4);
+                // Serra recolhida: pisca em branco e dá um pop de escala que
+                // cresce e retrai suave.
+                this.chain.weapon?.playReconnect?.();
+            },
             // A serra nunca cai num ponto inalcançável (buraco, parede, ilha).
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });
@@ -710,7 +715,17 @@ export class Game {
         // Pegadas / poeira
         this.effects.update();
 
-        // Feedback de "kill" em espaço de tela (flash + respingos).
+        // Flash vermelho SÓ quando um jogador perde vida (qualquer fonte:
+        // inimigo, flecha, spike). Detecta pela queda de `lives` desde o
+        // último passo; cura e reinício (lives sobe) não disparam.
+        for (const p of [p1, p2]) {
+            if (p._livesSeen !== undefined && p.lives < p._livesSeen) {
+                this.screenGore.triggerFlash();
+            }
+            p._livesSeen = p.lives;
+        }
+
+        // Feedback de tela: respingos (kill) + flash vermelho (dano).
         this.screenGore.update();
 
         // Flash de "porta aberta": decai ao longo do tempo até sumir.

@@ -181,9 +181,11 @@ export class TrailerStage {
     // Névoa atmosférica: bancos de fumaça radiais derivando pela tela, por
     // cima da iluminação (determinístico, por senoides defasadas).
     _drawFog() {
-        const { ctx, canvas } = this;
-        const w = canvas.width, h = canvas.height;
-        const ph = this._fogPhase;
+        this.drawFogOn(this.ctx, this.canvas.width, this.canvas.height, this._fogPhase);
+    }
+
+    // Mesma névoa em qualquer canvas (ex.: o canvas próprio de uma ActionArena).
+    drawFogOn(ctx, w, h, ph = this._fogPhase) {
         const banks = [
             { cy: h * 0.82, r: h * 0.55, color: '70, 60, 95', base: 0.16, n: 4, speed: 1.0, drift: w * 0.5 },
             { cy: h * 0.35, r: h * 0.45, color: '60, 70, 110', base: 0.08, n: 3, speed: 0.6, drift: w * 0.6 }

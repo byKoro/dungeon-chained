@@ -70,6 +70,21 @@ const INERTIA_FRAME = SAW_FRAME.cols - 1; // 3
 const SHAKE_SPIN = 4;
 const SHAKE_TRANSITION = 3;
 
+// Animação de RECONEXÃO (jogadores recolhem a lâmina e a corrente volta):
+// a serra pisca em branco e dá um "pop" de escala que cresce rápido e retrai
+// suave (com um leve assentamento abaixo de 1 antes de voltar ao normal).
+const RECONNECT_FRAMES = 42;   // duração total (~0,7 s a 60Hz)
+const RECONNECT_GROW_END = 0.2; // fração da animação gasta CRESCENDO
+const RECONNECT_SCALE = 0.5;    // +50% de escala no pico
+const RECONNECT_BLINKS = 3;     // quantas piscadas brancas
+
+const easeOutCubic = (k) => 1 - Math.pow(1 - k, 3);
+// Ease-out com leve overshoot: passa um pouco do alvo e assenta.
+const easeOutBack = (k) => {
+    const c1 = 1.4, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2);
+};
+
 export class SawWeapon extends Weapon {
     constructor(sprite = null, cableSprite = null) {
         super("SERRAS", 14);
@@ -100,6 +115,41 @@ export class SawWeapon extends Weapon {
         this.sweepPhase = 0;   // fase do feixe de luz diagonal (varre o sprite)
         this.dropT = 0;        // 0->1 ao surgir (pop de queda) e aterrissar
         this.dropHover = 0;    // 0..1 flutuação atual (modula a luz que emite)
+
+        // Animação de reconexão: frames restantes (0 = inativa).
+        this.reconnectTimer = 0;
+    }
+
+    // Dispara a animação de RECONEXÃO (pisca + pop de escala que retrai).
+    // Chamado pelo Game no evento onReconnect da corrente.
+    playReconnect() {
+        this.reconnectTimer = RECONNECT_FRAMES;
+    }
+
+    // Progresso 0..1 da animação de reconexão (1 = terminada).
+    get _reconnectT() {
+        return 1 - this.reconnectTimer / RECONNECT_FRAMES;
+    }
+
+    // Escala da reconexão: cresce rápido (ease-out) até o pico e retrai suave
+    // de volta a 1, com um leve assentamento (ease-out back).
+    get _reconnectScale() {
+        if (this.reconnectTimer <= 0) return 1;
+        const t = this._reconnectT;
+        if (t < RECONNECT_GROW_END) {
+            return 1 + RECONNECT_SCALE * easeOutCubic(t / RECONNECT_GROW_END);
+        }
+        const k = (t - RECONNECT_GROW_END) / (1 - RECONNECT_GROW_END);
+        return 1 + RECONNECT_SCALE * (1 - easeOutBack(k));
+    }
+
+    // Intensidade 0..1 do pisca branco da reconexão: começa aceso e oscila
+    // RECONNECT_BLINKS vezes, apagando aos poucos.
+    get _reconnectFlash() {
+        if (this.reconnectTimer <= 0) return 0;
+        const t = this._reconnectT;
+        const osc = 0.5 + 0.5 * Math.cos(t * Math.PI * 2 * RECONNECT_BLINKS);
+        return osc * Math.pow(1 - t, 1.5);
     }
 
     // Marca a lâmina como dropada numa posição fixa do mundo (chamado quando a
@@ -150,6 +200,9 @@ export class SawWeapon extends Weapon {
             this.spin += (0 - this.spin) * SPIN_DECEL;
             return;
         }
+
+        // Avança a animação de reconexão (pisca + pop de escala).
+        if (this.reconnectTimer > 0) this.reconnectTimer--;
 
         // Pisca de ruptura iminente: a fase avança mais rápido quanto maior a
         // tensão, então o piscar acelera progressivamente até arrebentar.
@@ -393,10 +446,13 @@ export class SawWeapon extends Weapon {
             // mistura: oscila cedo, satura em branco perto da ruptura.
             flash = Math.min(1, osc * env * 1.4 + env * env * 0.6);
         }
+        // Reconexão: pisca branco por cima (usa o mesmo tingimento/halo).
+        flash = Math.max(flash, this._reconnectFlash);
 
         // JUICE: "pop" de escala no arranque — estica ao engatar o giro e volta
-        // ao normal conforme o kick decai (ease-out).
-        const popScale = 1 + 0.22 * this.spinKick;
+        // ao normal conforme o kick decai (ease-out). Multiplicado pelo pop
+        // da reconexão (cresce e retrai ao recolher a lâmina).
+        const popScale = (1 + 0.22 * this.spinKick) * this._reconnectScale;
 
         // Desenha o disco (rotação real) a partir de uma linha/frame da folha.
         // Tanto a INÉRCIA quanto o GIRO rotacionam de fato — a diferença é só
@@ -460,7 +516,7 @@ export class SawWeapon extends Weapon {
                 ctx.shadowBlur = 8 * flash;
                 ctx.fillStyle = "#eaf2ff";
                 ctx.beginPath();
-                ctx.arc(x, y, draw * 0.28, 0, Math.PI * 2);
+                ctx.arc(x, y, draw * 0.28 * popScale, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.restore();
                 ctx.globalAlpha = 1;
