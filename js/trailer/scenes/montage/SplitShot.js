@@ -4,7 +4,7 @@
  *             de buracos (os buracos ficam do lado de fora de cada curva);
  *   direita:  separados (sem a serra), correm enquanto flechas atravessam a
  *             tela; freiam/pulam/arrancam para desviar.
- * Última cena: depois do roteiro fica "respirando" em loop (fim do trailer).
+ * Termina em 6.4s (param ofegantes em 6.0s) e corta para a geração de mapas.
  */
 import { ActionArena } from '../../kit/ActionArena.js';
 import { TILE } from '../../../config/GameConfig.js';
@@ -23,7 +23,8 @@ export class SplitShot {
     }
 
     reset() { this.t = 0; }
-    get isDone() { return false; }
+    // Corta (impacto) para a geração de mapas logo depois de pararem.
+    get isDone() { return this.t > 6.4; }
     get reachedEnd() { return this.t > 6.2; }
 
     start() {

@@ -145,6 +145,18 @@ export const BACKGROUND_TILE = 78; // tile que preenche o vazio fora da sala
 
 export const HOLE_TILE = -1; // marcador de "sem piso" na grade floor[r][c]
 
+// Resistência à queda em buracos. O jogador não cai só por encostar o centro
+// num tile de buraco: existe uma BORDA "agarrável" onde o movimento para dentro
+// é freado e um empurrão leve devolve ao piso. Só cai quem insiste além da
+// borda por alguns frames seguidos (ou é arremessado fundo).
+export const HOLE_FALL = Object.freeze({
+    edgeMargin: 8,       // px dentro do buraco (a partir do piso) que ainda são "beirada"
+    footOffset: 14,      // px abaixo do centro: a queda é medida nos PÉS (o que se vê pisando)
+    inwardDamping: 0.7,  // fração da velocidade PARA DENTRO mantida por frame no buraco
+    pushBack: 0.9,       // px/frame máx. de empurrão de volta ao piso (cresce com a profundidade)
+    graceFrames: 12      // frames seguidos além da beirada até a queda (~0.2s)
+});
+
 // bitmask (N=1,E=2,S=4,W=8 => lado COM borda) -> índice do tile no tileset.
 export const HOLE_TILES = Object.freeze({
     0:  116,  // interior puro (cercado por buraco em todos os lados)

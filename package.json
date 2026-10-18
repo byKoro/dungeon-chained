@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "dependencies": {
+    "caveman": "^0.1.6"
+  }
+}

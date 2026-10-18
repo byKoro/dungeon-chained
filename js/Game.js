@@ -718,8 +718,9 @@ export class Game {
         rooms.clampPlayer(p1, this.arenaBounds, doors, canPass);
         rooms.clampPlayer(p2, this.arenaBounds, doors, canPass);
 
-        // Queda em buracos/abismos: se o centro do jogador está sobre um tile
-        // sem piso (-1), ele cai e morre. A posição já está confinada acima.
+        // Queda em buracos/abismos COM RESISTÊNCIA (HOLE_FALL): na beirada o
+        // jogador é freado e empurrado de volta ao piso; só cai (e morre) se
+        // insistir além dela por alguns frames. A posição já está confinada acima.
         this.tiles.checkHoleFalls([p1, p2]);
 
         // Arma: a animação já é atualizada por chain.update(). O dano só é

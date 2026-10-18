@@ -1,4 +1,4 @@
-import { TILE, HOLE_TILE } from '../config/GameConfig.js';
+import { TILE, HOLE_TILE, HOLE_FALL } from '../config/GameConfig.js';
 
 /**
  * DungeonTileQuery — consultas e regras sobre a GRADE DE TILES da sala atual.
@@ -66,22 +66,85 @@ export class DungeonTileQuery {
         return rects.length ? rects : null;
     }
 
-    // Dispara a queda de cada jogador que estiver sobre um buraco (-1). A queda
-    // leva à morte ao fim da animação. Usa o CENTRO do jogador. Já espera que a
-    // posição esteja confinada aos bounds.
+    // Queda em buracos COM RESISTÊNCIA (ver HOLE_FALL). Usa os PÉS do
+    // jogador (centro + footOffset) e mede a PROFUNDIDADE deles dentro do
+    // buraco (distância até o piso pisável mais próximo):
+    //   - fora do buraco: nada acontece (e a contagem de queda zera);
+    //   - dentro do buraco: a velocidade para dentro é freada e um empurrão
+    //     (proporcional à profundidade) devolve o jogador ao piso;
+    //   - além da beirada (`edgeMargin`) por `graceFrames` frames seguidos: cai.
+    // A queda leva à morte ao fim da animação. Já espera que a posição esteja
+    // confinada aos bounds.
     checkHoleFalls(players) {
         const tiles = this._floor();
         if (!tiles) return;
         const rect = this.rooms.cellRect();
+        const wallSet = new Set((tiles.walls || []).map(w => `${w.col},${w.row}`));
+        const { edgeMargin, inwardDamping, pushBack, graceFrames, footOffset = 0 } = HOLE_FALL;
+
         for (const player of players) {
             if (player.falling) continue;
-            const { col, row } = this._toTile(player.x, player.y, rect);
-            if (this._tileValue(tiles, col, row) !== HOLE_TILE) continue;
-            // Centro do tile do buraco, para o sprite afundar alinhado.
-            const cx = rect.x + (col + 0.5) * TILE;
-            const cy = rect.y + (row + 0.5) * TILE;
-            player.startFalling(cx, cy);
+            const hole = this._holeDepth(tiles, rect, wallSet, player.x, player.y + footOffset);
+            if (!hole) { player.holeGrace = 0; continue; }
+
+            const { depth, nx, ny, col, row } = hole;
+            const beyondEdge = depth > edgeMargin;
+            player.holeGrace = beyondEdge ? (player.holeGrace ?? 0) + 1 : 0;
+
+            if (beyondEdge && player.holeGrace >= graceFrames) {
+                player.holeGrace = 0;
+                // Centro do tile do buraco, para o sprite afundar alinhado.
+                player.startFalling(rect.x + (col + 0.5) * TILE, rect.y + (row + 0.5) * TILE);
+                continue;
+            }
+
+            // (nx, ny) aponta para o piso. Sem piso por perto (miolo de um
+            // buraco grande) não há para onde empurrar: só a contagem vale.
+            if (nx === 0 && ny === 0) continue;
+
+            // Freia só a componente que vai PARA DENTRO do buraco (andar ao
+            // longo da beirada ou voltar ao piso continua livre).
+            const inward = -(player.vx * nx + player.vy * ny);
+            if (inward > 0) {
+                const cut = inward * (1 - inwardDamping);
+                player.vx += nx * cut;
+                player.vy += ny * cut;
+            }
+
+            // Empurrão de volta ao piso, mais forte quanto mais fundo. Tem um
+            // mínimo (senão só se aproxima da borda sem nunca sair do buraco)
+            // e não passa do necessário para pisar de volta no piso.
+            const k = Math.max(0.35, Math.min(1, depth / edgeMargin));
+            const push = Math.min(depth + 0.5, pushBack * k);
+            player.x += nx * push;
+            player.y += ny * push;
         }
+    }
+
+    // Profundidade de um ponto do MUNDO dentro de um buraco: distância até o
+    // tile PISÁVEL mais próximo (vizinhança 3x3) e a direção (unitária) até
+    // ele. Retorna null se o ponto não está sobre um buraco. Sem piso pisável
+    // na vizinhança, depth = Infinity e direção (0, 0).
+    _holeDepth(tiles, rect, wallSet, x, y) {
+        const { col, row } = this._toTile(x, y, rect);
+        if (this._tileValue(tiles, col, row) !== HOLE_TILE) return null;
+
+        let best = Infinity, bx = 0, by = 0;
+        for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+                const c = col + dc, r = row + dr;
+                if (!this._isWalkable(tiles, c, r, wallSet)) continue;
+                // Ponto do tile vizinho mais próximo de (x, y).
+                const left = rect.x + c * TILE, top = rect.y + r * TILE;
+                const px = Math.max(left, Math.min(left + TILE, x));
+                const py = Math.max(top, Math.min(top + TILE, y));
+                const d = Math.hypot(px - x, py - y);
+                if (d < best) { best = d; bx = px - x; by = py - y; }
+            }
+        }
+        if (best === Infinity) return { depth: Infinity, nx: 0, ny: 0, col, row };
+        const len = best || 1;
+        return { depth: best, nx: bx / len, ny: by / len, col, row };
     }
 
     // Tile PISÁVEL: dentro da grade, com piso (não buraco/-1), fora da moldura

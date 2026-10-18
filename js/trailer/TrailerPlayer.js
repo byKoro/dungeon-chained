@@ -18,8 +18,9 @@ import { FrenzyScene } from './scenes/frenzy/FrenzyScene.js';
 import { ZigZagShot } from './scenes/montage/ZigZagShot.js';
 import { SnapShot } from './scenes/montage/SnapShot.js';
 import { SplitShot } from './scenes/montage/SplitShot.js';
+import { MapGenScene } from './scenes/mapgen/MapGenScene.js';
 
-const SCENES = [IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot];
+const SCENES = [IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene];
 
 const IMPACT_INVERT = 0.06;   // s de imagem invertida (quadro de impacto)
 const IMPACT_FLASH = 0.22;    // s até o clarão branco sumir

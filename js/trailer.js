@@ -10,7 +10,8 @@
  *   fx/*                    efeitos de tela (sangue, respingos)
  *
  * Atalhos: ?cena=N começa na cena N (0 = intro, 1 = cartela, 2 = frenesi,
- * 3 = zigue-zague, 4 = corda arrebenta, 5 = tela dividida); o número também
+ * 3 = zigue-zague, 4 = corda arrebenta, 5 = tela dividida, 6 = geração de
+ * mapas); o número também
  * aparece no cronômetro discreto do rodapé.
  * botão/Espaço/Enter repete. `window.trailer` fica exposto para o console.
  */
