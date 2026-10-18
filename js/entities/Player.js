@@ -14,6 +14,9 @@ export class Player extends Entity {
         this.hurtDuration = 30;    // duração do balanço/pose de impacto (frames)
         this.scaredTimer = 0;      // após o dano, anda "assustado" por um tempo
         this.scaredDuration = 120; // ~2s a 60fps
+        // Expressão forçada (olhos/sobrancelhas). Nome de uma chave em
+        // sprite.expressions; null = usa o comportamento normal. Usado no trailer.
+        this.expression = null;
 
         // Configuração do sprite.
         // Spritesheet animado (P1): {
@@ -97,6 +100,12 @@ export class Player extends Entity {
         if (this.hurtTimer > 0 && hasSheet(s.hurt)) {
             const frame = Math.min(s.hurt.hurtFrame, s.hurt.frameCount - 1);
             return build(s.hurt.img, s.hurt, frame);
+        }
+
+        // 1.5) Expressão forçada: mesmo ciclo de andar, folha da expressão
+        if (this.expression && s.expressions) {
+            const e = s.expressions[this.expression];
+            if (hasSheet(e)) return build(e.img, e, walkFrameIndex());
         }
 
         // 2) Assustado: mesmo ciclo de andar, porém na folha "scared"

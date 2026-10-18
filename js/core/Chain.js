@@ -6,7 +6,8 @@ import { Physics } from './Physics.js';
  * Responsabilidades (antes espalhadas no main.js):
  *  - Manter a tensão elástica entre os jogadores.
  *  - Arrebentar quando eles insistem em se separar (empurrão elástico) e
- *    deixá-los DESARMADOS; reconectar ao se reaproximarem.
+ *    deixá-los DESARMADOS; reconectar quando os dois voltam até a lâmina
+ *    largada no chão.
  *  - Portar a arma ativa (serras) e aplicar o dano aos inimigos apenas
  *    quando conectada.
  *  - Desenhar a arma/corrente (só quando conectada).
@@ -27,6 +28,9 @@ export class Chain {
         this.reconnectDistance = config.reconnectDistance ?? 110;
         this.snapImpulse = config.snapImpulse ?? 12;   // empurrão ao arrebentar
         this.reconnectDelay = config.reconnectDelay ?? 20;
+        // Raio em volta da lâmina largada: os DOIS jogadores precisam estar
+        // dentro dele para recolhê-la e reconectar.
+        this.pickupRadius = config.pickupRadius ?? 60;
 
         // Zona morta: perto do corpo do player a arma não mata (deixa o inimigo
         // encostar e causar dano).
@@ -67,7 +71,8 @@ export class Chain {
      * Atualiza tensão, ruptura e reconexão da corrente.
      * @param {object} p1 jogador 1
      * @param {object} p2 jogador 2
-     * @param {object} events callbacks opcionais { onSnap, onReconnect }
+     * @param {object} events callbacks opcionais { onSnap, onReconnect,
+     *   resolveDropPoint(x, y) -> {x, y} }
      */
     update(p1, p2, events = {}) {
         if (this.reconnectCooldown > 0) this.reconnectCooldown--;
@@ -96,14 +101,18 @@ export class Chain {
                 // DROP: a lâmina cai e fica flutuando no chão (item coletável)
                 // no ponto exato onde a serra estava no instante da ruptura.
                 const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
-                const dropX = sp ? sp.x : (p1.x + p2.x) / 2;
-                const dropY = sp ? sp.y : (p1.y + p2.y) / 2;
-                this.weapon.drop?.(dropX, dropY);
+                const rawX = sp ? sp.x : (p1.x + p2.x) / 2;
+                const rawY = sp ? sp.y : (p1.y + p2.y) / 2;
+                // O jogo pode corrigir o ponto (ex.: tirar a lâmina de cima de
+                // um buraco/parede) para ela nunca ficar inalcançável.
+                const fixed = events.resolveDropPoint?.(rawX, rawY) ?? { x: rawX, y: rawY };
+                this.weapon.drop?.(fixed.x, fixed.y);
 
                 events.onSnap?.();
             }
-        } else if (this.reconnectCooldown <= 0 && dist < this.reconnectDistance) {
-            // Desarmados: reconecta ao se reaproximarem — a lâmina é "recolhida".
+        } else if (this.reconnectCooldown <= 0 && this._canReconnect(p1, p2, dist)) {
+            // Desarmados: reconecta quando os DOIS chegam até a lâmina largada
+            // — ela é "recolhida" e a corrente volta a uni-los.
             this.connected = true;
             this.weapon.pickup?.();
             events.onReconnect?.();
@@ -129,6 +138,22 @@ export class Chain {
         // Desconectada: avança a animação da lâmina largada no chão (flutuação,
         // feixe de luz, giro residual).
         if (!this.connected) this.weapon.updateDropped?.();
+    }
+
+    /**
+     * Regra de reconexão. Com a lâmina largada no chão, AMBOS os jogadores
+     * precisam estar a até `pickupRadius` dela — só se aproximar um do outro
+     * não basta. Armas sem estado de drop caem na regra antiga (distância
+     * entre os jogadores).
+     */
+    _canReconnect(p1, p2, dist) {
+        const w = this.weapon;
+        if (!w.dropped) return dist < this.reconnectDistance;
+
+        const r = this.pickupRadius;
+        const d1 = Math.hypot(p1.x - w.dropX, p1.y - w.dropY);
+        const d2 = Math.hypot(p2.x - w.dropX, p2.y - w.dropY);
+        return d1 < r && d2 < r;
     }
 
     /**

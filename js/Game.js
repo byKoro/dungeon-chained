@@ -118,8 +118,8 @@ export class Game {
         });
         // A corrente une os jogadores e porta a arma ativa. Se insistirem em se
         // separar além do limite, ela ARREBENTA (empurrão elástico) e os
-        // jogadores ficam DESARMADOS até se reaproximarem. Ajuste os "dials"
-        // (tensão, ruptura, reconexão) aqui.
+        // jogadores ficam DESARMADOS até os dois voltarem até a serra caída
+        // (pickupRadius). Ajuste os "dials" (tensão, ruptura, reconexão) aqui.
         this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], {
             rest: 130,
             stiffness: 0.02,
@@ -127,6 +127,7 @@ export class Game {
             strainDistance: 165,
             strainLimit: 30,
             reconnectDistance: 110,
+            pickupRadius: 60,
             snapImpulse: 12,
             playerSafeZone: PLAYER_SAFE_ZONE
         });
@@ -274,6 +275,11 @@ export class Game {
 
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
+
+        // Saíram DESARMADOS: a lâmina largada ficaria presa na sala anterior
+        // (coordenadas de outra célula) e nunca mais poderia ser recolhida.
+        // Ela acompanha os jogadores e a corrente volta conectada.
+        if (!this.chain.isConnected) this.chain.reset();
 
         // Sala de combate (tem inimigos a instanciar): dispara a SEQUÊNCIA DE
         // INTRO (jogadores parados na porta -> zoom -> inimigos aparecem
@@ -568,7 +574,9 @@ export class Game {
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
-            onReconnect: () => this.renderer.triggerShake(4)
+            onReconnect: () => this.renderer.triggerShake(4),
+            // A serra nunca cai num ponto inalcançável (buraco, parede, ilha).
+            resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });
 
         // Serra em velocidade ALTA: tremida de câmera SECA e PEQUENA, contínua

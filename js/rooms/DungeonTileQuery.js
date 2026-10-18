@@ -84,6 +84,84 @@ export class DungeonTileQuery {
         }
     }
 
+    // Tile PISÁVEL: dentro da grade, com piso (não buraco/-1), fora da moldura
+    // de parede de borda e sem parede autoral do editor em cima.
+    _isWalkable(tiles, c, r, wallSet) {
+        const value = this._tileValue(tiles, c, r);
+        if (value === undefined || value < 0) return false;
+        if (c <= 0 || r <= 0 || c >= tiles.cols - 1 || r >= tiles.rows - 1) return false;
+        return !wallSet.has(`${c},${r}`);
+    }
+
+    /**
+     * Ponto onde a serra pode cair SEM ficar inalcançável.
+     *
+     * Faz uma busca em largura (4 vizinhos, conservadora: não conta "passar
+     * pela quina" entre dois buracos/paredes) pelos tiles pisáveis a partir
+     * dos tiles onde os jogadores estão. Se o tile do ponto pedido for
+     * alcançável, mantém o ponto exato; senão devolve o CENTRO do tile
+     * alcançável mais próximo. Cobre buraco, parede autoral, moldura, vão de
+     * porta (fora da grade) e "ilhas" de piso cercadas por buracos.
+     *
+     * @param {number} x  ponto pedido (mundo)
+     * @param {number} y
+     * @param {{x:number,y:number}[]} players
+     * @returns {{x:number,y:number}}
+     */
+    reachableDropPoint(x, y, players) {
+        const tiles = this._floor();
+        if (!tiles) return { x, y };
+        const rect = this.rooms.cellRect();
+        const wallSet = new Set((tiles.walls || []).map(w => `${w.col},${w.row}`));
+        const walkable = (c, r) => this._isWalkable(tiles, c, r, wallSet);
+
+        // BFS a partir dos tiles (pisáveis) dos jogadores.
+        const reached = new Set();
+        const queue = [];
+        for (const p of players) {
+            const { col, row } = this._toTile(p.x, p.y, rect);
+            const key = `${col},${row}`;
+            if (walkable(col, row) && !reached.has(key)) {
+                reached.add(key);
+                queue.push([col, row]);
+            }
+        }
+        // Nenhum jogador sobre piso (ex.: ambos caindo): qualquer tile pisável
+        // serve como candidato — melhor que deixar a serra num buraco.
+        const anyWalkable = queue.length === 0;
+        for (let i = 0; i < queue.length; i++) {
+            const [c, r] = queue[i];
+            for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nc = c + dc, nr = r + dr;
+                const key = `${nc},${nr}`;
+                if (reached.has(key) || !walkable(nc, nr)) continue;
+                reached.add(key);
+                queue.push([nc, nr]);
+            }
+        }
+        const ok = (c, r) => anyWalkable ? walkable(c, r) : reached.has(`${c},${r}`);
+
+        const { col, row } = this._toTile(x, y, rect);
+        if (ok(col, row)) return { x, y };
+
+        // Tile alcançável cujo centro está mais perto do ponto pedido.
+        let best = null;
+        let bestDist = Infinity;
+        for (let r = 0; r < tiles.rows; r++) {
+            for (let c = 0; c < tiles.cols; c++) {
+                if (!ok(c, r)) continue;
+                const cx = rect.x + (c + 0.5) * TILE;
+                const cy = rect.y + (r + 0.5) * TILE;
+                const d = (cx - x) ** 2 + (cy - y) ** 2;
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = { x: cx, y: cy };
+                }
+            }
+        }
+        return best ?? { x, y };
+    }
+
     // Garante que um jogador não nasça sobre um buraco: se o tile atual não for
     // piso válido, busca em anéis crescentes o tile seguro mais próximo e
     // recoloca o jogador no centro dele (zerando a velocidade).

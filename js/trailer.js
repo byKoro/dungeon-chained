@@ -15,7 +15,8 @@
  *   4. Eles chegam perto da serra e PEGAM ela; a câmera chega bem perto.
  *   5. Balão de fala do VERMELHO (comenta o quão afiada é a serra); vai pro
  *      AZUL e ele concorda.
- *   6. A sala toda TREME e o sprite de espanto toca novamente.
+ *   5b. Fim da conversa: CLOSE no rosto do VERMELHO e depois no do AZUL.
+ *   6. A câmera recua, a sala toda TREME e o sprite de espanto toca novamente.
  *   7. Eles se aproximam da porta DEVAGAR enquanto a câmera dá zoom; ambos
  *      entram pela porta lentamente, sumindo na ESCURIDÃO.
  */
@@ -27,10 +28,56 @@ import { RoomTiles } from './core/RoomTiles.js';
 import { Player } from './entities/Player.js';
 import { SawWeapon } from './weapons/SawWeapon.js';
 import { PostProcessor } from './systems/PostProcessor.js';
-import { LightingRenderer } from './systems/LightingRenderer.js';
 import { WindSystem } from './systems/WindSystem.js';
 import { playerConfigs } from './config/EntityConfig.js';
-import { TILE, ROOM_COLS, ROOM_ROWS, BACKGROUND_TILE, DOOR_STUB_TILES } from './config/GameConfig.js';
+import { renderSpeechBubble } from './ui/SpeechBubble.js';
+import { BloodScreen } from './trailer/BloodScreen.js';
+import { FrenzyScene } from './trailer/FrenzyScene.js';
+
+// Linha do tempo da CENA 2 (segundos). title: a partir da cartela preta;
+// frenzyDur/outroFade: a partir da revelação do frenesi.
+const SEQUEL_TIMING = {
+    flickerStart: 2.0,  // cartela parada antes de começar a piscar
+    sprayStart: 2.6,    // primeiras gotas de sangue
+    sprayFull: 4.6,     // tela totalmente coberta
+    drainStart: 5.0,    // sangue começa a escorrer e revela o frenesi
+    frenzyDur: 10.0,    // duração do frenesi
+    outroFade: 1.2      // fade final para a cartela
+};
+
+// Hash determinístico 0..1 (estroboscópio do pisca vermelho).
+const hash01 = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+
+// Pixel do balão = esta fração do pixel de arte do jogo (1 = mesma escala).
+const BUBBLE_PIXEL_RATIO = 0.5;
+import {
+    TILE, ROOM_COLS, ROOM_ROWS, BACKGROUND_TILE, DOOR_STUB_TILES,
+    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES
+} from './config/GameConfig.js';
+
+// Expressões faciais dos jogadores (spritesheets de 8 frames, mesmo layout do
+// player_walk.png). Carregadas SÓ no trailer e injetadas em sprite.expressions;
+// o jogo não é afetado. As chaves batem com os arquivos em
+// assets/player_0X/expressions/<nome>.png.
+const TRAILER_EXPRESSIONS = [
+    'neutro', 'assustado', 'espantado', 'raiva', 'furia', 'preocupado',
+    'desconfiado', 'olhando_esquerda', 'olhando_direita', 'olhando_cima',
+    'olhos_fechados'
+];
+
+// Perfil de luz AZUL-AÇO da serra (mesma cor do jogo), para o trailer montar a
+// luz da lâmina localmente (com escurecimento próprio).
+const BLADE_LIGHT_PROFILE = {
+    color: '150, 196, 255',
+    flickerBase: 1, flickerSine: 0.05, flickerNoise: 0.02,
+    falloff: [
+        { offset: 0.0, alpha: 0.9 },
+        { offset: 0.3, alpha: 0.5 },
+        { offset: 0.55, alpha: 0.26 },
+        { offset: 0.78, alpha: 0.1 },
+        { offset: 1.0, alpha: 0.0 }
+    ]
+};
 
 // ---------------------------------------------------------------------------
 // Utilidades de animação
@@ -103,27 +150,44 @@ class TrailerScene {
         this.redPlayer = this.p1;
         this.bluePlayer = this.p2;
 
+        // --- Expressões (olhos/sobrancelhas) geradas por tools/gen_expressions.py ---
+        // Mesmo layout da folha de caminhada; troca via this._express(p, nome).
+        for (const [p, dir] of [[this.p1, 'player_01'], [this.p2, 'player_02']]) {
+            const s = p.sprite;
+            s.expressions = {};
+            for (const name of TRAILER_EXPRESSIONS) {
+                s.expressions[name] = {
+                    img: this.assets.load(`${dir}_expr_${name}`, `assets/${dir}/expressions/${name}.png`),
+                    frameCount: s.frameCount, cellSize: s.cellSize,
+                    cropX: s.cropX, cropY: s.cropY, cropW: s.cropW, cropH: s.cropH
+                };
+            }
+        }
+
         // --- Serra ---
         this.saw = new SawWeapon(this.assets.saw, this.assets.cable);
 
-        // --- Iluminação (reuso do pipeline do jogo) ---
-        // PostProcessor: ambiente escuro + halos de luz + vinheta. LightingRenderer
-        // monta as luzes (jogadores, tochas, serra azul, wash) a cada frame.
-        this.postProcessor = new PostProcessor(canvas, this.ctx);
-        this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
+        // --- Iluminação (reuso do PostProcessor do jogo) ---
+        // PostProcessor: ambiente escuro + halos de luz + vinheta. As luzes
+        // (jogadores, tochas, serra azul) são montadas em _renderLights() a cada
+        // frame, com brilho escurecido pelo SPOT_DIM — tudo isolado no trailer.
+        //
+        // IMPORTANTE: estes overrides valem SÓ no trailer (passados ao
+        // construtor, não ao config global) — o jogo continua intacto. Deixam
+        // os spots de luz mais ESCUROS: ambiente mais sombrio + luzes menos
+        // intensas (flickerBase menor reduz o brilho das elipses).
+        // Overrides SÓ do trailer (passados ao construtor; o config global do
+        // jogo fica intacto). Ambiente mais escuro + vinheta mais fechada deixam
+        // a cena mais sombria. O brilho dos SPOTS em si é escurecido no montador
+        // de luzes local (_renderLights), via SPOT_DIM.
+        this.postProcessor = new PostProcessor(canvas, this.ctx, {
+            lighting: { ambient: '30, 26, 40' }, // era 41,35,53
+            vignette: { strength: 0.8 }          // era 0.7
+        });
 
-        // Adaptador mínimo que o LightingRenderer espera no lugar da Chain:
-        // expõe isConnected, weapon e getDroppedLight(). Assim ganhamos a luz
-        // azul-aço da serra (ativa e largada) de graça.
-        const self = this; // referência estável para os getters abaixo
-        this.chainLike = {
-            get isConnected() { return self.sawCarried; },
-            get weapon() { return self.saw; },
-            getDroppedLight: () => {
-                if (!self.sawVisibleDropped) return null;
-                return { x: self.saw.dropX, y: self.saw.dropY, hover: self.saw.dropHover ?? 0 };
-            }
-        };
+        // Fator de escurecimento dos spots (tochas, jogadores, serra). 1 = cheio;
+        // < 1 escurece. Vive só no trailer.
+        this.SPOT_DIM = 0.6;
 
         // --- Névoa / poeira ambiente (clima misterioso) ---
         this.wind = new WindSystem();
@@ -141,6 +205,10 @@ class TrailerScene {
         this.time = 0;         // tempo acumulado da cena (s)
         this.beatIndex = 0;    // beat atual
         this.beatTime = 0;     // tempo dentro do beat atual (s)
+
+        // --- Cena 2: transição de sangue + frenesi ---
+        this.bloodScreen = new BloodScreen(canvas);
+        this.frenzy = new FrenzyScene(this);
 
         this._buildBeats();
         this.reset();
@@ -200,9 +268,12 @@ class TrailerScene {
             // Posição de espanto (recuaram um pouco ao ver a serra).
             p1Startled: { x: this.center.x - TILE * 2.1, y: this.center.y + TILE * 1.9 },
             p2Startled: { x: this.center.x + TILE * 2.1, y: this.center.y + TILE * 1.9 },
-            // Perto da serra (para pegá-la), um de cada lado.
-            p1AtSaw: { x: this.center.x - TILE * 1.25, y: this.center.y + TILE * 0.7 },
-            p2AtSaw: { x: this.center.x + TILE * 1.25, y: this.center.y + TILE * 0.7 }
+            // Perto da serra (para pegá-la), um de cada lado e NA MESMA ALTURA
+            // do centro: assim o MEIO da corda (cablePoint 0.5) cai exatamente
+            // onde a serra estava largada (this.center), sem o disco "teleportar"
+            // ao conectar. Ligeiramente abaixo (0.15) para ficarem de frente p/ ela.
+            p1AtSaw: { x: this.center.x - TILE * 1.15, y: this.center.y + TILE * 0.15 },
+            p2AtSaw: { x: this.center.x + TILE * 1.15, y: this.center.y + TILE * 0.15 }
         };
     }
 
@@ -218,7 +289,14 @@ class TrailerScene {
         this.chainReveal = 0;
         this.saw.spin = 0;
         this.saw.rotation = 0;
+        this.saw.dragX = this.saw.dragY = 0;
         this._fogPhase = 0;
+        // Cena 2 (cartela -> sangue -> frenesi) volta ao início.
+        this.phase = 'scene1';
+        this.phaseT = 0;
+        this.bloodScreen?.reset();
+        this.frenzy?.reset();
+        this.renderer.screenShake = 0;
         this.renderer.setIntroZoomFactor(1);
         this.renderer.resetSway();
 
@@ -228,6 +306,15 @@ class TrailerScene {
         this._place(this.p2, L.p2OutsideDoor);
         this.p1.facingLeft = false;
         this.p2.facingLeft = false;
+        this._faceFree(); // destrava o facing (importante ao repetir a cena)
+        // Zera expressões (ao repetir a cena, começa limpo).
+        for (const p of [this.p1, this.p2]) {
+            p.expression = null;
+            p._exprBase = null;
+            p._exprTimer = 0;
+            p.scaredTimer = 0;
+            p.hurtTimer = 0;
+        }
 
         // Câmera começa com zoom BEM PERTO da porta (onde a cena abre).
         this.renderer.camX = this.doorWorld.x;
@@ -263,6 +350,10 @@ class TrailerScene {
                 enter: () => {
                     this._place(this.p1, L.p1OutsideDoor);
                     this._place(this.p2, L.p2OutsideDoor);
+                    // Entram cautelosos, olhando para a sala escura (cada um para
+                    // um lado) — exploram o ambiente antes de avançar.
+                    this._express(this.p1, 'olhando_direita');
+                    this._express(this.p2, 'olhando_esquerda');
                 },
                 update: (k) => {
                     // Câmera cravada perto da porta, com um leve recuo ao longo do beat.
@@ -273,6 +364,13 @@ class TrailerScene {
                     const w = easeInOut(clamp01(k / 0.85));
                     this._walkTo(this.p1, L.p1OutsideDoor, L.p1NearDoor, w, 'up');
                     this._walkTo(this.p2, L.p2OutsideDoor, L.p2NearDoor, w, 'up');
+
+                    // Já dentro, olham para FRENTE/CIMA (encaram o interior) e
+                    // ficam desconfiados com o lugar.
+                    if (k > 0.5) {
+                        this._express(this.p1, 'olhando_cima');
+                        this._express(this.p2, 'desconfiado');
+                    }
                 }
             },
 
@@ -291,9 +389,10 @@ class TrailerScene {
                     this.sawCarried = false;
                     this.screenFlashT = 1; // clarão branco no nascimento
                     this.renderer.triggerShake(10);
-                    // Reação imediata: sprite de ESPANTO (continuam onde estão).
-                    this._startle(this.p1);
-                    this._startle(this.p2);
+                    // Reação imediata ao ver a serra nascer: ESPANTO (boca/olhos
+                    // arregalados). A expressão tem prioridade sobre o "scared".
+                    this._express(this.p1, 'espantado');
+                    this._express(this.p2, 'espantado');
                 },
                 update: (k) => {
                     // Câmera desliza da porta para o MEIO da sala, afastando um pouco
@@ -302,13 +401,16 @@ class TrailerScene {
                     const cx = lerp(this.doorWorld.x, this.center.x, easeInOut(k));
                     const cy = lerp(this.doorWorld.y - TILE * 0.2, this.center.y + TILE * 0.7, easeInOut(k));
                     this._camTo(cx, cy, z, 0.1);
-                    // Parados, assustados, encarando a serra.
+                    // Parados, espantados, encarando a serra.
                     this._idle(this.p1);
                     this._idle(this.p2);
-                    this._keepStartled(this.p1);
-                    this._keepStartled(this.p2);
                     this.p1.facingLeft = false;
                     this.p2.facingLeft = true;
+                    // Depois do susto inicial, a tensão vira apreensão (preocupado).
+                    if (k > 0.6) {
+                        this._express(this.p1, 'preocupado');
+                        this._express(this.p2, 'preocupado');
+                    }
                 }
             },
 
@@ -319,8 +421,9 @@ class TrailerScene {
             {
                 dur: 2.8,
                 enter: () => {
-                    this._keepStartled(this.p1);
-                    this._keepStartled(this.p2);
+                    // Começam o avanço ainda apreensivos (herdam 'preocupado').
+                    this._express(this.p1, 'preocupado');
+                    this._express(this.p2, 'preocupado');
                 },
                 update: (k) => {
                     // Trajeto contínuo: de onde pararam (perto da porta) até a serra.
@@ -334,17 +437,50 @@ class TrailerScene {
                     const z = lerp(fit() * 1.3, fit() * 2.8, easeInOut(k));
                     this._camTo(this.center.x, cy, z, 0.1);
 
-                    // Perto da serra deixam de ficar assustados (curiosidade vence).
-                    if (k > 0.6) { this._calm(this.p1); this._calm(this.p2); }
+                    // Aproximam-se CAUTELOSOS (desconfiados da serra misteriosa).
+                    if (k <= 0.55) {
+                        this._express(this.p1, 'desconfiado');
+                        this._express(this.p2, 'desconfiado');
+                    }
 
-                    // Ao chegar, PEGAM a serra: a corda liga os dois (com transição)
-                    // e o disco passa a ser carregado entre eles.
+                    // TELEPORTE SUAVE: enquanto se aproximam, a serra largada
+                    // DESLIZA do centro até o MEIO dos dois jogadores. Assim,
+                    // quando a corda conecta, o disco (meio da corda) já está
+                    // exatamente onde a serra estava — sem salto.
+                    const mid = this._playersMid();
+                    const slide = easeInOut(clamp01((k - 0.4) / 0.38)); // começa na 2ª metade
+                    this.saw.dropX = lerp(this.center.x, mid.x, slide);
+                    this.saw.dropY = lerp(this.center.y, mid.y, slide);
+
+                    // Perto da serra (e ANTES de pegá-la): VIRAM-SE PARA ELA
+                    // (flip do sprite + olhar DIRECIONAL olhando_esquerda/direita).
+                    // Trava o facing para o passo não revirá-los. Depois de pegar
+                    // (sawCarried) paramos de forçar o olhar, para não sobrescrever
+                    // o SUSTO da conexão no frame seguinte.
+                    if (k > 0.55 && !this.sawCarried) {
+                        this._calm(this.p1);
+                        this._calm(this.p2);
+                        this._faceSaw();
+                        this._lookAtSaw();
+                    }
+
+                    // Ao chegar, PEGAM a serra: a corda liga os dois (transição da
+                    // corda) e o disco passa a ser carregado. Como o disco já foi
+                    // deslizado até o meio deles, a troca é CONTÍNUA (sem teleporte).
                     if (k > 0.78 && !this.sawCarried) {
                         this.sawCarried = true;
                         this.sawVisibleDropped = false;
                         this.saw.pickup();
-                        this.renderer.triggerZoomPunch(0.05);
-                        this.renderer.triggerShake(5);
+                        this._faceSaw();
+                        this.renderer.triggerZoomPunch(0.04);
+                        // LEVE SUSTO no instante em que a serra conecta e começa a
+                        // girar: expressão "assustado" por um instante, volta ao
+                        // normal (neutro) sozinha. Pulsinho de câmera + micro-shake.
+                        this._express(this.p1, 'neutro');
+                        this._express(this.p2, 'neutro');
+                        this._bothExpressFor('assustado', 0.6);
+                        this.saw.spin = 0.4;                 // engata o giro de leve
+                        this.renderer.triggerShake(4);
                     }
                 }
             },
@@ -356,17 +492,19 @@ class TrailerScene {
             {
                 dur: 2.6,
                 enter: () => {
-                    // Já pegaram a serra: cara normal (fim do espanto) para falar.
+                    // Passado o susto: VERMELHO admira a serra (neutro, falando);
+                    // AZUL observa a lâmina com desconfiança.
                     this._calm(this.p1);
                     this._calm(this.p2);
+                    this._express(this.redPlayer, 'neutro');
+                    this._express(this.bluePlayer, 'desconfiado');
                     this._speak(this.redPlayer, 'Olha como essa serra é afiada…', 2.4);
                 },
                 update: () => {
                     this._camTo(this.center.x, this.center.y + TILE * 0.35, this._zoomFit() * 2.7, 0.08);
                     this._idle(this.p1);
                     this._idle(this.p2);
-                    this.p1.facingLeft = false;
-                    this.p2.facingLeft = true;
+                    this._faceSaw(); // encaram a serra que seguram
                     // Serra GIRA a toda (feedback de "afiada"): spin acima de
                     // BLEND_HI (0.6) para engatar o SPRITE DE GIRO; rotação real
                     // acelerada para o disco rodar visível.
@@ -383,19 +521,28 @@ class TrailerScene {
                 enter: () => {
                     this._calm(this.p1);
                     this._calm(this.p2);
+                    // AZUL concorda empolgado (neutro); VERMELHO acompanha o giro.
+                    this._express(this.bluePlayer, 'neutro');
+                    this._express(this.redPlayer, 'neutro');
                     this._speak(this.bluePlayer, 'Com certeza. Corta qualquer coisa!', 2.2);
                 },
                 update: () => {
                     this._camTo(this.center.x, this.center.y + TILE * 0.35, this._zoomFit() * 2.6, 0.08);
                     this._idle(this.p1);
                     this._idle(this.p2);
-                    this.p1.facingLeft = false;
-                    this.p2.facingLeft = true;
+                    this._faceSaw(); // seguem encarando a serra
                     // Mantém o giro a toda (sprite de giro) durante a concordância.
                     this.saw.spin = lerp(this.saw.spin, 0.9, 0.1);
                     this.saw.rotation += 0.4;
                 }
             },
+
+            // ----------------------------------------------------------------
+            // BEAT 4b/4c — Fim da conversa: CLOSE no rosto do VERMELHO e depois
+            //              no do AZUL (troca de olhares antes do tremor).
+            // ----------------------------------------------------------------
+            this._faceCloseUp(this.redPlayer, ['desconfiado', 'raiva']),
+            this._faceCloseUp(this.bluePlayer, ['olhos_fechados', 'furia']),
 
             // ----------------------------------------------------------------
             // BEAT 5 — A sala toda TREME; o sprite de espanto toca novamente.
@@ -405,8 +552,9 @@ class TrailerScene {
                 enter: () => {
                     this.worldQuake = 1;        // tremor forte decaindo
                     this.renderer.triggerShake(22);
-                    this._startle(this.p1);
-                    this._startle(this.p2);
+                    // A sala treme: ESPANTO novamente (olhos arregalados).
+                    this._express(this.p1, 'espantado');
+                    this._express(this.p2, 'espantado');
                 },
                 update: (k) => {
                     // Afasta para mostrar a sala toda tremendo (vinha do zoom
@@ -415,12 +563,16 @@ class TrailerScene {
                     this._camTo(this.center.x, this.center.y, z, 0.1);
                     this._idle(this.p1);
                     this._idle(this.p2);
-                    this._keepStartled(this.p1);
-                    this._keepStartled(this.p2);
                     // Serra desacelera (eles param de girar, assustados).
                     this.saw.spin = lerp(this.saw.spin, 0, 0.06);
                     // Mantém o tremor pulsando durante o beat.
                     if (k < 0.8 && this.renderer.screenShake < 6) this.renderer.triggerShake(14);
+                    // Passado o baque inicial, viram apreensão (preocupado) —
+                    // preparando a retirada.
+                    if (k > 0.5) {
+                        this._express(this.p1, 'preocupado');
+                        this._express(this.p2, 'preocupado');
+                    }
                 }
             },
 
@@ -431,8 +583,10 @@ class TrailerScene {
             {
                 dur: 3.6,
                 enter: () => {
-                    this._keepStartled(this.p1);
-                    this._keepStartled(this.p2);
+                    this._faceFree(); // ao recuar, voltam a virar conforme o movimento
+                    // Recuam AMEDRONTADOS (herdam 'preocupado' do beat anterior).
+                    this._express(this.p1, 'preocupado');
+                    this._express(this.p2, 'preocupado');
                 },
                 update: (k) => {
                     // Trajeto lento em dois trechos: da serra -> perto da porta
@@ -443,6 +597,16 @@ class TrailerScene {
                     // Devagar: velocidade do passo reduzida (fator menor).
                     this._walkTo(this.p1, seg.a1, seg.b1, seg.kk, 'down', 0.5);
                     this._walkTo(this.p2, seg.a2, seg.b2, seg.kk, 'down', 0.5);
+
+                    // Olham para trás (para a serra que deixam) na saída: um breve
+                    // olhar por cima do ombro antes de sumir na escuridão.
+                    if (k > 0.3 && k < 0.6) {
+                        this._express(this.p1, 'olhando_cima');
+                        this._express(this.p2, 'olhando_cima');
+                    } else if (k >= 0.6) {
+                        this._express(this.p1, 'preocupado');
+                        this._express(this.p2, 'preocupado');
+                    }
 
                     // Câmera dá zoom aproximando na porta conforme eles somem.
                     const z = lerp(this._zoomFit() * 1.4, this._zoomFit() * 2.1, easeIn(k));
@@ -475,14 +639,39 @@ class TrailerScene {
         p._moving = moving;
         p._gaitScale = speedScale;
 
-        // Encaramento horizontal: segue o movimento lateral (com limiar).
-        if (dx < -0.1) p.facingLeft = true;
-        else if (dx > 0.1) p.facingLeft = false;
+        // Encaramento horizontal: segue o movimento lateral (com limiar), a
+        // menos que o facing esteja TRAVADO (p._faceLock) — usado quando eles
+        // devem encarar a serra independentemente da direção do passo.
+        if (!p._faceLock) {
+            if (dx < -0.1) p.facingLeft = true;
+            else if (dx > 0.1) p.facingLeft = false;
+        }
     }
 
     _idle(p) {
         p._moving = false;
         p._gaitScale = 1;
+    }
+
+    // Ponto médio atual entre os dois jogadores (centro da futura corda).
+    _playersMid() {
+        return { x: (this.p1.x + this.p2.x) / 2, y: (this.p1.y + this.p2.y) / 2 };
+    }
+
+    // Vira AMBOS para a serra (centro): quem está à esquerda do centro olha para
+    // a direita; quem está à direita olha para a esquerda. Trava o facing para o
+    // passo não revirá-los (p._faceLock).
+    _faceSaw() {
+        this.p1.facingLeft = this.p1.x > this.center.x;
+        this.p2.facingLeft = this.p2.x > this.center.x;
+        this.p1._faceLock = true;
+        this.p2._faceLock = true;
+    }
+
+    // Libera o facing travado (volta a seguir o movimento).
+    _faceFree() {
+        this.p1._faceLock = false;
+        this.p2._faceLock = false;
     }
 
     // Avança a animação de caminhada SUAVE de um jogador (chamado todo frame no
@@ -528,17 +717,84 @@ class TrailerScene {
     _startle(p) {
         p.hurtTimer = 0;
         p.scaredTimer = 600;
+        p.expression = 'assustado';
     }
     _keepStartled(p) {
         p.scaredTimer = 600; // reforça todo frame -> some assim que paramos de chamar
     }
     _calm(p) {
         p.scaredTimer = 0;   // volta ao sprite normal (fim do espanto)
+        p.expression = null;
+    }
+
+    // Força uma expressão permanente (ver TRAILER_EXPRESSIONS); null = normal.
+    // Também define a expressão BASE para onde um susto temporário volta.
+    _express(p, name) {
+        p.expression = name;
+        p._exprBase = name;
+        p._exprTimer = 0;
+    }
+
+    // Expressão TEMPORÁRIA (ex.: susto): aplica `name` por `seconds` e depois
+    // volta sozinha para a expressão base atual (via _tickExpressions).
+    _expressFor(p, name, seconds) {
+        p._exprBase = p._exprBase ?? p.expression ?? null;
+        p.expression = name;
+        p._exprTimer = seconds;
+    }
+
+    // Atalho: aplica a MESMA expressão temporária aos dois jogadores.
+    _bothExpressFor(name, seconds) {
+        this._expressFor(this.p1, name, seconds);
+        this._expressFor(this.p2, name, seconds);
+    }
+
+    // Avança os timers de expressão temporária; ao zerar, volta à base.
+    _tickExpressions(dt) {
+        for (const p of [this.p1, this.p2]) {
+            if (p._exprTimer > 0) {
+                p._exprTimer -= dt;
+                if (p._exprTimer <= 0) p.expression = p._exprBase ?? null;
+            }
+        }
+    }
+
+    // Vira AMBOS os jogadores para encarar a serra usando as EXPRESSÕES
+    // direcionais (olhando_esquerda/olhando_direita) além do flip do sprite.
+    _lookAtSaw() {
+        // P1 à esquerda do centro olha para a DIREITA; P2 à direita, para a ESQUERDA.
+        this._express(this.p1, this.p1.x <= this.center.x ? 'olhando_direita' : 'olhando_esquerda');
+        this._express(this.p2, this.p2.x <= this.center.x ? 'olhando_direita' : 'olhando_esquerda');
     }
 
     // Balão de fala sobre a cabeça do jogador.
     _speak(who, text, dur) {
         this.speech = { who, text, t: 0, dur };
+    }
+
+    // Beat de CLOSE no rosto de `who`: câmera mergulha rápido no rosto, segura
+    // e troca a expressão no meio (exprs[0] -> exprs[1]). O outro jogador e a
+    // serra continuam no lugar (serra girando).
+    _faceCloseUp(who, exprs, dur = 1.6) {
+        const FACE_ZOOM = 5.0;   // multiplicador sobre o zoom-fit da sala
+        const FACE_DY = -28;     // rosto fica ~28px de mundo acima do centro do sprite
+        return {
+            dur,
+            enter: () => {
+                this.speech = null;
+                this._express(who, exprs[0]);
+                this.renderer.triggerZoomPunch(0.05);
+            },
+            update: (k) => {
+                this._camTo(who.x, who.y + FACE_DY, this._zoomFit() * FACE_ZOOM, 0.18);
+                this._idle(this.p1);
+                this._idle(this.p2);
+                this._faceSaw();
+                if (k > 0.45) this._express(who, exprs[1]);
+                this.saw.spin = lerp(this.saw.spin, 0.9, 0.1);
+                this.saw.rotation += 0.4;
+            }
+        };
     }
 
     // Interpola a câmera manualmente (sem clamp de sala, para liberdade cênica).
@@ -553,6 +809,18 @@ class TrailerScene {
     // -----------------------------------------------------------------------
 
     update(dt) {
+        // Depois da cena 1: cartela, sangue e frenesi.
+        if (this.phase !== 'scene1') {
+            this._updateSequel(dt);
+            this._tickExpressions(dt);
+            return;
+        }
+        if (this.beatIndex >= this.beats.length) {
+            this.phase = 'title';
+            this.phaseT = 0;
+            return;
+        }
+
         // Avança timers visuais.
         if (this.screenFlashT > 0) this.screenFlashT = Math.max(0, this.screenFlashT - dt * 2.2);
         if (this.worldQuake > 0) this.worldQuake = Math.max(0, this.worldQuake - dt * 0.6);
@@ -580,6 +848,9 @@ class TrailerScene {
         this._gait(this.p1, dt);
         this._gait(this.p2, dt);
 
+        // Expressões temporárias (sustos) voltam à base quando o timer zera.
+        this._tickExpressions(dt);
+
         // Névoa/poeira ambiente (atravessa a sala, revelada pela luz).
         this.wind.update(this.bounds);
 
@@ -600,6 +871,7 @@ class TrailerScene {
     }
 
     render() {
+        if (this.phase !== 'scene1') { this._renderSequel(); return; }
         const { ctx, renderer } = this;
 
         renderer.beginFrame();
@@ -675,23 +947,10 @@ class TrailerScene {
 
         renderer.endFrame();
 
-        // --- ILUMINAÇÃO (pipeline do jogo) em espaço de TELA ---
-        // Monta as luzes do quadro e compõe o mapa de luz + vinheta sobre a cena.
-        const sawPos = (this.sawCarried && this.saw)
-            ? this.saw.getSawPositions(this.p1, this.p2)[0]
-            : null;
-        this.lighting.render({
-            players: [this.p1, this.p2],
-            chain: this.chainLike,
-            sawPos,
-            arenaBounds: this.bounds,
-            tiles: this.tiles,
-            rect: this.rect,
-            doors: this.doorList,
-            doorHalf: this.doorHalf,
-            open: true,
-            doorFlashT: 0
-        });
+        // --- ILUMINAÇÃO em espaço de TELA ---
+        // Monta as luzes do quadro (jogadores, tochas, serra azul) com o brilho
+        // escurecido pelo SPOT_DIM (só do trailer) e compõe luz + vinheta.
+        this._renderLights();
         this.postProcessor.draw();
 
         // --- Overlays em espaço de TELA (após a iluminação) ---
@@ -778,57 +1037,127 @@ class TrailerScene {
         const alpha = inK * outK;
         const scale = lerp(0.8, 1, inK);
 
+        // Balão de pedra em pixel art + fonte bitmap minúscula (js/ui).
+        // Texto aparece como máquina de escrever (~40 caracteres/s).
         const text = this.speech.text;
+        const chars = Math.floor(this.speech.t * 40);
+        const key = `${text}|${chars}|${who.color}`;
+        if (!this._bubbleCache || this._bubbleCache.key !== key) {
+            this._bubbleCache = { key, ...renderSpeechBubble(text, who.color, chars) };
+        }
+        const { canvas: art, tipX, tipY } = this._bubbleCache;
+
+        // "Pixel de arte" com a MESMA escala do jogo: tile de 16px de arte
+        // ocupa TILE px de mundo, vezes o zoom quantizado da câmera.
+        // Metade do pixel do jogo: fica "chunky" mas ainda legível. Limita a
+        // largura do balão a ~55% da tela para não estourar em zoom alto.
+        const gamePx = (TILE / 16) * scr.zoom;
+        const maxP = Math.floor((this.canvas.width * 0.55) / art.width);
+        const baseP = Math.max(2, Math.min(Math.round(gamePx * BUBBLE_PIXEL_RATIO), maxP));
+        const P = baseP * scale;
+        const dw = Math.round(art.width * P);
+        const dh = Math.round(art.height * P);
+        // Ponta do rabicho logo acima da cabeça; sobe um pouco ao surgir.
+        const rise = (1 - inK) * 4 * P;
+        let dx = Math.round(scr.x - tipX * P);
+        let dy = Math.round(scr.y - 6 - tipY * P + rise);
+        // Mantém o balão dentro da área visível (fora das barras de cinema).
+        const margin = Math.round(this.canvas.height * 0.10) + 8;
+        dx = Math.max(8, Math.min(dx, this.canvas.width - dw - 8));
+        dy = Math.max(margin, dy);
+
         ctx.save();
-        ctx.font = 'bold 20px monospace';
-        const padX = 16, padY = 11;
-        const metrics = ctx.measureText(text);
-        const w = metrics.width + padX * 2;
-        const h = 20 + padY * 2;
-        const bx = scr.x - w / 2;
-        const by = scr.y - h - 14;
-
         ctx.globalAlpha = alpha;
-        ctx.translate(scr.x, by + h);
-        ctx.scale(scale, scale);
-        ctx.translate(-scr.x, -(by + h));
-
-        // Balão (retângulo arredondado) na cor do personagem.
-        const color = who.color || '#fffffe';
-        this._roundRect(ctx, bx, by, w, h, 10);
-        ctx.fillStyle = 'rgba(16, 14, 24, 0.92)';
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = color;
-        ctx.stroke();
-
-        // Rabicho apontando para a cabeça.
-        ctx.beginPath();
-        ctx.moveTo(scr.x - 9, by + h - 1);
-        ctx.lineTo(scr.x + 9, by + h - 1);
-        ctx.lineTo(scr.x, by + h + 13);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(16, 14, 24, 0.92)';
-        ctx.fill();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // Texto.
-        ctx.fillStyle = '#fffffe';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, scr.x, by + h / 2 + 1);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(art, dx, dy, dw, dh);
         ctx.restore();
     }
 
+    // Monta as luzes do quadro no PostProcessor (espaço de TELA), com o brilho
+    // ESCURECIDO por SPOT_DIM. Replica o essencial do LightingRenderer do jogo
+    // (jogadores + tochas + serra), mas isolado no trailer para poder regular a
+    // intensidade sem tocar no config global.
+    // `world` (opcional) permite outra cena (ex.: FrenzyScene) reaproveitar o
+    // montador com a SUA sala: { tiles, rect, sawPos, sawDropped }.
+    _renderLights(world = null) {
+        const tiles = world?.tiles ?? this.tiles;
+        const rect = world?.rect ?? this.rect;
+        const pp = this.postProcessor;
+        const r = this.renderer;
+        const dim = this.SPOT_DIM;
+        const lightPixel = (zoom, scale = LIGHT_PIXEL_SCALE) =>
+            Math.max(2, Math.round((TILE / 16) * zoom * scale));
+        // Clona um perfil escurecendo cada alpha do falloff por SPOT_DIM.
+        const dimProfile = (base) => ({
+            ...base,
+            falloff: base.falloff.map(s => ({ offset: s.offset, alpha: s.alpha * dim }))
+        });
+
+        // 1) Luz de cada jogador (perfil global padrão, escurecido).
+        const playerProfile = dimProfile({
+            color: '255, 220, 150',
+            falloff: [
+                { offset: 0.0, alpha: 1.0 }, { offset: 0.25, alpha: 0.6 },
+                { offset: 0.45, alpha: 0.35 }, { offset: 0.65, alpha: 0.17 },
+                { offset: 1.0, alpha: 0.0 }
+            ]
+        });
+        for (const p of [this.p1, this.p2]) {
+            const s = r.worldToScreen(p.x, p.y);
+            pp.addLight(s.x, s.y, PLAYER_LIGHT_RADIUS * s.zoom, lightPixel(s.zoom), 1, playerProfile);
+        }
+
+        // 2) Tochas de parede: halo na chama + mancha de área empurrada p/ dentro.
+        if (TORCHES.enabled && tiles.torches?.length) {
+            const tl = TORCHES.light;
+            const area = tl.area;
+            const glowProfile = dimProfile({ ...tl, falloff: tl.glow.falloff });
+            const areaProfile = dimProfile({ ...tl, falloff: area.falloff });
+            for (const t of tiles.torches) {
+                let wx = rect.x + t.col * TILE + TILE / 2;
+                let wy = rect.y + t.row * TILE + TILE / 2;
+                let adx = 0, ady = 0;
+                if (t.side === 'N') { wy += tl.offsetY; ady = area.pushIn; }
+                else if (t.side === 'S') { wy -= tl.offsetY; ady = -area.pushIn; }
+                else if (t.side === 'W') { wx += tl.offsetX; adx = area.pushIn; }
+                else if (t.side === 'E') { wx -= tl.offsetX; adx = -area.pushIn; }
+                const s = r.worldToScreen(wx, wy);
+                const px = lightPixel(s.zoom, tl.pixelScale);
+                pp.addLight(s.x, s.y, tl.glow.radius * s.zoom, px, tl.glow.flatten, glowProfile);
+                const ac = r.worldToScreen(wx + adx, wy + ady);
+                pp.addLight(ac.x, ac.y, area.radius * s.zoom, px, area.flatten, areaProfile);
+            }
+        }
+
+        // 3) Luz azul-aço da serra (ativa entre os dois, ou largada no chão).
+        const bladeProfile = dimProfile(BLADE_LIGHT_PROFILE);
+        if (world) {
+            if (world.sawPos) {
+                const s = r.worldToScreen(world.sawPos.x, world.sawPos.y);
+                const radius = 60 + (this.saw.spin ?? 0) * 18;
+                pp.addLight(s.x, s.y, radius * s.zoom, lightPixel(s.zoom), 1, bladeProfile);
+            }
+        } else if (this.sawCarried) {
+            const sp = this.saw.getSawPositions(this.p1, this.p2)[0];
+            const s = r.worldToScreen(sp.x, sp.y);
+            const radius = 60 + (this.saw.spin ?? 0) * 18;
+            pp.addLight(s.x, s.y, radius * s.zoom, lightPixel(s.zoom), 1, bladeProfile);
+        } else if (this.sawVisibleDropped) {
+            const s = r.worldToScreen(this.saw.dropX, this.saw.dropY);
+            const breathe = 0.85 + (this.saw.dropHover ?? 0) * 0.15;
+            pp.addLight(s.x, s.y, 150 * breathe * s.zoom, lightPixel(s.zoom), 1, bladeProfile);
+        }
+    }
+
     // Brilho AZUL-AÇO em volta do disco da serra (no MUNDO, aditivo). Intensifica
-    // com o giro — casa com a luz fria que o LightingRenderer já emite da lâmina.
+    // com o giro — casa com a luz fria que _renderLights emite da lâmina.
     _drawSawGlow(ctx, pos) {
         if (!pos) return;
         const spin = this.saw.spin ?? 0;
         const r = (this.saw.discRadius ?? 32);
-        const intensity = 0.35 + spin * 0.5; // base + reforço com o giro
+        // Base mais contida (acompanha o escurecimento dos spots); o giro ainda
+        // reforça o brilho azul.
+        const intensity = 0.22 + spin * 0.45;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         // Halo externo difuso.
@@ -916,17 +1245,116 @@ class TrailerScene {
         ctx.fillStyle = `rgba(3, 2, 8, ${a})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (this.beatIndex > lastIndex) {
-            // Cartela final simples.
-            ctx.fillStyle = '#fffffe';
-            ctx.font = 'bold 42px monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('DUNGEON CHAINED', canvas.width / 2, canvas.height / 2 - 6);
-            ctx.fillStyle = '#a7a9be';
-            ctx.font = '16px monospace';
-            ctx.fillText('acorrentados no calabouço', canvas.width / 2, canvas.height / 2 + 26);
-        }
+        if (this.beatIndex > lastIndex) this._drawTitleText();
         ctx.restore();
+    }
+
+    // Nome do jogo no centro. `red` 0..1 tinge de vermelho e treme (frenesi).
+    _drawTitleText(red = 0, alpha = 1) {
+        const { ctx, canvas } = this;
+        const jx = red > 0 ? (Math.random() - 0.5) * 6 * red : 0;
+        const jy = red > 0 ? (Math.random() - 0.5) * 4 * red : 0;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = red > 0.5 ? '#ff3344' : '#fffffe';
+        ctx.font = 'bold 42px monospace';
+        ctx.fillText('DUNGEON CHAINED', canvas.width / 2 + jx, canvas.height / 2 - 6 + jy);
+        ctx.fillStyle = red > 0.5 ? '#b3122a' : '#a7a9be';
+        ctx.font = '16px monospace';
+        ctx.fillText('acorrentados no calabouço', canvas.width / 2 + jx * 0.5, canvas.height / 2 + 26 + jy * 0.5);
+        ctx.restore();
+    }
+
+    // -----------------------------------------------------------------------
+    // CENA 2: cartela -> pisca vermelho -> sangue enche a tela -> escorre e
+    // revela o FRENESI (FrenzyScene) -> fade -> cartela final.
+    // -----------------------------------------------------------------------
+
+    _updateSequel(dt) {
+        const T = SEQUEL_TIMING;
+        this.phaseT += dt;
+        const bs = this.bloodScreen;
+
+        if (this.phase === 'title') {
+            if (this.phaseT >= T.sprayStart && bs.mode === 'idle') {
+                bs.startSpray();
+                this.renderer.triggerShake(6);
+            }
+            if (bs.mode === 'spray') {
+                const k = clamp01((this.phaseT - T.sprayStart) / (T.sprayFull - T.sprayStart));
+                bs.update(dt, k);
+                if (this.phaseT >= T.sprayFull) bs.flood();
+            }
+            if (this.phaseT >= T.drainStart) {
+                this.phase = 'frenzy';
+                this.phaseT = 0;
+                this.frenzy.start();
+                bs.startDrain();
+            }
+            return;
+        }
+
+        // frenzy / outro
+        this.frenzy.update(dt);
+        bs.update(dt);
+        if (this.phase === 'frenzy' && this.phaseT >= T.frenzyDur) {
+            this.phase = 'outro';
+            this.phaseT = 0;
+        }
+    }
+
+    _renderSequel() {
+        const { ctx, canvas } = this;
+        const T = SEQUEL_TIMING;
+        const W = canvas.width, H = canvas.height;
+
+        if (this.phase === 'title') {
+            const t = this.phaseT;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = '#030208';
+            ctx.fillRect(0, 0, W, H);
+
+            // Pisca vermelho: estroboscópio irregular que fica mais forte e
+            // mais frequente conforme se aproxima do sangue.
+            const amt = easeInOut(clamp01((t - T.flickerStart) / (T.sprayFull - T.flickerStart)));
+            let red = 0;
+            if (amt > 0) {
+                const on = hash01(Math.floor(t * 14)) < 0.3 + 0.45 * amt;
+                ctx.fillStyle = on
+                    ? `rgba(150, 0, 18, ${0.25 + 0.5 * amt})`
+                    : `rgba(55, 0, 8, ${0.35 * amt})`;
+                ctx.fillRect(0, 0, W, H);
+                red = on ? Math.max(0.6, amt) : amt * 0.4;
+            }
+            ctx.restore();
+            this._drawTitleText(red);
+            this.bloodScreen.draw(ctx);
+            this._drawLetterbox();
+            return;
+        }
+
+        // Frenesi por baixo; a camada de sangue escorre por cima.
+        this.frenzy.render();
+        // Clarão vermelho residual logo no começo da revelação.
+        if (this.phase === 'frenzy' && this.phaseT < 0.6) {
+            ctx.save();
+            ctx.fillStyle = `rgba(150, 0, 18, ${0.4 * (1 - this.phaseT / 0.6)})`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+        this.bloodScreen.draw(ctx);
+        this._drawLetterbox();
+
+        if (this.phase === 'outro') {
+            const a = easeInOut(clamp01(this.phaseT / T.outroFade));
+            ctx.save();
+            ctx.fillStyle = `rgba(3, 2, 8, ${a})`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+            if (a > 0.6) this._drawTitleText(0, (a - 0.6) / 0.4);
+        }
     }
 }
 
@@ -943,6 +1371,15 @@ async function bootstrap() {
     // Esconde a tela de carregamento.
     const loading = document.getElementById('trailer-loading');
     if (loading) loading.style.display = 'none';
+
+    // Atalho de edição: trailer.html?cena=2 pula direto para a cartela/sangue.
+    const skipToSequel = () => {
+        if (new URLSearchParams(location.search).get('cena') === '2') scene.beatIndex = scene.beats.length;
+    };
+    skipToSequel();
+    const origReset = scene.reset.bind(scene);
+    scene.reset = () => { origReset(); skipToSequel(); };
+    window.trailerScene = scene; // inspeção pelo console
 
     // Botão de repetir a cena.
     const replay = document.getElementById('btn-replay');
