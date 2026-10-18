@@ -551,6 +551,140 @@ class RoomEditor {
     }
 
     /* --------------------------------------------------------------------------
+     * SPAWN DO TESTE (botão "Testar")
+     * Configuração só do editor: persiste no localStorage à parte da cena, para
+     * não vazar para o JSON salvo em /map.
+     * -------------------------------------------------------------------------- */
+    _loadTestSpawn() {
+        const fallback = { mode: "CENTER", p1: null, p2: null };
+        try {
+            const raw = localStorage.getItem("editor_test_spawn");
+            if (!raw) return fallback;
+            const data = JSON.parse(raw);
+            const valid = ["CENTER", "N", "S", "E", "W", "custom"];
+            if (!data || !valid.includes(data.mode)) return fallback;
+            return { mode: data.mode, p1: data.p1 || null, p2: data.p2 || null };
+        } catch (e) {
+            return fallback;
+        }
+    }
+
+    _saveTestSpawn() {
+        try {
+            localStorage.setItem("editor_test_spawn", JSON.stringify(this.testSpawn));
+        } catch (e) {
+            // Silencioso: sem localStorage, a escolha só vale nesta sessão.
+        }
+    }
+
+    // Tile interno onde um player pode nascer (sem borda, parede ou buraco).
+    _isTestSpawnTileFree(col, row) {
+        if (col <= 0 || row <= 0 || col >= this.cols - 1 || row >= this.rows - 1) return false;
+        if (this.room.holes.has(`${col},${row}`)) return false;
+        if ((this.room.walls || []).some(w => w.col === col && w.row === row)) return false;
+        return true;
+    }
+
+    // Resolve o spawn do teste em tiles + px. Se o modo escolhido não existir
+    // mais na sala atual (porta removida, tile virou buraco), cai no centro.
+    _resolveTestSpawn() {
+        const ts = this.testSpawn;
+        const toPos = (t) => ({
+            col: t.col,
+            row: t.row,
+            x: (t.col + 0.5) * this.tilePx,
+            y: (t.row + 0.5) * this.tilePx
+        });
+
+        if (ts.mode === "custom" && ts.p1 && ts.p2 &&
+            this._isTestSpawnTileFree(ts.p1.col, ts.p1.row) &&
+            this._isTestSpawnTileFree(ts.p2.col, ts.p2.row)) {
+            return { mode: "custom", p1: toPos(ts.p1), p2: toPos(ts.p2) };
+        }
+        if (["N", "S", "E", "W"].includes(ts.mode) && this.room.sockets[ts.mode]) {
+            const d = getPlayerSpawnPositions(ts.mode, 0, 0, this.tilePx);
+            return { mode: ts.mode, p1: d.p1, p2: d.p2 };
+        }
+        const d = getPlayerSpawnPositions("CENTER", 0, 0, this.tilePx);
+        return { mode: "CENTER", p1: d.p1, p2: d.p2 };
+    }
+
+    // Clique no canvas (aba Spawns): P1 no tile clicado, P2 no primeiro vizinho
+    // livre. Ficam colados para a corrente não arrebentar ao iniciar.
+    _setCustomTestSpawn(col, row) {
+        if (!this._isTestSpawnTileFree(col, row)) return;
+        const neighbors = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        let p2 = null;
+        for (const [dc, dr] of neighbors) {
+            if (this._isTestSpawnTileFree(col + dc, row + dr)) {
+                p2 = { col: col + dc, row: row + dr };
+                break;
+            }
+        }
+        if (!p2) return; // tile isolado: sem espaço para os dois players
+
+        this.testSpawn = { mode: "custom", p1: { col, row }, p2 };
+        this._saveTestSpawn();
+        this._updateTestSpawnUI();
+        this.render();
+    }
+
+    _updateTestSpawnUI() {
+        const sel = document.getElementById("test-spawn-mode");
+        const info = document.getElementById("test-spawn-info");
+        if (!sel) return;
+
+        const options = [{ value: "CENTER", label: "Centro (padrão)" }];
+        const doorLabels = { N: "Porta Norte", S: "Porta Sul", W: "Porta Oeste", E: "Porta Leste" };
+        for (const dir of ["N", "S", "W", "E"]) {
+            if (this.room.sockets[dir]) options.push({ value: dir, label: `Entrada ${doorLabels[dir]}` });
+        }
+        options.push({ value: "custom", label: "Personalizado (clique no mapa)" });
+
+        const resolved = this._resolveTestSpawn();
+        // Mantém "Personalizado" visível como escolha mesmo antes do 1º clique.
+        const current = this.testSpawn.mode === "custom" ? "custom" : resolved.mode;
+        sel.innerHTML = options
+            .map(o => `<option value="${o.value}"${o.value === current ? " selected" : ""}>${o.label}</option>`)
+            .join("");
+
+        if (info) {
+            const pending = this.testSpawn.mode === "custom" && resolved.mode !== "custom";
+            info.textContent = pending
+                ? "Clique num tile de piso para definir o spawn (usando o centro por enquanto)."
+                : `P1 [Col ${resolved.p1.col}, Linha ${resolved.p1.row}] · P2 [Col ${resolved.p2.col}, Linha ${resolved.p2.row}]`;
+        }
+    }
+
+    // Marcador verde do spawn do teste no canvas (distinto das entradas).
+    _renderTestSpawn(ctx, tileW) {
+        const sp = this._resolveTestSpawn();
+        ctx.save();
+        ctx.strokeStyle = "#2cb67d";
+        ctx.fillStyle = "rgba(44, 182, 125, 0.18)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        for (const p of [sp.p1, sp.p2]) {
+            ctx.fillRect(p.col * tileW, p.row * tileW, tileW, tileW);
+            ctx.strokeRect(p.col * tileW + 2, p.row * tileW + 2, tileW - 4, tileW - 4);
+        }
+        ctx.setLineDash([]);
+        this._drawPlayerSprite(ctx, sp.p1.x, sp.p1.y, "p1", "#ffd166", "P1");
+        this._drawPlayerSprite(ctx, sp.p2.x, sp.p2.y, "p2", "#6bb4db", "P2");
+
+        // Etiqueta "TESTE" acima do par.
+        const labelX = (Math.min(sp.p1.col, sp.p2.col)) * tileW + 4;
+        const labelY = (Math.min(sp.p1.row, sp.p2.row)) * tileW + 4;
+        ctx.font = "bold 11px sans-serif";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+        ctx.fillRect(labelX - 2, labelY - 1, 44, 14);
+        ctx.fillStyle = "#2cb67d";
+        ctx.fillText("TESTE", labelX, labelY);
+        ctx.restore();
+    }
+
+    /* --------------------------------------------------------------------------
      * ATUALIZAÇÃO DA INTERFACE A PARTIR DO ESTADO
      * -------------------------------------------------------------------------- */
     _updateUIFromState() {
