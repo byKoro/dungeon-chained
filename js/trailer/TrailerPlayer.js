@@ -109,6 +109,10 @@ export class TrailerPlayer {
         st._tickExpressions(dt);
         st.tickSpeech(dt);
         if (st.bloodScreen.mode === 'drain') st.bloodScreen.update(dt);
+        if (st.overlay) {
+            st.overlay.update(dt);
+            if (st.overlay.done) st.overlay = null;
+        }
 
         if (!this.ended && this.index === this.scenes.length - 1 && this.current.reachedEnd) {
             this.ended = true;
@@ -120,6 +124,7 @@ export class TrailerPlayer {
         const { ctx, canvas } = this.stage;
         this.current.render();
         this.stage.bloodScreen.draw(ctx);
+        this.stage.overlay?.draw(ctx);
         this._drawImpact(ctx, canvas);
         this.stage.drawLetterbox();
         if (this.showTimer) this._drawTimer(ctx, canvas);

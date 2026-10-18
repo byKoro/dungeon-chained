@@ -62,6 +62,10 @@ export class TrailerStage {
         this.bloodScreen = new BloodScreen(canvas);
 
         this.speech = null;     // { who, text, t, dur }
+        // Transição em TELA que atravessa o corte entre cenas (ex.: cortina de
+        // flechas). { update(dt), draw(ctx), done } — o player atualiza e
+        // desenha por cima da cena e remove quando `done`.
+        this.overlay = null;
         this._fogPhase = 0;
         this._onResize = () => this.resize();
         this.resize();
@@ -102,6 +106,7 @@ export class TrailerStage {
         this.speech = null;
         this._fogPhase = 0;
         this.bloodScreen.reset();
+        this.overlay = null;
         this.renderer.screenShake = 0;
         this.renderer.setIntroZoomFactor(1);
         this.renderer.resetSway?.();

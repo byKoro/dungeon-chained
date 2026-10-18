@@ -17,6 +17,7 @@ const LIGHT = {
     saw: { color: '150, 196, 255', falloff: SOFT, flickerBase: 1, flickerSine: 0.05, flickerNoise: 0.02 },
     connect: { color: '215, 232, 255', falloff: SOFT, flickerBase: 1, flickerSine: 0, flickerNoise: 0 },
     kill: { color: '255, 70, 50', falloff: SOFT, flickerBase: 1, flickerSine: 0, flickerNoise: 0.1 },
+    alarm: { color: '255, 40, 36', falloff: [{ offset: 0, alpha: 0.75 }, { offset: 0.5, alpha: 0.32 }, { offset: 1, alpha: 0 }], flickerBase: 1, flickerSine: 0, flickerNoise: 0.03 },
 };
 
 export function renderArena(A, w, h) {
@@ -42,8 +43,10 @@ export function renderArena(A, w, h) {
     renderer.drawRoom(A.rect, A.bounds, A.tiles, TILE, true, A.doorList, A.doorHalf);
     renderer.drawDoorStubs(A.rect, A.doorList, TILE, A.doorHalf, DOOR_STUB_TILES);
     renderer.drawDoorGradients(A.doorList, A.doorHalf, TILE, DOOR_STUB_TILES);
+    drawClosedDoors(A, ctx, false);
     A.particles.drawFloor(ctx, A.bounds);
     A.particles.drawSmoke(ctx);
+    A.onDrawFloor?.(ctx);
 
     for (const p of [p1, p2]) renderer.drawRoundShadow(p.x, p.y, 14 - Math.min(6, p.hopZ * 0.4), 0);
     for (const e of A.enemies) if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0);
@@ -68,8 +71,10 @@ export function renderArena(A, w, h) {
     A.particles.drawSparks(ctx);
     A.particles.drawFlames(ctx);
     renderer.drawFrontWall(A.rect, A.tiles, TILE, true, A.doorList, A.doorHalf, DOOR_STUB_TILES);
+    drawClosedDoors(A, ctx, true);
     for (const g of A.gibs) g.draw(ctx);
     drawArrows(A, ctx);
+    A.onDrawTop?.(ctx);
     A.particles.drawAir(ctx);
     A.wind.draw(ctx);
 
@@ -79,6 +84,7 @@ export function renderArena(A, w, h) {
     renderLights(A);
     A.post.draw();
     A.stage.drawFogOn(ctx, W, H, A.fogPhase ?? 0);
+    drawRedMood(A, ctx, W, H);
     A.screenGore.draw(ctx);
     A.lens.draw(ctx);
 
@@ -86,9 +92,15 @@ export function renderArena(A, w, h) {
     ctx.save();
     ctx.setTransform(worldTf);
     if (A.sawVisible) {
-        A.stage._drawSawGlow(ctx, A.sawPos);
-        if (A.connected) saw.draw(ctx, p1, p2);
+        const sp = A.sawPos, s = A.sawScale;
+        if (s !== 1) {
+            ctx.translate(sp.x, sp.y); ctx.scale(s, s); ctx.translate(-sp.x, -sp.y);
+        }
+        A.stage._drawSawGlow(ctx, sp);
+        if (A.freeSaw) { const f = { x: sp.x, y: sp.y }; saw.draw(ctx, f, f); }
+        else if (A.connected) saw.draw(ctx, p1, p2);
         else if (saw.dropped) saw.drawDropped(ctx);
+        if (s !== 1) ctx.setTransform(worldTf);
     }
     if (A.connectFlash > 0 && A._connectAt) {
         const f = A.connectFlash, a = A._connectAt;
@@ -111,6 +123,51 @@ export function renderArena(A, w, h) {
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
     }
+}
+
+// Portas FECHADAS (A.doorOpen[dir] < 1): as folhas recolhem para os batentes
+// conforme abrem. A porta S é redesenhada por cima da parede frontal.
+function drawClosedDoors(A, ctx, front) {
+    const ts = A.renderer.tileset;
+    if (!ts || !ts.ready) return;
+    const last = A.cols - 1, bottom = A.rows - 1;
+    const seen = {};
+    for (const d of A.tiles.doorCells) {
+        const dir = d.row === 0 ? 'N' : d.row === bottom ? 'S' : d.col === 0 ? 'W' : d.col === last ? 'E' : null;
+        const k = A.doorOpen[dir];
+        if (k === undefined || k >= 1) continue;
+        if (front !== (dir === 'S')) continue;
+        const n = seen[dir] = (seen[dir] ?? -1) + 1;   // 0 = primeira folha
+        const s = 1 - k * k;
+        const x = d.col * TILE, y = d.row * TILE;
+        if (dir === 'N' || dir === 'S') {
+            const w = TILE * s;
+            ts.draw(ctx, d.index, n === 0 ? x : x + TILE - w, y, w, TILE);
+        } else {
+            const h = TILE * s;
+            ts.draw(ctx, d.index, x, n === 0 ? y : y + TILE - h, TILE, h);
+        }
+    }
+}
+
+// Clima vermelho: vinheta vermelha pulsando (alarme) por cima da luz.
+function drawRedMood(A, ctx, W, H) {
+    if (A.red <= 0.01) return;
+    const pulse = 0.5 + 0.5 * Math.sin((A.t || 0) * Math.PI * 2 * A.redHz);
+    const a = A.red * (0.28 + 0.22 * pulse);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const R = Math.hypot(W, H) / 2;
+    const g = ctx.createRadialGradient(W / 2, H / 2, R * 0.35, W / 2, H / 2, R);
+    g.addColorStop(0, 'rgba(120, 0, 12, 0)');
+    g.addColorStop(0.6, `rgba(120, 0, 14, ${a * 0.55})`);
+    g.addColorStop(1, `rgba(70, 0, 8, ${a})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = `rgba(200, 20, 30, ${A.red * (0.1 + 0.08 * pulse)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
 }
 
 // Fundo cobrindo a viewport GIRADA (o do Renderer só cobre a reta).
@@ -204,8 +261,15 @@ function renderLights(A) {
     }
     if (A.sawVisible) {
         const sp = A.sawPos, s = ws(sp.x, sp.y);
-        const breathe = A.connected ? 1 : 0.85 + (A.saw.dropHover ?? 0) * 0.3;
-        pp.addLight(s.x, s.y, (70 + A.saw.spin * 40) * breathe * s.zoom, pix(s.zoom), 1, LIGHT.saw);
+        const breathe = A.connected || A.freeSaw ? 1 : 0.85 + (A.saw.dropHover ?? 0) * 0.3;
+        pp.addLight(s.x, s.y, (70 + A.saw.spin * 40) * breathe * A.sawScale * s.zoom, pix(s.zoom), 1, LIGHT.saw);
+    }
+    // Alarme vermelho: luz vermelha pulsando em volta dos dois.
+    if (A.red > 0.01) {
+        const pulse = 0.5 + 0.5 * Math.sin((A.t || 0) * Math.PI * 2 * A.redHz);
+        const m = ws(A.mid.x, A.mid.y);
+        pp.addLight(m.x, m.y, 520 * m.zoom, pix(m.zoom, 1.4), 0.8,
+            { ...LIGHT.alarm, falloff: LIGHT.alarm.falloff.map(f => ({ offset: f.offset, alpha: f.alpha * A.red * (0.55 + 0.45 * pulse) })) });
     }
     if (A.connectFlash > 0 && A._connectAt) {
         const s = ws(A._connectAt.x, A._connectAt.y);
