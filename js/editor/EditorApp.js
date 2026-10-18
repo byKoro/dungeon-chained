@@ -1082,7 +1082,13 @@ class RoomEditor {
                 const t = tiles[0];
                 const cx = t.col * tileW + tileW / 2;
                 const cy = t.row * tileW + tileW / 2;
-                // Botão de pressão co-op
+                // Botão de pressão co-op: sprite (frame 0 = levantado), com a
+                // forma geométrica antiga como fallback.
+                const btnImg = this.assets.get("button");
+                if (btnImg && btnImg.complete && btnImg.naturalWidth > 0) {
+                    ctx.drawImage(btnImg, 0, 0, 16, 16, t.col * tileW, t.row * tileW, tileW, tileW);
+                    continue;
+                }
                 ctx.fillStyle = "#5c0a18";
                 ctx.beginPath();
                 ctx.ellipse(cx, cy, 22, 14, 0, 0, Math.PI * 2);

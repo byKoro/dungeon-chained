@@ -10,7 +10,7 @@
  * Cada cena recebe o stage no construtor e o usa como `host`.
  */
 import { Renderer } from '../core/Renderer.js';
-import { Tileset } from '../core/Tileset.js';
+import { SeamlessTileset as Tileset } from './kit/SeamlessTileset.js';
 import { Player } from '../entities/Player.js';
 import { SawWeapon } from '../weapons/SawWeapon.js';
 import { playerConfigs } from '../config/EntityConfig.js';

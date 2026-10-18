@@ -14,7 +14,7 @@
  * `arena.script = (t) => {...}` (t = tempo de simulação), a cada passo.
  */
 import { Renderer } from '../../core/Renderer.js';
-import { Tileset } from '../../core/Tileset.js';
+import { SeamlessTileset as Tileset } from './SeamlessTileset.js';
 import { RoomTiles } from '../../core/RoomTiles.js';
 import { Physics } from '../../core/Physics.js';
 import { Player } from '../../entities/Player.js';
@@ -90,6 +90,8 @@ export class ActionArena {
         this.midTarget = { get x() { return (A.p1.x + A.p2.x) / 2; }, get y() { return (A.p1.y + A.p2.y) / 2; } };
 
         this.ropeLen = opts.ropeLen ?? 230;
+        // Aproxima todos os enquadramentos (focus/snapCamera) desta arena.
+        this.camClose = opts.camClose ?? 1.3;
         this.reset();
     }
 
@@ -173,7 +175,7 @@ export class ActionArena {
 
     snapCamera(x, y, zoom, rot = 0) {
         const r = this.renderer;
-        r.camX = x; r.camY = y; r.zoom = zoom; this.rot = rot;
+        r.camX = x; r.camY = y; r.zoom = zoom * this.camClose; this.rot = rot;
         this.camGoal = null;
     }
 
@@ -182,13 +184,15 @@ export class ActionArena {
      * (limita o zoom, já considerando a rotação). zoom é ×zoomRef.
      */
     focus({ x, y, zoom, rot = 0, k = 0.1, fit = null, pad = 110 }) {
-        let z = zoom * this.zoomRef;
+        let z = zoom * this.zoomRef * this.camClose;
         if (fit && fit.length) {
             const W = this.canvas.width, H = this.canvas.height;
             let hw = 0, hh = 0;
             for (const p of fit) { if (!p) continue; hw = Math.max(hw, Math.abs(p.x - x)); hh = Math.max(hh, Math.abs(p.y - y)); }
             const c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
-            const rw = hw * c + hh * s + pad, rh = hw * s + hh * c + pad;
+            // Margem reduzida e área útil maior: enquadramento colado nos dois.
+            const pd = pad * 0.65;
+            const rw = hw * c + hh * s + pd, rh = hw * s + hh * c + pd;
             z = Math.min(z, (W * 0.5) / rw, (H * 0.4) / rh);
         }
         this.camGoal = { x, y, zoom: z, rot, k };

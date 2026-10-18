@@ -131,6 +131,10 @@ export class Player extends Entity {
         }
 
         const hasInput = moveX !== 0 || moveY !== 0;
+        // Intenção de movimento do frame (usada pela assistência dos botões
+        // para não "grudar" quem está tentando sair).
+        this.moveX = moveX;
+        this.moveY = moveY;
 
         if (hasInput) {
             // Acelera na direção do input (comportamento normal).

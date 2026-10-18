@@ -41,6 +41,19 @@ const DOOR_BEAM_PROFILE = {
     ]
 };
 
+// Luz quente e contida dos botões de pressão (tom da tampa, dessaturado).
+// A intensidade por frame é aplicada escalando os alphas do falloff.
+const BUTTON_PROFILE = {
+    color: "214, 120, 112",
+    flickerBase: 1, flickerSine: 0, flickerNoise: 0,
+    falloff: [
+        { offset: 0.0, alpha: 0.7 },
+        { offset: 0.35, alpha: 0.35 },
+        { offset: 0.7, alpha: 0.1 },
+        { offset: 1.0, alpha: 0.0 }
+    ]
+};
+
 /**
  * LightingRenderer — monta todas as LUZES de tela do quadro no PostProcessor.
  *
@@ -82,13 +95,33 @@ export class LightingRenderer {
      * @param {boolean} scene.open             sala destravada (portas visíveis)
      * @param {number} scene.doorFlashT        segundos restantes do flash de porta
      */
-    render({ players, chain, sawPos, arenaBounds, tiles, rect, doors, doorHalf, open, doorFlashT }) {
+    render({ players, chain, sawPos, arenaBounds, tiles, rect, doors, doorHalf, open, doorFlashT, buttons = [] }) {
+        this._renderButtonLights(buttons);
         this._renderPlayerLights(players);
         this._renderDroppedBladeLight(chain);
         this._renderActiveBladeLight(chain, sawPos);
         this._renderWallWash(arenaBounds);
         this._renderTorches(tiles, rect);
         this._renderDoorFlash({ doors, doorHalf, open, doorFlashT });
+    }
+
+    // Luz quente dos BOTÕES de pressão: acende enquanto pressionado (glow
+    // contínuo, raio pequeno) e dá um pico maior no instante do clique
+    // (flash), reforçando o feedback de "ativou".
+    _renderButtonLights(buttons) {
+        for (const b of buttons) {
+            const glow = b.glow ?? 0, flash = b.flash ?? 0;
+            const strength = Math.max(glow * 0.7, flash);
+            if (strength < 0.02) continue;
+            const s = this.renderer.worldToScreen(b.x, b.y);
+            const px = this._lightPixel(s.zoom);
+            const radius = (55 + glow * 15 + flash * 55) * s.zoom;
+            // flatten 0.6: luz achatada, "deitada" no chão em volta do botão.
+            this.postProcessor.addLight(s.x, s.y, radius, px, 0.6, {
+                ...BUTTON_PROFILE,
+                falloff: BUTTON_PROFILE.falloff.map(f => ({ ...f, alpha: f.alpha * strength }))
+            });
+        }
     }
 
     // Luz de cada jogador. O raio em mundo (PLAYER_LIGHT_RADIUS) é convertido

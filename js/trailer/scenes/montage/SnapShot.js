@@ -22,6 +22,7 @@ export class SnapShot extends ArenaShot {
         this.phase = 'run';
         this._doneAt = undefined;
         this._charging = false;
+        this._chargeKills = 0;
         this.wallT = this.lookT = this.connT = this.snapT = undefined;
         const S = this;
 
@@ -146,12 +147,19 @@ export class SnapShot extends ArenaShot {
                 A.both(p => { p.accel = 0.1; p.wobble = 0.05; });
                 for (const e of A.enemies) { e.goal = null; e.chase = A.midTarget; e.speed = 1.8; e.stopDist = 0; }
             }
-            if (S._charging && S._doneAt === undefined &&
-                (A.enemies.length === 0 || p1.x > A.bounds.maxX - 80)) S._doneAt = S.t + 0.7;
+            // Corta logo depois do ÚLTIMO abate (antes de chegarem na parede).
+            // Garantia: se sobrar alguém, corta ao se aproximarem da parede.
+            if (S._charging && S._doneAt === undefined) {
+                const alive = A.enemies.filter(e => e.state !== 'dying').length;
+                if ((alive === 0 && S._chargeKills > 0) || p1.x > A.bounds.maxX - 300) S._doneAt = S.t + 0.3;
+            }
 
             S._camera(A, t);
         };
-        A.onKill = () => { if (A.kills === 1) { A.slowmo(0.25, 0.3); A.renderer.triggerZoomPunch(0.05); } };
+        A.onKill = () => {
+            if (S._charging) S._chargeKills++;
+            if (A.kills === 1) { A.slowmo(0.25, 0.3); A.renderer.triggerZoomPunch(0.05); }
+        };
         A.snapCamera(A.mid.x + 60, A.mid.y, 1.9 * A.zoomRef, -0.12);
     }
 

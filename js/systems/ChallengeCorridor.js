@@ -128,6 +128,7 @@ export class ChallengeCorridor {
         const peaks = assets && assets.peaks ? assets.peaks : null;
         const arrowTrapSprites = assets && assets.arrowTrap ? assets.arrowTrap : null;
         const arrowSprite = assets && assets.arrow ? assets.arrow : null;
+        const buttonSprite = assets && assets.button ? assets.button : null;
 
         for (const el of this.layout.elements) {
             const byTile = el.col !== undefined && el.row !== undefined;
@@ -172,7 +173,7 @@ export class ChallengeCorridor {
                 }
                 case "button": {
                     const p = this._elemWorld(el);
-                    this.buttons.push(new PressureButton(p.x, p.y));
+                    this.buttons.push(new PressureButton(p.x, p.y, { sprite: buttonSprite }));
                     break;
                 }
             }
@@ -209,12 +210,32 @@ export class ChallengeCorridor {
         }
     }
 
-    // Elementos que devem entrar na ordenação por profundidade (desenhados
-    // junto com players/inimigos). Spikes e botões ficam no chão; melhor
-    // desenhá-los ANTES das entidades. As flechas voam por cima.
+    // Spikes: rentes ao chão, desenhados ANTES do sangue (a mancha cai por
+    // cima do tile deles).
     drawFloorLayer(ctx) {
-        for (const b of this.buttons) b.draw(ctx);
         for (const s of this.spikes) s.draw(ctx);
+    }
+
+    // Botões: objetos com ALTURA. Desenhados DEPOIS do sangue e das pegadas
+    // (nada mancha a tampa) e antes das sombras/entidades.
+    drawButtons(ctx) {
+        for (const b of this.buttons) b.draw(ctx);
+    }
+
+    // Passo de oclusão dos botões dentro da ordenação por profundidade: cada
+    // botão vira um "drawable" com chave Y própria; ele só se redesenha se há
+    // entidade atrás dele (a tampa cobre os pés de quem passa por trás).
+    buttonOccluders(entities) {
+        return this.buttons.map(b => ({
+            y: b.sortY,
+            draw: (ctx) => b.drawOcclusion(ctx, entities)
+        }));
+    }
+
+    // true se (x, y) está sobre algum botão (bloqueia pegadas/carimbos).
+    coversButton(x, y) {
+        for (const b of this.buttons) if (b.covers(x, y)) return true;
+        return false;
     }
 
     drawWallLayer(ctx) {

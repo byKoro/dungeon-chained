@@ -139,6 +139,8 @@ export class Game {
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio });
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
+        // Pegadas não marcam os botões do corredor-desafio.
+        this.effects.stepBlocker = (x, y) => !!this.rooms?.current?.challenge?.coversButton(x, y);
         this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
 
         // Consultas de grade de tiles (buracos, spawn seguro) sobre a sala atual.
@@ -194,6 +196,29 @@ export class Game {
         };
         resize();
         window.addEventListener("resize", resize);
+    }
+
+    // Feedback dos botões de pressão (tier "pequeno" de game feel): som de
+    // clique, tremidinha de câmera e poeira saindo da base ao apertar; um
+    // clique mais leve ao soltar. A animação (squash, onda, brilho) é do
+    // próprio PressureButton.
+    _buttonFeedback(challenge) {
+        for (const b of challenge.buttons) {
+            if (b.justPressed) {
+                this.audio?.play("buttonPress");
+                this.renderer.triggerShake(3);
+                // Poeira radial saindo da borda da base (triggerDust lança
+                // CONTRA a direção dada, por isso o sinal invertido).
+                const n = 8;
+                for (let i = 0; i < n; i++) {
+                    const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
+                    const cx = Math.cos(a), cy = Math.sin(a);
+                    this.particleSystem.triggerDust(b.x + cx * 26, b.y + 14 + cy * 12, -cx, -cy, 2);
+                }
+            } else if (b.justReleased) {
+                this.audio?.play("buttonRelease");
+            }
+        }
     }
 
     _bindButtons() {
@@ -649,7 +674,10 @@ export class Game {
         this.enforceSeparationLimit();
 
         // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
-        if (room.challenge) room.challenge.update([p1, p2], deltaSeconds);
+        if (room.challenge) {
+            room.challenge.update([p1, p2], deltaSeconds);
+            this._buttonFeedback(room.challenge);
+        }
 
         // Inimigos: IA + dano no player (feedback via CombatSystem)
         const enemies = room.enemies;
@@ -824,6 +852,9 @@ export class Game {
 
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
+        // Botões: objeto com altura, POR CIMA do sangue e das pegadas (nada
+        // mancha a tampa), mas sob a poeira, as sombras e as entidades.
+        if (challenge) challenge.drawButtons(ctx);
         this.particleSystem.drawSmoke(ctx);
 
         // Corações de cura: desenhados no CHÃO, sob as entidades e suas sombras.
@@ -849,7 +880,11 @@ export class Game {
         const sawY = this.chain.weapon?.getSawPositions
             ? this.chain.weapon.getSawPositions(this.p1, this.p2)[0].y
             : (this.p1.y + this.p2.y) / 2;
-        const drawables = [this.p1, this.p2, ...enemies].sort((a, b) => a.y - b.y);
+        const entities = [this.p1, this.p2, ...enemies];
+        // Botões entram na ordenação como OCLUSORES: redesenham a tampa por
+        // cima dos pés de quem passa por TRÁS deles (dá volume ao botão).
+        const occluders = challenge ? challenge.buttonOccluders(entities) : [];
+        const drawables = [...entities, ...occluders].sort((a, b) => a.y - b.y);
 
         drawables.filter(e => e.y <= sawY).forEach(e => e.draw(ctx));
 
@@ -907,7 +942,8 @@ export class Game {
             doors,
             doorHalf,
             open,
-            doorFlashT: this._doorFlashT
+            doorFlashT: this._doorFlashT,
+            buttons: this.rooms.current?.challenge?.buttons ?? []
         });
 
         // Vinheta "respira" no ritmo da TENSÃO da corrente: quanto mais perto

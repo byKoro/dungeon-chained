@@ -506,8 +506,21 @@ export const HAZARDS = {
 
     // ---- Botão de pressão (co-op) ----
     button: {
-        radius: 26,            // raio da base do botão
-        pressRadius: 30,       // raio em que um player conta como "pisando"
+        radius: 26,            // raio da base do botão (fallback geométrico)
+        pressRadius: 26,       // raio (dos PÉS à tampa) em que conta como "pisando"
+        pressYScale: 1.5,      // peso do eixo vertical (tampa em perspectiva)
+        footOffset: 15,        // pés do player = centro + 15px (igual às pegadas)
+        capOffsetY: -4,        // centro da tampa relativo ao centro do tile
+        frameSize: 16,         // frame do sprite (assets/buttom/buttom_16.png)
+        drawSize: 64,          // 1 tile: 16px de arte x4, igual ao cenário
+        // Assistência de posicionamento (puxa os pés para o centro da tampa).
+        assistRadius: 46,      // alcance (px de mundo)
+        assistStrength: 0.12,  // fração da distância corrigida por frame
+        // Squash & stretch (mola amortecida).
+        pressSquash: 0.24,     // achatamento instantâneo ao apertar
+        releaseStretch: 0.14,  // esticada ao soltar
+        springK: 0.28,         // rigidez da mola
+        springDamp: 0.34,      // amortecimento (menor = mais overshoot)
         baseColor: "#3a2f4a",
         ringColor: "#8a7fb0",
         idleColor: "#6bb4db",  // topo solto

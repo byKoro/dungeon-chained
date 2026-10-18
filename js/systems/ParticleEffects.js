@@ -20,6 +20,9 @@ export class ParticleEffects {
         this.bloodCanvas = bloodCanvas;
         this.audio = audio;
         this.footprints = [];
+        // (x, y) => true se o passo cai sobre algo que não recebe pegada.
+        // Definido pelo Game (botões do corredor-desafio).
+        this.stepBlocker = null;
     }
 
     clear() {
@@ -85,6 +88,9 @@ export class ParticleEffects {
             player.footstepSoundCooldown = player.speedMag > player.speed * 0.7 ? 7 : 10;
         }
         const x = player.stepX, y = player.stepY, ang = player.stepAngle;
+        // Passo sobre um objeto do chão (ex.: botão): não deixa pegada nem
+        // gasta os passos ensanguentados.
+        if (this.stepBlocker?.(x, y)) return;
         if (this.bloodCanvas.isBloodZone(x, y)) player.bloodStepsLeft = BLOOD_STEPS;
         if (player.bloodStepsLeft > 0) {
             const intensity = player.bloodStepsLeft / BLOOD_STEPS;

@@ -53,6 +53,12 @@ export class AssetLoader {
         this.load("arrowTrap4", "assets/arrow/arrow_4.png");
         this.load("arrow", "assets/arrow/Just_arrow.png");
 
+        // Botão de pressão co-op: folha 32x16 com 2 frames de 16x16
+        // (esquerda = levantado, direita = apertado). Versão em 16px do
+        // buttom.png original, para bater com a grade de pixels do cenário
+        // (16px de arte desenhados a 64px = 4px de tela por pixel).
+        this.load("button", "assets/buttom/buttom_16.png");
+
         // Animações de fogo para paredes e candlesticks.
         for (let frame = 1; frame <= 4; frame++) {
             this.load(`torch${frame}`, `assets/torch/torch_${frame}.png`);
@@ -124,6 +130,7 @@ export class AssetLoader {
     get peaks() { return [this.images.peaks0, this.images.peaks1, this.images.peaks2, this.images.peaks3]; }
     get arrowTrap() { return [this.images.arrowTrap1, this.images.arrowTrap2, this.images.arrowTrap3, this.images.arrowTrap4]; }
     get arrow() { return this.images.arrow; }
+    get button() { return this.images.button; }
     get torchSprites() {
         return {
             torch: [1, 2, 3, 4].map(frame => this.images[`torch${frame}`]),

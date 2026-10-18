@@ -208,6 +208,9 @@ export class AudioManager {
             rate = Math.max(0.2, Math.min(4.0, baseRate + offset));
         }
         audio.playbackRate = rate;
+        // Por padrão o navegador preserva o tom ao mudar o rate (só acelera).
+        // Cues com `pitchShift: true` mudam o TOM junto (ex.: clique agudo).
+        if (cue?.pitchShift) audio.preservesPitch = false;
         audio.currentTime = 0;
 
         this.active.add(audio);

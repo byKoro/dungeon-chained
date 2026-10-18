@@ -83,6 +83,29 @@ export const AUDIO_CONFIG = {
             rate: 1.0,
             rateVariance: 0.05,
             enabled: true
+        },
+
+        // Botão de pressão. Sem arquivo dedicado ainda: reaproveita o passo de
+        // pedra ACELERADO (vira um "clack" seco). Troque `files` quando houver
+        // um som de clique próprio.
+        buttonPress: {
+            description: "Botão de pressão afundando (clique ao pisar)",
+            files: ["assets/audio/footstep-stone-02.ogg", "assets/audio/footstep-stone-05.ogg"],
+            volume: 0.8,
+            rate: 1.7,
+            rateVariance: 0.05,
+            pitchShift: true,   // rate também sobe o TOM (clique mais agudo)
+            enabled: true
+        },
+
+        buttonRelease: {
+            description: "Botão de pressão voltando (clique leve ao sair)",
+            files: ["assets/audio/footstep-stone-03.ogg"],
+            volume: 0.4,
+            rate: 2.0,
+            rateVariance: 0.05,
+            pitchShift: true,
+            enabled: true
         }
     }
 };

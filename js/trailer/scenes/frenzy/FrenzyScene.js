@@ -30,6 +30,7 @@ import { LensSplatter } from '../../fx/LensSplatter.js';
 const COLS = 22, ROWS = 13;    // arena maior que a sala padrão (espaço p/ correr)
 const ROPE_LEN = 230;          // comprimento máximo da corda (px de mundo)
 const BUMP_DIST = 34;          // distância de trombada entre os dois
+const CAM_CLOSE = 1.3;         // aproxima TODOS os enquadramentos da cena
 const HOLD_DIST = 250;         // horda "segura" a esta distância até a investida
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -164,7 +165,7 @@ export class FrenzyScene {
         const mid = this._mid();
         renderer.camX = mid.x;
         renderer.camY = mid.y;
-        renderer.zoom = host._zoomFit() * 2.1;
+        renderer.zoom = host._zoomFit() * 2.1 * CAM_CLOSE;
         this._enterBeat(0);
     }
 
@@ -235,16 +236,20 @@ export class FrenzyScene {
             x += (vx / m) * lead * Math.min(1, m / 4);
             y += (vy / m) * lead * Math.min(1, m / 4);
         }
-        if (lean) { x = lerp(x, lean.x, leanK); y = lerp(y, lean.y, leanK); }
+        // Inclinação mais contida: o foco fica nos jogadores (e o zoom fechado).
+        if (lean) { leanK *= 0.6; x = lerp(x, lean.x, leanK); y = lerp(y, lean.y, leanK); }
 
         // Garante os DOIS (e o ponto de interesse) dentro do quadro.
         const W = this.host.canvas.width, H = this.host.canvas.height;
         const xs = [p1.x, p2.x], ys = [p1.y, p2.y];
         if (lean && leanK > 0.2) { xs.push(lean.x); ys.push(lean.y); }
-        const halfW = Math.max(...xs.map(v => Math.abs(v - x))) + 110;
-        const halfH = Math.max(...ys.map(v => Math.abs(v - y))) + 120;
+        // Margem menor e área útil maior: câmera mais colada nos dois.
+        const halfW = Math.max(...xs.map(v => Math.abs(v - x))) + 70;
+        const halfH = Math.max(...ys.map(v => Math.abs(v - y))) + 80;
+        // 0.5 da largura / 0.4 da altura = metade visível (fora do letterbox):
+        // garante os pontos DENTRO do quadro.
         const fitZoom = Math.min((W * 0.5) / halfW, (H * 0.4) / halfH);
-        return { x, y, zoom: Math.min(this.host._zoomFit() * zoom, fitZoom) };
+        return { x, y, zoom: Math.min(this.host._zoomFit() * zoom * CAM_CLOSE, fitZoom) };
     }
 
     // ---- Horda ----
