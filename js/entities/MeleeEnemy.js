@@ -87,7 +87,10 @@ export class MeleeEnemy extends Entity {
         // termina e o Game chama unfreeze(). `spawnFx` é um timer (frames) do
         // efeito de aparição, usado no draw para um fade-in/sobe suave.
         this.frozen = false;
-        this.spawnFxDuration = 26; // ~0.43s a 60fps
+        // Duração da REVELAÇÃO de baixo para cima (frames). Mais longa que o
+        // fade antigo para acompanhar a coluna de fogo subindo e revelando o
+        // inimigo pouco a pouco.
+        this.spawnFxDuration = 40; // ~0.66s a 60fps
         this.spawnFx = 0;
         // Atraso (frames) antes de o inimigo APARECER. Enquanto > 0 ele fica
         // invisível e inerte: permite escalonar o spawn (cada inimigo surge num
@@ -113,6 +116,18 @@ export class MeleeEnemy extends Entity {
     // true enquanto o inimigo ainda não apareceu (está no atraso de spawn).
     get isHidden() {
         return this.spawnDelay > 0;
+    }
+
+    // Altura do sprite desenhado no mundo (px). O sprite é desenhado centrado
+    // em this.y, então vai de (y - drawHeight/2) no topo a (y + drawHeight/2)
+    // na base (os pés).
+    get drawHeight() {
+        return this.sprite?.drawHeight ?? 44;
+    }
+
+    // Coordenada Y da BASE do sprite (os pés, onde o fogo deve nascer no chão).
+    get footY() {
+        return this.y + this.drawHeight / 2;
     }
 
     // Libera o inimigo para agir (fim da intro).
@@ -534,22 +549,34 @@ export class MeleeEnemy extends Entity {
         // centro da célula, tornando o espelhamento simétrico.
         const cropCenterOffset = ((s.cropX + cw / 2) - cell / 2) * scale;
 
-        // Efeito de APARIÇÃO (spawn na intro): o inimigo materializa de baixo
-        // para cima com um fade-in. `t` vai de 0 (recém-aparecido) a 1 (pronto).
-        let fxAlpha = 1, fxRiseY = 0;
+        // Efeito de APARIÇÃO (spawn na intro): o inimigo é REVELADO de baixo
+        // para cima, como se emergisse do fogo que sobe do chão. `t` vai de 0
+        // (recém-nascido, invisível) a 1 (totalmente revelado).
+        let revealT = 1;
         if (this.spawnFx > 0 && this.spawnFxDuration > 0) {
-            const t = 1 - this.spawnFx / this.spawnFxDuration; // 0 -> 1
-            fxAlpha = t;                 // some translúcido -> opaco
-            fxRiseY = (1 - t) * 10;      // sobe ~10px conforme materializa
+            revealT = 1 - this.spawnFx / this.spawnFxDuration; // 0 -> 1
         }
 
         ctx.save();
-        ctx.translate(this.x, this.y + fxRiseY);
+        ctx.translate(this.x, this.y);
         if (this.facingLeft) ctx.scale(-1, 1);
         // Alinha sprite e manchas ao centro real do boneco na célula
         ctx.translate(cropCenterOffset, 0);
 
-        if (fxAlpha < 1) ctx.globalAlpha = fxAlpha;
+        // Enquanto revela, recorta a região VISÍVEL: só a parte do sprite ABAIXO
+        // da "linha do fogo", que começa na base (pés) e sobe até o topo. Em
+        // coords locais o sprite ocupa de -drawH/2 (topo) a +drawH/2 (base).
+        if (revealT < 1) {
+            const top = -drawH / 2;
+            const bottom = drawH / 2;
+            // Linha de revelação: em t=0 está na base; em t=1 chega ao topo.
+            const revealLineY = bottom - (bottom - top) * revealT;
+            ctx.beginPath();
+            // Largura folgada para cobrir o sprite inteiro mesmo com flip.
+            ctx.rect(-drawW, revealLineY, drawW * 2, bottom - revealLineY + 2);
+            ctx.clip();
+        }
+
         ctx.drawImage(
             this.sheet,
             srcX, srcY, cw, ch,

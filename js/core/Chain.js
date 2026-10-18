@@ -42,6 +42,8 @@ export class Chain {
         this.connected = true;
         this.strain = 0;
         this.reconnectCooldown = 0;
+        // Garante que a lâmina não fique "largada" ao reiniciar/trocar de sala.
+        this.weapon.pickup?.();
     }
 
     get weapon() {
@@ -90,11 +92,20 @@ export class Chain {
                 this.connected = false;
                 this.strain = 0;
                 this.reconnectCooldown = this.reconnectDelay;
+
+                // DROP: a lâmina cai e fica flutuando no chão (item coletável)
+                // no ponto exato onde a serra estava no instante da ruptura.
+                const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
+                const dropX = sp ? sp.x : (p1.x + p2.x) / 2;
+                const dropY = sp ? sp.y : (p1.y + p2.y) / 2;
+                this.weapon.drop?.(dropX, dropY);
+
                 events.onSnap?.();
             }
         } else if (this.reconnectCooldown <= 0 && dist < this.reconnectDistance) {
-            // Desarmados: reconecta ao se reaproximarem
+            // Desarmados: reconecta ao se reaproximarem — a lâmina é "recolhida".
             this.connected = true;
+            this.weapon.pickup?.();
             events.onReconnect?.();
         }
 
@@ -114,6 +125,10 @@ export class Chain {
         // o nível de tensão para o feedback de ruptura iminente.
         this.weapon.setStrain?.(strainLevel);
         this.weapon.update(p1, p2);
+
+        // Desconectada: avança a animação da lâmina largada no chão (flutuação,
+        // feixe de luz, giro residual).
+        if (!this.connected) this.weapon.updateDropped?.();
     }
 
     /**
@@ -147,5 +162,17 @@ export class Chain {
     // Desenha a arma (disco) apenas quando conectada.
     draw(ctx, p1, p2) {
         if (this.connected) this.weapon.draw(ctx, p1, p2);
+    }
+
+    // Desenha a LÂMINA DROPADA (flutuando no chão) apenas quando desconectada.
+    drawDropped(ctx) {
+        if (!this.connected) this.weapon.drawDropped?.(ctx);
+    }
+
+    // Posição (mundo) da lâmina largada no chão, ou null se não estiver dropada.
+    // O Game usa isto para registrar uma LUZ própria da lâmina (ela brilha).
+    getDroppedLight() {
+        if (this.connected || !this.weapon.dropped) return null;
+        return { x: this.weapon.dropX, y: this.weapon.dropY, hover: this.weapon.dropHover ?? 0 };
     }
 }

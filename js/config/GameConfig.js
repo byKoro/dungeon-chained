@@ -268,9 +268,12 @@ export const TORCHES = {
     },
 
     // ---- Luz emitida por cada tocha ----
+    // A luz da tocha agora é DIRECIONAL: um FEIXE (cone) projetado da parede
+    // para DENTRO da sala — muito mais imersivo que um disco de luz circular,
+    // que achatava a sensação de profundidade. Mantemos ainda um pequeno HALO
+    // na própria chama (a fonte brilha no seu entorno imediato), pois uma luz
+    // real ilumina o ponto de origem e projeta o facho adiante.
     light: {
-        radius: 150,            // raio da luz (px de MUNDO) — menor que a do jogador
-        flatten: 0.95,          // quase circular (a tocha ilumina ao redor)
         pixelScale: 1.2,        // blocos pixelados da luz da tocha
         // Deslocamento (px de MUNDO) do ponto de luz em relação ao centro do
         // tile da tocha. Para tochas do NORTE, offsetY empurra a luz para baixo
@@ -286,14 +289,59 @@ export const TORCHES = {
         flickerSine: 0.045,
         flickerNoise: 0.03,
 
-        // Perfil radial suave (bordas difusas, como a luz do jogador).
-        falloff: [
-            { offset: 0.0, alpha: 0.85 },
-            { offset: 0.3, alpha: 0.5 },
-            { offset: 0.55, alpha: 0.28 },
-            { offset: 0.78, alpha: 0.1 },
-            { offset: 1.0, alpha: 0.0 }
-        ]
+        // ---- WASH de parede (preenchimento ambiente a partir das bordas) ----
+        // Uma faixa de luz contínua ancorada em cada parede que PREENCHE o
+        // ambiente e esvaece para o interior. Somando as quatro paredes, a sala
+        // fica banhada (forte nas bordas, suave no miolo) — sem vãos escuros
+        // entre as tochas. É o "preenchimento"; as áreas/halos abaixo dão o
+        // destaque pontual de cada chama por cima deste banho.
+        wash: {
+            enabled: false,     // DESLIGADO: o banho de borda apagava o gradiente
+                                // escuro dos vãos de porta e clareava a parede
+                                // frontal inferior. Sem ele, as entradas voltam
+                                // a ficar escuras (gradiente de corredor).
+            depth: 300,         // quão fundo o banho entra na sala (px de MUNDO)
+            falloff: [
+                { offset: 0.0, alpha: 0.42 },  // forte junto à parede
+                { offset: 0.35, alpha: 0.2 },
+                { offset: 0.7, alpha: 0.06 },
+                { offset: 1.0, alpha: 0.0 }    // dissolve no interior
+            ]
+        },
+
+        // ---- ÁREA da tocha (mancha de luz CIRCULAR, difusa) ----
+        // A tocha ilumina uma ÁREA circular à frente. O centro é empurrado para
+        // DENTRO da sala (pushIn), então a luz fica concentrada no interior. O
+        // raio é generoso e o falloff bem gradual, então as bordas se dissolvem
+        // sem anel marcado — mancha orgânica, não um poste de luz.
+        area: {
+            radius: 240,        // raio da mancha circular (px de MUNDO) — maior
+            flatten: 1,         // 1 = círculo perfeito (sem achatar)
+            pushIn: 70,         // desloca o centro para dentro da sala (px MUNDO)
+            // Perfil radial MUITO suave: muitos stops de alpha baixo espalham a
+            // transição por todo o raio, dissolvendo a borda por completo.
+            falloff: [
+                { offset: 0.0, alpha: 0.9 },
+                { offset: 0.2, alpha: 0.62 },
+                { offset: 0.4, alpha: 0.38 },
+                { offset: 0.6, alpha: 0.2 },
+                { offset: 0.78, alpha: 0.09 },
+                { offset: 0.9, alpha: 0.03 },
+                { offset: 1.0, alpha: 0.0 }
+            ]
+        },
+
+        // ---- HALO na fonte (a chama ilumina seu entorno imediato) ----
+        glow: {
+            radius: 60,         // raio pequeno (px de MUNDO) ao redor da chama
+            flatten: 0.95,      // quase circular
+            falloff: [
+                { offset: 0.0, alpha: 0.85 },
+                { offset: 0.45, alpha: 0.4 },
+                { offset: 0.75, alpha: 0.14 },
+                { offset: 1.0, alpha: 0.0 }
+            ]
+        }
     }
 };
 
@@ -390,7 +438,7 @@ export const POST_PROCESSING = {
     // ---- Iluminação dinâmica (ambiente escuro + halos de luz) ----
     lighting: {
         enabled: true,
-        ambient: "34, 29, 44",       // cor do ambiente escuro (menor = + sombrio) — +30% de luz ambiente
+        ambient: "41, 35, 53",       // cor do ambiente escuro (menor = + sombrio) — +20% sobre 34,29,44
         lightColor: "255, 220, 150", // cor da luz (âmbar quente de tocha)
         flatten: 1,               // achatamento vertical da elipse (1 = círculo)
 

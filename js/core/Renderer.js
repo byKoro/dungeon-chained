@@ -201,6 +201,25 @@ export class Renderer {
         this.ctx.restore();
     }
 
+    /**
+     * Reaplica o transform da câmera para desenhar uma camada de MUNDO DEPOIS
+     * do pós-processamento (ex.: a parede frontal por cima da luz). Usa o mesmo
+     * zoom quantizado e translação arredondada do worldToScreen (sem shake/
+     * punch), de modo que a camada fique perfeitamente alinhada à cena.
+     * Encerre com endOverlayWorld().
+     */
+    beginOverlayWorld() {
+        const z = this._quantizeZoom(this.zoom);
+        const tx = Math.round(this.canvas.width / 2 - this.camX * z);
+        const ty = Math.round(this.canvas.height / 2 - this.camY * z);
+        this.ctx.save();
+        this.ctx.setTransform(z, 0, 0, z, tx, ty);
+    }
+
+    endOverlayWorld() {
+        this.ctx.restore();
+    }
+
     drawRoundShadow(x, y, baseRadius, bounceFactor = 0) {
         this.ctx.save();
         const currentR = Math.max(6, baseRadius - bounceFactor * 1.5);

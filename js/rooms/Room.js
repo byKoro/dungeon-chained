@@ -187,8 +187,13 @@ export class Room {
 
         const floorGrid = this.tiles.floor;
         this.enemies = this._validAuthoredEnemies.map(foe => {
-            const ex = this.bounds.minX + foe.col * 64;
-            const ey = this.bounds.minY + foe.row * 64;
+            // Posição = CENTRO do tile (col+0.5, row+0.5). A entidade usa (x,y)
+            // como centro, igual ao player (getPlayerSpawnPositions) e ao desenho
+            // do editor (col*tile + tile/2). Sem o +0.5 o inimigo nascia no canto
+            // superior-esquerdo do tile e caía na borda de um buraco adjacente,
+            // ficando preso.
+            const ex = this.bounds.minX + (foe.col + 0.5) * 64;
+            const ey = this.bounds.minY + (foe.row + 0.5) * 64;
             const enemy = spawnSystem.createEnemy(ex, ey, this._spawnFloor, foe.type);
             enemy.setNavigationFloor(floorGrid, this.bounds, this.tiles.walls);
             if (frozen) enemy.beginFrozenSpawn();

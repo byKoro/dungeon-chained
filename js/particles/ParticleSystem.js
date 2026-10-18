@@ -114,15 +114,19 @@ export class ParticleSystem {
         }
     }
 
-    // CHAMA de APARIÇÃO (spawn de inimigo na intro): uma labareda SOBE do ponto
-    // de spawn com as cores da tocha, dando a sensação de que o inimigo
-    // "surge do fogo". `baseColor` é o RGB da chama ([r,g,b]); `amount` é a
-    // quantidade de línguas de fogo. Puramente visual.
-    triggerFlameBurst(x, y, baseColor = [255, 190, 110], amount = 22) {
+    // COLUNA DE CHAMA de APARIÇÃO (spawn de inimigo na intro): uma labareda
+    // GRANDE sobe do CHÃO (os pés do inimigo) com as cores da tocha, revelando
+    // o inimigo pouco a pouco conforme sobe. `baseColor` é o RGB ([r,g,b]).
+    // `opts`: { amount, rise (altura px), width (largura da base px), sizeScale }.
+    triggerFlameBurst(x, y, baseColor = [255, 190, 110], opts = {}) {
+        const amount = opts.amount ?? 34;
+        const flameOpts = {
+            rise: opts.rise ?? 50,
+            width: opts.width ?? 30,
+            sizeScale: opts.sizeScale ?? 1
+        };
         for (let i = 0; i < amount; i++) {
-            // Potência variada: algumas sobem mais alto (chama irregular).
-            const power = 0.7 + Math.random() * 0.8;
-            this.flames.push(new FlameParticle(x, y, baseColor, power));
+            this.flames.push(new FlameParticle(x, y, baseColor, flameOpts));
         }
     }
 

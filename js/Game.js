@@ -5,6 +5,7 @@ import { Renderer } from './core/Renderer.js';
 import { Tileset } from './core/Tileset.js';
 import { AssetLoader } from './core/AssetLoader.js';
 import { AudioManager } from './core/AudioManager.js';
+import { GameLoop } from './core/GameLoop.js';
 
 import { SawWeapon } from './weapons/SawWeapon.js';
 
@@ -16,18 +17,20 @@ import { SpawnSystem } from './systems/SpawnSystem.js';
 import { ParticleEffects } from './systems/ParticleEffects.js';
 import { CombatSystem } from './combat/CombatSystem.js';
 import { RoomManager } from './rooms/RoomManager.js';
+import { DungeonTileQuery } from './rooms/DungeonTileQuery.js';
 import { PostProcessor } from './systems/PostProcessor.js';
 import { ScreenGore } from './systems/ScreenGore.js';
 import { WindSystem } from './systems/WindSystem.js';
 import { PlayerAI } from './systems/PlayerAI.js';
+import { LightingRenderer } from './systems/LightingRenderer.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     MAX_PLAYER_SEPARATION, CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
-    PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES, DOOR_LIGHT, WIND,
-    getPlayerSpawnPositions, HOLE_TILE, AUDIO_CONFIG, AUDIO_CLIPS,
-    SIM_STEP, MAX_SIM_STEPS_PER_FRAME, PLAYER_SAFE_ZONE, HIT_SLOWMO, ROOM_INTRO
+    TORCHES, DOOR_LIGHT, WIND,
+    getPlayerSpawnPositions, AUDIO_CONFIG,
+    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO
 } from './config/GameConfig.js';
 
 /**
@@ -108,7 +111,7 @@ export class Game {
             getRoom: () => this.rooms?.current,
             // Testa se um ponto do MUNDO cai sobre um buraco (ou fora da sala),
             // para a IA desviar de abismos. Reaproveita a grade de tiles.
-            isHoleAt: (x, y) => this._isHoleAtWorld(x, y),
+            isHoleAt: (x, y) => this.tiles.isHoleAtWorld(x, y),
             // Portas abertas da sala atual (para a IA acompanhar o humano ao
             // atravessar). Vazio quando a sala está trancada.
             getDoors: () => (this.rooms?.isLocked() ? [] : this.rooms.doorsOfCurrent())
@@ -135,6 +138,18 @@ export class Game {
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
         this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
 
+        // Consultas de grade de tiles (buracos, spawn seguro) sobre a sala atual.
+        this.tiles = new DungeonTileQuery({ rooms: this.rooms });
+        // Montagem das luzes de tela do quadro (jogadores, serra, tochas, portas).
+        this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
+        // Laço principal: fixed timestep + slow-motion. Os callbacks resolvem
+        // leitura de controles, um passo de simulação e o render do quadro.
+        this.gameLoop = new GameLoop({
+            onFrameStart: () => this.input.pollGamepads(),
+            onStep: (dt) => this._step(dt),
+            onRender: () => this._render()
+        });
+
         // Modo de teste do editor: carrega UMA sala custom e desabilita a
         // troca de salas (não há vizinhas — transicionar causaria crash).
         this.playtest = typeof window !== "undefined" &&
@@ -151,9 +166,6 @@ export class Game {
         this.transition = null; // { phase: "out"|"in", t, door }
         this.roomIntro = null;   // { phase, t } sequência de entrada na sala
         this._doorFlashT = 0;    // segundos restantes do flash de "porta aberta"
-        this._lastFrameTimestamp = null;
-        this._simAccumulator = 0; // acumulador de tempo do fixed timestep (s)
-        this._slowmoT = 0;        // segundos restantes de slow-motion de abate
 
         this._bindButtons();
     }
@@ -168,8 +180,7 @@ export class Game {
         [this.p1, this.p2] = this.players;
         this.newDungeon();
         this.updateHud();
-        this._loop = this._loop.bind(this);
-        requestAnimationFrame(this._loop);
+        this.gameLoop.start();
     }
 
     _bindResize() {
@@ -238,8 +249,8 @@ export class Game {
         // (morte instantânea em loop). Reposiciona cada player no tile de piso
         // seguro mais próximo do centro.
         if (this.playtest) {
-            this._ensureSafeSpawn(this.p1, rect);
-            this._ensureSafeSpawn(this.p2, rect);
+            this.tiles.ensureSafeSpawn(this.p1, rect);
+            this.tiles.ensureSafeSpawn(this.p2, rect);
         }
 
         const center = this.rooms.cellCenter();
@@ -248,44 +259,6 @@ export class Game {
         this.renderer.resetSway();
 
         this.updateHud();
-    }
-
-    // Garante que um jogador não nasça sobre um buraco (-1): se o tile atual for
-    // abismo, busca em espiral o tile de piso válido mais próximo e recoloca o
-    // jogador no centro dele.
-    _ensureSafeSpawn(player, rect) {
-        const tiles = this.rooms.currentTiles;
-        if (!tiles || !tiles.floor) return;
-        const floor = tiles.floor;
-
-        const col = Math.floor((player.x - rect.x) / TILE);
-        const row = Math.floor((player.y - rect.y) / TILE);
-
-        const isSafe = (c, r) => {
-            const line = floor[r];
-            // Dentro da sala, não ser parede de borda e não ser buraco.
-            return !!line && line[c] !== undefined && line[c] >= 0 &&
-                c > 0 && r > 0 && c < tiles.cols - 1 && r < tiles.rows - 1;
-        };
-
-        if (isSafe(col, row)) return;
-
-        // Busca em anéis crescentes ao redor do tile original.
-        const maxR = Math.max(tiles.cols, tiles.rows);
-        for (let radius = 1; radius < maxR; radius++) {
-            for (let dr = -radius; dr <= radius; dr++) {
-                for (let dc = -radius; dc <= radius; dc++) {
-                    if (Math.max(Math.abs(dr), Math.abs(dc)) !== radius) continue;
-                    const c = col + dc, r = row + dr;
-                    if (isSafe(c, r)) {
-                        player.x = rect.x + (c + 0.5) * TILE;
-                        player.y = rect.y + (r + 0.5) * TILE;
-                        player.vx = 0; player.vy = 0;
-                        return;
-                    }
-                }
-            }
-        }
     }
 
     // Move para a sala vizinha através de uma porta, reposicionando cada player em um tile logo à frente da porta.
@@ -368,25 +341,10 @@ export class Game {
         this.renderer.triggerZoomPunch(0.045);
     }
 
-    // Dispara o slow-motion de abate: a simulação desacelera e volta suave ao
-    // normal, dando peso ao golpe sem travar. Reinicia o timer para o cheio, de
-    // modo que mortes em sequência renovem (não encurtem) o efeito.
+    // Dispara o slow-motion de abate (dá peso ao golpe sem travar). Delega ao
+    // GameLoop, dono do tempo da simulação.
     triggerHitSlowmo() {
-        this._slowmoT = HIT_SLOWMO.duration;
-    }
-
-    // Fator de velocidade atual da simulação (0..1). Em slow-motion começa em
-    // HIT_SLOWMO.minScale (quando o timer está cheio) e sobe suavemente até 1
-    // conforme o timer esvazia, usando easeOutCubic (desacelera a recuperação
-    // perto do fim, deixando a volta ao normal bem macia). Sem efeito ativo
-    // retorna 1 (velocidade cheia).
-    _slowmoTimeScale() {
-        if (this._slowmoT <= 0) return 1;
-        const duration = HIT_SLOWMO.duration || 1;
-        // progress: 0 no início do efeito (mais lento) -> 1 no fim (normal).
-        const progress = 1 - this._slowmoT / duration;
-        const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-        return HIT_SLOWMO.minScale + (1 - HIT_SLOWMO.minScale) * eased;
+        this.gameLoop.triggerHitSlowmo();
     }
 
     updateHud() {
@@ -453,51 +411,10 @@ export class Game {
         });
     }
 
-    // ---- Loop ----
+    // ---- Simulação ----
     //
-    // Fixed timestep (acumulador): o render roda na taxa do monitor via
-    // requestAnimationFrame, mas a SIMULAÇÃO roda em passos fixos de SIM_STEP
-    // (1/60 s). Assim a velocidade de movimento, a física e os timers (contados
-    // em "frames" de 60fps no restante do código) ficam idênticos em qualquer
-    // taxa de atualização de tela (60Hz, 144Hz, 240Hz...).
-    _loop(timestamp) {
-        const frameSeconds = this._lastFrameTimestamp === null
-            ? 0
-            : Math.min(Math.max((timestamp - this._lastFrameTimestamp) / 1000, 0), 0.25);
-        this._lastFrameTimestamp = timestamp;
-
-        // Lê os controles (Xbox/PlayStation) uma vez por quadro e traduz
-        // sticks/d-pad nas teclas virtuais que os players já consomem. Fica
-        // antes do loop de simulação para valer em todos os passos do quadro.
-        this.input.pollGamepads();
-
-        // Slow-motion de abate: enquanto ativo, a SIMULAÇÃO roda em câmera
-        // lenta e volta suave ao normal (sem travar seco). O timer corre em
-        // tempo REAL; o fator de velocidade começa em minScale no pico e sobe
-        // até 1 com easing. Só o tempo ESCALADO alimenta o acumulador, então o
-        // mundo desacelera sem perder a independência de framerate.
-        const timeScale = this._slowmoTimeScale();
-        if (this._slowmoT > 0) {
-            this._slowmoT = Math.max(0, this._slowmoT - frameSeconds);
-        }
-
-        this._simAccumulator += frameSeconds * timeScale;
-
-        // Teto de passos por quadro: se o quadro atrasou muito (aba em segundo
-        // plano, stall de GC), descarta o excesso para não travar numa "espiral
-        // da morte" tentando recuperar dezenas de passos de uma vez.
-        if (this._simAccumulator > SIM_STEP * MAX_SIM_STEPS_PER_FRAME) {
-            this._simAccumulator = SIM_STEP * MAX_SIM_STEPS_PER_FRAME;
-        }
-
-        while (this._simAccumulator >= SIM_STEP) {
-            this._step(SIM_STEP);
-            this._simAccumulator -= SIM_STEP;
-        }
-
-        this._render();
-        requestAnimationFrame(this._loop);
-    }
+    // O laço e o tempo (fixed timestep + slow-motion) vivem no GameLoop; aqui
+    // ficam só os passos de simulação e o render, chamados pelos callbacks.
 
     // Um passo lógico de tamanho fixo (SIM_STEP segundos).
     _step(deltaSeconds) {
@@ -590,9 +507,21 @@ export class Game {
         // para a cena não "congelar" por completo.
         for (const e of room.enemies) {
             e.update([this.p1, this.p2], () => {});
+            // Altura do fogo: um pouco MAIOR que o sprite, para a coluna de
+            // chama cobrir e revelar o inimigo de baixo para cima.
+            const riseH = e.drawHeight * 1.15;
             if (e.justAppeared) {
-                this.particleSystem.triggerFlameBurst(e.x, e.y + 6, this._introFlameColor, 24);
-                this.renderer.triggerShake(5);
+                // Erupção inicial (densa) saindo do CHÃO (os pés).
+                this.particleSystem.triggerFlameBurst(e.x, e.footY, this._introFlameColor, {
+                    amount: 40, rise: riseH, width: e.drawHeight * 0.6
+                });
+                this.renderer.triggerShake(6);
+            } else if (e.spawnFx > 0) {
+                // Alimenta a coluna de fogo durante toda a REVELAÇÃO, para o
+                // fogo acompanhar o sprite surgindo (não some antes da hora).
+                this.particleSystem.triggerFlameBurst(e.x, e.footY, this._introFlameColor, {
+                    amount: 6, rise: riseH, width: e.drawHeight * 0.55
+                });
             }
             this.rooms.clampEnemy(e, this.arenaBounds);
         }
@@ -748,7 +677,7 @@ export class Game {
 
         // Queda em buracos/abismos: se o centro do jogador está sobre um tile
         // sem piso (-1), ele cai e morre. A posição já está confinada acima.
-        this._checkHoleFalls([p1, p2]);
+        this.tiles.checkHoleFalls([p1, p2]);
 
         // Arma: a animação já é atualizada por chain.update(). O dano só é
         // aplicado quando a corrente está conectada (desarmada = sem dano).
@@ -796,62 +725,6 @@ export class Game {
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
         this.updateHud();
-    }
-
-    // Verifica se cada jogador está sobre um tile de buraco (-1). Em caso
-    // positivo, dispara a queda (que leva à morte ao fim da animação). Usa o
-    // centro do jogador convertido para coordenada de tile da sala atual.
-    _checkHoleFalls(players) {
-        const tiles = this.rooms.currentTiles;
-        if (!tiles || !tiles.floor) return;
-        const rect = this.rooms.cellRect();
-
-        for (const p of players) {
-            if (p.falling) continue;
-            const col = Math.floor((p.x - rect.x) / TILE);
-            const row = Math.floor((p.y - rect.y) / TILE);
-            const line = tiles.floor[row];
-            if (line && line[col] === HOLE_TILE) {
-                // Centro do tile do buraco, para o sprite afundar alinhado.
-                const cx = rect.x + (col + 0.5) * TILE;
-                const cy = rect.y + (row + 0.5) * TILE;
-                p.startFalling(cx, cy);
-            }
-        }
-    }
-
-    // Testa se um ponto do MUNDO (x, y) cai sobre um tile de buraco (-1) na
-    // sala atual, ou fora da grade de piso. Usado pela IA do P1 para desviar de
-    // abismos. Pontos dentro dos vãos de porta (fora dos bounds) são tratados
-    // como seguros, para a IA conseguir atravessar.
-    _isHoleAtWorld(x, y) {
-        const tiles = this.rooms.currentTiles;
-        if (!tiles || !tiles.floor) return false;
-        const rect = this.rooms.cellRect();
-        const col = Math.floor((x - rect.x) / TILE);
-        const row = Math.floor((y - rect.y) / TILE);
-        const line = tiles.floor[row];
-        if (!line || line[col] === undefined) return false; // fora da grade: trata como seguro (portas/corredores)
-        return line[col] === HOLE_TILE;
-    }
-
-    // Retângulos (mundo) dos tiles de BURACO na sala atual. Usados para FURAR
-    // o clip do sangue, garantindo que nenhuma mancha (gotas, poças, serra)
-    // apareça sobre os buracos. Exclui TODOS os tiles de buraco — tanto o miolo
-    // escuro quanto as bordas — pois o jogador percebe o tile inteiro como vão.
-    _darkHoleRects() {
-        const tiles = this.rooms.currentTiles;
-        if (!tiles || !tiles.floor) return null;
-        const rect = this.rooms.cellRect();
-        const rects = [];
-        for (let r = 0; r < tiles.floor.length; r++) {
-            const line = tiles.floor[r];
-            for (let c = 0; c < line.length; c++) {
-                if (line[c] !== HOLE_TILE) continue; // qualquer tile de buraco
-                rects.push({ x: rect.x + c * TILE, y: rect.y + r * TILE, w: TILE, h: TILE });
-            }
-        }
-        return rects.length ? rects : null;
     }
 
     // Atualiza os corações da sala e resolve a coleta pelos jogadores.
@@ -924,7 +797,7 @@ export class Game {
         const challenge = rooms.current.challenge;
         if (challenge) challenge.drawFloorLayer(ctx);
 
-        this.particleSystem.drawFloor(ctx, this.arenaBounds, this._darkHoleRects());
+        this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
         this.particleSystem.drawSmoke(ctx);
 
@@ -958,6 +831,11 @@ export class Game {
         // Disco da serra: só aparece quando conectada (a Chain cuida disso).
         this.chain.draw(ctx, this.p1, this.p2);
 
+        // Lâmina DROPADA: quando a corrente arrebenta, a serra fica flutuando
+        // no chão como item coletável (sombra + feixe de luz). Só desenha
+        // quando desconectada (a Chain cuida disso).
+        this.chain.drawDropped(ctx);
+
         // Faíscas da serra: por cima do disco (centelhas saltando).
         this.particleSystem.drawSparks(ctx);
 
@@ -988,116 +866,24 @@ export class Game {
         renderer.endFrame();
 
         // Pós-processamento em espaço de tela (iluminação + vinheta), sobre a
-        // cena mas por baixo dos overlays de UI/transição/game over.
-        // Registra uma luz na posição (de tela) de cada jogador. O raio em
-        // mundo (PLAYER_LIGHT_RADIUS) é convertido para tela pelo zoom.
-        for (const p of [this.p1, this.p2]) {
-            const s = renderer.worldToScreen(p.x, p.y);
-            // pixel de arte do cenário na tela ~= (TILE/16) * zoom. Escalamos
-            // por LIGHT_PIXEL_SCALE (config) para a elipse de luz ficar chunky.
-            const lightPixel = Math.max(2, Math.round((TILE / 16) * s.zoom * LIGHT_PIXEL_SCALE));
-            this.postProcessor.addLight(s.x, s.y, PLAYER_LIGHT_RADIUS * s.zoom, lightPixel);
-        }
-
-        // Luzes das TOCHAS de parede (pontos de luz naturais do cenário). Cada
-        // tocha registrada em tiles.torches vira uma luz suave na sua posição.
-        if (TORCHES.enabled && tiles.torches && tiles.torches.length) {
-            const tl = TORCHES.light;
-            for (const t of tiles.torches) {
-                // Centro do tile da tocha no mundo + deslocamento para o lado de
-                // DENTRO da sala, onde a chama de fato ilumina:
-                //   N  -> empurra para baixo (offsetY)
-                //   W  -> empurra para a direita (offsetX)
-                //   E  -> empurra para a esquerda (-offsetX)
-                let wx = rect.x + t.col * TILE + TILE / 2;
-                let wy = rect.y + t.row * TILE + TILE / 2;
-                if (t.side === "N") wy += tl.offsetY;
-                else if (t.side === "S") wy -= tl.offsetY; // empurra para dentro (para cima)
-                else if (t.side === "W") wx += tl.offsetX;
-                else if (t.side === "E") wx -= tl.offsetX;
-
-                const s = renderer.worldToScreen(wx, wy);
-                const px = Math.max(2, Math.round((TILE / 16) * s.zoom * tl.pixelScale));
-                this.postProcessor.addLight(s.x, s.y, tl.radius * s.zoom, px, tl.flatten, tl);
-            }
-        }
-
-        // Luz amarela TEMPORÁRIA das PORTAS: dispara quando a porta abre
-        // (sala destravada ou entrada numa sala já aberta), pulsa suavemente por
-        // um instante e enfraquece até sumir. Controlada pelo timer
-        // _doorFlashT (segundos restantes). O foco é empurrado para DENTRO da
-        // sala e o halo é alongado no eixo de projeção, de modo que a luz pareça
-        // SAIR do vão e se espalhar na direção contrária à parede.
-        if (DOOR_LIGHT.enabled && this._doorFlashT > 0 && open && doors && doors.length) {
-            const dl = DOOR_LIGHT;
-            // Progresso 0..1 do início ao fim do flash.
-            const prog = 1 - this._doorFlashT / dl.flashDuration;
-            // Envelope de enfraquecimento: começa cheio e cai até 0 no fim.
-            const fade = Math.pow(1 - prog, dl.fadeExponent);
-            // Pulso suave sobreposto ao fade (respira sem piscar bruscamente).
-            const pulse = 1 + Math.sin(prog * dl.flashDuration * dl.pulseSpeed) * dl.pulseDepth;
-            // O desvanecimento é por OPACIDADE (alpha), NÃO por tamanho: a
-            // GEOMETRIA do feixe (comprimento, boca, início) fica FIXA o flash
-            // todo, então ele não encolhe nem "anda para trás" — só perde brilho.
-            const alphaScale = Math.max(0, fade * pulse);
-            // Perfil neutro: cor amarela + falloff próprio, SEM flicker do
-            // PostProcessor (o pulso/fade já vêm do alphaScale).
-            const profile = {
-                color: dl.color,
-                flickerBase: 1, flickerSine: 0, flickerNoise: 0,
-                falloff: [
-                    { offset: 0.0, alpha: 0.9 },
-                    { offset: 0.4, alpha: 0.5 },
-                    { offset: 0.7, alpha: 0.2 },
-                    { offset: 0.9, alpha: 0.06 },
-                    { offset: 1.0, alpha: 0.0 }
-                ]
-            };
-            for (const door of doors) {
-                // Direção do feixe: para DENTRO da sala (contrária à parede).
-                //   N (topo)    -> aponta para baixo
-                //   S (base)    -> aponta para cima
-                //   W (esquerda)-> aponta para a direita
-                //   E (direita) -> aponta para a esquerda
-                let dx = 0, dy = 0;
-                if (door.dir === "N") dy = 1;
-                else if (door.dir === "S") dy = -1;
-                else if (door.dir === "W") dx = 1;
-                else if (door.dir === "E") dx = -1;
-
-                // Recuo do apex ATRÁS da porta derivado da LARGURA do vão: para
-                // a boca do cone cobrir a porta de ponta a ponta, a meia-largura
-                // do feixe no plano da porta deve ser = doorHalf. Como essa
-                // meia-largura ~= apexBehind * tan(spread), isolamos apexBehind.
-                const apexBehind = doorHalf / Math.tan(dl.spread);
-
-                // Apex ATRÁS da porta (lado de fora da sala): recua na direção
-                // OPOSTA ao feixe, de modo que o cone nasça atrás do vão, já
-                // tenha a largura da porta ao cruzar a soleira e se projete para
-                // dentro da sala.
-                const wx = door.x - dx * apexBehind;
-                const wy = door.y - dy * apexBehind;
-
-                const s = renderer.worldToScreen(wx, wy);
-                const px = Math.max(2, Math.round((TILE / 16) * s.zoom * dl.pixelScale));
-                // Comprimento = recuo atrás da porta + alcance dentro da sala,
-                // para render o mesmo alcance interno mesmo nascendo atrás do
-                // vão. intensity (pulso×fade) escala o comprimento: encolhe e
-                // some ao final do flash.
-                // Geometria FIXA (não escala com o fade): comprimento = recuo
-                // atrás da porta + alcance dentro da sala.
-                const beamLen = (dl.length + apexBehind) * s.zoom;
-                // O feixe só aparece A PARTIR do plano da porta (startDist =
-                // apexBehind): recorta a ponta atrás do vão. Como a boca fica no
-                // plano da porta, nasce já com a largura do vão.
-                const startDist = apexBehind * s.zoom;
-                // O desvanecer vai no alphaScale (opacidade), mantendo o tamanho.
-                // startFade suaviza o início do feixe na soleira da porta.
-                this.postProcessor.addSpotLight(
-                    s.x, s.y, dx, dy, beamLen, dl.spread, px, profile, startDist, alphaScale, dl.startFade
-                );
-            }
-        }
+        // cena mas por baixo dos overlays de UI/transição/game over. Toda a
+        // montagem de luzes do quadro é delegada ao LightingRenderer; a posição
+        // da serra em uso é calculada aqui (depende de p1/p2) e injetada.
+        const sawPos = (this.chain.isConnected && this.chain.weapon)
+            ? this.chain.weapon.getSawPositions?.(this.p1, this.p2)?.[0] ?? null
+            : null;
+        this.lighting.render({
+            players: [this.p1, this.p2],
+            chain: this.chain,
+            sawPos,
+            arenaBounds: this.arenaBounds,
+            tiles,
+            rect,
+            doors,
+            doorHalf,
+            open,
+            doorFlashT: this._doorFlashT
+        });
 
         // Vinheta "respira" no ritmo da TENSÃO da corrente: quanto mais perto
         // de arrebentar, mais a tela pulsa (tensão/ansiedade). Sem tensão (ou

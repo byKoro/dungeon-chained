@@ -87,6 +87,49 @@ export class SawWeapon extends Weapon {
         this.textureOffset = 0;   // deslocamento da textura (fluxo contínuo)
         this.dragX = 0;        // vetor de ARRASTO (oposto ao movimento),
         this.dragY = 0;        // suavizado — curva a corda "sendo puxada".
+
+        // --- Estado de LÂMINA DROPADA (corrente arrebentada) ---
+        // Quando a corrente arrebenta, a serra cai no chão e fica FLUTUANDO
+        // como um item coletável: bob vertical suave, sombra pulsante embaixo
+        // e um feixe de luz diagonal varrendo o sprite (brilho de "pega-me").
+        this.dropped = false;  // true enquanto a lâmina está largada no chão
+        this.dropX = 0;        // posição travada no chão (centro do sprite)
+        this.dropY = 0;
+        this.dropPhase = 0;    // fase contínua do bob de flutuação
+        this.dropSpin = 0;     // giro residual lento enquanto está no chão
+        this.sweepPhase = 0;   // fase do feixe de luz diagonal (varre o sprite)
+        this.dropT = 0;        // 0->1 ao surgir (pop de queda) e aterrissar
+        this.dropHover = 0;    // 0..1 flutuação atual (modula a luz que emite)
+    }
+
+    // Marca a lâmina como dropada numa posição fixa do mundo (chamado quando a
+    // corrente arrebenta). Trava a serra ali até ser "recolhida" na reconexão.
+    drop(x, y) {
+        this.dropped = true;
+        this.dropX = x;
+        this.dropY = y;
+        this.dropPhase = 0;
+        this.sweepPhase = 0;
+        this.dropT = 0;
+        // Herda um pouco do giro atual para desacelerar suave no chão.
+        this.dropSpin = this.spin;
+    }
+
+    // Recolhe a lâmina (chamado quando os jogadores reconectam a corrente).
+    pickup() {
+        this.dropped = false;
+    }
+
+    // Avança as animações da lâmina dropada (bob, giro residual, feixe de luz).
+    // Deve ser chamado uma vez por passo enquanto estiver dropada.
+    updateDropped() {
+        if (!this.dropped) return;
+        this.dropPhase += 0.07;          // flutuação lenta e serena
+        this.sweepPhase += 0.03;         // varredura do feixe (bem gradual)
+        this.dropSpin *= 0.94;           // giro residual morre devagar
+        this.rotation += this.dropSpin * 0.25;
+        if (this.dropT < 1) this.dropT = Math.min(1, this.dropT + 0.06); // aterrissa
+        this.dropHover = (Math.sin(this.dropPhase) + 1) / 2; // 0..1 p/ modular a luz
     }
 
     update(p1 = null, p2 = null) {
@@ -94,6 +137,19 @@ export class SawWeapon extends Weapon {
         // o timer expirar). O Game ajusta `onBlood` a cada frame.
         if (this.onBlood) this.bloodTimer = BLOOD_DURATION;
         else if (this.bloodTimer > 0) this.bloodTimer--;
+
+        // LÂMINA DROPADA: largada no chão, ela NÃO responde ao movimento dos
+        // jogadores — nada de giro ativo nem arrasto. Toda a animação do estado
+        // dropado (bob, feixe de luz e o giro RESIDUAL que morre devagar) é
+        // responsabilidade de updateDropped(). Sem este early-return, o giro
+        // ativo (que sobe quando os dois andam) faria a lâmina largada girar ao
+        // caminhar — justamente o bug reportado.
+        if (this.dropped) {
+            // Zera o alvo de giro para o spin desaparecer suave (não "segura"
+            // velocidade de antes da queda).
+            this.spin += (0 - this.spin) * SPIN_DECEL;
+            return;
+        }
 
         // Pisca de ruptura iminente: a fase avança mais rápido quanto maior a
         // tensão, então o piscar acelera progressivamente até arrebentar.
@@ -446,5 +502,127 @@ export class SawWeapon extends Weapon {
         ctx.globalAlpha = 1;
         ctx.imageSmoothingEnabled = prevSmoothing;
         ctx.restore();
+    }
+
+    // Desenha a LÂMINA DROPADA no chão (corrente arrebentada): sombra pulsante,
+    // sprite flutuando (bob vertical) e um feixe de luz diagonal varrendo a
+    // lâmina — sinalizando um item que pode ser recolhido (ao reconectar).
+    drawDropped(ctx) {
+        if (!this.dropped) return;
+
+        const sprite = this.sprite;
+        const spriteReady = sprite && sprite.complete && sprite.naturalWidth > 0;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+
+        const draw = SAW_DRAW_LARGE;
+        const bloody = this.bloodTimer > 0;
+        // Frame da serra: usa o disco de inércia (parado) na linha certa.
+        const row = (bloody ? ROW_INERTIA_BLOODY : ROW_INERTIA_CLEAN) * SAW_FRAME.size;
+        const sx = INERTIA_FRAME * SAW_FRAME.size;
+
+        // Flutuação: altura do bob (senoide) e fator 0..1 para a sombra.
+        const bob = Math.sin(this.dropPhase) * 5;      // sobe/desce ~5px
+        const hover = (Math.sin(this.dropPhase) + 1) / 2; // 0..1
+        // Pop de queda: ao surgir, a lâmina "assenta" (escala de 1.25 -> 1).
+        const settle = 1 + (1 - this.dropT) * 0.25;
+
+        const cx = this.dropX;
+        const cy = this.dropY;
+
+        // --- 1) Sombra no chão (elipse) — encolhe/clareia quando a lâmina sobe ---
+        ctx.save();
+        const shadowScale = 1 - hover * 0.22;          // menor quando flutua alto
+        const shadowAlpha = 0.38 - hover * 0.14;       // mais fraca quando alto
+        ctx.globalAlpha = Math.max(0, shadowAlpha);
+        ctx.fillStyle = "#000000";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + draw * 0.34, draw * 0.34 * shadowScale, draw * 0.13 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // --- 2) Glow suave embaixo da lâmina (realça o item no escuro) ---
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.18 + hover * 0.12;
+        ctx.shadowColor = "#cfe4ff";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#9fc4ff";
+        ctx.beginPath();
+        ctx.arc(cx, cy - bob, draw * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Centro vertical da lâmina flutuando (aplicamos o bob aqui).
+        const ly = cy - bob;
+        const sz = draw * settle;
+
+        // --- 3) A lâmina em si ---
+        if (spriteReady) {
+            ctx.save();
+            ctx.translate(cx, ly);
+            ctx.rotate(this.rotation * this.spinDir);
+            ctx.drawImage(sprite, sx, row, SAW_FRAME.size, SAW_FRAME.size, -sz / 2, -sz / 2, sz, sz);
+            ctx.restore();
+
+            // --- 4) Feixe de luz DIAGONAL varrendo o sprite ---
+            // Um gradiente diagonal (faixa clara que atravessa) é recortado pelo
+            // ALFA do próprio sprite, então o brilho só aparece sobre a lâmina —
+            // como um reflexo que corre pela superfície metálica.
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.translate(cx, ly);
+            // A faixa de luz é desenhada num offscreen do tamanho do frame,
+            // já mascarada pelo recorte do sprite, e então ampliada.
+            const beam = this._buildBeam(sx, row);
+            if (beam) ctx.drawImage(beam, -sz / 2, -sz / 2, sz, sz);
+            ctx.restore();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.imageSmoothingEnabled = prevSmoothing;
+    }
+
+    // Monta (num canvas offscreen) o FEIXE de luz diagonal recortado pelo alfa
+    // do frame da serra. A posição da faixa corre com `this.sweepPhase`, então
+    // o reflexo "varre" a lâmina de um canto ao outro, em loop.
+    _buildBeam(sx, sy) {
+        const sprite = this.sprite;
+        if (!sprite || !sprite.complete || !sprite.naturalWidth) return null;
+
+        const S = SAW_FRAME.size;
+        if (!this._beamCanvas) {
+            this._beamCanvas = document.createElement("canvas");
+            this._beamCanvas.width = S;
+            this._beamCanvas.height = S;
+        }
+        const bc = this._beamCanvas;
+        const bx = bc.getContext("2d");
+        bx.imageSmoothingEnabled = false;
+        bx.clearRect(0, 0, S, S);
+
+        // Posição da faixa (0..1 em loop) convertida em deslocamento diagonal.
+        // Vai de -S a +2S para a faixa entrar e sair totalmente do quadro.
+        const p = (Math.sin(this.sweepPhase) + 1) / 2; // 0..1 (vai e volta)
+        const travel = -S + p * (2.2 * S);
+
+        // Gradiente numa reta DIAGONAL (de um canto ao canto oposto). A faixa
+        // clara fica centrada em `travel`, estreita, com bordas suaves.
+        const dx = travel, dy = travel; // direção (1,1) normalizada no espaço do quadro
+        const grad = bx.createLinearGradient(dx - S * 0.5, dy - S * 0.5, dx + S * 0.5, dy + S * 0.5);
+        grad.addColorStop(0.0, "rgba(255,255,255,0)");
+        grad.addColorStop(0.42, "rgba(255,255,255,0)");
+        grad.addColorStop(0.5, "rgba(255,255,255,0.85)");
+        grad.addColorStop(0.58, "rgba(255,255,255,0)");
+        grad.addColorStop(1.0, "rgba(255,255,255,0)");
+        bx.fillStyle = grad;
+        bx.fillRect(0, 0, S, S);
+
+        // Recorta a faixa pelo alfa do sprite (o brilho só vive sobre a lâmina).
+        bx.globalCompositeOperation = "destination-in";
+        bx.drawImage(sprite, sx, sy, S, S, 0, 0, S, S);
+        bx.globalCompositeOperation = "source-over";
+        return bc;
     }
 }

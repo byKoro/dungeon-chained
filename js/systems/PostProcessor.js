@@ -84,6 +84,43 @@ export class PostProcessor {
     }
 
     /**
+     * Registra uma luz de ÁREA DIRECIONAL (elipse com semieixos independentes).
+     * Diferente do SPOT (cone de holofote, bordas duras), esta é uma MANCHA de
+     * luz suave, larga numa direção e rasa na outra — ideal para uma tocha de
+     * parede: ilumina uma ÁREA à frente, concentrada do lado de dentro, sem o
+     * aspecto de poste de luz. Como o decaimento é radial e suave e o semieixo
+     * perpendicular à parede é curto, a luz morre antes de atravessar a parede.
+     * @param {number} x,y          centro da elipse na tela
+     * @param {number} radiusX      semieixo horizontal (px de tela)
+     * @param {number} radiusY      semieixo vertical (px de tela)
+     * @param {number} [pixel=6]    tamanho do "pixel" de arte (serrilhado chunky)
+     * @param {object} [profile]    { color, falloff, flicker* } próprio da luz
+     */
+    addAreaLight(x, y, radiusX, radiusY, pixel = 6, profile = null) {
+        this._lights.push({ kind: "ellipse", x, y, radiusX, radiusY, pixel, profile });
+    }
+
+    /**
+     * Registra um WASH de parede: uma FAIXA de luz contínua ancorada numa borda
+     * da sala que PREENCHE o ambiente e esvaece em direção ao interior. Diferente
+     * das elipses (que iluminam pontos e deixam vãos escuros entre si), o wash
+     * cobre toda a extensão da parede, então somando os quatro washes o ambiente
+     * fica banhado de luz — forte junto às paredes, suave no miolo.
+     * @param {object} rectScreen { x, y, w, h } faixa em px de TELA a preencher
+     * @param {string} dir   direção do decaimento: "N"(de cima p/ baixo),
+     *                        "S"(de baixo p/ cima), "W"(esq->dir), "E"(dir->esq)
+     * @param {object} [profile] { color, falloff, flicker* } próprio do wash
+     */
+    addWash(rectScreen, dir, profile = null) {
+        // x/y = centro do retângulo: usados só para dar uma FASE estável ao
+        // flicker (em _drawLighting, phase deriva de light.x+light.y). Sem eles,
+        // phase viraria NaN e a cor rgba(..., NaN) seria inválida.
+        const x = rectScreen.x + rectScreen.w / 2;
+        const y = rectScreen.y + rectScreen.h / 2;
+        this._lights.push({ kind: "wash", rect: rectScreen, dir, profile, x, y });
+    }
+
+    /**
      * Registra um SPOT/CONE de luz para ESTE frame (coordenadas de tela). O
      * feixe nasce ESTREITO no apex (x,y) e se abre na direção (dirX,dirY),
      * clareando mais perto do apex e esmaecendo ao longo do comprimento e nas
@@ -145,6 +182,8 @@ export class PostProcessor {
             const color = p.color ?? this.lighting.lightColor;
             if (light.kind === "spot") {
                 this._drawPixelSpotLight(light, flick, color);
+            } else if (light.kind === "wash") {
+                this._drawWash(light, flick, color);
             } else {
                 this._drawPixelEllipseLight(light, flick, color);
             }
@@ -167,8 +206,11 @@ export class PostProcessor {
      */
     _drawPixelEllipseLight(light, flick, lc) {
         const px = Math.max(2, light.pixel | 0);
-        const rx = Math.max(1, light.radius * flick);      // raio horizontal (tela)
-        const ry = Math.max(1, rx * (light.flatten ?? this.lighting.flatten)); // raio vertical
+        // Raios horizontal/vertical. Se a luz definir radiusX/radiusY próprios
+        // (luz de ÁREA direcional), usa-os; senão deriva de radius + flatten
+        // (luz circular/achatada clássica).
+        const rx = Math.max(1, (light.radiusX ?? light.radius) * flick);
+        const ry = Math.max(1, (light.radiusY ?? (light.radius * (light.flatten ?? this.lighting.flatten))) * flick);
 
         // Dimensões em BAIXA resolução (nº de "pixels de arte" que cobrem a luz).
         const loW = Math.max(1, Math.ceil((rx * 2) / px));
@@ -182,13 +224,14 @@ export class PostProcessor {
         loCtx.imageSmoothingEnabled = false;
         loCtx.clearRect(0, 0, loW, loH);
 
-        // Gradiente radial no espaço lo-res. Como a elipse é mais larga que
-        // alta, escalamos o eixo Y antes de desenhar um gradiente circular.
+        // Gradiente radial no espaço lo-res. Desenhamos um círculo de raio = o
+        // MAIOR dos dois semieixos e escalamos o eixo menor para achatar — vale
+        // tanto para elipse larga (loW>loH) quanto alta (loH>loW).
         const cxLo = loW / 2, cyLo = loH / 2;
-        const rLo = loW / 2;
+        const rLo = Math.max(loW, loH) / 2;
         loCtx.save();
         loCtx.translate(cxLo, cyLo);
-        loCtx.scale(1, loH / loW); // circulo -> elipse achatada
+        loCtx.scale(loW / Math.max(loW, loH), loH / Math.max(loW, loH));
         const g = loCtx.createRadialGradient(0, 0, 0, 0, 0, rLo);
         // Perfil radial: o próprio da luz (tochas) ou o global (jogadores).
         // Centro forte caindo até transparente; os stops viram degraus visíveis
@@ -211,6 +254,36 @@ export class PostProcessor {
         const dx = Math.round((light.x - dw / 2) / px) * px;
         const dy = Math.round((light.y - dh / 2) / px) * px;
         lctx.drawImage(this._loCanvas, 0, 0, loW, loH, dx, dy, dw, dh);
+    }
+
+    /**
+     * Desenha um WASH de parede: faixa retangular com gradiente LINEAR que vai
+     * de FORTE (junto à parede) a TRANSPARENTE (interior), seguindo o perfil de
+     * falloff. Aditivo sobre o mapa de luz. Preenche o ambiente de forma
+     * contínua (sem os vãos escuros que ficavam entre elipses isoladas).
+     */
+    _drawWash(light, flick, lc) {
+        const r = light.rect;
+        const lctx = this._lightCtx;
+        const falloff = (light.profile && light.profile.falloff) || this.lighting.falloff;
+
+        // Eixo do gradiente conforme a direção (0 = parede/forte -> 1 = interior).
+        let x0 = r.x, y0 = r.y, x1 = r.x, y1 = r.y;
+        if (light.dir === "N") { y1 = r.y + r.h; }        // decai para baixo
+        else if (light.dir === "S") { y0 = r.y + r.h; }   // começa embaixo, decai p/ cima
+        else if (light.dir === "W") { x1 = r.x + r.w; }   // decai para a direita
+        else if (light.dir === "E") { x0 = r.x + r.w; }   // começa à direita, decai p/ esq
+
+        const g = lctx.createLinearGradient(x0, y0, x1, y1);
+        for (const stop of falloff) {
+            // flick modula a intensidade (crepitar suave da tocha).
+            const a = Math.max(0, Math.min(1, stop.alpha * flick));
+            g.addColorStop(stop.offset, `rgba(${lc}, ${a})`);
+        }
+        lctx.save();
+        lctx.fillStyle = g;
+        lctx.fillRect(r.x, r.y, r.w, r.h);
+        lctx.restore();
     }
 
     /**
