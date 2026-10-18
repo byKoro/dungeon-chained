@@ -49,6 +49,9 @@ export class ActionArena {
         this.renderer.setTileset(new Tileset(assets.tileset, 16, 10));
         this.renderer.setAssets(assets);
         this.renderer.setTileWorldSize(TILE);
+        // Zoom contínuo (sem degraus de 1px por tile): o SeamlessTileset já
+        // evita as frestas, então mergulhos/zooms rápidos ficam lisos.
+        if (opts.smoothZoom) this.renderer._quantizeZoom = (z) => z;
 
         this.tiles = new RoomTiles(this.cols, this.rows, this.doors, opts.seed ?? 5, true);
         this.rect = { x: 0, y: 0, w: this.cols * TILE, h: this.rows * TILE };
@@ -110,6 +113,7 @@ export class ActionArena {
     setHoles(cells) {
         for (const [c, r] of cells) if (this.tiles.floor[r]) this.tiles.floor[r][c] = -1;
         this.holeCells = cells;
+        this._holeSet = new Set(cells.map(([c, r]) => r * this.cols + c));
         const set = new Set(cells.map(([c, r]) => `${c},${r}`));
         this.tiles.props = (this.tiles.props || []).filter(p => !set.has(`${p.col},${p.row}`));
     }
@@ -136,6 +140,13 @@ export class ActionArena {
         this.camGoal = null;
         this.script = null;
         this.onKill = this.onWallHit = this.onYank = this.onBump = null;
+        this.onDrawFloor = this.onDrawTop = null;   // ganchos de desenho (mundo)
+        this.freeSaw = null;     // {x,y,vx,vy}: serra solta, voando sozinha
+        this.sawScale = 1;       // serra gigante (>1)
+        this.arrowsKill = false; // flechas perfuram inimigos
+        this.red = 0;            // clima vermelho (luz + vinheta pulsando) 0..1
+        this.redHz = 1.6;
+        this.doorOpen = {};      // dir -> 0..1 (ausente = aberta)
         const s = this.saw;
         s.spin = 0; s.rotation = 0; s.dragX = s.dragY = 0; s.dropped = false; s.bloodTimer = 0;
         this.particles.clear();
@@ -169,6 +180,7 @@ export class ActionArena {
     get zoomRef() { return this.canvas.height / (ROOM_ROWS * TILE + 180); }
     get mid() { return { x: (this.p1.x + this.p2.x) / 2, y: (this.p1.y + this.p2.y) / 2 }; }
     get sawPos() {
+        if (this.freeSaw) return this.freeSaw;
         return this.connected ? this.saw.getSawPositions(this.p1, this.p2)[0]
             : { x: this.saw.dropX, y: this.saw.dropY };
     }
@@ -177,6 +189,32 @@ export class ActionArena {
         const r = this.renderer;
         r.camX = x; r.camY = y; r.zoom = zoom * this.camClose; this.rot = rot;
         this.camGoal = null;
+    }
+    // Câmera posta direto (zoom ABSOLUTO, sem camClose): mergulhos roteirizados.
+    setCam(x, y, zoom, rot = 0) {
+        const r = this.renderer;
+        r.camX = x; r.camY = y; r.zoom = zoom; this.rot = rot;
+        this.camGoal = null;
+    }
+
+    // Mata um inimigo pelo roteiro (serra solta, serra gigante, flecha).
+    killEnemy(e, shake = 10) {
+        if (e.state === 'dying' || e.isHidden) return false;
+        if (e.frozen) { e.unfreeze(); e.spawnFx = 0; }
+        e.startDying();
+        this.saw.onHit?.();
+        this.renderer.triggerShake(shake);
+        this.particles.triggerBlood(e.x, e.y, 10, 0.9);
+        this.kills++;
+        this.killFlashes.push({ x: e.x, y: e.y, life: 1 });
+        this.onKill?.(e);
+        return true;
+    }
+    // O pé de (x,y) cai num buraco?
+    inHole(x, y) {
+        if (!this._holeSet) return false;
+        const c = Math.floor(x / TILE), r = Math.floor((y + 14) / TILE);
+        return this._holeSet.has(r * this.cols + c);
     }
 
     /**
@@ -287,8 +325,10 @@ export class ActionArena {
         e.currentAttack = e.attackKeys?.[(Math.random() * e.attackKeys.length) | 0] ?? 'attack';
         e.facingLeft = tx < e.x;
     }
-    fireArrow(x, y, vx, vy = 0) {
-        this.arrows.push({ x, y, vx, vy, angle: Math.atan2(vy, vx), stuck: 0 });
+    fireArrow(x, y, vx, vy = 0, opts = {}) {
+        const a = { x, y, vx, vy, angle: Math.atan2(vy, vx), stuck: 0, ...opts };
+        this.arrows.push(a);
+        return a;
     }
 
     render(w, h) { renderArena(this, w, h); }
@@ -321,7 +361,22 @@ export class ActionArena {
         else this._bump(p1, p2);
         for (const p of [p1, p2]) { this._animate(p); if (p.hurtTimer > 0) p.hurtTimer--; }
 
-        if (this.sawVisible) {
+        if (this.sawVisible && this.freeSaw) {
+            // Serra SOLTA: gira a toda, voa pelo roteiro (vx,vy) e corta sozinha.
+            const f = this.freeSaw;
+            f.x += f.vx || 0; f.y += f.vy || 0;
+            const fake = { x: f.x, y: f.y, vx: 0, vy: 0, speedMag: 10, speed: 4 };
+            saw.dragX = saw.dragY = 0;
+            saw.update(fake, fake);
+            saw.spin = 1;
+            const sp = Math.hypot(f.vx || 0, f.vy || 0);
+            if (sp > 1) this.particles.triggerSparks(f.x, f.y, saw.discRadius * this.sawScale, saw.spinDir, 2 + (sp / 4) | 0);
+            const R = saw.discRadius * this.sawScale;
+            for (const e of this.enemies) {
+                if (Math.hypot(e.x - f.x, e.y - f.y) < R + e.hitRadius) this.killEnemy(e, 12);
+            }
+            renderer.triggerShake(2.5);
+        } else if (this.sawVisible) {
             if (this.connected) {
                 saw.update(p1, p2);
                 if (saw.spin < this.minSpin) saw.spin = this.minSpin;
@@ -364,6 +419,14 @@ export class ActionArena {
             this.killFlashes.push({ x: e.x, y: e.y, life: 1 });
             this.onKill?.(e);
         });
+        // Serra GIGANTE: o disco inteiro (escalado) corta.
+        if (armed && this.sawScale > 1.05) {
+            const sc = saw.getSawPositions(p1, p2)[0];
+            const R = saw.discRadius * this.sawScale;
+            for (const e of this.enemies) {
+                if (Math.hypot(e.x - sc.x, e.y - sc.y) < R + e.hitRadius) this.killEnemy(e, 14);
+            }
+        }
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
             if (!e.readyToGib) continue;
@@ -508,6 +571,13 @@ export class ActionArena {
             if (e.frozen && !e.isHidden && e.spawnFx <= 0) e.unfreeze();
             return;
         }
+        const px = e.x, py = e.y;
+        this._moveEnemy(e);
+        // Não anda por cima de buraco: volta para onde estava.
+        if (this.inHole(e.x, e.y) && !this.inHole(px, py)) { e.x = px; e.y = py; e.vx *= 0.3; e.vy *= 0.3; }
+    }
+
+    _moveEnemy(e) {
         if (e.lungeT > 0) {
             e.lungeT--;
             e.animTime++;
@@ -549,10 +619,18 @@ export class ActionArena {
                 continue;
             }
             a.x += a.vx; a.y += a.vy;
-            if ((a.vx > 0 && a.x > b.maxX - 4) || (a.vx < 0 && a.x < b.minX + 4)) {
-                a.x = a.vx > 0 ? b.maxX - 4 : b.minX + 4;
-                a.stuck = 0.9;
-                this.particles.triggerDust(a.x, a.y, -Math.sign(a.vx), 0, 5);
+            // Crava no chão num ponto marcado (stopX) ou na parede oposta.
+            const hitStop = a.stopX !== undefined && (a.vx < 0 ? a.x <= a.stopX : a.x >= a.stopX);
+            if (hitStop || (a.vx > 0 && a.x > b.maxX - 4) || (a.vx < 0 && a.x < b.minX + 4)) {
+                a.x = hitStop ? a.stopX : (a.vx > 0 ? b.maxX - 4 : b.minX + 4);
+                a.stuck = a.stuckDur ?? 0.9;
+                this.particles.triggerDust(a.x, a.y + (hitStop ? 10 : 0), -Math.sign(a.vx), 0, hitStop ? 7 : 5);
+                continue;
+            }
+            if (this.arrowsKill) {
+                for (const e of this.enemies) {
+                    if (Math.abs(e.x - a.x) < 22 && Math.abs(e.y - a.y) < 26) this.killEnemy(e, 6);
+                }
             }
         }
     }

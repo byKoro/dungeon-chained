@@ -19,8 +19,15 @@ import { ZigZagShot } from './scenes/montage/ZigZagShot.js';
 import { SnapShot } from './scenes/montage/SnapShot.js';
 import { SplitShot } from './scenes/montage/SplitShot.js';
 import { MapGenScene } from './scenes/mapgen/MapGenScene.js';
+import { ArrowRunShot } from './scenes/rush/ArrowRunShot.js';
+import { HoleRunShot } from './scenes/rush/HoleRunShot.js';
+import { ButtonDoorShot } from './scenes/rush/ButtonDoorShot.js';
+import { GiantSawShot } from './scenes/rush/GiantSawShot.js';
 
-const SCENES = [IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene];
+const SCENES = [
+    IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene,
+    ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot
+];
 
 const IMPACT_INVERT = 0.06;   // s de imagem invertida (quadro de impacto)
 const IMPACT_FLASH = 0.22;    // s até o clarão branco sumir
@@ -109,6 +116,10 @@ export class TrailerPlayer {
         st._tickExpressions(dt);
         st.tickSpeech(dt);
         if (st.bloodScreen.mode === 'drain') st.bloodScreen.update(dt);
+        if (st.overlay) {
+            st.overlay.update(dt);
+            if (st.overlay.done) st.overlay = null;
+        }
 
         if (!this.ended && this.index === this.scenes.length - 1 && this.current.reachedEnd) {
             this.ended = true;
@@ -120,6 +131,7 @@ export class TrailerPlayer {
         const { ctx, canvas } = this.stage;
         this.current.render();
         this.stage.bloodScreen.draw(ctx);
+        this.stage.overlay?.draw(ctx);
         this._drawImpact(ctx, canvas);
         this.stage.drawLetterbox();
         if (this.showTimer) this._drawTimer(ctx, canvas);
