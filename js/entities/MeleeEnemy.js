@@ -20,8 +20,11 @@ import { BloodStains } from '../particles/BloodStains.js';
  *   rows: {
  *     walk:   { row, frames, fps },
  *     attack: { row, frames, fps, hitFrame },  // hitFrame = quando o golpe conecta
+ *     attack2, attack3: (opcionais, mesmo formato)
  *     death:  { row, frames, fps }
- *   }
+ *   },
+ *   body: { x, y, w, h },   // opcional: corpo na célula (âncora/altura)
+ *   gib:  { gridCols, gridRows, box: { x, y, w, h } }  // box opcional
  * }
  */
 export class MeleeEnemy extends Entity {
@@ -54,7 +57,7 @@ export class MeleeEnemy extends Entity {
         this.dyingDuration = 9;  // ~0.15s a 60fps: rápido, mas perceptível
 
         // Ataques disponíveis (o demon tem 2). Escolhido aleatoriamente por golpe.
-        this.attackKeys = ["attack", "attack2"].filter(k => this.sprite.rows[k]);
+        this.attackKeys = ["attack", "attack2", "attack3"].filter(k => this.sprite.rows[k]);
         this.currentAttack = this.attackKeys[0] || "attack";
 
         this.bloodPalette = null;   // definida externamente (paleta da textura)
@@ -121,8 +124,20 @@ export class MeleeEnemy extends Entity {
     // Altura do sprite desenhado no mundo (px). O sprite é desenhado centrado
     // em this.y, então vai de (y - drawHeight/2) no topo a (y + drawHeight/2)
     // na base (os pés).
+    // Com `sprite.body` (caixa do corpo dentro da célula), a altura é a do
+    // CORPO, não do recorte inteiro (que inclui golpes/efeitos largos).
     get drawHeight() {
-        return this.sprite?.drawHeight ?? 44;
+        const s = this.sprite;
+        if (s?.body) return s.body.h * (s.drawHeight / s.cropH);
+        return s?.drawHeight ?? 44;
+    }
+
+    // Y (coords da célula) que fica alinhado a this.y. Por padrão é o centro
+    // do recorte; com `sprite.body`, o centro do corpo — assim golpes que
+    // sobem/descem muito não deslocam o boneco da posição de colisão.
+    _anchorY() {
+        const s = this.sprite;
+        return s.body ? s.body.y + s.body.h / 2 : s.cropY + s.cropH / 2;
     }
 
     // Coordenada Y da BASE do sprite (os pés, onde o fogo deve nascer no chão).
@@ -249,16 +264,22 @@ export class MeleeEnemy extends Entity {
 
         // Usa o ÚLTIMO frame da animação de morte (corpo caído/estirado) como
         // fonte dos recortes, para os fragmentos parecerem o inimigo no chão.
+        // `gib.box` (opcional) = caixa do corpo caído no último frame de morte;
+        // sem ela, picota o recorte inteiro (comportamento original).
+        const gib = s.gib || {};
+        const box = gib.box || { x: s.cropX, y: s.cropY, w: s.cropW, h: s.cropH };
         const death = s.rows.death;
         const deathFrame = death.frames - 1;
-        const baseSrcX = deathFrame * cell + s.cropX;
-        const baseSrcY = death.row * cell + s.cropY;
-        const cw = s.cropW, ch = s.cropH;
+        const baseSrcX = deathFrame * cell + box.x;
+        const baseSrcY = death.row * cell + box.y;
+        const cw = box.w, ch = box.h;
+        // Ponto da célula que corresponde a (this.x, this.y) no mundo.
+        const anchorX = s.body ? cell / 2 : s.cropX + s.cropW / 2;
+        const anchorY = this._anchorY();
 
         const pieces = [];
 
         // Grade fina de picotamento. Configurável por sprite via gib.gridCols/Rows.
-        const gib = s.gib || {};
         const cols = gib.gridCols ?? 5;
         const rows = gib.gridRows ?? 4;
         const pieceW = cw / cols;
@@ -275,8 +296,8 @@ export class MeleeEnemy extends Entity {
                 const sh = Math.min(pieceH, ch - (r * pieceH));
 
                 // Offset do pedaço em relação ao centro do boneco (mundo)
-                const offX = ((c + 0.5) * pieceW - cw / 2) * scale;
-                const offY = ((r + 0.5) * pieceH - ch / 2) * scale;
+                const offX = (box.x + (c + 0.5) * pieceW - anchorX) * scale;
+                const offY = (box.y + (r + 0.5) * pieceH - anchorY) * scale;
 
                 const gibPiece = new GibPiece(
                     this.x + offX, this.y + offY,
@@ -548,6 +569,9 @@ export class MeleeEnemy extends Entity {
         // faria o sprite "pular" ao dar flip. Compensamos alinhando o desenho ao
         // centro da célula, tornando o espelhamento simétrico.
         const cropCenterOffset = ((s.cropX + cw / 2) - cell / 2) * scale;
+        // Idem na vertical: alinha o ponto-âncora (centro do corpo, se houver
+        // `body`) a this.y. Sem `body` o deslocamento é 0 (centro do recorte).
+        const cropCenterOffsetY = ((s.cropY + ch / 2) - this._anchorY()) * scale;
 
         // Efeito de APARIÇÃO (spawn na intro): o inimigo é REVELADO de baixo
         // para cima, como se emergisse do fogo que sobe do chão. `t` vai de 0
@@ -561,19 +585,20 @@ export class MeleeEnemy extends Entity {
         ctx.translate(this.x, this.y);
         if (this.facingLeft) ctx.scale(-1, 1);
         // Alinha sprite e manchas ao centro real do boneco na célula
-        ctx.translate(cropCenterOffset, 0);
+        ctx.translate(cropCenterOffset, cropCenterOffsetY);
 
         // Enquanto revela, recorta a região VISÍVEL: só a parte do sprite ABAIXO
         // da "linha do fogo", que começa na base (pés) e sobe até o topo. Em
-        // coords locais o sprite ocupa de -drawH/2 (topo) a +drawH/2 (base).
+        // coords locais o recorte ocupa de -drawH/2 (topo) a +drawH/2 (base);
+        // com `body`, a revelação percorre só a altura do corpo.
         if (revealT < 1) {
-            const top = -drawH / 2;
-            const bottom = drawH / 2;
+            const top = s.body ? (s.body.y - s.cropY) * scale - drawH / 2 : -drawH / 2;
+            const bottom = s.body ? (s.body.y + s.body.h - s.cropY) * scale - drawH / 2 : drawH / 2;
             // Linha de revelação: em t=0 está na base; em t=1 chega ao topo.
             const revealLineY = bottom - (bottom - top) * revealT;
             ctx.beginPath();
             // Largura folgada para cobrir o sprite inteiro mesmo com flip.
-            ctx.rect(-drawW, revealLineY, drawW * 2, bottom - revealLineY + 2);
+            ctx.rect(-drawW, revealLineY, drawW * 2, drawH / 2 - revealLineY + 2);
             ctx.clip();
         }
 
