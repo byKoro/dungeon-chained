@@ -1839,24 +1839,48 @@ class RoomEditor {
 
 
     _toggleWallAt(col, row) {
-        // Nas bordas, só permite substituir parede existente
         const onBorder = col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1;
+        // Nas bordas é permitido trocar a parede, exceto nas aberturas das portas
+        // (uma parede ali bloquearia a passagem dos players).
+        if (onBorder && this._isDoorTile(col, row)) return;
+
         const key = String(col) + "," + String(row);
-        const existingWall = this.room.walls.find(w => String(w.col) + "," + String(w.row) === key);
-        if (onBorder && !existingWall) return; // Só substitui, não cria nova
-        if (existingWall) {
-            // Substitui a parede existente pelo tipo selecionado
-            const tile = Number(document.getElementById("wall-tile")?.value || 0);
-            existingWall.tile = tile;
-            existingWall.side = this._wallSideForTile(tile);
+        const tile = Number(document.getElementById("wall-tile")?.value || 0);
+        const existing = this.room.walls.findIndex(w => String(w.col) + "," + String(w.row) === key);
+
+        if (existing >= 0) {
+            const wall = this.room.walls[existing];
+            if (Number(wall.tile) === tile) {
+                // Mesmo bloco: clicar de novo remove (volta à parede/piso original).
+                this.room.walls.splice(existing, 1);
+            } else {
+                // Bloco diferente: substitui pelo selecionado.
+                wall.tile = tile;
+                wall.side = this._wallSideForTile(tile);
+            }
         } else {
-            if (this.room.holes.has(key)) return;
-            const tile = Number(document.getElementById("wall-tile")?.value || 0);
+            if (!onBorder) {
+                // No interior, não bloqueia o spawn dos players nem coloca parede sobre buraco.
+                const spawns = this._getPlayerSpawns();
+                if (spawns.some(sp => (sp.p1.col === col && sp.p1.row === row) || (sp.p2.col === col && sp.p2.row === row))) return;
+                if (this.room.holes.has(key)) return;
+            }
             this.room.walls.push({ col, row, tile, side: this._wallSideForTile(tile) });
         }
         this._updateWallsListUI();
         this._updateCodeOutput();
         this.render();
+    }
+
+    // Tile de borda que faz parte da abertura de uma porta ativa.
+    _isDoorTile(col, row) {
+        const s = this.room.sockets;
+        const inSpan = (sock, v) => !!sock && v >= sock.offset && v < sock.offset + sock.span;
+        if (row === 0 && inSpan(s.N, col)) return true;
+        if (row === this.rows - 1 && inSpan(s.S, col)) return true;
+        if (col === this.cols - 1 && inSpan(s.E, row)) return true;
+        if (col === 0 && inSpan(s.W, row)) return true;
+        return false;
     }
 
     _wallSideForTile(tile) {
