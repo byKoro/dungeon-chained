@@ -13,7 +13,9 @@
  * inimigos vagando à toa. Layout em ./mapLayout.js (determinístico),
  * desenho das peças estáticas assado em ./mapBake.js.
  *
- * Última cena: `reachedEnd` em END_AT; depois segue em loop (drone lento).
+ * Fim: em DIVE_AT a câmera MERGULHA numa sala retangular perto do centro
+ * até ela encher a tela, com clarão branco que passa (overlay) para a cena
+ * seguinte (ArrowRunShot), que continua o zoom.
  */
 import { TILE, TORCHES } from '../../../config/GameConfig.js';
 import { SpikeTrap } from '../../../entities/SpikeTrap.js';
@@ -37,7 +39,9 @@ const POPS = [
     { at: 10.2, level: 3, spread: 1.6 }
 ];
 const POP_DUR = 0.8;      // duração do recuo de câmera
-const END_AT = 14.2;      // reachedEnd (botão COMEÇAR)
+const DIVE_AT = 13.0;     // mergulho lá de cima numa das salas
+const DIVE_DUR = 1.15;
+const DIVE_FLASH = 0.8;   // clarão branco no fim do mergulho (continua na próxima cena)
 const ROOM_POP = 0.42;    // pop de uma sala
 const CORR_POP = 0.3;     // pop de um corredor
 const DOOR_OPEN = 0.2;    // animação de abrir porta
@@ -75,12 +79,17 @@ export class MapGenScene {
         });
         this._baked = false;
         this._schedule();
+        // Sala do mergulho: retangular, perto do centro (não a do centro).
+        const rects = this.D.rooms.filter(R => R.shape === 'rect' && R.level >= 1 && R.level <= 2);
+        rects.sort((a, b) => a.d - b.d);
+        this.diveRoom = rects[0] || this.center;
         this.t = 0;
     }
 
     reset() { this.t = 0; }
-    get isDone() { return false; }
-    get reachedEnd() { return this.t > END_AT; }
+    // Termina no fim do mergulho; a cena seguinte continua o zoom.
+    get isDone() { return this.t >= DIVE_AT + DIVE_DUR; }
+    get reachedEnd() { return this.isDone; }
 
     // Ordem de nascimento: anel 3x3 em sentido horário; depois ondas a partir
     // do centro (distância + um pouco de acaso estável).
@@ -112,6 +121,7 @@ export class MapGenScene {
         this.shake = 0;
         this.flash = 0;
         this._firedPop = 0;
+        this._flashHanded = false;
         this.fogPhase = 0;
         if (!this._baked) {
             bakeDungeon(this.D, this.stage.assets.tileset);
@@ -169,6 +179,11 @@ export class MapGenScene {
             this.shake = Math.max(this.shake, 16);
             this.flash = 0.4;
             this._firedPop++;
+        }
+        // Fim do mergulho: o clarão segue por cima da próxima cena (overlay).
+        if (this.isDone && !this._flashHanded) {
+            this._flashHanded = true;
+            this.stage.overlay = whiteFade(DIVE_FLASH, 0.4);
         }
         this._acc += dt * 60;
         let n = 0;
@@ -336,6 +351,25 @@ export class MapGenScene {
     // Pop para trás: antecipa (aproxima ~6%), recua rápido passando do ponto
     // (easeOutBack em escala logarítmica) e assenta no novo enquadramento.
     _camAt(t) {
+        if (t >= DIVE_AT) return this._diveCam(t);
+        return this._popCam(t);
+    }
+    // Mergulho acelerando até a sala escolhida encher a tela (girando).
+    _diveCam(t) {
+        const A = this._popCam(DIVE_AT);
+        const R = this.diveRoom;
+        const r = { x: R.gx * TILE, y: R.gy * TILE, w: R.w * TILE, h: R.h * TILE };
+        const u = clamp01((t - DIVE_AT) / DIVE_DUR);
+        const rot = lerp(A.rot, 0.32, easeInOut(u));
+        const zB = this._fit(r, rot) * 1.15;
+        const w = Math.pow(u, 2.2);
+        const pw = easeInOut(clamp01(u * 1.25));
+        return {
+            x: lerp(A.x, r.x + r.w / 2, pw), y: lerp(A.y, r.y + r.h / 2, pw),
+            z: Math.exp(Math.log(A.z) + (Math.log(zB) - Math.log(A.z)) * w), rot
+        };
+    }
+    _popCam(t) {
         let k = 0;
         while (k < POPS.length && t >= POPS[k].at) k++;
         if (k === 0) return this._base(0, t);
@@ -428,6 +462,7 @@ export class MapGenScene {
         this.post.draw();
         this.stage.drawFogOn(ctx, W, H, this.fogPhase);
         this._drawSpeedLines(ctx, W, H);
+        this._drawDive(ctx, W, H);
         if (this.flash > 0.01) {
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -569,6 +604,38 @@ export class MapGenScene {
         }
     }
 
+    // Mergulho: riscos saindo do centro (aproximação) + clarão branco no fim.
+    _drawDive(ctx, W, H) {
+        const u = (this.t - DIVE_AT) / DIVE_DUR;
+        if (u <= 0) return;
+        const v = clamp01(u);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        const a = clamp01((v - 0.25) / 0.3) * 0.45;
+        if (a > 0) {
+            const diag = Math.hypot(W, H) / 2;
+            ctx.strokeStyle = `rgba(230, 220, 255, ${a})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < 64; i++) {
+                const ang = (i / 64) * Math.PI * 2 + hash01(i + 91) * 0.1;
+                const ph = (this.t * 2.4 + hash01(i * 4.3)) % 1;
+                const r0 = diag * (0.25 + ph * 0.9), r1 = r0 + diag * (0.1 + 0.25 * v);
+                ctx.moveTo(W / 2 + Math.cos(ang) * r0, H / 2 + Math.sin(ang) * r0);
+                ctx.lineTo(W / 2 + Math.cos(ang) * r1, H / 2 + Math.sin(ang) * r1);
+            }
+            ctx.stroke();
+        }
+        const f = clamp01((v - 0.72) / 0.28);
+        if (f > 0) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = `rgba(255, 250, 245, ${DIVE_FLASH * f * f})`;
+            ctx.fillRect(0, 0, W, H);
+        }
+        ctx.restore();
+    }
+
     // Luz: ambiente escuro de perto clareando ao afastar (o mapa fica
     // legível), tochas/castiçais, preenchimento roxo e o clarão de cada pop.
     _drawLights(rooms, cam) {
@@ -636,4 +703,22 @@ function makeShadowSprite() {
     g.arc(0, 0, 29, 0, Math.PI * 2);
     g.fill();
     return c;
+}
+
+// Clarão branco que some (overlay do stage, atravessa o corte de cena).
+function whiteFade(alpha, dur) {
+    return {
+        t: 0,
+        get done() { return this.t >= dur; },
+        update(dt) { this.t += dt; },
+        draw(ctx) {
+            const k = 1 - clamp01(this.t / dur);
+            if (k <= 0) return;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = `rgba(255, 250, 245, ${alpha * k * k})`;
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.restore();
+        }
+    };
 }

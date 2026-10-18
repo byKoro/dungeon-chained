@@ -19,8 +19,15 @@ import { ZigZagShot } from './scenes/montage/ZigZagShot.js';
 import { SnapShot } from './scenes/montage/SnapShot.js';
 import { SplitShot } from './scenes/montage/SplitShot.js';
 import { MapGenScene } from './scenes/mapgen/MapGenScene.js';
+import { ArrowRunShot } from './scenes/rush/ArrowRunShot.js';
+import { HoleRunShot } from './scenes/rush/HoleRunShot.js';
+import { ButtonDoorShot } from './scenes/rush/ButtonDoorShot.js';
+import { GiantSawShot } from './scenes/rush/GiantSawShot.js';
 
-const SCENES = [IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene];
+const SCENES = [
+    IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene,
+    ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot
+];
 
 const IMPACT_INVERT = 0.06;   // s de imagem invertida (quadro de impacto)
 const IMPACT_FLASH = 0.22;    // s até o clarão branco sumir

@@ -93,14 +93,13 @@ export function renderArena(A, w, h) {
     ctx.setTransform(worldTf);
     if (A.sawVisible) {
         const sp = A.sawPos, s = A.sawScale;
-        if (s !== 1) {
-            ctx.translate(sp.x, sp.y); ctx.scale(s, s); ctx.translate(-sp.x, -sp.y);
+        if (s > 1.05) drawBigSaw(A, ctx, sp, s, worldTf);
+        else {
+            A.stage._drawSawGlow(ctx, sp);
+            if (A.freeSaw) { const f = { x: sp.x, y: sp.y }; saw.draw(ctx, f, f); }
+            else if (A.connected) saw.draw(ctx, p1, p2);
+            else if (saw.dropped) saw.drawDropped(ctx);
         }
-        A.stage._drawSawGlow(ctx, sp);
-        if (A.freeSaw) { const f = { x: sp.x, y: sp.y }; saw.draw(ctx, f, f); }
-        else if (A.connected) saw.draw(ctx, p1, p2);
-        else if (saw.dropped) saw.drawDropped(ctx);
-        if (s !== 1) ctx.setTransform(worldTf);
     }
     if (A.connectFlash > 0 && A._connectAt) {
         const f = A.connectFlash, a = A._connectAt;
@@ -148,6 +147,44 @@ function drawClosedDoors(A, ctx, front) {
             ts.draw(ctx, d.index, x, n === 0 ? y : y + TILE - h, TILE, h);
         }
     }
+}
+
+// Serra GIGANTE: desenhada à mão (o draw do jogo treme alguns px de mundo,
+// o que escalado vira um terremoto). Disco girando + 2 fantasmas de borrão
+// de movimento + brilho azul + anel de faísca na borda.
+function drawBigSaw(A, ctx, sp, s, worldTf) {
+    const saw = A.saw, img = saw.sprite;
+    const R = saw.discRadius * s;
+    ctx.save();
+    ctx.setTransform(worldTf);
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(sp.x, sp.y, R * 0.2, sp.x, sp.y, R * 1.6);
+    g.addColorStop(0, 'rgba(150, 196, 255, 0.22)');
+    g.addColorStop(0.62, 'rgba(120, 170, 255, 0.12)');
+    g.addColorStop(1, 'rgba(120, 170, 255, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, R * 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    if (img && img.complete && img.naturalWidth) {
+        ctx.imageSmoothingEnabled = false;
+        const row = (saw.bloodTimer > 0 ? 3 : 2) * 16;
+        const sz = R * 2;
+        const j = Math.min(3, s * 0.3);
+        const jx = (Math.random() - 0.5) * j, jy = (Math.random() - 0.5) * j;
+        for (const [off, a] of [[0.22, 0.22], [0.11, 0.4], [0, 1]]) {
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.translate(sp.x + jx, sp.y + jy);
+            ctx.rotate(-(saw.rotation + off));
+            ctx.drawImage(img, 0, row, 16, 16, -sz / 2, -sz / 2, sz, sz);
+            ctx.restore();
+        }
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = `rgba(210, 230, 255, ${0.25 + 0.15 * Math.random()})`;
+    ctx.lineWidth = Math.max(2, R * 0.03);
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, R * 0.97, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
 }
 
 // Clima vermelho: vinheta vermelha pulsando (alarme) por cima da luz.

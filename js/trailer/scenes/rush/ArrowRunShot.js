@@ -42,7 +42,7 @@ export class ArrowRunShot extends RushShot {
         A.minSpin = 0.8; A.saw.spin = 0.9;
         A.arrowsKill = true;
         A.red = 0;
-        A.impactFlash = 0.9;    // sai do clarão do mergulho
+        A.impactFlash = 0.3;    // o clarão do mergulho vem do overlay do mapa
 
         // Demônios no caminho (as flechas os espetam antes da serra chegar).
         const foes = [];
