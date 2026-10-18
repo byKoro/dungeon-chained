@@ -26,6 +26,9 @@ import { Tileset } from './core/Tileset.js';
 import { RoomTiles } from './core/RoomTiles.js';
 import { Player } from './entities/Player.js';
 import { SawWeapon } from './weapons/SawWeapon.js';
+import { PostProcessor } from './systems/PostProcessor.js';
+import { LightingRenderer } from './systems/LightingRenderer.js';
+import { WindSystem } from './systems/WindSystem.js';
 import { playerConfigs } from './config/EntityConfig.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, BACKGROUND_TILE, DOOR_STUB_TILES } from './config/GameConfig.js';
 
@@ -63,6 +66,7 @@ class TrailerScene {
         // --- Sala do trailer: porta S (base), de frente para a câmera ---
         this.doors = { N: false, S: true, E: false, W: false };
         this.tiles = new RoomTiles(ROOM_COLS, ROOM_ROWS, this.doors, 1, true);
+        this._decorateRoom();
 
         // Retângulo da célula no mundo (origem 0,0).
         this.rect = { x: 0, y: 0, w: ROOM_COLS * TILE, h: ROOM_ROWS * TILE };
@@ -102,6 +106,28 @@ class TrailerScene {
         // --- Serra ---
         this.saw = new SawWeapon(this.assets.saw, this.assets.cable);
 
+        // --- Iluminação (reuso do pipeline do jogo) ---
+        // PostProcessor: ambiente escuro + halos de luz + vinheta. LightingRenderer
+        // monta as luzes (jogadores, tochas, serra azul, wash) a cada frame.
+        this.postProcessor = new PostProcessor(canvas, this.ctx);
+        this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
+
+        // Adaptador mínimo que o LightingRenderer espera no lugar da Chain:
+        // expõe isConnected, weapon e getDroppedLight(). Assim ganhamos a luz
+        // azul-aço da serra (ativa e largada) de graça.
+        const self = this; // referência estável para os getters abaixo
+        this.chainLike = {
+            get isConnected() { return self.sawCarried; },
+            get weapon() { return self.saw; },
+            getDroppedLight: () => {
+                if (!self.sawVisibleDropped) return null;
+                return { x: self.saw.dropX, y: self.saw.dropY, hover: self.saw.dropHover ?? 0 };
+            }
+        };
+
+        // --- Névoa / poeira ambiente (clima misterioso) ---
+        this.wind = new WindSystem();
+
         // --- Estado da cena ---
         this.sawVisibleDropped = false; // true quando a serra está "nascida" no chão
         this.sawCarried = false;        // true quando os jogadores a pegaram (corda ligada)
@@ -110,6 +136,7 @@ class TrailerScene {
         this.speech = null;   // { who, text, t, dur } balão de fala ativo
         this.screenFlashT = 0; // 0..1 clarão branco (nascimento da serra)
         this.worldQuake = 0;   // intensidade do tremor da sala (px)
+        this.chainReveal = 0;  // 0..1 transição da corda ao conectar aos jogadores
 
         this.time = 0;         // tempo acumulado da cena (s)
         this.beatIndex = 0;    // beat atual
@@ -123,6 +150,41 @@ class TrailerScene {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.ctx.imageSmoothingEnabled = false;
+    }
+
+    // Decora a sala do trailer: TOCHAS nas paredes (o Renderer anima pelos
+    // sprites de assets.torchSprites conforme t.side/t.type) e PROPS no piso
+    // (índices do tileset desenhados pelo Renderer em tiles.props).
+    _decorateRoom() {
+        const last = ROOM_COLS - 1;
+        const bottom = ROOM_ROWS - 1;
+
+        // Tochas de PAREDE. IMPORTANTE: tochas laterais ficam na PRIMEIRA
+        // coluna de PISO à frente da parede (col 1 à esquerda, col last-1 à
+        // direita) — não dentro da coluna de parede (col 0/last), senão o
+        // sprite fica escondido atrás do tile sólido. É o mesmo padrão das
+        // peças do jogo (ver map/*.json: side "W" em col 1, side "E" em col 12).
+        this.tiles.torches = [
+            { col: 1, row: 2, side: 'W', type: 'torch' },
+            { col: 1, row: 4, side: 'W', type: 'torch' },
+            { col: 1, row: bottom - 2, side: 'W', type: 'torch' },
+            { col: last - 1, row: 2, side: 'E', type: 'torch' },
+            { col: last - 1, row: 4, side: 'E', type: 'torch' },
+            { col: last - 1, row: bottom - 2, side: 'E', type: 'torch' },
+            { col: 3, row: 0, side: 'N', type: 'torch' },
+            { col: last - 3, row: 0, side: 'N', type: 'torch' }
+        ];
+
+        // Props decorativos no piso (encostados nas paredes, longe do vão da
+        // porta e do centro onde a serra nasce). Índices de PROP_SCATTER.tiles.
+        this.tiles.props = [
+            { col: 2, row: 2, index: 59 },
+            { col: last - 2, row: 2, index: 68 },
+            { col: 2, row: bottom - 2, index: 64 },
+            { col: last - 2, row: bottom - 2, index: 77 },
+            { col: 4, row: 3, index: 64 },
+            { col: last - 4, row: 3, index: 59 }
+        ];
     }
 
     // Posições-chave da cena (em coordenadas de mundo).
@@ -153,6 +215,10 @@ class TrailerScene {
         this.worldQuake = 0;
         this.sawVisibleDropped = false;
         this.sawCarried = false;
+        this.chainReveal = 0;
+        this.saw.spin = 0;
+        this.saw.rotation = 0;
+        this._fogPhase = 0;
         this.renderer.setIntroZoomFactor(1);
         this.renderer.resetSway();
 
@@ -212,9 +278,11 @@ class TrailerScene {
 
             // ----------------------------------------------------------------
             // BEAT 1 — Câmera vai para o MEIO; a SERRA NASCE (drop + luz + clarão).
+            //          Os jogadores REAGEM com ESPANTO ali mesmo (perto da porta),
+            //          sem corte: congelam e encaram a serra.
             // ----------------------------------------------------------------
             {
-                dur: 2.2,
+                dur: 2.0,
                 enter: () => {
                     // A serra passa a existir, caída no centro (estado "dropped"),
                     // com o pop de queda e o feixe de luz varrendo (drawDropped).
@@ -223,71 +291,55 @@ class TrailerScene {
                     this.sawCarried = false;
                     this.screenFlashT = 1; // clarão branco no nascimento
                     this.renderer.triggerShake(10);
-                },
-                update: (k) => {
-                    // Câmera desliza da porta para o MEIO da sala, afastando um pouco.
-                    const z = lerp(fit() * 1.7, fit() * 1.25, easeInOut(k));
-                    const cx = lerp(this.doorWorld.x, this.center.x, easeInOut(k));
-                    const cy = lerp(this.doorWorld.y - TILE * 0.2, this.center.y, easeInOut(k));
-                    this._camTo(cx, cy, z, 0.12);
-                    // Jogadores parados perto da porta (ainda sem reação).
-                    this._idle(this.p1);
-                    this._idle(this.p2);
-                }
-            },
-
-            // ----------------------------------------------------------------
-            // BEAT 2 — CORTE para os jogadores com o sprite de ESPANTO.
-            // ----------------------------------------------------------------
-            {
-                dur: 1.8,
-                enter: () => {
-                    // Reposiciona (corte) um pouco mais afastados, encarando a serra.
-                    this._place(this.p1, L.p1Startled);
-                    this._place(this.p2, L.p2Startled);
+                    // Reação imediata: sprite de ESPANTO (continuam onde estão).
                     this._startle(this.p1);
                     this._startle(this.p2);
-                    // Corte seco de câmera: enquadra os dois com a serra ao fundo.
-                    const z = fit() * 1.5;
-                    this.renderer.zoom = z;
-                    this.renderer.camX = this.center.x;
-                    this.renderer.camY = this.center.y + TILE * 1.0;
                 },
                 update: (k) => {
-                    this._camTo(this.center.x, this.center.y + TILE * 1.0, fit() * 1.5, 0.1);
+                    // Câmera desliza da porta para o MEIO da sala, afastando um pouco
+                    // para revelar a serra nascendo (sem corte seco).
+                    const z = lerp(fit() * 1.7, fit() * 1.3, easeInOut(k));
+                    const cx = lerp(this.doorWorld.x, this.center.x, easeInOut(k));
+                    const cy = lerp(this.doorWorld.y - TILE * 0.2, this.center.y + TILE * 0.7, easeInOut(k));
+                    this._camTo(cx, cy, z, 0.1);
+                    // Parados, assustados, encarando a serra.
                     this._idle(this.p1);
                     this._idle(this.p2);
                     this._keepStartled(this.p1);
                     this._keepStartled(this.p2);
-                    // Encaram a serra (viram-se para o centro).
                     this.p1.facingLeft = false;
                     this.p2.facingLeft = true;
                 }
             },
 
             // ----------------------------------------------------------------
-            // BEAT 3 — Chegam perto da serra e PEGAM ela; câmera chega bem perto.
+            // BEAT 2 — CAMINHAM (sem corte) da porta até perto da serra e PEGAM
+            //          ela; câmera acompanha e dá um zoom BEM FORTE na serra.
             // ----------------------------------------------------------------
             {
-                dur: 2.4,
+                dur: 2.8,
                 enter: () => {
                     this._keepStartled(this.p1);
                     this._keepStartled(this.p2);
                 },
                 update: (k) => {
-                    const w = easeInOut(clamp01(k / 0.7));
-                    // Curiosos: mantêm o espanto no começo e vão perdendo ao se
-                    // aproximarem (o scared decai sozinho conforme o timer cai).
-                    this._walkTo(this.p1, L.p1Startled, L.p1AtSaw, w, 'toCenter');
-                    this._walkTo(this.p2, L.p2Startled, L.p2AtSaw, w, 'toCenter');
+                    // Trajeto contínuo: de onde pararam (perto da porta) até a serra.
+                    const w = easeInOut(clamp01(k / 0.78));
+                    this._walkTo(this.p1, L.p1NearDoor, L.p1AtSaw, w, 'toCenter');
+                    this._walkTo(this.p2, L.p2NearDoor, L.p2AtSaw, w, 'toCenter');
 
-                    // Câmera aproxima bem perto da serra.
-                    const z = lerp(fit() * 1.5, fit() * 2.15, easeInOut(k));
-                    this._camTo(this.center.x, this.center.y + TILE * 0.4, z, 0.12);
+                    // Câmera acompanha a aproximação com zoom crescente e FORTE na
+                    // serra (bem mais perto do que antes).
+                    const cy = lerp(this.center.y + TILE * 0.7, this.center.y + TILE * 0.3, easeInOut(k));
+                    const z = lerp(fit() * 1.3, fit() * 2.8, easeInOut(k));
+                    this._camTo(this.center.x, cy, z, 0.1);
 
-                    // Ao chegar perto (fim do trajeto), PEGAM a serra: a corda liga
-                    // os dois e o disco passa a ser carregado entre eles.
-                    if (k > 0.72 && !this.sawCarried) {
+                    // Perto da serra deixam de ficar assustados (curiosidade vence).
+                    if (k > 0.6) { this._calm(this.p1); this._calm(this.p2); }
+
+                    // Ao chegar, PEGAM a serra: a corda liga os dois (com transição)
+                    // e o disco passa a ser carregado entre eles.
+                    if (k > 0.78 && !this.sawCarried) {
                         this.sawCarried = true;
                         this.sawVisibleDropped = false;
                         this.saw.pickup();
@@ -298,7 +350,8 @@ class TrailerScene {
             },
 
             // ----------------------------------------------------------------
-            // BEAT 4 — Balão do VERMELHO: comenta o quão afiada é a serra.
+            // BEAT 3 — Balão do VERMELHO: comenta o quão afiada é a serra.
+            //          Enquadramento fechado (zoom forte) na serra entre os dois.
             // ----------------------------------------------------------------
             {
                 dur: 2.6,
@@ -309,19 +362,21 @@ class TrailerScene {
                     this._speak(this.redPlayer, 'Olha como essa serra é afiada…', 2.4);
                 },
                 update: () => {
-                    this._camTo(this.center.x, this.center.y + TILE * 0.4, this._zoomFit() * 2.15, 0.1);
+                    this._camTo(this.center.x, this.center.y + TILE * 0.35, this._zoomFit() * 2.7, 0.08);
                     this._idle(this.p1);
                     this._idle(this.p2);
                     this.p1.facingLeft = false;
                     this.p2.facingLeft = true;
-                    // Serra gira devagar nas mãos deles (feedback de "afiada").
-                    this.saw.spin = lerp(this.saw.spin, 0.5, 0.08);
-                    this.saw.rotation += 0.18;
+                    // Serra GIRA a toda (feedback de "afiada"): spin acima de
+                    // BLEND_HI (0.6) para engatar o SPRITE DE GIRO; rotação real
+                    // acelerada para o disco rodar visível.
+                    this.saw.spin = lerp(this.saw.spin, 0.95, 0.12);
+                    this.saw.rotation += 0.42;
                 }
             },
 
             // ----------------------------------------------------------------
-            // BEAT 5 — Balão do AZUL: concorda.
+            // BEAT 4 — Balão do AZUL: concorda.
             // ----------------------------------------------------------------
             {
                 dur: 2.4,
@@ -331,16 +386,19 @@ class TrailerScene {
                     this._speak(this.bluePlayer, 'Com certeza. Corta qualquer coisa!', 2.2);
                 },
                 update: () => {
-                    this._camTo(this.center.x, this.center.y + TILE * 0.4, this._zoomFit() * 2.1, 0.1);
+                    this._camTo(this.center.x, this.center.y + TILE * 0.35, this._zoomFit() * 2.6, 0.08);
                     this._idle(this.p1);
                     this._idle(this.p2);
-                    this.saw.spin = lerp(this.saw.spin, 0.35, 0.08);
-                    this.saw.rotation += 0.14;
+                    this.p1.facingLeft = false;
+                    this.p2.facingLeft = true;
+                    // Mantém o giro a toda (sprite de giro) durante a concordância.
+                    this.saw.spin = lerp(this.saw.spin, 0.9, 0.1);
+                    this.saw.rotation += 0.4;
                 }
             },
 
             // ----------------------------------------------------------------
-            // BEAT 6 — A sala toda TREME; o sprite de espanto toca novamente.
+            // BEAT 5 — A sala toda TREME; o sprite de espanto toca novamente.
             // ----------------------------------------------------------------
             {
                 dur: 2.2,
@@ -351,8 +409,9 @@ class TrailerScene {
                     this._startle(this.p2);
                 },
                 update: (k) => {
-                    // Afasta um pouco para mostrar a sala toda tremendo.
-                    const z = lerp(this._zoomFit() * 2.1, this._zoomFit() * 1.4, easeOut(k));
+                    // Afasta para mostrar a sala toda tremendo (vinha do zoom
+                    // fechado da fala; recua suave).
+                    const z = lerp(this._zoomFit() * 2.6, this._zoomFit() * 1.4, easeOut(k));
                     this._camTo(this.center.x, this.center.y, z, 0.1);
                     this._idle(this.p1);
                     this._idle(this.p2);
@@ -366,7 +425,7 @@ class TrailerScene {
             },
 
             // ----------------------------------------------------------------
-            // BEAT 7 — Recuam DEVAGAR até a porta enquanto a câmera dá zoom;
+            // BEAT 6 — Recuam DEVAGAR até a porta enquanto a câmera dá zoom;
             //          ambos entram pela porta e SOMEM na escuridão (fade).
             // ----------------------------------------------------------------
             {
@@ -399,29 +458,67 @@ class TrailerScene {
     // Helpers de movimentação / estado dos jogadores
     // -----------------------------------------------------------------------
 
-    // Move o jogador de `from` para `to` conforme t (0..1) e anima o passo.
-    // dir define a direção de encaramento ('up'/'down'/'toCenter'); speedScale
-    // modula a velocidade da animação de passo (devagar < 1).
+    // Move o jogador de `from` para `to` conforme t (0..1) e anima o passo de
+    // forma SUAVE. A animação (bobPhase/tilt/walkFrame) é dirigida por um
+    // relógio contínuo próprio (_gaitPhase) e NÃO pelo deslocamento bruto por
+    // frame — assim o personagem não "treme" quando o dt varia. A velocidade
+    // real (vx/vy) é apenas uma dica amortecida para a serra reagir, mantida
+    // pequena para o bob (que depende de speedMag/speed) ficar discreto.
+    // speedScale modula o ritmo do passo (devagar < 1).
     _walkTo(p, from, to, t, dir = 'up', speedScale = 1) {
         const nx = lerp(from.x, to.x, t);
         const ny = lerp(from.y, to.y, t);
         const dx = nx - p.x, dy = ny - p.y;
         p.x = nx; p.y = ny;
-        // Velocidade aparente (para a serra e a animação reagirem ao movimento).
-        p.vx = dx; p.vy = dy;
-        const moving = Math.hypot(dx, dy) > 0.05;
-        if (moving) {
-            p.walkFrame += (1.1 * speedScale);
-            // Encaramento horizontal: segue o movimento lateral.
-            if (dx < -0.1) p.facingLeft = true;
-            else if (dx > 0.1) p.facingLeft = false;
-        }
-        // speedMag é derivado de vx/vy (getter), então o sprite de passo liga/desliga sozinho.
+
+        const moving = Math.hypot(dx, dy) > 0.03;
+        p._moving = moving;
+        p._gaitScale = speedScale;
+
+        // Encaramento horizontal: segue o movimento lateral (com limiar).
+        if (dx < -0.1) p.facingLeft = true;
+        else if (dx > 0.1) p.facingLeft = false;
     }
 
     _idle(p) {
-        p.vx = 0; p.vy = 0;
-        p.walkFrame = 0; // pose parada (frame 0)
+        p._moving = false;
+        p._gaitScale = 1;
+    }
+
+    // Avança a animação de caminhada SUAVE de um jogador (chamado todo frame no
+    // update, com dt real). Mantém bobPhase/tilt/walkFrame contínuos e com
+    // amplitude contida, e amortece vx/vy para o bob (speedMag/speed) ser leve.
+    _gait(p, dt) {
+        const moving = !!p._moving;
+        const scale = p._gaitScale ?? 1;
+
+        // "Velocidade aparente" bem baixa: ~20% da velocidade máxima quando
+        // andando. Como o bob/tilt do Player escalam por speedMag/speed, isso
+        // deixa o balanço SUAVE (sem tranco). A cena anda na vertical, então
+        // injetamos a magnitude no eixo Y; o X fica num valor pequeno coerente
+        // com o lado para onde encara (dá um tilt leve, sem solavanco).
+        const dirSign = p.facingLeft ? -1 : 1;
+        const targetMag = moving ? p.speed * 0.20 * scale : 0;
+        const targetVX = moving ? dirSign * p.speed * 0.04 : 0;
+        const targetVY = -targetMag;
+        p.vx += (targetVX - p.vx) * 0.12;
+        p.vy += (targetVY - p.vy) * 0.12;
+
+        // Relógio de passo contínuo (independe de dt irregular): avança em
+        // "passos por segundo" fixos, escalado pela velocidade da cena.
+        const stepsPerSec = 7.5 * scale;
+        if (moving) {
+            p.walkFrame += stepsPerSec * dt;
+        } else {
+            p.walkFrame = 0; // pose parada
+        }
+
+        // Bob/tilt próprios, suaves e contínuos. bobPhase avança devagar; o tilt
+        // persegue um alvo pequeno. (No jogo isso vive em Player.update, que
+        // aqui não roda, então replicamos de forma mais branda.)
+        p.bobPhase += (moving ? (3.2 + 2.0 * scale) : 0) * dt;
+        const tiltTarget = moving ? dirSign * 0.04 : 0;
+        p.tilt += (tiltTarget - p.tilt) * 0.08;
     }
 
     // Dispara/mantém o sprite de ESPANTO (scared). resolveSprite usa a folha
@@ -464,27 +561,42 @@ class TrailerScene {
             if (this.speech.t >= this.speech.dur) this.speech = null;
         }
 
+        // Máquina de beats (define posição/estado dos jogadores neste frame).
+        const beat = this.beats[this.beatIndex];
+        if (beat) {
+            if (this.beatTime === 0 && beat.enter) beat.enter();
+            this.beatTime += dt;
+            const k = clamp01(this.beatTime / beat.dur);
+            if (beat.update) beat.update(k);
+
+            if (this.beatTime >= beat.dur) {
+                this.beatIndex++;
+                this.beatTime = 0;
+            }
+            this.time += dt;
+        }
+
+        // Animação SUAVE de caminhada (depois dos beats definirem _moving).
+        this._gait(this.p1, dt);
+        this._gait(this.p2, dt);
+
+        // Névoa/poeira ambiente (atravessa a sala, revelada pela luz).
+        this.wind.update(this.bounds);
+
+        // Camadas de névoa atmosférica (bancos de fumaça lentos). Avança a fase.
+        this._fogPhase = (this._fogPhase ?? 0) + dt * 0.06;
+
+        // Transição da corda: cresce de 0->1 quando a serra é conectada.
+        if (this.sawCarried && this.chainReveal < 1) {
+            this.chainReveal = Math.min(1, this.chainReveal + dt / 0.45);
+        }
+
         // Serra: estado carregada (gira com o movimento) ou largada (bob + luz).
         if (this.sawCarried) {
             this.saw.update(this.p1, this.p2);
         } else if (this.sawVisibleDropped) {
             this.saw.updateDropped();
         }
-
-        // Máquina de beats.
-        const beat = this.beats[this.beatIndex];
-        if (!beat) return; // cena terminou (segura o último quadro)
-
-        if (this.beatTime === 0 && beat.enter) beat.enter();
-        this.beatTime += dt;
-        const k = clamp01(this.beatTime / beat.dur);
-        if (beat.update) beat.update(k);
-
-        if (this.beatTime >= beat.dur) {
-            this.beatIndex++;
-            this.beatTime = 0;
-        }
-        this.time += dt;
     }
 
     render() {
@@ -518,8 +630,17 @@ class TrailerScene {
         renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, 0);
         renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, 0);
 
-        // Corda (quando a serra está sendo carregada), sempre ao fundo.
-        if (this.sawCarried) this.saw.drawChain(ctx, this.p1, this.p2);
+        // Corda (quando a serra está sendo carregada), sempre ao fundo. Na
+        // CONEXÃO, a corda surge com uma transição: cresce em alpha e dá um
+        // pulso de luz branca correndo entre os jogadores (ela "liga").
+        if (this.sawCarried) {
+            const rev = this.chainReveal;
+            ctx.save();
+            ctx.globalAlpha = rev; // fade-in da corda
+            this.saw.drawChain(ctx, this.p1, this.p2);
+            ctx.restore();
+            if (rev < 1) this._drawChainConnectPulse(ctx, rev);
+        }
 
         // Ordenação por profundidade pelo Y (como o jogo).
         const sawY = this.sawCarried
@@ -531,8 +652,12 @@ class TrailerScene {
 
         // Disco da serra: carregada (entre os dois) ou largada no chão (nasce).
         if (this.sawCarried) {
+            // Brilho AZUL em volta do disco (reforça a luz fria da serra),
+            // pulsando com o giro — desenhado atrás do disco, aditivo.
+            this._drawSawGlow(ctx, this.saw.getSawPositions(this.p1, this.p2)[0]);
             this.saw.draw(ctx, this.p1, this.p2);
         } else if (this.sawVisibleDropped) {
+            this._drawSawGlow(ctx, { x: this.saw.dropX, y: this.saw.dropY });
             this.saw.drawDropped(ctx);
         }
 
@@ -541,14 +666,37 @@ class TrailerScene {
         // Parede frontal por cima (quem encosta na base fica "atrás").
         renderer.drawFrontWall(this.rect, this.tiles, TILE, true, this.doorList, this.doorHalf, DOOR_STUB_TILES);
 
+        // Poeira/vento no MUNDO (dentro do clip): a luz das tochas/jogadores a
+        // revela, deixando o ar "vivo".
+        this.wind.draw(ctx);
+
         ctx.restore(); // fim do clip da sala
         ctx.restore(); // fim do tremor
 
         renderer.endFrame();
 
-        // --- Overlays em espaço de TELA (após o mundo) ---
-        this._drawFlash();
-        this._drawVignette();
+        // --- ILUMINAÇÃO (pipeline do jogo) em espaço de TELA ---
+        // Monta as luzes do quadro e compõe o mapa de luz + vinheta sobre a cena.
+        const sawPos = (this.sawCarried && this.saw)
+            ? this.saw.getSawPositions(this.p1, this.p2)[0]
+            : null;
+        this.lighting.render({
+            players: [this.p1, this.p2],
+            chain: this.chainLike,
+            sawPos,
+            arenaBounds: this.bounds,
+            tiles: this.tiles,
+            rect: this.rect,
+            doors: this.doorList,
+            doorHalf: this.doorHalf,
+            open: true,
+            doorFlashT: 0
+        });
+        this.postProcessor.draw();
+
+        // --- Overlays em espaço de TELA (após a iluminação) ---
+        this._drawFog();        // névoa atmosférica (bancos de fumaça)
+        this._drawFlash();      // clarão do nascimento da serra
         this._drawSpeech();
         this._drawLetterbox();
         this._drawEndFade();
@@ -565,18 +713,39 @@ class TrailerScene {
         ctx.restore();
     }
 
-    // Vinheta de masmorra (escurece as bordas).
-    _drawVignette() {
+    // Névoa atmosférica: bancos de fumaça suaves derivando pela tela, por cima
+    // da iluminação (a vinheta já vem do PostProcessor). Vários blobs radiais
+    // azul-arroxeados, lentos, de baixa opacidade — dão o ar "misterioso" sem
+    // esconder a cena. Posições derivam de senoides defasadas (determinístico).
+    _drawFog() {
         const { ctx, canvas } = this;
-        const g = ctx.createRadialGradient(
-            canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.3,
-            canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.75
-        );
-        g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, 'rgba(0,0,0,0.72)');
+        const w = canvas.width, h = canvas.height;
+        const ph = this._fogPhase ?? 0;
+
+        // Camada 1: banco baixo (chão), mais denso. Camada 2: véu alto, tênue.
+        const banks = [
+            { cy: h * 0.82, r: h * 0.55, color: '70, 60, 95', base: 0.16, n: 4, speed: 1.0, drift: w * 0.5 },
+            { cy: h * 0.35, r: h * 0.45, color: '60, 70, 110', base: 0.08, n: 3, speed: 0.6, drift: w * 0.6 }
+        ];
+
         ctx.save();
-        ctx.fillStyle = g;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = 'screen'; // névoa clareia de leve (não some no escuro)
+        for (const bank of banks) {
+            for (let i = 0; i < bank.n; i++) {
+                // Posição horizontal derivando devagar em loop (vai e volta).
+                const phase = ph * bank.speed + (i / bank.n) * Math.PI * 2;
+                const cx = w * 0.5 + Math.sin(phase) * bank.drift;
+                const cy = bank.cy + Math.cos(phase * 0.7) * (h * 0.05);
+                // Opacidade pulsando devagar (respiração da névoa).
+                const a = bank.base * (0.6 + 0.4 * (0.5 + 0.5 * Math.sin(phase * 1.3)));
+                const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, bank.r);
+                g.addColorStop(0, `rgba(${bank.color}, ${a})`);
+                g.addColorStop(0.6, `rgba(${bank.color}, ${a * 0.4})`);
+                g.addColorStop(1, `rgba(${bank.color}, 0)`);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, w, h);
+            }
+        }
         ctx.restore();
     }
 
@@ -650,6 +819,73 @@ class TrailerScene {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, scr.x, by + h / 2 + 1);
+        ctx.restore();
+    }
+
+    // Brilho AZUL-AÇO em volta do disco da serra (no MUNDO, aditivo). Intensifica
+    // com o giro — casa com a luz fria que o LightingRenderer já emite da lâmina.
+    _drawSawGlow(ctx, pos) {
+        if (!pos) return;
+        const spin = this.saw.spin ?? 0;
+        const r = (this.saw.discRadius ?? 32);
+        const intensity = 0.35 + spin * 0.5; // base + reforço com o giro
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // Halo externo difuso.
+        const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, r * 1.9);
+        g.addColorStop(0, `rgba(150, 196, 255, ${0.5 * intensity})`);
+        g.addColorStop(0.5, `rgba(120, 170, 255, ${0.22 * intensity})`);
+        g.addColorStop(1, 'rgba(120, 170, 255, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r * 1.9, 0, Math.PI * 2);
+        ctx.fill();
+        // Núcleo mais intenso bem no disco.
+        ctx.fillStyle = `rgba(210, 230, 255, ${0.3 * intensity})`;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Pulso de luz da CONEXÃO da corda: um brilho branco-azulado que parte do
+    // meio (onde está a serra) e corre para os dois jogadores conforme a corda
+    // se revela (rev 0..1). Dá a sensação de a corda "ligar" os dois.
+    _drawChainConnectPulse(ctx, rev) {
+        const saw = this.saw;
+        // Extensão do brilho a partir do meio (t=0.5) rumo às pontas (0 e 1).
+        const spread = easeOut(rev);          // cresce rápido no começo
+        const glow = Math.sin(rev * Math.PI); // acende e apaga (pico no meio)
+        if (glow <= 0.01) return;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineWidth = 7;
+        ctx.strokeStyle = `rgba(200, 225, 255, ${0.9 * glow})`;
+        ctx.shadowColor = 'rgba(170, 205, 255, 0.9)';
+        ctx.shadowBlur = 14 * glow;
+
+        // Dois segmentos: do meio para P1 e do meio para P2.
+        const drawSeg = (fromT, toT) => {
+            ctx.beginPath();
+            const steps = 20;
+            for (let i = 0; i <= steps; i++) {
+                const t = lerp(fromT, toT, i / steps);
+                const pt = saw.cablePoint(this.p1, this.p2, t);
+                if (i === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.stroke();
+        };
+        drawSeg(0.5, 0.5 - 0.5 * spread); // meio -> P1
+        drawSeg(0.5, 0.5 + 0.5 * spread); // meio -> P2
+
+        // Clarão na própria serra no auge da conexão.
+        const mid = saw.cablePoint(this.p1, this.p2, 0.5);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(230, 240, 255, ${0.8 * glow})`;
+        ctx.arc(mid.x, mid.y, 10 + 10 * glow, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
     }
 
