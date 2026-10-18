@@ -202,7 +202,7 @@ function drawRedMood(A, ctx, W, H) {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'overlay';
-    ctx.fillStyle = `rgba(200, 20, 30, ${A.red * (0.1 + 0.08 * pulse)})`;
+    ctx.fillStyle = `rgba(200, 20, 30, ${A.red * (0.05 + 0.06 * pulse)})`;
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
 }

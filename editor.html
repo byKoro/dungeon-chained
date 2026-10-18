@@ -252,14 +252,8 @@
                         <div class="tab-panel" id="tab-enemies">
                             <div class="panel-section">
                                 <div class="panel-title">Tipo de Inimigo ao Clicar</div>
-                                <div style="display:flex; flex-direction:column; gap:6px;">
-                                    <label class="btn tool-enemy-btn active" data-enemy="demon">
-                                        <input type="radio" name="enemy-choice" value="demon" checked> Demônio (Rápido)
-                                    </label>
-                                    <label class="btn tool-enemy-btn" data-enemy="bloodMonster">
-                                        <input type="radio" name="enemy-choice" value="bloodMonster"> Monstro de Sangue (Tanque)
-                                    </label>
-                                </div>
+                                <!-- Gerado por EditorApp a partir de ENEMY_TYPES (EntityConfig.js) -->
+                                <div id="enemy-choice-list" role="radiogroup" aria-label="Tipo de inimigo" style="display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto;"></div>
                             </div>
 
                             <div class="panel-section">

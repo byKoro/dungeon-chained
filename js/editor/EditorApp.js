@@ -20,7 +20,7 @@ import { RoomPresets } from '../rooms/RoomPresets.js';
 import { RoomCatalog, doorSignature } from '../rooms/RoomCatalog.js';
 import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor, EMPTY_FLOOR_TILE, EMPTY_FLOOR_COLOR } from '../config/GameConfig.js';
-import { demonConfig, bloodMonsterConfig, playerConfigs } from '../config/EntityConfig.js';
+import { ENEMY_TYPES, ENEMY_TYPE_BY_KEY, playerConfigs } from '../config/EntityConfig.js';
 
 class RoomEditor {
     constructor() {
@@ -110,6 +110,7 @@ class RoomEditor {
     async _initAssets() {
         await this.assets.whenReady();
         this.tileset = new Tileset(this.assets.tileset, 16, 10);
+        this._drawEnemyChoiceThumbs();
 
         // Carrega o catálogo de peças (/map) para o navegador de formas/variações.
         this.catalog = new RoomCatalog();
@@ -827,7 +828,7 @@ class RoomEditor {
             const item = document.createElement("div");
             item.className = "status-item";
             item.innerHTML = `
-                <span>${foe.type === "demon" ? "Demônio" : "Monstro Sangue"} (${foe.col}, ${foe.row})</span>
+                <span>${ENEMY_TYPE_BY_KEY[foe.type]?.label ?? String(foe.type).replace(/[&<>"']/g, "?")} (${foe.col}, ${foe.row})</span>
                 <button class="btn btn-sm btn-danger" data-del-enemy="${i}">✕</button>
             `;
             listEl.appendChild(item);
@@ -1313,58 +1314,100 @@ class RoomEditor {
             const cx = foe.col * tileW + tileW / 2;
             const cy = foe.row * tileW + tileW / 2;
 
-            if (foe.type === "demon") {
-                // Demon config: cellSize: 100, cropX: 28, cropY: 34, cropW: 52, cropH: 26, row: 1
-                const sprite = this.assets.get("demon");
-                const sx = 28;
-                const sy = 100 + 34; // Row 1 (walk frame 0)
-                const sw = 52;
-                const sh = 26;
+            const style = this._enemyEditorStyle(foe.type);
 
-                // Anel de destaque sob o inimigo
-                ctx.fillStyle = "rgba(239, 69, 101, 0.25)";
+            // Anel de destaque sob o inimigo
+            ctx.fillStyle = style.ring;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + 12, 24, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (!this._drawEnemyPreview(ctx, foe.type, cx, cy - 4, style.scale)) {
+                ctx.fillStyle = style.fallback;
                 ctx.beginPath();
-                ctx.ellipse(cx, cy + 12, 24, 10, 0, 0, Math.PI * 2);
+                ctx.arc(cx, cy, 18, 0, Math.PI * 2);
                 ctx.fill();
-
-                if (sprite && sprite.complete) {
-                    const scale = 1.45;
-                    const dw = sw * scale;
-                    const dh = sh * scale;
-                    ctx.drawImage(sprite, sx, sy, sw, sh, cx - dw / 2, cy - dh / 2 - 4, dw, dh);
-                } else {
-                    ctx.fillStyle = "#ef4565";
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, 18, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-            } else {
-                // Blood Monster config: cellSize: 100, cropX: 36, cropY: 30, cropW: 48, cropH: 30, row: 1
-                const sprite = this.assets.get("bloodMonster");
-                const sx = 36;
-                const sy = 100 + 30; // Row 1 (walk frame 0)
-                const sw = 48;
-                const sh = 30;
-
-                ctx.fillStyle = "rgba(127, 90, 240, 0.25)";
-                ctx.beginPath();
-                ctx.ellipse(cx, cy + 12, 24, 10, 0, 0, Math.PI * 2);
-                ctx.fill();
-
-                if (sprite && sprite.complete) {
-                    const scale = 1.35;
-                    const dw = sw * scale;
-                    const dh = sh * scale;
-                    ctx.drawImage(sprite, sx, sy, sw, sh, cx - dw / 2, cy - dh / 2 - 4, dw, dh);
-                } else {
-                    ctx.fillStyle = "#7f5af0";
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, 18, 0, Math.PI * 2);
-                    ctx.fill();
-                }
             }
         }
+    }
+
+    // Cor do anel / escala de preview por tipo. Os dois originais mantêm o
+    // visual de antes; os demais usam uma cor neutra.
+    _enemyEditorStyle(type) {
+        if (type === "demon") return { ring: "rgba(239, 69, 101, 0.25)", fallback: "#ef4565", scale: 1.45 };
+        if (type === "bloodMonster") return { ring: "rgba(127, 90, 240, 0.25)", fallback: "#7f5af0", scale: 1.35 };
+        return { ring: "rgba(255, 137, 6, 0.25)", fallback: "#ff8906", scale: 1.45 };
+    }
+
+    /**
+     * Desenha o frame 0 do walk de um tipo de inimigo centrado em (cx, cy).
+     * Usa a caixa do corpo (`body`) quando existir, senão o recorte da config.
+     * `scale` = px de tela por px de arte; ou `fit` = {w, h} para caber numa caixa.
+     * Retorna false se o tipo/imagem não estiver disponível.
+     */
+    _drawEnemyPreview(ctx, type, cx, cy, scale, fit = null) {
+        const entry = ENEMY_TYPE_BY_KEY[type];
+        if (!entry) return false;
+        const cfg = entry.config(this.assets);
+        const img = cfg.img;
+        if (!img || !img.complete || img.naturalWidth === 0) return false;
+
+        const r = cfg.body || { x: cfg.cropX, y: cfg.cropY, w: cfg.cropW, h: cfg.cropH };
+        const sx = r.x;
+        const sy = cfg.rows.walk.row * cfg.cellSize + r.y;
+        const k = fit ? Math.min(fit.w / r.w, fit.h / r.h) : scale;
+        const dw = r.w * k, dh = r.h * k;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, sx, sy, r.w, r.h, cx - dw / 2, cy - dh / 2, dw, dh);
+        ctx.restore();
+        return true;
+    }
+
+    // Cria um botão (radio) por tipo de ENEMY_TYPES no painel de Inimigos.
+    _buildEnemyChoices() {
+        const list = document.getElementById("enemy-choice-list");
+        if (!list) return;
+        list.innerHTML = "";
+        for (const t of ENEMY_TYPES) {
+            const label = document.createElement("label");
+            label.className = "btn tool-enemy-btn";
+            label.dataset.enemy = t.key;
+            label.style.cssText = "display:flex; align-items:center; gap:8px; justify-content:flex-start;";
+
+            const input = document.createElement("input");
+            input.type = "radio";
+            input.name = "enemy-choice";
+            input.value = t.key;
+            input.checked = t.key === this.selectedEnemy;
+            input.onchange = () => {
+                this.selectedEnemy = t.key;
+                list.querySelectorAll(".tool-enemy-btn").forEach(l =>
+                    l.classList.toggle("active", l.dataset.enemy === t.key));
+            };
+
+            const thumb = document.createElement("canvas");
+            thumb.width = thumb.height = 32;
+            thumb.dataset.enemyThumb = t.key;
+            thumb.setAttribute("aria-hidden", "true");
+            thumb.style.cssText = "width:32px; height:32px; image-rendering:pixelated; flex:none;";
+
+            const text = document.createElement("span");
+            text.textContent = t.label;
+
+            label.classList.toggle("active", input.checked);
+            label.append(input, thumb, text);
+            list.appendChild(label);
+        }
+    }
+
+    // Preenche as miniaturas dos botões de inimigo (após carregar os assets).
+    _drawEnemyChoiceThumbs() {
+        document.querySelectorAll("canvas[data-enemy-thumb]").forEach(c => {
+            const ctx = c.getContext("2d");
+            ctx.clearRect(0, 0, c.width, c.height);
+            this._drawEnemyPreview(ctx, c.dataset.enemyThumb, c.width / 2, c.height / 2, 1, { w: c.width - 2, h: c.height - 2 });
+        });
     }
 
     /**
@@ -1536,10 +1579,8 @@ class RoomEditor {
             this._updateCodeOutput();
         };
 
-        // Inimigos
-        document.querySelectorAll("[name='enemy-choice']").forEach(r => {
-            r.onchange = () => { this.selectedEnemy = r.value; };
-        });
+        // Inimigos: um botão por tipo registrado em ENEMY_TYPES.
+        this._buildEnemyChoices();
         document.getElementById("btn-clear-enemies").onclick = () => {
             this.room.enemies = [];
             this._updateEnemiesListUI();

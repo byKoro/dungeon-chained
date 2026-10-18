@@ -1,12 +1,6 @@
 import { MeleeEnemy } from '../entities/MeleeEnemy.js';
-import { MELEE_ENEMY_CONFIGS, demonConfig, bloodMonsterConfig } from '../config/EntityConfig.js';
+import { MELEE_ENEMY_CONFIGS, ENEMY_TYPE_BY_KEY } from '../config/EntityConfig.js';
 import { BLOOD_STAIN_CONFIG } from '../config/GameConfig.js';
-
-// Mapeia o "type" autoral (escolhido no editor) para a fábrica de config.
-const ENEMY_CONFIG_BY_TYPE = {
-    demon: demonConfig,
-    bloodMonster: bloodMonsterConfig
-};
 
 /**
  * SpawnSystem — fábrica de inimigos.
@@ -32,11 +26,11 @@ export class SpawnSystem {
     }
 
     /**
-     * Cria um inimigo. Se `type` ("demon"|"bloodMonster") for informado (vindo
-     * da peça autoral do editor), usa a config correspondente; senão sorteia.
+     * Cria um inimigo. Se `type` (chave de ENEMY_TYPES, vinda da peça autoral
+     * do editor) for informado, usa a config correspondente; senão sorteia.
      */
     createEnemy(x, y, floor, type = null) {
-        const factory = (type && ENEMY_CONFIG_BY_TYPE[type]) || null;
+        const factory = (type && ENEMY_TYPE_BY_KEY[type]?.config) || null;
         const cfg = factory ? factory(this.assets) : this.randomMeleeConfig();
         const foe = new MeleeEnemy(x, y, cfg.img, cfg, floor);
         foe.bloodPalette = this.bloodCanvas.palette;

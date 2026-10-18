@@ -5,6 +5,8 @@
  * encapsulados: cria-se uma instância, acessam-se as imagens por nome e,
  * se necessário, aguarda-se o carregamento com `whenReady()`.
  */
+import { TINY_RPG_ENEMIES } from '../config/TinyRpgEnemies.js';
+
 export class AssetLoader {
     constructor() {
         this.images = {};
@@ -20,6 +22,8 @@ export class AssetLoader {
         // Inimigos
         this.load("demon", "assets/enemies/demon.png");
         this.load("bloodMonster", "assets/enemies/blood_monster.png");
+        // Tiny RPG Pack 02 (folhas geradas por tools/build_tinyrpg_enemies.py)
+        for (const e of TINY_RPG_ENEMIES) this.load(e.key, e.src);
 
         // Tileset das salas (grade 10x10 de 16px). Além do padrão, carregamos
         // variantes OPCIONAIS para testar texturas (alternador in-game, tecla

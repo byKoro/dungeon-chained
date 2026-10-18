@@ -12,7 +12,8 @@ import { mulberry32 } from '../scenes/mapgen/mapLayout.js';
 export class RushShot extends ArenaShot {
     constructor(stage, opts = {}, duration = 4) {
         super(stage, {
-            smoothZoom: true, ambient: '32, 22, 36', vignette: 0.88, camClose: 1.5, ...opts
+            // camClose 1: os zooms das cenas já são "colados" (×zoomRef).
+            smoothZoom: true, ambient: '32, 22, 36', vignette: 0.88, camClose: 1.0, ...opts
         }, duration);
         this.cutIn = 'impact';
     }

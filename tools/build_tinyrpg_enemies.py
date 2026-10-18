@@ -105,7 +105,7 @@ def split_frames(strip):
 
 
 def alpha_count(frame):
-    return sum(1 for a in frame.getchannel("A").getdata() if a > 0)
+    return frame.getchannel("A").point(lambda a: 255 if a > 0 else 0).histogram()[255]
 
 
 def bbox_union(frames):
@@ -187,9 +187,14 @@ def build_character(zf, root, folder, overrides):
         for c, f in enumerate(frames):
             sheet.paste(f, (c * CELL, r * CELL))
 
+    # Recorte = união de TODOS os frames usados (golpes largos não são
+    # cortados). O "corpo" = união só do walk: é ele que fica centrado na
+    # posição/colisão do inimigo (ver anchor em MeleeEnemy.draw).
     all_frames = walk_f + death_f + [f for a in atk_f for f in a]
     x0, y0, x1, y1 = bbox_union(all_frames)
-    crop = {"cropX": x0, "cropY": y0, "cropW": x1 - x0, "cropH": y1 - y0}
+    bx0, by0, bx1, by1 = bbox_union(walk_f)
+    crop = {"cropX": x0, "cropY": y0, "cropW": x1 - x0, "cropH": y1 - y0,
+            "body": {"x": bx0, "y": by0, "w": bx1 - bx0, "h": by1 - by0}}
 
     rows = {"walk": {"row": 1, "frames": len(walk_f), "fps": WALK_TICKS}}
     for i, frames in enumerate(atk_f):
@@ -198,7 +203,11 @@ def build_character(zf, root, folder, overrides):
                      "fps": attack_ticks(len(frames)), "hitFrame": hit_frame(frames)}
     rows["death"] = {"row": 2 + len(atk_f), "frames": len(death_f), "fps": DEATH_TICKS}
 
-    return sheet, crop, rows
+    # Gibs saem do corpo caído (último frame da morte), não do recorte todo.
+    gx0, gy0, gx1, gy1 = death_f[-1].getchannel("A").getbbox()
+    gib_box = {"x": gx0, "y": gy0, "w": gx1 - gx0, "h": gy1 - gy0}
+
+    return sheet, crop, rows, gib_box
 
 
 def main():
@@ -210,7 +219,7 @@ def main():
     with zipfile.ZipFile(zip_path) as zf:
         root = find_zip_root(zf)
         for folder, key, fname, label, overrides in CHARACTERS:
-            sheet, crop, rows = build_character(zf, root, folder, overrides)
+            sheet, crop, rows, gib_box = build_character(zf, root, folder, overrides)
             rel = f"assets/enemies/{fname}.png"
             sheet.save(os.path.join(ROOT, rel), optimize=True)
             entries.append({
@@ -218,9 +227,12 @@ def main():
                 **crop, "drawHeight": round(crop["cropH"] * PIXEL_SCALE),
                 "rows": rows,
                 "deathFlash": {"row": 0, "frame": 0},
-                "gib": {"gridCols": 5, "gridRows": 4},
+                # Grade proporcional ao corpo caído (pedaços de ~5x4 px de arte).
+                "gib": {"gridCols": max(3, min(5, round(gib_box["w"] / 5))),
+                        "gridRows": max(2, min(4, round(gib_box["h"] / 4))),
+                        "box": gib_box},
             })
-            print(f"{key:16} {sheet.size} crop={crop} rows={ {k: v['frames'] for k, v in rows.items()} }")
+            print(f"{key:16} {sheet.size} crop={crop} rows={ {k: (v['frames'], v.get('hitFrame')) for k, v in rows.items()} }")
 
     js = (
         "// GERADO por tools/build_tinyrpg_enemies.py — não editar à mão.\n"

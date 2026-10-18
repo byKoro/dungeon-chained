@@ -19,7 +19,7 @@ const WIPE_AT = 3.9;     // s (simulação) em que a cortina começa
 
 export class ArrowRunShot extends RushShot {
     constructor(stage) {
-        super(stage, { cols: 36, rows: 11, doors: { W: true }, seed: 71, ropeLen: 200 }, 9);
+        super(stage, { cols: 46, rows: 11, doors: { W: true }, seed: 71, ropeLen: 200 }, 9);
         this.cutIn = null;   // continua o mergulho do mapa (sem corte)
     }
 
@@ -47,8 +47,8 @@ export class ArrowRunShot extends RushShot {
         // Demônios no caminho (as flechas os espetam antes da serra chegar).
         const foes = [];
         for (let i = 0; i < 4; i++) {
-            const e = A.spawnEnemy(x0 - 700 - i * 230, cy + (i % 2 ? 150 : -150) + (hash01(i) - 0.5) * 60,
-                i === 2 ? 'bloodMonster' : 'demon', { speed: 1.1, chase: A.midTarget, stopDist: 30 });
+            const e = A.spawnEnemy(x0 - 900 - i * 300, cy + (i % 2 ? 150 : -150) + (hash01(i) - 0.5) * 60,
+                i === 2 ? 'bloodMonster' : 'demon', { speed: 0.9, chase: A.midTarget, stopDist: 30 });
             foes.push(e);
         }
 
@@ -57,7 +57,7 @@ export class ArrowRunShot extends RushShot {
         const zFit = Math.min(W / A.rect.w, H * 0.8 / A.rect.h);
         const camStart = { x: A.center.x, y: A.center.y, z: zFit, rot: 0.32 };
         const camAt = (t) => {
-            const m = A.mid, z = lerp(2.25, 2.7, clamp01(t / 3.6)) * A.zoomRef * A.camClose;
+            const m = A.mid, z = lerp(1.7, 2.05, clamp01(t / 3.6)) * A.zoomRef * A.camClose;
             const h = handheld(t, 1.2);
             // À frente dos dois, com o lado direito livre para as flechas.
             return {
@@ -119,7 +119,9 @@ export class ArrowRunShot extends RushShot {
             // Mira nos demônios do caminho (espeta cada um).
             for (const e of foes) {
                 if (e.state === 'dying' || e._shot) continue;
-                if (e.x > left + 120 && e.x < A.mid.x - 140) {
+                // Só quando já está no quadro, à frente deles.
+                const dx = e.x - A.mid.x;
+                if (t > 1.2 && dx > -330 && dx < -170) {
                     e._shot = true;
                     A.fireArrow(right, e.y + 4, -30);
                 }

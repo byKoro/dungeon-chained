@@ -126,11 +126,12 @@ export class HoleRunShot extends RushShot {
 
             const h = handheld(t, 1.3);
             const k = clamp01(t / 3.8);
+            const m = A.mid;
             A.focus({
-                x: mx + h.x, y: my - 120 + h.y, zoom: lerp(2.4, 2.85, k),
+                x: m.x + h.x, y: m.y - 110 + h.y, zoom: lerp(1.95, 2.35, k),
                 rot: lerp(0.42, -0.24, easeInOut(k)) + h.r, k: 0.16, fit: [p1, p2], pad: 70
             });
         };
-        A.snapCamera(pathX(y0), y0 - 120, 2.4 * A.zoomRef, 0.42);
+        A.snapCamera(pathX(y0), y0 - 110, 1.95 * A.zoomRef, 0.42);
     }
 }
