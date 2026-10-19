@@ -1,6 +1,11 @@
 import { Physics } from '../core/Physics.js';
 import { PLAYER_SAFE_ZONE, MAX_ACTIVE_GIBS, HEART_DROP } from '../config/GameConfig.js';
 
+// Combo sonoro dos cortes: janela entre acertos, degrau de tom e teto.
+const HIT_COMBO_WINDOW_MS = 900;
+const HIT_COMBO_PITCH_STEP = 0.035; // +3.5% de tom por acerto encadeado
+const HIT_COMBO_MAX_STEPS = 5;
+
 /**
  * CombatSystem — centraliza a resolução de combate.
  *
@@ -19,6 +24,34 @@ export class CombatSystem {
         this.renderer = renderer;
         this.particleSystem = particleSystem;
         this.audio = audio;
+        // Combo de cortes: acertos encadeados em sequência sobem o tom do
+        // golpe (sensação de "embalo"). Zera após HIT_COMBO_WINDOW_MS sem cortar.
+        this._combo = 0;
+        this._lastHitAt = -Infinity;
+    }
+
+    _now() {
+        return globalThis.performance?.now?.() ?? Date.now();
+    }
+
+    /**
+     * Som do golpe da serra, disparado UMA vez por quadro com acerto: vários
+     * inimigos cortados juntos viram um golpe mais encorpado (volume sobe com
+     * a contagem) em vez de N cópias empilhadas (que somariam e estourariam).
+     * O tom sobe com o combo e o ambiente abaixa um instante (ducking) para o
+     * impacto ficar em primeiro plano.
+     */
+    _playSawHit(count) {
+        if (!this.audio) return;
+        const now = this._now();
+        this._combo = now - this._lastHitAt < HIT_COMBO_WINDOW_MS ? this._combo + 1 : 0;
+        this._lastHitAt = now;
+        const step = Math.min(this._combo, HIT_COMBO_MAX_STEPS);
+        this.audio.play("sawHit", {
+            rateMultiplier: 1 + step * HIT_COMBO_PITCH_STEP,
+            volumeMultiplier: Math.min(1.35, 1 + (count - 1) * 0.15)
+        });
+        this.audio.duck?.(-7, { attackMs: 10, holdMs: 90, releaseMs: 500 });
     }
 
     /**
@@ -60,6 +93,7 @@ export class CombatSystem {
         // cobre todo o raio visual — encostar em qualquer parte dele mata.
         const sawPos = weapon.getSawPositions ? weapon.getSawPositions(p1, p2)[0] : null;
         const discR = (sawPos && weapon.discRadius) ? weapon.discRadius : 0;
+        let hits = 0;
 
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
@@ -78,6 +112,9 @@ export class CombatSystem {
             if (hitChain || hitDisc) {
                 enemy.startDying();
                 weapon.onHit?.();
+                hits++;
+                // Voz do monstro por inimigo (camada "orgânica"); o golpe
+                // metálico da serra sai uma vez só, após o laço.
                 if (this.audio) this.audio.play("monsterHurt");
                 // IMPACT: tremida seca e forte no momento do corte, com um
                 // respingo de sangue extra no ponto de contato.
@@ -88,6 +125,8 @@ export class CombatSystem {
                 onKill?.(enemy);
             }
         }
+
+        if (hits > 0) this._playSawHit(hits);
     }
 
     /**

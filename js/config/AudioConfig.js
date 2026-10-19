@@ -76,12 +76,99 @@ export const AUDIO_CONFIG = {
             enabled: true
         },
 
+        // ---- Sons gerados por tools/gen_sfx.py (rodar de novo regera) ----
+        // Campos extras: cooldownMs (intervalo mínimo entre disparos do mesmo
+        // cue), maxVoices (polifonia; rouba a voz mais antiga) e loop.
+
         pickup: {
-            description: "Coleta de item no chão (ex: coração de vida)",
-            files: ["assets/audio/item-pickup.flac"],
-            volume: 0.65,
+            description: "Coleta do coração: batimento 'tum-tum' + arpejo subindo (tom sobe em coletas seguidas)",
+            files: [1, 2].map(i => `assets/audio/heart-pickup-0${i}.wav`),
+            volume: 0.6,
+            rate: 1.0,
+            rateVariance: 0.03,
+            pitchShift: true,
+            cooldownMs: 60,
+            enabled: true
+        },
+
+        sawHit: {
+            description: "Lâmina cortando o monstro (hit_sound.mp3 retrabalhado: sem silêncio inicial, sub-thump e 'rip' dos dentes)",
+            files: [1, 2, 3].map(i => `assets/audio/saw-hit-0${i}.wav`),
+            volume: 0.7,
+            rate: 1.0,
+            rateVariance: 0.06,
+            pitchShift: true,
+            cooldownMs: 45,   // cortes no mesmo quadro viram UM golpe mais forte
+            maxVoices: 3,
+            enabled: true
+        },
+
+        sawSnap: {
+            description: "Corrente arrebentando: estalo + ping metálico + twang do cabo + elos soltos",
+            files: ["assets/audio/saw-snap.wav"],
+            volume: 0.95,
             rate: 1.0,
             rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 200,
+            enabled: true
+        },
+
+        sawLand: {
+            description: "Lâmina largada pousando na pedra (clang + giro de moeda morrendo)",
+            files: [1, 2].map(i => `assets/audio/saw-land-0${i}.wav`),
+            volume: 0.7,
+            rate: 1.0,
+            rateVariance: 0.06,
+            pitchShift: true,
+            cooldownMs: 200,
+            enabled: true
+        },
+
+        sawPickup: {
+            description: "Serra recolhida/corrente reconectada: elos puxando + trava + 'shing' + motor",
+            files: ["assets/audio/saw-pickup.wav"],
+            volume: 0.85,
+            rate: 1.0,
+            rateVariance: 0.04,
+            pitchShift: true,
+            cooldownMs: 200,
+            enabled: true
+        },
+
+        playerFall: {
+            description: "Jogador caindo no abismo (vento descendo + assobio + baque distante)",
+            files: ["assets/audio/player-fall.wav"],
+            volume: 0.75,
+            rate: 1.0,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 120,
+            enabled: true
+        },
+
+        doorOpen: {
+            description: "Sala limpa: trinco + pedra arrastando (portas destravam)",
+            files: ["assets/audio/door-open.wav"],
+            volume: 0.7,
+            rate: 1.0,
+            rateVariance: 0.03,
+            enabled: true
+        },
+
+        sawMotor: {
+            description: "Motor da serra em loop (regime do circular-saw.mp3); nível/tom/brilho seguem o giro — ver SawMotorAudio",
+            files: ["assets/audio/saw-motor-loop.wav"],
+            volume: 0.38,     // nível com a serra a toda (spin = 1)
+            loop: true,       // tocado por audio.createLoopVoice (controlável)
+            enabled: true
+        },
+
+        ambience: {
+            description: "Ambiente da dungeon em loop (drone, vento, gotas, rangidos distantes)",
+            files: ["assets/audio/ambience-dungeon.wav"],
+            volume: 0.45,
+            loop: true,       // tocado por audio.playLoop (Web Audio, sem emenda)
             enabled: true
         },
 

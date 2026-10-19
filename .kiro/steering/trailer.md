@@ -50,10 +50,16 @@ js/trailer/
   fx/ArrowWipe.js       cortina de flechas em tela (transição via stage.overlay)
   fx/SawIris.js         disco da serra abrindo em espiral (transição 10 → 11 via stage.overlay)
   fx/FxParticles.js     brasas, explosões e pedaços de tile (emissivos, mundo ou tela).
-                        Explosão = brilho suave aditivo + folha pixel art
-                        assets/fx/explosion.png (32x32, 10 frames x 3 variações,
-                        paleta do fogo do ghostfire; gerada por tools/gen_explosion.py),
-                        desenhada na grade de pixel (px = round(r·2.15/32))
+                        Explosão = brilho suave aditivo + PIXEL NORMALIZADO (`pixel`):
+                        fogo e brasas viram um campo de calor numa camada de baixa
+                        resolução na grade fixa de `pixel` px (cena 11: = BS, o pixel
+                        do boss), pintado em faixas da paleta do ghostfire e ampliado
+                        sem suavizar; bolas sobrepostas se fundem. `fx.rays`
+                        [{x,y,ang,len,wid,heat}] = feixes de luz em cunha na mesma
+                        grade (eixo claro, borda âmbar; cena 11: rachaduras via
+                        `_crackRays`, só um brilho leve por baixo). Reusa a camada se
+                        nada andou (câmera lenta/congelado). Sem `pixel`, cai na folha
+                        assets/fx/explosion.png (tools/gen_explosion.py)
   scenes/rush/ArrowRunShot.js, HoleRunShot.js, ButtonDoorShot.js, GiantSawShot.js
   scenes/rush/BossWallShot.js  boss parede de fogo (ghostfire) + plano final
 ```
@@ -325,8 +331,16 @@ Faixa de jogo em Y: `Y_TOP 175 … Y_BOT 520`, meio `Y_MID 345`.
   para a direita: lado R espelha.
 - Folha (100×100): linha 1 idle, 2 cuspe (spit), 3 raio (f0–2 carga, f3 aviso
   fino, f4 raio grosso, f5 apagando, f6 recupera), 4 morte, 0 silhueta clara
-  (usada nas rachaduras). Raio prolongado = coluna 99 do frame esticada
-  `BEAM_EXT 150` px de sprite + brilho aditivo.
+  (usada nas rachaduras). Raio no f4 = 3 px (linhas 41–43): frame até a coluna
+  88, depois o trecho quente 66–88 repetido rolando (`BEAM_FLOW`) até
+  `BEAM_EXT 150` e a ponta 89–99 no fim; aviso/apagando = coluna 99 esticada.
+  Brilho: nasce dentro da boca (4·BS) e ganha força em ~2 tiles, ~4.5 px de
+  sprite de espessura ondulando, mais fraco ao longe (montado coluna a coluna
+  numa camada pequena `glowLayer` e ampliado — sem emendas) + clarão pequeno
+  na boca. Luzes do chão: 14 achatadas (0.4) a cada 190 px desde a boca,
+  pulsando. Pixels do raio (grade BS, calor ≤ `BEAM_HEAT` = sem rosado):
+  `_beamSuck` (carga/aviso), `_beamBurst` (disparo), `_beamSparks` (faíscas
+  ao longo + crepitar nas bordas), `_beamRemains` (apagando).
 - Desenho emissivo via ganchos novos da ActionArena: `A.onDrawOver(ctx)`
   (mundo, depois de luz/névoa/respingos, antes da serra) e
   `A.onLights(pp, ws, pix)`. `killFlashes` aceitam `scale`.
@@ -338,14 +352,22 @@ Faixa de jogo em Y: `Y_TOP 175 … Y_BOT 520`, meio `Y_MID 345`.
   Raio: `BEAM` carga 0.4 (mira o meio da corda) / aviso 0.42 (trava, os dois
   correm lado a lado 175px fora da linha) / disparo 0.5 (mata minions na linha,
   slowmo) / apaga 0.15 / recupera 0.15.
-- Modos dos jogadores: `calm, shock, shock2, fight` (investem 400 / recuam 730
-  da parede em ciclos de 1.5s, formação vertical ±95), `dodge, charge` (serra
+- Modos dos jogadores: `calm, shock, shock2` (recuam cambaleando), `fight`
+  (NUNCA param: o meio da corda segue um Lissajous no tempo global entre
+  330 e 900 px da parede, puxado 60% para o minion mais próximo; `_formation`
+  põe a corda de través ao movimento, girando suave, ±95), `dodge` (vaivém
+  paralelo ao raio, `_dodge`), `charge` (serra
   cresce até `SAW_BIG 2.6`), `impale` (seguram a serra cravada; rachaduras
   0.75s, slowmo), `blown` (morte, linha 4, 14 estouros em cascata pelo quadro).
   Minions (`hellbat`, `demonessA`, `demonessB`) perseguem o meio da corda,
   dão 1 bote e morrem ao encostar no disco (garantia).
-- Câmera: boss a ~85% da largura (`x = tx + away·0.7·hw`); durante o sumiço a
-  câmera já vai para o lado onde ele ressurge.
+- Câmera de luta: troca de "posição de drone" a cada 1.3s (`wide` boss a ~85%
+  da largura, `push` aproximando, `dutch` inclinado ±0.14, `dolly` deslizando
+  e girando) e reage às ações (`mouth` no cuspe, `beamAim`/`beamFire` no raio,
+  `charge` na investida, tranco `_kick` em cada abate, lead pela velocidade).
+  Todo plano usa `fit: [p1, p2, frente da caveira]` (o zoom cede para caber).
+  Na entrada/sumiço/choque: plano aberto, e no sumiço a câmera já vai para o
+  lado onde ele ressurge.
 - Plano final em TELA (`_drawLeap`, tempo real `leapLT`): fundo em câmera lenta
   0.12 até congelar em `FREEZE_AT 2.0`; os dois crescem de 10% a 42% da altura
   (frame de passada, `furia`, inclinados para fora), corda desenhada no espaço

@@ -4,23 +4,52 @@
  * Desenhadas por quem as possui, no espaço que estiver no ctx (mundo ou tela),
  * normalmente DEPOIS da iluminação (são emissivas).
  *
+ * PIXEL NORMALIZADO (`pixel`): todo o fogo (explosões + brasas) vira um
+ * CAMPO DE CALOR numa camada de baixa resolução alinhada a uma grade fixa
+ * de `pixel` px; o calor é pintado em faixas da PALETA DO FOGO do boss e
+ * ampliado sem suavizar. Toda explosão, grande ou pequena, tem o MESMO
+ * tamanho de pixel (o do boss), formas chunky e sem detalhe miúdo, e bolas
+ * sobrepostas viram uma massa de fogo só. Por baixo fica um brilho suave
+ * aditivo (luz). Sem `pixel`, usa a folha assets/fx/explosion.png.
+ *
  * update(steps) avança em passos de 60 Hz (respeita a câmera lenta de quem chama).
  */
 
-const EMBER_COLORS = ['255, 214, 120', '255, 150, 60', '255, 96, 40', '220, 50, 40'];
+// Paleta do fogo do ghostfire (assets/enemies/ghostfire.png), frio -> quente.
+const PALETTE = [
+    [58, 9, 8], [97, 64, 58], [92, 19, 34], [125, 24, 24],
+    [159, 50, 50], [190, 81, 47], [221, 144, 74], [242, 213, 213]
+];
+const EMBER_COLORS = ['242, 213, 213', '221, 144, 74', '190, 81, 47', '159, 50, 50'];
+const MAX_SPAN = 6000;     // limite da camada (px de mundo) por eixo
 
 // Folha de explosão (tools/gen_explosion.py): células 32x32, 10 frames x 3 variações.
 const EXP_CELL = 32, EXP_FRAMES = 10, EXP_VARIANTS = 3;
 
 export class FxParticles {
-    /** @param {HTMLImageElement} [explosion] folha assets/fx/explosion.png */
-    constructor(explosion = null) { this.list = []; this.explosion = explosion; }
-    clear() { this.list.length = 0; }
+    /**
+     * @param {HTMLImageElement} [explosion] folha assets/fx/explosion.png
+     * @param {object} [opts] { pixel } tamanho do pixel normalizado (0 = desligado)
+     */
+    constructor(explosion = null, { pixel = 0 } = {}) {
+        this.list = [];
+        // Feixes de luz (pixel normalizado): [{ x, y, ang, len, wid, heat }],
+        // repostos por quem desenha a cada passo. Cunha que afina na ponta.
+        this.rays = [];
+        this.explosion = explosion;
+        this.pixel = pixel;
+        this._buf = null;
+    }
+    clear() { this.list.length = 0; this.rays = []; this._last = null; }
 
-    /** Brasa: quadradinho aditivo que sobe/deriva e apaga. */
-    ember(x, y, vx, vy, { size = 4, life = 1.2, color = null } = {}) {
+    /** Brasa: pixel que sobe/deriva e apaga. */
+    /**
+     * `heat` (pixel normalizado) = calor inicial 0..1 (1 = rosado claro,
+     * ~0.85 = âmbar); `float: false` desliga a subida/ondulação (faíscas retas).
+     */
+    ember(x, y, vx, vy, { size = 4, life = 1.2, color = null, heat = 1, float = true, drag = 0.97 } = {}) {
         this.list.push({
-            kind: 'ember', x, y, vx, vy, size, life, max: life,
+            kind: 'ember', x, y, vx, vy, size, life, max: life, heat, float, drag,
             color: color ?? EMBER_COLORS[(Math.random() * EMBER_COLORS.length) | 0],
             wob: Math.random() * 10
         });
@@ -49,15 +78,16 @@ export class FxParticles {
 
     /** Explosão completa num ponto (fogo + brasas + pedaços). */
     blast(x, y, power = 1, tileset = null, tiles = null) {
-        // Bola principal + bolas menores em volta, nascendo em cascata.
-        this.fire(x, y, 0, -0.3, { r: 70 * power, life: 0.9, grow: 1 });
-        for (let i = 0; i < 5 * power; i++) {
-            const a = Math.random() * Math.PI * 2, d = (25 + Math.random() * 45) * power;
-            const s = Math.random() * 2.5 * power;
+        // Bola principal + poucas bolas grandes em volta, nascendo em cascata
+        // (menos bolas e maiores = massa de fogo chunky, sem miudeza).
+        this.fire(x, y, 0, -0.3, { r: 80 * power, life: 0.95, grow: 1 });
+        for (let i = 0; i < 3 * power; i++) {
+            const a = Math.random() * Math.PI * 2, d = (35 + Math.random() * 45) * power;
+            const s = Math.random() * 2.2 * power;
             this.fire(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, Math.cos(a) * s, Math.sin(a) * s,
-                { r: (26 + Math.random() * 30) * power, grow: 1, life: 0.6 + Math.random() * 0.5, delay: Math.random() * 0.18 });
+                { r: (45 + Math.random() * 30) * power, grow: 1, life: 0.65 + Math.random() * 0.45, delay: Math.random() * 0.18 });
         }
-        for (let i = 0; i < 18 * power; i++) {
+        for (let i = 0; i < 12 * power; i++) {
             const a = Math.random() * Math.PI * 2, s = 3 + Math.random() * 11 * power;
             this.ember(x, y, Math.cos(a) * s, Math.sin(a) * s - 2, { size: 3 + Math.random() * 6, life: 0.6 + Math.random() * 1.1 });
         }
@@ -71,6 +101,7 @@ export class FxParticles {
     }
 
     update(steps = 1) {
+        if (steps > 0) this._ver = (this._ver ?? 0) + 1;   // camada de pixel precisa refazer
         const dt = 1 / 60;
         for (let n = 0; n < steps; n++) {
             for (let i = this.list.length - 1; i >= 0; i--) {
@@ -81,8 +112,8 @@ export class FxParticles {
                 p.x += p.vx; p.y += p.vy;
                 if (p.kind === 'ember') {
                     p.wob += 0.15;
-                    p.vx = p.vx * 0.97 + Math.sin(p.wob) * 0.08;
-                    p.vy = p.vy * 0.97 - 0.06;          // sobe (calor)
+                    p.vx = p.vx * p.drag + (p.float ? Math.sin(p.wob) * 0.08 : 0);
+                    p.vy = p.vy * p.drag - (p.float ? 0.06 : 0);   // sobe (calor)
                 } else if (p.kind === 'fire') {
                     p.vx *= 0.92; p.vy = p.vy * 0.92 - 0.05;
                 } else {
@@ -95,10 +126,11 @@ export class FxParticles {
     }
 
     draw(ctx) {
-        if (!this.list.length) return;
+        if (!this.list.length && !this.rays.length) return;
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        // Pedaços (normais) primeiro, depois fogo/brasas (aditivos).
+
+        // Pedaços de pedra (arte do tileset, escala do cenário).
         for (const p of this.list) {
             if (p.kind !== 'chunk' || !p.ts?.ready) continue;
             const k = p.life / p.max;
@@ -109,15 +141,16 @@ export class FxParticles {
             p.ts.draw(ctx, p.index, -p.size / 2, -p.size / 2, p.size, p.size);
             ctx.restore();
         }
+
         const sheet = this.explosion;
-        const sprite = sheet && sheet.complete && sheet.naturalWidth > 0;
+        const sprite = !!(sheet && sheet.complete && sheet.naturalWidth > 0);
         const fires = this.list.filter(p => p.kind === 'fire' && !(p.delay > 0));
 
-        // 1) Luz: brilho suave atrás de cada bola (aditivo), mais forte no início.
+        // Luz: brilho suave atrás de cada bola (aditivo), mais forte no início.
         ctx.globalCompositeOperation = 'lighter';
         for (const p of fires) {
-            const k = p.life / p.max, age = 1 - k;
-            const r = p.r * (sprite ? 1.6 : 1 + (p.grow - 1) * age);
+            const k = p.life / p.max;
+            const r = p.r * (sprite ? 1.6 : 1 + (p.grow - 1) * (1 - k));
             const a = sprite ? 0.5 * k * k : 0.85 * k;
             const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
             g.addColorStop(0, `rgba(255, 220, 160, ${a})`);
@@ -127,8 +160,152 @@ export class FxParticles {
             ctx.fillStyle = g;
             ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
         }
+        ctx.globalCompositeOperation = 'source-over';
 
-        // 2) Pixels: a explosão da folha, na grade de pixel (sem suavizar).
+        if (this.pixel > 0) this._drawPixel(ctx, fires);
+        else this._drawRaw(ctx, fires, sprite);
+        ctx.restore();
+    }
+
+    // Camada de pixel normalizado: desenha fogo + brasas em baixa resolução
+    // (grade fixa), quantiza na paleta e amplia sem suavizar.
+    _drawPixel(ctx, fires) {
+        const P = this.pixel;
+        const embers = this.list.filter(p => p.kind === 'ember' && !(p.delay > 0));
+        const rays = this.rays;
+        if (!fires.length && !embers.length && !rays.length) return;
+        // Nada andou desde o último quadro (câmera lenta / congelado): reusa.
+        const L = this._last;
+        if (L && L.ver === this._ver && L.P === P) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(this._buf, 0, 0, L.w, L.h, L.bx, L.by, L.w * P, L.h * P);
+            return;
+        }
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const p of fires) {
+            const h = p.r * 1.1;
+            x0 = Math.min(x0, p.x - h); y0 = Math.min(y0, p.y - h);
+            x1 = Math.max(x1, p.x + h); y1 = Math.max(y1, p.y + h);
+        }
+        for (const p of embers) {
+            x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+            x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+        }
+        for (const r of rays) {
+            const ex = r.x + Math.cos(r.ang) * r.len, ey = r.y + Math.sin(r.ang) * r.len, hw = r.wid / 2;
+            x0 = Math.min(x0, r.x - hw, ex - hw); y0 = Math.min(y0, r.y - hw, ey - hw);
+            x1 = Math.max(x1, r.x + hw, ex + hw); y1 = Math.max(y1, r.y + hw, ey + hw);
+        }
+        if (x1 - x0 > MAX_SPAN) { const c = (x0 + x1) / 2; x0 = c - MAX_SPAN / 2; x1 = c + MAX_SPAN / 2; }
+        if (y1 - y0 > MAX_SPAN) { const c = (y0 + y1) / 2; y0 = c - MAX_SPAN / 2; y1 = c + MAX_SPAN / 2; }
+        const bx = Math.floor(x0 / P) * P, by = Math.floor(y0 / P) * P;
+        const w = Math.ceil((x1 - bx) / P) + 2, h = Math.ceil((y1 - by) / P) + 2;
+
+        if (!this._buf) {
+            this._buf = document.createElement('canvas');
+            this._bctx = this._buf.getContext('2d', { willReadFrequently: true });
+        }
+        const buf = this._buf, b = this._bctx;
+        if (buf.width < w || buf.height < h) { buf.width = Math.max(buf.width, w); buf.height = Math.max(buf.height, h); }
+        b.setTransform(1, 0, 0, 1, 0, 0);
+        b.globalCompositeOperation = 'source-over';
+        b.globalAlpha = 1;
+        b.clearRect(0, 0, w, h);
+
+        // CAMPO DE CALOR na grade: cada bola soma calor (forma irregular por
+        // ruído de baixa frequência na grade do MUNDO, estável com a câmera);
+        // o calor vira faixas da paleta (miolo claro → âmbar → laranja →
+        // vermelho → fumaça). Bolas sobrepostas se fundem numa massa só.
+        const N = w * h;
+        if (!this._heat || this._heat.length < N) { this._heat = new Float32Array(N); this._cov = new Uint8Array(N); }
+        const heat = this._heat, cov = this._cov;
+        heat.fill(0, 0, N); cov.fill(0, 0, N);
+        const gx0 = bx / P, gy0 = by / P;
+        for (const p of fires) {
+            const age = 1 - p.life / p.max;
+            const R = Math.max(2, (p.r * 1.07) / P) * (0.4 + 0.6 * easeOut(Math.min(1, age * 1.7)));
+            const hot = 1.3 - 1.25 * Math.pow(age, 1.25);           // esfria com o tempo
+            const hollow = Math.max(0, (age - 0.5) / 0.5);          // miolo queima (anel de fumaça)
+            const cx = (p.x - bx) / P, cy = (p.y - by) / P;
+            const ix0 = Math.max(0, Math.floor(cx - R - 2)), ix1 = Math.min(w - 1, Math.ceil(cx + R + 2));
+            const iy0 = Math.max(0, Math.floor(cy - R - 2)), iy1 = Math.min(h - 1, Math.ceil(cy + R + 2));
+            const seed = p.variant * 37.1 + (p.flip ? 11 : 0);
+            for (let y = iy0; y <= iy1; y++) {
+                for (let x = ix0; x <= ix1; x++) {
+                    const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+                    // Ruído de baixa frequência: só deforma a BORDA (blocos
+                    // grandes); o calor por dentro varia liso (faixas limpas).
+                    const nz = vnoise((gx0 + x) * 0.2 + seed, (gy0 + y) * 0.2 + age * 1.2);
+                    const d = Math.hypot(dx, dy) / R + (nz - 0.5) * 0.45;
+                    if (d >= 1) continue;
+                    // Fim: a nuvem se desfaz em blocos soltos.
+                    if (age > 0.72 && nz < (age - 0.72) * 2.6) continue;
+                    let hv = (1 - d) * hot + (nz - 0.5) * 0.05;
+                    if (hollow > 0 && d < hollow * 0.7) hv *= 0.25;
+                    const i = y * w + x;
+                    cov[i] = 1;
+                    // Soma suave: duas bolas juntas esquentam o encontro.
+                    heat[i] = Math.max(heat[i], hv) + Math.max(0, hv) * 0.12;
+                }
+            }
+        }
+        // Feixes de luz: cunha na grade (degraus de pixel), miolo claro no
+        // eixo e perto da origem, bordas âmbar/laranja, ponta afinando.
+        for (const r of rays) {
+            const ox = (r.x - bx) / P, oy = (r.y - by) / P;
+            const L = r.len / P, half0 = r.wid / (2 * P);
+            const c = Math.cos(r.ang), s = Math.sin(r.ang);
+            const ex = ox + c * L, ey = oy + s * L;
+            const ix0 = Math.max(0, Math.floor(Math.min(ox, ex) - half0 - 1)), ix1 = Math.min(w - 1, Math.ceil(Math.max(ox, ex) + half0 + 1));
+            const iy0 = Math.max(0, Math.floor(Math.min(oy, ey) - half0 - 1)), iy1 = Math.min(h - 1, Math.ceil(Math.max(oy, ey) + half0 + 1));
+            for (let y = iy0; y <= iy1; y++) {
+                for (let x = ix0; x <= ix1; x++) {
+                    const dx = x + 0.5 - ox, dy = y + 0.5 - oy;
+                    const along = dx * c + dy * s;
+                    if (along < 0 || along > L) continue;
+                    const f = along / L;
+                    const half = half0 * Math.pow(1 - f, 0.85) + 0.35;
+                    const q = Math.abs(-dx * s + dy * c);
+                    if (q > half) continue;
+                    // Luz: eixo claro em quase todo o comprimento, borda âmbar.
+                    const hv = (1.4 - 0.45 * f - 0.6 * (q / half)) * (0.75 + 0.25 * r.heat);
+                    if (hv <= 0.1) continue;
+                    const i = y * w + x;
+                    cov[i] = 1;
+                    heat[i] = Math.max(heat[i], hv);
+                }
+            }
+        }
+        // Brasas: 1 pixel da grade com calor próprio (claras → apagando).
+        for (const p of embers) {
+            const k = p.life / p.max;
+            const s = Math.max(1, Math.round(p.size * (0.5 + 0.5 * k) / P));
+            const x = Math.round((p.x - bx) / P - s / 2), y = Math.round((p.y - by) / P - s / 2);
+            const hv = (p.heat ?? 1) * (0.25 + 0.75 * k);
+            for (let yy = y; yy < y + s; yy++) for (let xx = x; xx < x + s; xx++) {
+                if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+                const i = yy * w + xx;
+                cov[i] = 1; heat[i] = Math.max(heat[i], hv);
+            }
+        }
+
+        let img;
+        try { img = b.createImageData(w, h); } catch { return; }
+        const d = img.data;
+        for (let i = 0; i < N; i++) {
+            if (!cov[i]) continue;
+            const c = heatColor(heat[i]);
+            const o = i * 4;
+            d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+        }
+        b.putImageData(img, 0, 0);
+        this._last = { ver: this._ver, P, bx, by, w, h };
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(buf, 0, 0, w, h, bx, by, w * P, h * P);
+    }
+
+    // Sem normalização: sprites na escala própria + brasas aditivas.
+    _drawRaw(ctx, fires, sprite) {
         if (sprite) {
             for (const p of fires) {
                 const k = p.life / p.max, age = 1 - k;
@@ -136,33 +313,46 @@ export class FxParticles {
                 const px = Math.max(2, Math.round((p.r * 2.15) / EXP_CELL));
                 const D = px * EXP_CELL;
                 const x0 = Math.round((p.x - D / 2) / px) * px, y0 = Math.round((p.y - D / 2) / px) * px;
-                const sx = f * EXP_CELL, sy = p.variant * EXP_CELL;
                 ctx.save();
                 if (p.flip) { ctx.translate(x0 * 2 + D, 0); ctx.scale(-1, 1); }
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = 1;
-                ctx.drawImage(sheet, sx, sy, EXP_CELL, EXP_CELL, x0, y0, D, D);
-                // Quentura: a mesma arte somada por cima nos primeiros frames.
-                const hot = Math.max(0, 1 - age * 2.2);
-                if (hot > 0) {
-                    ctx.globalCompositeOperation = 'lighter';
-                    ctx.globalAlpha = 0.55 * hot;
-                    ctx.drawImage(sheet, sx, sy, EXP_CELL, EXP_CELL, x0, y0, D, D);
-                }
+                ctx.drawImage(this.explosion, f * EXP_CELL, p.variant * EXP_CELL, EXP_CELL, EXP_CELL, x0, y0, D, D);
                 ctx.restore();
             }
         }
-
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 1;
         for (const p of this.list) {
+            if (p.kind !== 'ember' || p.delay > 0) continue;
             const k = p.life / p.max;
-            if (p.kind === 'ember') {
-                const s = Math.max(1, Math.round(p.size * (0.5 + 0.5 * k)));
-                ctx.fillStyle = `rgba(${p.color}, ${Math.min(1, k * 1.6)})`;
-                ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
-            }
+            const s = Math.max(1, Math.round(p.size * (0.5 + 0.5 * k)));
+            ctx.fillStyle = `rgba(${p.color}, ${Math.min(1, k * 1.6)})`;
+            ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), s, s);
         }
-        ctx.restore();
     }
 }
+
+// Calor → cor (faixas da paleta, sem meio-tom). Abaixo de zero = fumaça.
+function heatColor(hv) {
+    if (hv > 0.9) return PALETTE[7];   // miolo claro
+    if (hv > 0.72) return PALETTE[6];  // âmbar
+    if (hv > 0.54) return PALETTE[5];  // laranja
+    if (hv > 0.38) return PALETTE[4];  // vermelho
+    if (hv > 0.24) return PALETTE[3];  // vermelho escuro
+    if (hv > 0.1) return PALETTE[2];   // vinho
+    if (hv > -0.05) return PALETTE[0]; // fumaça escura
+    return PALETTE[1];                 // fumaça fria
+}
+
+// Ruído de valor 2D (0..1) com hash inteiro — determinístico, barato.
+function hash2(x, y) {
+    let h = (x * 374761393 + y * 668265263) | 0;
+    h = (h ^ (h >>> 13)) * 1274126177 | 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+function vnoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
+    return a + (b - a) * sx + (c - a + (d - c - b + a) * sx) * sy;
+}
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);

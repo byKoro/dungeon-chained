@@ -54,6 +54,11 @@ export class GameLoop {
     // Fator de velocidade atual da simulação (0..1). Em slow-motion começa em
     // HIT_SLOWMO.minScale (timer cheio) e sobe suavemente até 1 conforme o timer
     // esvazia (easeOutCubic). Sem efeito ativo, retorna 1.
+    // Leitura pública do fator de tempo (ex.: o áudio baixa o tom no slow-mo).
+    get timeScale() {
+        return this._timeScale();
+    }
+
     _timeScale() {
         if (this._slowmoT <= 0) return 1;
         const duration = HIT_SLOWMO.duration || 1;

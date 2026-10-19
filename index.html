@@ -21,14 +21,8 @@
 
     <!-- Tela de carregamento (js/ui/LoadingScreen.js). Começa visível para
          cobrir o canvas enquanto os módulos e as texturas carregam. -->
-    <div id="loading-screen" role="status" aria-live="polite">
-        <div class="ls-box">
-            <div class="ls-title">DUNGEON CHAINED</div>
-            <div class="ls-label">Carregando…</div>
-            <div class="ls-bar" aria-hidden="true"><div class="ls-bar-fill"></div></div>
-            <div class="ls-pct">0%</div>
-            <div class="ls-tip"></div>
-        </div>
+    <div id="loading-screen" role="progressbar" aria-label="Carregando…" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <canvas class="ls-bar" aria-hidden="true"></canvas>
     </div>
 
     <script type="module" src="js/main.js"></script>

@@ -8,6 +8,7 @@ import { AudioManager } from './core/AudioManager.js';
 import { GameLoop } from './core/GameLoop.js';
 
 import { SawWeapon } from './weapons/SawWeapon.js';
+import { SawMotorAudio } from './weapons/SawMotorAudio.js';
 
 import { ParticleSystem } from './particles/ParticleSystem.js';
 import { BloodCanvas } from './particles/BloodCanvas.js';
@@ -160,7 +161,7 @@ export class Game {
         // Laço principal: fixed timestep + slow-motion. Os callbacks resolvem
         // leitura de controles, um passo de simulação e o render do quadro.
         this.gameLoop = new GameLoop({
-            onFrameStart: () => { this.input.pollGamepads(); this._pollRestartPad(); },
+            onFrameStart: () => { this.input.pollGamepads(); this._pollRestartPad(); this._updateSawMotor(); },
             onStep: (dt) => this._step(dt),
             onRender: () => this._render()
         });
@@ -194,6 +195,13 @@ export class Game {
         this.players = this.playerFactory.create();
         [this.p1, this.p2] = this.players;
         this.newDungeon();
+        // Ambiente contínuo da dungeon (Web Audio, emenda sem clique). Entra
+        // com fade longo para não "bater" junto com o início da partida.
+        this.audio.playLoop("ambience", { fadeMs: 3000 });
+        // Motor da serra: loop contínuo cujo nível/tom/brilho seguem o giro
+        // (começa em silêncio; atualizado a cada quadro em _updateSawMotor).
+        this.sawMotor ??= new SawMotorAudio(this.audio.createLoopVoice("sawMotor"));
+        if (typeof window !== "undefined") window.sawMotor = this.sawMotor; // debug, como window.audio
         this.gameLoop.start();
     }
 
@@ -289,6 +297,9 @@ export class Game {
         this.screenGore.clear();
         this.gameOver = false;
         this.deathScreen.hide();
+        this._sawLandPending = false;
+        // Restaura o ambiente após a tela de morte (no-op se já está em 0 dB).
+        this.audio.setLoopLevel("ambience", 0, 1500);
 
         // A corrente começa conectada a cada nova dungeon.
         this.chain.reset();
@@ -421,6 +432,18 @@ export class Game {
     _triggerDoorFlash() {
         this._doorFlashT = DOOR_LIGHT.flashDuration;
         this.renderer.triggerZoomPunch(0.045);
+    }
+
+    // Motor da serra: roda TODO quadro (também em transição/intro/game over),
+    // então nunca congela no último valor — fora do gameplay ele some suave.
+    _updateSawMotor() {
+        const w = this.chain?.weapon;
+        if (!this.sawMotor || !w) return;
+        this.sawMotor.update(w.spinSpeed ?? 0, {
+            connected: this.chain.isConnected,
+            active: !this.gameOver && !this.transition && !this.roomIntro,
+            timeScale: this.gameLoop.timeScale
+        });
     }
 
     // Dispara o slow-motion de abate (dá peso ao golpe sem travar). Delega ao
@@ -621,6 +644,14 @@ export class Game {
         this.chain.update(p1, p2, {
             onSnap: () => {
                 this.renderer.triggerShake(14);
+                // Som no MESMO quadro do shake/faíscas (evento grande): estalo
+                // da corrente + ducking forte do ambiente. O "clang" da lâmina
+                // tocando o chão vem depois, quando o sprite assenta (ver
+                // _updateSawLanding) — a separação no tempo vende a queda.
+                this.audio.play("sawSnap");
+                this.sawMotor?.onSnap();
+                this.audio.duck(-9, { attackMs: 10, holdMs: 250, releaseMs: 1100 });
+                this._sawLandPending = true;
                 // Ruptura: explosão exagerada de FAÍSCAS (radiais, com glow) +
                 // flash branco no ponto da serra (meio da curva da corda).
                 const sp = this.chain.weapon?.getSawPositions?.(p1, p2)?.[0];
@@ -632,6 +663,10 @@ export class Game {
             },
             onReconnect: () => {
                 this.renderer.triggerShake(4);
+                // Recompensa: serra de volta (elos puxando + trava + motor).
+                this.audio.play("sawPickup");
+                this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
+                this._sawLandPending = false;
                 // Serra recolhida: pisca em branco e dá um pop de escala que
                 // cresce e retrai suave.
                 this.chain.weapon?.playReconnect?.();
@@ -639,6 +674,7 @@ export class Game {
             // A serra nunca cai num ponto inalcançável (buraco, parede, ilha).
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });
+        this._updateSawLanding();
 
         // Serra em velocidade ALTA: tremida de câmera SECA e PEQUENA, contínua
         // enquanto o disco gira a toda (sensação de vibração do motor).
@@ -751,12 +787,25 @@ export class Game {
         // jogador é freado e empurrado de volta ao piso; só cai (e morre) se
         // insistir além dela por alguns frames. A posição já está confinada acima.
         this.tiles.checkHoleFalls([p1, p2]);
+        // Som de queda na BORDA de subida de `falling` (uma vez por queda), com
+        // ducking longo: o vento descendo domina o momento da morte.
+        for (const p of [p1, p2]) {
+            if (p.falling && !p._fallSeen) {
+                this.audio.play("playerFall");
+                this.audio.duck(-8, { attackMs: 30, holdMs: 500, releaseMs: 1200 });
+            }
+            p._fallSeen = p.falling;
+        }
 
         // Arma: a animação já é atualizada por chain.update(). O dano só é
         // aplicado quando a corrente está conectada (desarmada = sem dano).
         this.combat.resolveWeaponHits(
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
-            () => this.triggerHitSlowmo()
+            () => {
+                this.triggerHitSlowmo();
+                // Motor "engasga" ao morder o inimigo (oscilação de tom/volume).
+                this.sawMotor?.onHit();
+            }
         );
         this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger(), [p1, p2]);
 
@@ -795,6 +844,8 @@ export class Game {
         // o flash amarelo nas portas (pulsa um momento e enfraquece).
         if (rooms.tryClearCurrent()) {
             this._triggerDoorFlash();
+            // Portas destravando (trinco + pedra arrastando), junto do flash.
+            this.audio.play("doorOpen");
             // Pulso de câmera mais forte ao LIMPAR a sala (alívio/recompensa):
             // afasta de leve e volta.
             this.renderer.triggerZoomPunch(-0.07);
@@ -807,6 +858,8 @@ export class Game {
         if (p1.lives <= 0 || p2.lives <= 0) {
             this.gameOver = true;
             this.deathScreen.show();
+            // Tela de morte: o ambiente recua (-10 dB) e volta no restart.
+            this.audio.setLoopLevel("ambience", -10, 1500);
         }
 
         this._checkDoorTransition(doors);
@@ -827,9 +880,45 @@ export class Game {
             );
             if (collector) {
                 collector.lives = Math.min(3, collector.lives + 1);
-                this.audio.play("pickup");
+                this._playHeartPickup();
+                // Brilho curto no ponto da coleta (a camada visual do som).
+                this.particleSystem.triggerFlash(heart.x, heart.y, 6, 0.6);
                 hearts.splice(i, 1);
             }
+        }
+    }
+
+    // Coletas em sequência (dentro de HEART_STREAK_MS) sobem o tom do pickup
+    // em degraus — recompensa crescente, como moedas em sequência.
+    _playHeartPickup() {
+        const now = globalThis.performance?.now?.() ?? Date.now();
+        const HEART_STREAK_MS = 2500;
+        this._heartStreak = now - (this._lastHeartAt ?? -Infinity) < HEART_STREAK_MS
+            ? Math.min((this._heartStreak ?? 0) + 1, 4)
+            : 0;
+        this._lastHeartAt = now;
+        this.audio.play("pickup", { rateMultiplier: 1 + this._heartStreak * 0.06 });
+    }
+
+    // "Clang" da lâmina largada: toca quando o pop de queda termina (dropT
+    // chega a 1, sprite assentado no chão), com tremidinha e poeira — o
+    // impacto sonoro casa com o momento visual do contato.
+    _updateSawLanding() {
+        const w = this.chain.weapon;
+        if (!this._sawLandPending) return;
+        if (this.chain.isConnected || !w?.dropped) {
+            this._sawLandPending = false;
+            return;
+        }
+        if ((w.dropT ?? 1) < 1) return;
+        this._sawLandPending = false;
+        this.audio.play("sawLand");
+        this.renderer.triggerShake(3);
+        const n = 6;
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
+            const cx = Math.cos(a), cy = Math.sin(a);
+            this.particleSystem.triggerDust(w.dropX + cx * 20, w.dropY + 10 + cy * 8, -cx, -cy, 1);
         }
     }
 

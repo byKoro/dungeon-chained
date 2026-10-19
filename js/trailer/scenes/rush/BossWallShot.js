@@ -66,51 +66,36 @@ const CRACK_LIGHT = {
 };
 
 const RAYS = 12;            // feixes de luz das rachaduras
+// Raio no frame 4 (linha 3): 3 px de altura (linhas 41–43); trecho quente
+// 66–88 (laranja/âmbar) e ponta escura 89–99 (vinho).
+const BEAM_ROW = 41, BEAM_H = 3, BEAM_HOT0 = 66, BEAM_HOT1 = 89, BEAM_TAIL = 11;
+const BEAM_FLOW = 140;      // px de sprite/s que o trecho quente rola para a frente
+// Pixels emitidos pelo raio: cores do raio no sprite (calor ≤ âmbar, sem o rosado).
+const BEAM_HEAT = 0.86;
 
-// Textura de UM feixe de luz (horizontal, origem na borda esquerda): brilho
-// que cai suave no comprimento E na largura (gradiente radial achatado) —
-// ponta afinando, sem bordas duras. Criada uma vez e reaproveitada.
-let _rayTex = null;
-function rayTexture() {
-    if (_rayTex) return _rayTex;
-    const w = 256, h = 64;
-    const cv = document.createElement('canvas');
-    cv.width = w; cv.height = h;
-    const g = cv.getContext('2d');
-    g.save();
-    g.translate(0, h / 2);
-    g.scale(1, h / (w * 0.9));
-    const rg = g.createRadialGradient(0, 0, 0, 0, 0, w);
-    rg.addColorStop(0, 'rgba(255, 252, 240, 1)');
-    rg.addColorStop(0.12, 'rgba(255, 240, 210, 0.75)');
-    rg.addColorStop(0.35, 'rgba(255, 214, 160, 0.35)');
-    rg.addColorStop(0.65, 'rgba(255, 170, 110, 0.12)');
-    rg.addColorStop(1, 'rgba(255, 140, 80, 0)');
-    g.fillStyle = rg;
-    g.fillRect(0, -w, w, w * 2);
-    g.restore();
-    // Núcleo mais fino e claro no centro do feixe.
-    const core = g.createLinearGradient(0, 0, 0, h);
-    core.addColorStop(0, 'rgba(255, 255, 250, 0)');
-    core.addColorStop(0.4, 'rgba(255, 255, 250, 0)');
-    core.addColorStop(0.5, 'rgba(255, 255, 250, 1)');
-    core.addColorStop(0.6, 'rgba(255, 255, 250, 0)');
-    core.addColorStop(1, 'rgba(255, 255, 250, 0)');
-    const fade = g.createLinearGradient(0, 0, w, 0);
-    fade.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
-    fade.addColorStop(0.6, 'rgba(255, 255, 255, 0.12)');
-    fade.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    // Núcleo = faixa central × queda no comprimento (camada separada).
-    const cc = document.createElement('canvas');
-    cc.width = w; cc.height = h;
-    const c2 = cc.getContext('2d');
-    c2.fillStyle = core; c2.fillRect(0, 0, w, h);
-    c2.globalCompositeOperation = 'destination-in';
-    c2.fillStyle = fade; c2.fillRect(0, 0, w, h);
-    g.globalCompositeOperation = 'lighter';
-    g.drawImage(cc, 0, 0);
-    _rayTex = cv;
-    return cv;
+// Brilho do raio: faixa vertical de 1 px (degradê do eixo para as bordas) e a
+// camada pequena onde o brilho é montado coluna a coluna. Criadas uma vez.
+let _glowStrip = null, _glowLayer = null;
+function glowStrip() {
+    if (_glowStrip) return _glowStrip;
+    const c = document.createElement('canvas');
+    c.width = 1; c.height = 32;
+    const g = c.getContext('2d');
+    const lg = g.createLinearGradient(0, 0, 0, 32);
+    lg.addColorStop(0, 'rgba(255, 70, 30, 0)');
+    lg.addColorStop(0.32, 'rgba(255, 100, 40, 0.32)');
+    lg.addColorStop(0.5, 'rgba(255, 200, 130, 0.7)');
+    lg.addColorStop(0.68, 'rgba(255, 100, 40, 0.32)');
+    lg.addColorStop(1, 'rgba(255, 70, 30, 0)');
+    g.fillStyle = lg;
+    g.fillRect(0, 0, 1, 32);
+    return (_glowStrip = c);
+}
+function glowLayer() {
+    if (_glowLayer) return _glowLayer;
+    const c = document.createElement('canvas');
+    c.width = 160; c.height = 24;
+    return (_glowLayer = c);
 }
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -127,8 +112,9 @@ export class BossWallShot extends RushShot {
         this.cutIn = null;          // contínua: o disco da cena 10 se abre (SawIris)
         // Explosão em pixel art na paleta do boss (tools/gen_explosion.py).
         const boom = stage.assets.get('fxExplosion') || stage.assets.load('fxExplosion', 'assets/fx/explosion.png');
-        this.fx = new FxParticles(boom);    // mundo (fogo, brasas, pedaços)
-        this.fxScreen = new FxParticles();  // tela (brasas do plano final)
+        // Fogo no MESMO tamanho de pixel do boss (pixel normalizado).
+        this.fx = new FxParticles(boom, { pixel: BS });   // mundo (fogo, brasas, pedaços)
+        this.fxScreen = new FxParticles(null, { pixel: 8 }); // tela (brasas do plano final)
         this.bossImg = stage.assets.get('ghostfire');
         this.leapLT = -1;
     }
@@ -176,6 +162,9 @@ export class BossWallShot extends RushShot {
         this._embAcc = 0;
         this.mode = 'calm';
         this.blasts = [];
+        this._fAng = Math.PI / 2;   // corda na vertical (p1 em cima)
+        this._dodge = null;
+        this._kick = null;
 
         A.ropeLen = 230;
         A.sawScale = 1;
@@ -200,9 +189,11 @@ export class BossWallShot extends RushShot {
             act: 'none', actT: 0, row: 1, frame: 0, landed: false, locked: false, firing: false, spawned: 0
         };
 
-        A.onKill = () => {
+        A.onKill = (e) => {
             S._kills++;
             if (S.mode !== 'fight' && S.mode !== 'dodge') return;
+            // Tranco de câmera na direção do abate (decai em ~0.3s).
+            if (e) S._kick = { x: e.x, y: e.y, t: A.t, s: S._kills % 2 ? 1 : -1 };
             if (S._kills % 4 === 1) { A.slowmo(0.22, 0.35); A.renderer.triggerZoomPunch(0.045); }
             const p = S._kills % 2 ? p1 : p2;
             A.hop(p, 3);
@@ -263,7 +254,7 @@ export class BossWallShot extends RushShot {
             A.particles.triggerDust(p.x, p.y + 10, away, 0, 10);
         });
         A.exprFor(p1, 'olhos_fechados', 0.25);
-        for (let i = 0; i < 70; i++) {
+        for (let i = 0; i < 24; i++) {
             const y = rnd(60, 640);
             this.fx.ember(B.x + away * rnd(80, 200), y, away * rnd(6, 16), rnd(-2, 2), { size: rnd(3, 8), life: rnd(0.6, 1.4) });
         }
@@ -295,7 +286,7 @@ export class BossWallShot extends RushShot {
     }
     _beam(A, dodgeDir, final = false) {
         const B = this.B;
-        B.act = 'beam'; B.actT = A.t; B.locked = false; B.firing = false; B.final = final;
+        B.act = 'beam'; B.actT = A.t; B.locked = false; B.firing = false; B.faded = false; B.final = final;
         B.dodgeDir = dodgeDir;
     }
     _vanish(A) {
@@ -315,6 +306,7 @@ export class BossWallShot extends RushShot {
         }
         this.fx.update(1);
         this._stepBoss(A, t);
+        this._crackRays(A);
         this._stepPlayers(A, t);
         this._stepMinions(A);
         this._stepEmbers(A, t);
@@ -402,7 +394,9 @@ export class BossWallShot extends RushShot {
             B.frame = Math.min(2, Math.floor(u / c * 3));
             ty = clamp(A.mid.y, 270, 420); yk = 0.09; bob *= 0.3;
             if (Math.random() < 0.5) this._emberFromFlame(A, 2);
+            this._beamSuck(A, 2);
         } else if (u < w) {
+            this._beamSuck(A, 1);
             B.frame = 3;
             if (!B.locked) {
                 // Trava a linha do raio (sprite e colisão na mesma altura).
@@ -420,11 +414,11 @@ export class BossWallShot extends RushShot {
             for (const e of A.enemies) {
                 if (Math.abs(e.y - B.beamY) < 78 && away * (e.x - B.x) > 150) A.killEnemy(e, 8);
             }
-            for (let i = 0; i < 3; i++) {
-                this.fx.ember(B.x + away * rnd(340, 2400), B.beamY + rnd(-30, 30), away * rnd(2, 8), rnd(-3, 1), { size: rnd(3, 7), life: rnd(0.3, 0.8) });
-            }
+            this._beamSparks(A);
         } else if (u < fd) {
             B.frame = 5; ty = B.y; yk = 0; bob = 0;
+            if (!B.faded) { B.faded = true; this._beamRemains(A, 34); }
+            else this._beamRemains(A, 1);
             // Último raio apagando: é a brecha para a investida final.
             if (B.final && this.mode !== 'charge' && this.mode !== 'impale') this._charge(A);
         } else if (u < end) {
@@ -447,13 +441,69 @@ export class BossWallShot extends RushShot {
         // Mantém distância da caveira (nunca colados nela durante o raio).
         const xm = this.away > 0 ? Math.max(A.mid.x, B.x + 420) : Math.min(A.mid.x, B.x - 420);
         this.mode = 'dodge';
+        this._dodge = { x: xm, y: yc, t: A.t };
         p1.goal = { x: xm - 85, y: yc, speed: 10 };
         p2.goal = { x: xm + 85, y: yc, speed: 10 };
         A.both(p => { p.accel = 0.3; A.exprFor(p, 'espantado', 0.7); });
         A.renderer.triggerShake(10);
     }
 
+    // ---- Pixels do raio (grade do boss, só cores do raio) ----
+    get _mouth() { const B = this.B; return { x: B.x + this.away * (SKULL_HALF + 1) * BS, y: B.y + B.bob }; }
+
+    // Carga/aviso: pixels sugados para a boca (convergem e apagam ao chegar).
+    _beamSuck(A, n) {
+        const mo = this._mouth, away = this.away;
+        for (let i = 0; i < n; i++) {
+            const a = (away > 0 ? 0 : Math.PI) + rnd(-1.1, 1.1);
+            const r = rnd(3, 9) * BS, life = rnd(0.22, 0.34);
+            const x = mo.x + Math.cos(a) * r, y = mo.y + Math.sin(a) * r;
+            // Velocidade para chegar à boca no fim da vida (passos de 60 Hz).
+            const steps = life * 60;
+            this.fx.ember(x, y, (mo.x - x) / steps, (mo.y - y) / steps,
+                { size: BS, life, heat: BEAM_HEAT * rnd(0.75, 1), float: false, drag: 1 });
+        }
+    }
+
+    // Rajada na boca no instante do disparo (cone para a frente).
+    _beamBurst(A) {
+        const mo = this._mouth, away = this.away;
+        for (let i = 0; i < 26; i++) {
+            const a = (away > 0 ? 0 : Math.PI) + rnd(-1.05, 1.05);
+            const s = rnd(6, 17);
+            this.fx.ember(mo.x, mo.y + rnd(-1, 1) * BS, Math.cos(a) * s, Math.sin(a) * s,
+                { size: BS * (Math.random() < 0.25 ? 2 : 1), life: rnd(0.25, 0.55), heat: BEAM_HEAT, float: false, drag: 0.9 });
+        }
+    }
+
+    // Disparo: faíscas correndo ao longo do raio + crepitar nas bordas.
+    _beamSparks(A) {
+        const B = this.B, away = this.away, mo = this._mouth;
+        const y = B.beamY;
+        for (let i = 0; i < 3; i++) {
+            const s = rnd(2, 70) * BS;
+            this.fx.ember(mo.x + away * s, y + rnd(-1, 1) * BS * 0.8, away * rnd(14, 28), 0,
+                { size: BS, life: rnd(0.12, 0.3), heat: BEAM_HEAT * rnd(0.85, 1), float: false, drag: 0.96 });
+        }
+        for (let i = 0; i < 2; i++) {
+            const s = rnd(2, 60) * BS, side = Math.random() < 0.5 ? -1 : 1;
+            this.fx.ember(mo.x + away * s, y + side * rnd(1.8, 2.8) * BS, away * rnd(1, 5), side * rnd(2, 6),
+                { size: BS, life: rnd(0.2, 0.45), heat: BEAM_HEAT * rnd(0.6, 0.85), float: false, drag: 0.93 });
+        }
+    }
+
+    // Raio apagando: restos flutuando na linha, esfriando para o vinho.
+    _beamRemains(A, n) {
+        const B = this.B, away = this.away, mo = this._mouth;
+        for (let i = 0; i < n; i++) {
+            const s = rnd(1, 75) * BS;
+            this.fx.ember(mo.x + away * s, B.beamY + rnd(-1.2, 1.2) * BS, away * rnd(0.5, 2.5), rnd(-1.2, 0.4),
+                { size: BS, life: rnd(0.35, 0.9), heat: BEAM_HEAT * rnd(0.5, 0.75), float: false, drag: 0.95 });
+        }
+    }
+
     _onFire(A) {
+        this._beamBurst(A);
         A.slowmo(0.3, 0.35);
         A.impactFlash = 0.4;
         A.renderer.triggerShake(28);
@@ -529,7 +579,7 @@ export class BossWallShot extends RushShot {
 
     _stepEmbers(A, t) {
         const B = this.B;
-        if (B.visible) { if (Math.random() < 0.7) this._emberFromFlame(A, 1); }
+        if (B.visible) { if (Math.random() < 0.35) this._emberFromFlame(A, 1); }
         else if (this.mode === 'calm') {
             // Antes de aparecer: brasas soprando da direita, fora do quadro.
             const r = A.renderer, hw = A.canvas.width / (2 * r.zoom);
@@ -549,24 +599,44 @@ export class BossWallShot extends RushShot {
             return;
         }
         if (this.mode === 'shock' || this.mode === 'shock2') {
-            const yc = Y_MID;
-            p1.goal = { x: B.tx + away * 780, y: yc - 90, speed: 3 };
-            p2.goal = { x: B.tx + away * 780, y: yc + 90, speed: 3 };
-            A.both(p => { p.faceX = B.x; });
+            // Recuam cambaleando (vaivém curto), sem ficar plantados.
+            const u = t - (this._shockT ?? t);
+            this._formation(A, B.tx + away * (760 + 50 * Math.sin(u * 5)), Y_MID + 40 * Math.sin(u * 3.4), 90, 4.5);
             if (this.mode === 'shock2' && t - this._shockT > 0.35) this._fight(A, 'furia');
             return;
         }
         // Raio acabou (ou foi emendado em outra ação): voltam à luta.
         if (this.mode === 'dodge' && B.act !== 'beam') this._fight(A, 'furia');
         if (this.mode === 'fight') {
-            // Investem contra a leva e recuam (a parede avança); serra no meio.
-            const cyc = ((t - this._fightT) % 1.5) / 1.5;
-            const charging = cyc < 0.5;
-            const tx = B.tx + away * (charging ? 400 : 730);
-            const yc = Y_MID + Math.sin(t * 1.7) * 50;
-            p1.goal = { x: tx + Math.sin(t * 3.1) * 30, y: yc - 95, speed: charging ? 8.5 : 6 };
-            p2.goal = { x: tx - Math.sin(t * 2.7) * 30, y: yc + 95, speed: charging ? 8.5 : 6 };
-            A.both(p => { p.faceX = B.x; });
+            // Nunca param: o MEIO da corda (= serra) percorre um caminho
+            // contínuo (Lissajous) entre 330 e 900 px da parede, puxado para o
+            // minion mais próximo (caçam a leva). A corda fica de través ao
+            // movimento (varre como lâmina) e gira devagar.
+            const u = t;   // tempo global: o caminho não "pula" ao voltar à luta
+            let mx = B.tx + away * (600 + 230 * Math.sin(u * 2.4 + 0.6));
+            let my = Y_MID + 150 * Math.sin(u * 1.75) + 40 * Math.sin(u * 4.3);
+            const prey = this._nearestMinion(A, A.mid);
+            if (prey) {
+                const k = 0.6;
+                mx = lerp(mx, prey.x, k); my = lerp(my, prey.y, k);
+            }
+            const lo = away > 0 ? B.tx + 330 : B.tx - 900, hi = away > 0 ? B.tx + 900 : B.tx - 330;
+            mx = clamp(mx, lo, hi);
+            my = clamp(my, Y_TOP + 20, Y_BOT - 10);
+            this._formation(A, mx, my, 95, 10);
+            return;
+        }
+        if (this.mode === 'dodge') {
+            // Correm paralelos ao raio (vaivém), sem parar esperando o disparo.
+            const g = this._dodge;
+            if (g) {
+                const u = t - g.t;
+                const x = g.x + away * 150 * Math.sin(u * 3.2);
+                A.both(p => {
+                    const off = (p === p1 ? -1 : 1) * 85;
+                    p.goal = { follow: true, x: x + off, y: g.y + Math.sin(u * 6 + (p === p1 ? 0 : 2)) * 12, gain: 0.22, max: 10 };
+                });
+            }
             return;
         }
         if (this.mode === 'charge') {
@@ -601,6 +671,34 @@ export class BossWallShot extends RushShot {
         }
     }
 
+    // Formação dos dois em volta de (mx, my): corda de través ao movimento do
+    // meio (varre como lâmina), girando suave; nunca inverte de lado.
+    _formation(A, mx, my, half, max) {
+        const { p1, p2 } = A, B = this.B, m = A.mid;
+        const dx = mx - m.x, dy = my - m.y;
+        if (Math.hypot(dx, dy) > 25) {
+            let a = Math.atan2(dy, dx) + Math.PI / 2;
+            // a e a+π dão a mesma corda: escolhe o mais perto do atual.
+            let diff = Math.atan2(Math.sin(a - this._fAng), Math.cos(a - this._fAng));
+            if (Math.abs(diff) > Math.PI / 2) diff -= Math.sign(diff) * Math.PI;
+            this._fAng += diff * 0.05;
+        }
+        const cx = Math.cos(this._fAng) * half, cy = Math.sin(this._fAng) * half;
+        p1.goal = { follow: true, x: mx - cx, y: clamp(my - cy, Y_TOP - 20, Y_BOT + 30), gain: 0.2, max };
+        p2.goal = { follow: true, x: mx + cx, y: clamp(my + cy, Y_TOP - 20, Y_BOT + 30), gain: 0.2, max };
+        A.both(p => { p.faceX = B.x; });
+    }
+
+    _nearestMinion(A, pt, maxD = 700) {
+        let best = null, bd = maxD;
+        for (const e of A.enemies) {
+            if (e.state === 'dying' || e.isHidden) continue;
+            const d = Math.hypot(e.x - pt.x, e.y - pt.y);
+            if (d < bd) { bd = d; best = e; }
+        }
+        return best;
+    }
+
     _stepMinions(A) {
         const m = A.mid;
         const sp = A.sawPos, R = A.saw.discRadius * A.sawScale;
@@ -629,13 +727,64 @@ export class BossWallShot extends RushShot {
         const hw = W / (2 * z);
         // Boss sumindo: a câmera já vai para o lado onde ele vai ressurgir
         // (a entrada "de uma vez" acontece dentro do quadro).
-        let tx = B.tx, aw = this.away;
         const switching = (B.act === 'vanish' && A.t - B.actT > 0.15) || B.act === 'gone';
-        if (switching) { aw = -this.away; tx = m.x - aw * 650; }
-        const x = tx + aw * 0.7 * hw;
-        const tilt = this.mode === 'charge' ? 0.05 * -this.away : 0;
-        const k = switching || this.mode === 'shock2' ? 0.11 : this.mode === 'shock' ? 0.09 : 0.07;
-        A.focus({ x: x + h.x, y: CAM_Y + h.y, zoom: FIGHT_ZOOM, rot: h.r + tilt, k });
+        if (switching || this.mode === 'shock' || this.mode === 'shock2' || !B.visible) {
+            let tx = B.tx, aw = this.away;
+            if (switching) { aw = -this.away; tx = m.x - aw * 650; }
+            const k = switching || this.mode === 'shock2' ? 0.11 : 0.09;
+            A.focus({ x: tx + aw * 0.7 * hw + h.x, y: CAM_Y + h.y, zoom: FIGHT_ZOOM, rot: h.r, k });
+            return;
+        }
+
+        // Plano de luta: a câmera troca de "posição de drone" a cada ~1.3s
+        // (aberto, aproximando, holandês, rasante) e reage às ações (cuspe,
+        // raio, investida, abates). `fit` garante os dois jogadores e a FRENTE
+        // da caveira sempre no quadro (o zoom cede se não couber).
+        const away = this.away;
+        const skull = { x: B.x + away * SKULL_HALF * BS, y: B.y };
+        const fit = [A.p1, A.p2, skull];
+        const vx = (A.p1.vx + A.p2.vx) / 2, vy = (A.p1.vy + A.p2.vy) / 2;
+        const lead = { x: vx * 14, y: vy * 10 };       // olha para onde estão indo
+        const seg = Math.floor(t / 1.3), su = (t / 1.3) % 1;
+        const SHOTS = ['wide', 'push', 'dutch', 'dolly'];
+        let shot = SHOTS[seg % SHOTS.length];
+        const u = t - B.actT;
+        if (B.act === 'beam') shot = u < BEAM.charge + BEAM.warn ? 'beamAim' : 'beamFire';
+        else if (B.act === 'spit' && u < 0.8) shot = 'mouth';
+        if (this.mode === 'charge') shot = 'charge';
+
+        let cx, cy, zoom, rot, k = 0.08;
+        const side = seg % 2 ? 1 : -1;
+        switch (shot) {
+            case 'wide':      // aberto: boss a ~85% da largura, como o plano base
+                cx = B.tx + away * 0.7 * hw; cy = CAM_Y; zoom = FIGHT_ZOOM; rot = 0.03 * side; break;
+            case 'push':      // aproxima nos dois, a caveira na borda
+                cx = lerp(m.x, skull.x, 0.35); cy = lerp(m.y, B.y, 0.3) - 10;
+                zoom = lerp(1.25, 1.5, easeInOut(su)); rot = 0.05 * side; k = 0.07; break;
+            case 'dutch':     // holandês: inclina forte para o lado da ação
+                cx = lerp(m.x, skull.x, 0.45); cy = m.y * 0.6 + CAM_Y * 0.4;
+                zoom = 1.3; rot = 0.14 * side; k = 0.07; break;
+            case 'dolly':     // trilho lateral: desliza junto deles, girando
+                cx = lerp(m.x, skull.x, 0.4) + lerp(-60, 60, su) * away; cy = m.y * 0.5 + CAM_Y * 0.5;
+                zoom = lerp(1.15, 1.4, su); rot = lerp(-0.1, 0.1, su) * side; break;
+            case 'mouth':     // boss cospe: puxa para a boca
+                cx = lerp(m.x, skull.x, 0.62); cy = B.y; zoom = 1.38; rot = -0.06 * away; k = 0.1; break;
+            case 'beamAim':   // carga/aviso: aberto e tenso, inclinando devagar
+                cx = B.tx + away * 0.66 * hw; cy = lerp(CAM_Y, B.y, 0.4); zoom = 1.05 + 0.12 * clamp01(u / 0.8);
+                rot = -0.05 * away; k = 0.09; break;
+            default:          // beamFire: recua no disparo, gira contra o raio
+                cx = B.tx + away * 0.72 * hw; cy = CAM_Y; zoom = 1.0; rot = 0.08 * away; k = 0.12; break;
+            case 'charge':    // investida: colado neles correndo para a caveira
+                cx = lerp(m.x, skull.x, 0.5); cy = lerp(m.y, B.y, 0.5); zoom = 1.45; rot = -0.09 * away; k = 0.1; break;
+        }
+        // Tranco no abate: a câmera dá um puxão para o ponto e gira um pouco.
+        const kk = this._kick && t - this._kick.t < 0.3 ? 1 - (t - this._kick.t) / 0.3 : 0;
+        if (kk > 0) {
+            cx += (this._kick.x - cx) * 0.12 * kk; cy += (this._kick.y - cy) * 0.12 * kk;
+            zoom += 0.12 * kk; rot += 0.04 * this._kick.s * kk;
+        }
+        cy = clamp(cy, 240, 380);
+        A.focus({ x: cx + lead.x + h.x, y: cy + lead.y + h.y, zoom, rot: rot + h.r, k, fit, pad: 95 });
     }
 
     // ---- Desenho ----
@@ -667,11 +816,30 @@ export class BossWallShot extends RushShot {
         ctx.scale(BS, BS * B.stretch);
         ctx.globalAlpha = B.alpha;
         const sx = B.frame * 100, sy = B.row * 100;
-        ctx.drawImage(img, sx, sy, 100, 100, -ax, -ANCHOR_Y, 100, 100);
-        // Raio prolongado: a última coluna do frame esticada (cores do sprite).
-        if (B.row === 3 && B.frame >= 3 && B.frame <= 5) {
-            ctx.globalAlpha = B.alpha * (warn ? 0.55 + 0.45 * Math.sin(A.t * 70) : 1);
-            ctx.drawImage(img, sx + 99, sy + 28, 1, 28, 100 - ax, 28 - ANCHOR_Y, BEAM_EXT, 28);
+        if (firing) {
+            // Disparo: o frame até a coluna 88; daí em diante o TRECHO QUENTE
+            // do raio (colunas 66–88) se repete rolando para a frente, e a
+            // ponta escura do sprite (89–99) fecha o fim do raio.
+            ctx.drawImage(img, sx, sy, BEAM_HOT1, 100, -ax, -ANCHOR_Y, BEAM_HOT1, 100);
+            const x0 = BEAM_HOT1 - ax, x1 = 100 + BEAM_EXT - BEAM_TAIL - ax;
+            const tw = BEAM_HOT1 - BEAM_HOT0;
+            const off = Math.floor(A.t * BEAM_FLOW) % tw;      // px inteiros: grade intacta
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x0, BEAM_ROW - ANCHOR_Y - 1, x1 - x0, BEAM_H + 2);
+            ctx.clip();
+            for (let x = x0 - tw + off; x < x1; x += tw) {
+                ctx.drawImage(img, sx + BEAM_HOT0, sy + BEAM_ROW, tw, BEAM_H, x, BEAM_ROW - ANCHOR_Y, tw, BEAM_H);
+            }
+            ctx.restore();
+            ctx.drawImage(img, sx + BEAM_HOT1, sy + BEAM_ROW, BEAM_TAIL, BEAM_H, x1, BEAM_ROW - ANCHOR_Y, BEAM_TAIL, BEAM_H);
+        } else {
+            ctx.drawImage(img, sx, sy, 100, 100, -ax, -ANCHOR_Y, 100, 100);
+            // Aviso / apagando: linha fina = última coluna do frame esticada.
+            if (warn || (B.row === 3 && B.frame === 5)) {
+                ctx.globalAlpha = B.alpha * (warn ? 0.55 + 0.45 * Math.sin(A.t * 70) : 1);
+                ctx.drawImage(img, sx + 99, sy + 28, 1, 28, 100 - ax, 28 - ANCHOR_Y, BEAM_EXT, 28);
+            }
         }
         // Rachaduras de luz: silhueta clara (linha 0) piscando por cima.
         if (B.crack > 0.01) {
@@ -683,59 +851,91 @@ export class BossWallShot extends RushShot {
         }
         ctx.restore();
 
-        // Brilho do raio (aditivo, no mundo).
+        // Brilho do raio (aditivo, no mundo): nasce DENTRO da boca (atrás do
+        // sprite) e ganha força em ~2 tiles; mais forte perto da boca, some ao
+        // longe; espessura ondulando por fatias (não é um retângulo).
         if (firing || warn) {
-            const x0 = B.x + away * (55 - ax) * BS;
-            const len = (100 - 55 + BEAM_EXT) * BS;
-            const th = firing ? 7 * BS * (0.9 + 0.2 * Math.random()) : 1.6 * BS;
-            const a = firing ? 1 : 0.35 * (0.5 + 0.5 * Math.sin(A.t * 70));
-            const y = B.beamY;
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            const lg = ctx.createLinearGradient(0, y - th / 2, 0, y + th / 2);
-            lg.addColorStop(0, 'rgba(255, 60, 20, 0)');
-            lg.addColorStop(0.3, `rgba(255, 90, 30, ${0.35 * a})`);
-            lg.addColorStop(0.5, `rgba(255, 225, 170, ${0.8 * a})`);
-            lg.addColorStop(0.7, `rgba(255, 90, 30, ${0.35 * a})`);
-            lg.addColorStop(1, 'rgba(255, 60, 20, 0)');
-            ctx.fillStyle = lg;
-            ctx.fillRect(away > 0 ? x0 : x0 - len, y - th / 2, len, th);
-            ctx.restore();
-        }
-
-        // Rachaduras: feixes de luz suaves saindo da caveira (textura de
-        // feixe com queda gaussiana na largura e no comprimento, aditiva).
-        if (B.crack > 0.01) {
-            const cx = B.x + B.jx, cy = B.y + B.bob + 2 * BS;
-            const tex = rayTexture();
-            const t = A.t;
+            const y = B.beamY, t = A.t;
+            const s0 = 4 * BS;                                   // dentro da boca
+            const len = (100 + BEAM_EXT - ax) * BS - s0;
+            const base = firing ? 4.5 * BS : 1.4 * BS;
+            const amp = firing ? 0.6 : 0.3 * (0.5 + 0.5 * Math.sin(t * 70));
+            // Montado numa camada pequena (1 coluna = 1 fatia, sem sobreposição
+            // = sem emendas) e ampliado com suavização: é luz, não pixel.
+            const gv = glowLayer(), g2 = gv.getContext('2d');
+            const GW = gv.width, GH = gv.height, maxTh = base * 1.3;
+            g2.setTransform(1, 0, 0, 1, 0, 0);
+            g2.globalCompositeOperation = 'source-over';
+            g2.globalAlpha = 1;
+            g2.clearRect(0, 0, GW, GH);
+            const strip = glowStrip();
+            for (let i = 0; i < GW; i++) {
+                const f = i / GW, s = f * len;
+                const fadeIn = clamp01(s / 128);                  // ~2 tiles a partir da boca
+                const a = amp * fadeIn * (1 - 0.65 * f);
+                if (a <= 0.01) continue;
+                const th = base * (1 + 0.16 * Math.sin(i * 0.35 - t * 24) + (firing ? 0.06 * Math.sin(t * 61) : 0));
+                const hp = GH * th / maxTh;
+                g2.globalAlpha = Math.min(1, a);
+                g2.drawImage(strip, 0, 0, 1, strip.height, i, (GH - hp) / 2, 1, hp);
+            }
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             ctx.imageSmoothingEnabled = true;
-            // Miolo: brilho redondo que esconde o encontro dos feixes.
-            const cr = (5 + 9 * B.crack) * BS;
-            const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
-            cg.addColorStop(0, `rgba(255, 250, 235, ${0.75 * B.crack})`);
-            cg.addColorStop(0.35, `rgba(255, 220, 170, ${0.32 * B.crack})`);
-            cg.addColorStop(1, 'rgba(255, 160, 90, 0)');
-            ctx.fillStyle = cg;
-            ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
-            for (let i = 0; i < RAYS; i++) {
-                // Ângulos fixos (ângulo áureo) girando devagar; pulsam suave.
-                const ang = i * 2.39996 + 0.3 + t * 0.12 * (i % 2 ? 1 : -1);
-                const vary = 0.6 + 0.4 * (((i * 37) % 10) / 10);
-                const pulse = 0.78 + 0.22 * Math.sin(t * 11 + i * 1.7);
-                const len = (8 + 26 * B.crack) * BS * vary * (0.92 + 0.08 * Math.sin(t * 7 + i));
-                const wid = (2.2 + 4.5 * B.crack) * BS * (0.7 + 0.3 * vary);
-                ctx.save();
-                ctx.globalAlpha = clamp01(0.85 * B.crack * pulse);
-                ctx.translate(cx, cy);
-                ctx.rotate(ang);
-                ctx.drawImage(tex, 0, -wid / 2, len, wid);
-                ctx.restore();
+            ctx.save();
+            ctx.translate(B.x + away * s0, y);
+            if (away < 0) ctx.scale(-1, 1);
+            ctx.drawImage(gv, 0, -maxTh / 2, len, maxTh);
+            ctx.restore();
+            // Clarão pequeno na boca: esconde a emenda do sprite com o brilho.
+            if (firing) {
+                const mx = B.x + away * 10 * BS, r = 4 * BS * (0.9 + 0.15 * Math.sin(t * 47));
+                const mg = ctx.createRadialGradient(mx, y, 0, mx, y, r);
+                mg.addColorStop(0, 'rgba(255, 210, 150, 0.45)');
+                mg.addColorStop(0.45, 'rgba(255, 120, 50, 0.2)');
+                mg.addColorStop(1, 'rgba(255, 70, 30, 0)');
+                ctx.fillStyle = mg;
+                ctx.fillRect(mx - r, y - r, r * 2, r * 2);
             }
             ctx.restore();
         }
+
+        // Rachaduras: os FEIXES são pixel art na grade do boss (desenhados pelo
+        // FxParticles, ver _crackRays); aqui só um brilho leve no miolo.
+        if (B.crack > 0.01) {
+            const cx = B.x + B.jx, cy = B.y + B.bob + 2 * BS;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const cr = (5 + 8 * B.crack) * BS;
+            const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr);
+            cg.addColorStop(0, `rgba(255, 236, 210, ${0.28 * B.crack})`);
+            cg.addColorStop(0.4, `rgba(255, 170, 100, ${0.12 * B.crack})`);
+            cg.addColorStop(1, 'rgba(255, 120, 60, 0)');
+            ctx.fillStyle = cg;
+            ctx.fillRect(cx - cr, cy - cr, cr * 2, cr * 2);
+            ctx.restore();
+        }
+    }
+
+    // Feixes de luz das rachaduras (mundo): ângulos fixos (ângulo áureo)
+    // girando devagar, comprimento e largura pulsando. Viram pixels da paleta
+    // na camada normalizada do FxParticles (miolo claro → âmbar → laranja).
+    _crackRays(A) {
+        const B = this.B, t = A.t;
+        if (!B.visible || B.crack <= 0.01) { this.fx.rays = []; return; }
+        const cx = B.x + B.jx, cy = B.y + B.bob + 2 * BS;
+        const rays = [];
+        for (let i = 0; i < RAYS; i++) {
+            const vary = 0.6 + 0.4 * (((i * 37) % 10) / 10);
+            rays.push({
+                x: cx, y: cy,
+                ang: i * 2.39996 + 0.3 + t * 0.12 * (i % 2 ? 1 : -1),
+                len: (8 + 26 * B.crack) * BS * vary * (0.92 + 0.08 * Math.sin(t * 7 + i)),
+                wid: (1.6 + 2.6 * B.crack) * BS * (0.7 + 0.3 * vary),
+                heat: clamp01(B.crack * 1.4) * (0.85 + 0.15 * Math.sin(t * 11 + i * 1.7))
+            });
+        }
+        this.fx.rays = rays;
     }
 
     _lights(A, pp, ws, pix) {
@@ -746,13 +946,21 @@ export class BossWallShot extends RushShot {
         pp.addLight(s.x, s.y, 1050 * B.alpha * s.zoom, pix(s.zoom, 1.4), 0.9, BOSS_LIGHT);
         const firing = B.row === 3 && B.frame === 4, warn = B.row === 3 && B.frame === 3;
         if (firing || warn) {
-            for (let i = 0; i < 9; i++) {
-                const p = ws(B.x + away * (360 + i * 270), B.beamY);
-                pp.addLight(p.x, p.y, (firing ? 330 : 120) * p.zoom, pix(p.zoom), 0.55, BEAM_LIGHT);
+            // Faixa de luz no chão: começa na boca, luzes próximas e achatadas,
+            // piscando junto com o raio (e mais fracas ao longe).
+            const t = A.t, n = firing ? 14 : 8;
+            for (let i = 0; i < n; i++) {
+                const d = (SKULL_HALF + 1) * BS + i * 190;
+                const p = ws(B.x + away * d, B.beamY);
+                const pulse = 0.82 + 0.18 * Math.sin(t * 31 + i * 1.3);
+                const near = i === 0 ? 0.6 : 1;
+                const fall = 1 - 0.45 * (i / n);
+                const r = (firing ? 270 : 100) * pulse * near * fall;
+                pp.addLight(p.x, p.y, r * p.zoom, pix(p.zoom), 0.4, BEAM_LIGHT);
             }
         }
         if (B.crack > 0.01) {
-            pp.addLight(s.x, s.y, (300 + 900 * B.crack) * s.zoom, pix(s.zoom), 1, CRACK_LIGHT);
+            pp.addLight(s.x, s.y, (220 + 520 * B.crack) * s.zoom, pix(s.zoom), 1, CRACK_LIGHT);
         }
     }
 
@@ -763,7 +971,7 @@ export class BossWallShot extends RushShot {
         const steps = Math.floor(this._embAcc);
         this._embAcc -= steps;
         for (let i = 0; i < steps; i++) {
-            for (let k = 0; k < 2; k++) {
+            for (let k = 0; k < 1; k++) {
                 this.fxScreen.ember(rnd(0, W), H * rnd(0.85, 1.0), rnd(-1.5, 1.5), rnd(-5, -2),
                     { size: rnd(3, 8) * H / 900, life: rnd(1.2, 2.4) });
             }
@@ -791,6 +999,8 @@ export class BossWallShot extends RushShot {
         ctx.fillStyle = gl;
         ctx.fillRect(0, 0, W, H);
         ctx.globalCompositeOperation = 'source-over';
+        // Brasas na grade de pixel dos bonecos gigantes (≈ altura × 0.42 / 23 px de arte).
+        this.fxScreen.pixel = Math.max(2, Math.round(H * 0.42 / 23));
         this.fxScreen.draw(ctx);
 
         // Escala "3D falsa": crescem vindo na direção da câmera.
