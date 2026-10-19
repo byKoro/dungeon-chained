@@ -165,7 +165,10 @@ export const HOLE_FALL = Object.freeze({
     footOffset: 14,      // px abaixo do centro: a queda é medida nos PÉS (o que se vê pisando)
     inwardDamping: 0.7,  // fração da velocidade PARA DENTRO mantida por frame no buraco
     pushBack: 0.9,       // px/frame máx. de empurrão de volta ao piso (cresce com a profundidade)
-    graceFrames: 12      // frames seguidos além da beirada até a queda (~0.2s)
+    graceFrames: 18,     // frames seguidos além da beirada até a queda (~0.3s; +50% sobre os 12 originais)
+    // Depois da queda o jogador RENASCE na porta por onde entrou na sala.
+    livesLost: 1,        // corações perdidos por queda (sem vidas sobrando = fim de jogo)
+    respawnInvulnFrames: 90 // invulnerabilidade (pisca) ao renascer (~1.5s)
 });
 
 // bitmask (N=1,E=2,S=4,W=8 => lado COM borda) -> índice do tile no tileset.

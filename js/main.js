@@ -34,7 +34,10 @@ async function bootstrap() {
         // ?timer mostra o cronômetro do trailer (para revisar; fora do itch.io).
         // ?mute desliga o som do trailer (sem a tela "clique para começar").
         trailer = new TrailerPlayer(canvas, assets, {
-            onEnd: () => ui.showStart(), showTimer: params.has('timer'), audio: !params.has('mute')
+            onEnd: () => ui.showStart(),
+            // SKIP só depois que o trailer começa de fato (não na tela de gesto).
+            onBegin: () => ui.showSkip(),
+            showTimer: params.has('timer'), audio: !params.has('mute')
         });
         window.trailer = trailer;   // depuração no console (como em trailer.html)
     }
@@ -68,8 +71,10 @@ async function bootstrap() {
     const ui = buildTrailerUI(startGame, () => trailer?.togglePause(), () => !!trailer?.paused);
     if (skipTrailer) { startGame(); return; }
     trailer.play();
-    ui.showSkip();
 }
+
+// Segundos de trailer antes de o SKIP aparecer.
+const SKIP_DELAY_MS = 3000;
 
 // Botões sobre o trailer: PULAR (canto) e COMEÇAR (no fim). Enter/Espaço
 // também começam quando o COMEÇAR está na tela; Esc pausa (RESUME + volume).
@@ -94,20 +99,32 @@ function buildTrailerUI(onStart, onPause = null, trailerPaused = null) {
     };
     scaleSkip();
     window.addEventListener('resize', scaleSkip);
-    // START (botão HTML simples) e atalhos de teclado não passam pelo
-    // PixelButton: tocam o mesmo "uiConfirm" aqui. Uma vez só (onStart é
-    // idempotente, mas o som não seria).
+    // START em pixel art (face vermelha), igual aos botões das telas de morte
+    // e pausa: o PixelButton cuida do hover ("uiMove"), do quadro apertado e
+    // do "uiConfirm" no clique. Enter/Espaço (atalho global) passam por
+    // confirmStart, que mostra o quadro apertado e toca o mesmo som. Uma vez
+    // só (onStart é idempotente, mas o som não seria).
     let confirmed = false;
+    const startBtn = new PixelButton(start, {
+        label: 'START',
+        ariaLabel: 'Start game',
+        face: 'red',
+        enabled: () => start.classList.contains('visible') && !confirmed,
+        onPress: () => { confirmed = true; onStart(); }
+    });
     const confirmStart = () => {
-        if (!confirmed) playUi('uiConfirm');
+        if (!confirmed) { startBtn.showPressed(); playUi('uiConfirm'); }
         confirmed = true;
         onStart();
     };
+    const scaleStart = () => {
+        const s = pixelScale();
+        startBtn.applyScale(s);
+        start.style.setProperty('--px', `${s}px`);
+    };
+    scaleStart();
+    window.addEventListener('resize', scaleStart);
     preloadUi();
-    start.addEventListener('pointerenter', () => {
-        if (start.classList.contains('visible')) playUi('uiMove');
-    });
-    start.addEventListener('click', confirmStart);
     const onKey = (e) => {
         // Esc pausa o trailer (RESUME + volume), como no jogo; pular = SKIP.
         if (e.key === 'Escape') { if (!e.repeat) onPause?.(); }
@@ -122,11 +139,16 @@ function buildTrailerUI(onStart, onPause = null, trailerPaused = null) {
     return {
         showSkip() {
             root.classList.remove('hidden');
-            setTimeout(() => skip.classList.add('visible'), 1200);
+            setTimeout(() => {
+                // Já no fim (START na tela) ou o jogo já começou: não mostra.
+                if (start.classList.contains('visible') || root.classList.contains('hidden')) return;
+                skip.classList.add('visible');
+            }, SKIP_DELAY_MS);
         },
         showStart() {
             root.classList.remove('hidden');
             skip.classList.remove('visible');
+            skip.blur();   // foco automático no START não deve tocar "uiMove"
             start.classList.add('visible');
             start.focus({ preventScroll: true });
         },

@@ -16,8 +16,10 @@ Cena:
   - serra PARADA ensanguentada (linha de inércia 1, frame 3) no fundo da curva;
   - título "DUNGEON / CHAINED" em fonte bitmap chunky desenhada aqui.
 
-Saída: assets/keyart/keyart_128.png, assets/keyart/keyart_1024.png e
-       assets/keyart/logo.png (só o título, fundo transparente, nativo)
+Saída: assets/keyart/keyart_128.png, assets/keyart/keyart_1024.png,
+       assets/keyart/logo.png (só o título, fundo transparente, nativo) e
+       assets/keyart/cover_630x500.png (capa do itch.io; heróis e serra
+       maiores que o cenário — ver make_cover)
 Uso:   python tools/gen_keyart.py
 """
 import math
@@ -51,20 +53,21 @@ def tile(sheet, index):
     return sheet.crop((x, y, x + TILE, y + TILE))
 
 
-def build_room(rng):
+def build_room(rng, cols=SIZE // TILE, rows=SIZE // TILE):
+    """Sala fechada de cols x rows tiles (paredes nas bordas, piso sorteado)."""
     sheet = Image.open(asset("tileset", "tileset.png")).convert("RGBA")
-    room = Image.new("RGBA", (SIZE, SIZE), (20, 14, 24, 255))
-    n = SIZE // TILE  # 8
-    top = [1, 2, 3, 4, 1, 2]
-    bottom = [41, 42, 43, 44, 41, 42]
+    room = Image.new("RGBA", (cols * TILE, rows * TILE), (20, 14, 24, 255))
+    n, m = cols, rows
+    top = [1, 2, 3, 4]
+    bottom = [41, 42, 43, 44]
     left = [10, 20, 30]
     right = [15, 25, 35]
-    for ty in range(n):
+    for ty in range(m):
         for tx in range(n):
             if ty == 0:
-                idx = 0 if tx == 0 else 5 if tx == n - 1 else top[tx - 1]
-            elif ty == n - 1:
-                idx = 40 if tx == 0 else 45 if tx == n - 1 else bottom[tx - 1]
+                idx = 0 if tx == 0 else 5 if tx == n - 1 else top[(tx - 1) % 4]
+            elif ty == m - 1:
+                idx = 40 if tx == 0 else 45 if tx == n - 1 else bottom[(tx - 1) % 4]
             elif tx == 0:
                 idx = left[(ty - 1) % 3]
             elif tx == n - 1:
@@ -115,8 +118,12 @@ def drops(img, cx, cy, radius, count, rng):
         a = rng.uniform(0, math.tau)
         r = rng.uniform(radius * 0.5, radius)
         x, y = int(round(cx + math.cos(a) * r)), int(round(cy + math.sin(a) * r * 0.6))
-        px[x, y] = rng.choice([BLOOD_MID, BLOOD_DARK, BLOOD_LIGHT])
-        if rng.random() < 0.35:
+        color = rng.choice([BLOOD_MID, BLOOD_DARK, BLOOD_LIGHT])
+        extra = rng.random() < 0.35
+        if not (0 <= x < img.width - 1 and 0 <= y < img.height):
+            continue   # gota fora da imagem (sorteios já feitos: seed estável)
+        px[x, y] = color
+        if extra:
             px[x + 1, y] = BLOOD_DARK
 
 
@@ -145,11 +152,12 @@ def light_level(x, y):
     return max(0.0, min(3.0, 3.0 * (0.30 + warm * 0.95) - 2.2 * vignette))
 
 
-def apply_lighting(img):
+def apply_lighting(img, level=light_level):
     px = img.load()
-    for y in range(SIZE):
-        for x in range(SIZE):
-            v = light_level(x, y)
+    w, h = img.size
+    for y in range(h):
+        for x in range(w):
+            v = level(x, y)
             base = int(v)
             threshold = (BAYER4[y % 4][x % 4] + 0.5) / 16
             band = min(3, base + (1 if (v - base) > threshold else 0))
@@ -214,10 +222,10 @@ def draw_rope(img, path):
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
                 q = (x + dx, y + dy)
-                if q not in core and 0 <= q[0] < SIZE and 0 <= q[1] < SIZE:
+                if q not in core and 0 <= q[0] < img.width and 0 <= q[1] < img.height:
                     px[q] = ROPE_OUTLINE
     for q, c in core.items():
-        if 0 <= q[0] < SIZE and 0 <= q[1] < SIZE:
+        if 0 <= q[0] < img.width and 0 <= q[1] < img.height:
             px[q] = c
 
 
@@ -355,6 +363,127 @@ def main():
     logo = logo.crop(logo.getbbox())
     logo.save(os.path.join(OUT_DIR, "logo.png"))
     print("ok:", os.path.join(OUT_DIR, "keyart_1024.png"), "| logo", logo.size)
+
+    make_cover(logo)
+
+
+# ---------------------------------------------------------------------------
+# Capa 630x500 (itch.io): heróis e serra em destaque
+# ---------------------------------------------------------------------------
+# Três camadas, cada uma na SUA grade de pixel e ampliada por escala inteira
+# (vizinho-mais-próximo) — dentro de cada camada todo pixel tem o mesmo
+# tamanho; os heróis/serra/corda ficam maiores que o cenário de propósito.
+COVER_W, COVER_H = 630, 500
+COVER_BG_SCALE = 3      # cenário: tile de 16px vira 48px
+COVER_HERO_SCALE = 9    # heróis, corda e serra: herói ~189px, serra 144px
+COVER_LOGO_SCALE = 4    # logo: 452x164
+COVER_BG_CROP = (7, 9)  # recorte da sala 14x12 tiles (parede de baixo fora do quadro) -> 210x167 px de arte
+
+
+def cover_level(x, y):
+    """Luz quente atrás dos heróis + vinheta (grade do cenário, 210x167)."""
+    lx, ly = 105, 104
+    d = math.hypot((x - lx) / 1.6, (y - ly))
+    warm = max(0.0, 1.0 - d / 78.0)
+    cx, cy = (x - 104.5) / 105, (y - 83) / 84
+    vignette = min(1.0, (cx * cx + cy * cy) ** 1.4)
+    return max(0.0, min(3.0, 3.0 * (0.26 + warm * 1.0) - 2.3 * vignette))
+
+
+def bloody(img, rng, toward, clusters=4):
+    """Respingos de sangue no corpo do herói (na grade nativa do sprite).
+
+    Só pinta pixels OPACOS do personagem (a sombra semitransparente fica
+    limpa) e preserva o contorno escuro, para a silhueta continuar legível.
+    `toward` = +1 se a serra está à direita do sprite, -1 à esquerda: a
+    maioria dos respingos cai no lado virado para ela.
+    """
+    px = img.load()
+    w, h = img.size
+
+    def body(x, y):
+        if not (0 <= x < w and 0 <= y < h):
+            return False
+        r, g, b, a = px[x, y]
+        return a == 255 and (0.299 * r + 0.587 * g + 0.114 * b) > 42
+
+    # Olhos (quase brancos) ficam sempre limpos: a expressão precisa ler.
+    def paintable(x, y):
+        if not body(x, y):
+            return False
+        r, g, b, _ = px[x, y]
+        return min(r, g, b) < 200
+
+    cells = [(x, y) for y in range(h) for x in range(w) if paintable(x, y)]
+    if not cells:
+        return img
+    mid = w / 2
+    top = min(y for _, y in cells)
+    # Respingos maiores só no corpo (abaixo da cabeça), no lado da serra.
+    torso = [c for c in cells if c[1] >= top + 9 and (c[0] - mid) * toward >= -1]
+    head = [c for c in cells if top + 2 <= c[1] < top + 9 and (c[0] - mid) * toward >= 1]
+    for _ in range(clusters):
+        cx, cy = rng.choice(torso)
+        size = rng.choice([1, 1, 2])
+        for (x, y) in torso:
+            dx, dy = x - cx, y - cy
+            if dx * dx + dy * dy <= size:
+                px[x, y] = rng.choice([BLOOD_MID, BLOOD_MID, BLOOD_LIGHT, BLOOD_DARK])
+        # escorrido: 1-2 px para baixo a partir do respingo
+        for k in range(rng.choice([0, 1, 2])):
+            if paintable(cx, cy + 1 + k):
+                px[cx, cy + 1 + k] = BLOOD_DARK
+    # Respingo pequeno no rosto (bochecha do lado da serra) + gotinhas soltas.
+    for (x, y) in rng.sample(head, min(3, len(head))):
+        px[x, y] = rng.choice([BLOOD_MID, BLOOD_LIGHT])
+    for (x, y) in rng.sample(torso, min(4, len(torso))):
+        px[x, y] = rng.choice([BLOOD_LIGHT, BLOOD_SHINE])
+    return img
+
+
+def make_cover(logo):
+    rng = random.Random(SEED + 1)
+
+    # 1) Cenário (escala 3): sala, sangue no chão e luz quantizada.
+    bw = -(-COVER_W // COVER_BG_SCALE)          # 210
+    bh = -(-COVER_H // COVER_BG_SCALE)          # 167
+    ox, oy = COVER_BG_CROP
+    bg = build_room(rng, cols=14, rows=12).crop((ox, oy, ox + bw, oy + bh))
+    blob(bg, 105, 157, 19, 4, rng)               # poça sob a serra
+    blob(bg, 62, 150, 4, 2, rng)
+    blob(bg, 150, 153, 5, 2, rng)
+    drops(bg, 105, 152, 44, 40, rng)
+    apply_lighting(bg, cover_level)
+
+    # 2) Heróis + corda + serra (escala 9), 70x56 px de arte. A serra fica
+    #    colada entre os dois (corda curta, quase só a curva).
+    hw = -(-COVER_W // COVER_HERO_SCALE)        # 70
+    hh = -(-COVER_H // COVER_HERO_SCALE)        # 56
+    heroes = Image.new("RGBA", (hw, hh), (0, 0, 0, 0))
+    p1_pos, p2_pos = (6, 21), (46, 21)
+    saw_center = (35, 45)
+    # Sujos de sangue (mais do lado virado para a serra).
+    p1 = bloody(hero("player_01", "furia"), rng, toward=+1)
+    # P2 espelhado: os dois olham para o centro (para a serra).
+    p2 = bloody(hero("player_02", "assustado").transpose(Image.FLIP_LEFT_RIGHT), rng, toward=-1)
+    a1 = (p1_pos[0] + ROPE_ANCHOR[0], p1_pos[1] + ROPE_ANCHOR[1])
+    a2 = (p2_pos[0] + (p2.width - 1 - ROPE_ANCHOR[0]), p2_pos[1] + ROPE_ANCHOR[1])
+    draw_rope(heroes, rope_pixels(a1, (saw_center[0], saw_center[1] - 1), a2))
+    heroes.alpha_composite(p1, p1_pos)
+    heroes.alpha_composite(p2, p2_pos)
+    heroes.alpha_composite(saw_still_bloody(), (saw_center[0] - 8, saw_center[1] - 8))
+
+    # 3) Composição final 630x500.
+    out = bg.resize((bw * COVER_BG_SCALE, bh * COVER_BG_SCALE), Image.NEAREST)
+    out = out.crop((0, 0, COVER_W, COVER_H))
+    big = heroes.resize((hw * COVER_HERO_SCALE, hh * COVER_HERO_SCALE), Image.NEAREST)
+    out.alpha_composite(big.crop((0, 0, COVER_W, COVER_H)))
+    lg = logo.resize((logo.width * COVER_LOGO_SCALE, logo.height * COVER_LOGO_SCALE), Image.NEAREST)
+    out.alpha_composite(lg, ((COVER_W - lg.width) // 2, 12))
+
+    path = os.path.join(OUT_DIR, "cover_630x500.png")
+    out.convert("RGB").save(path)
+    print("ok:", path, out.size)
 
 
 if __name__ == "__main__":

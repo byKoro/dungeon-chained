@@ -41,6 +41,10 @@ const DEBRIS = [2, 3, 42, 43, 10, 20, 49, 59];
 const BEAM = { charge: 0.4, warn: 0.42, fire: 0.5, fade: 0.15, recover: 0.15 };
 const FREEZE_AT = 2.0;      // s reais do plano final até congelar
 const TITLE_AT = 1.9;
+// Tela do START (depois do congelamento): float dos jogadores e pulso vermelho.
+const FLOAT_AMP = 2.5;      // px de arte do jogador (amplitude)
+const FLOAT_SPEED = 1.9;    // rad/s
+const PULSE_PERIOD = 1.6;   // s entre pulsadas vermelhas (mesmo ritmo do START antigo)
 
 // Linha do tempo (s de simulação).
 const T = {
@@ -1075,6 +1079,18 @@ export class BossWallShot extends RushShot {
         ctx.fillStyle = gl;
         ctx.fillRect(0, 0, W, H);
         ctx.globalCompositeOperation = 'source-over';
+        // Pulsada vermelha leve no fundo (tela do START): entra depois da logo,
+        // batida curta tipo coração a cada PULSE_PERIOD, mais forte nas bordas.
+        const pk = easeInOut(clamp01((lt - TITLE_AT - 0.3) / 0.8));
+        if (pk > 0) {
+            const beat = Math.pow(0.5 + 0.5 * Math.sin((lt / PULSE_PERIOD) * Math.PI * 2), 3);
+            const pa = pk * (0.04 + 0.12 * beat);
+            const pg = ctx.createRadialGradient(W / 2, H / 2, H * 0.15, W / 2, H / 2, Math.hypot(W, H) * 0.6);
+            pg.addColorStop(0, `rgba(170, 12, 28, ${pa * 0.35})`);
+            pg.addColorStop(1, `rgba(170, 12, 28, ${pa})`);
+            ctx.fillStyle = pg;
+            ctx.fillRect(0, 0, W, H);
+        }
         // Brasas na grade de pixel dos bonecos gigantes (≈ altura × 0.42 / 23 px de arte).
         this.fxScreen.pixel = Math.max(2, Math.round(H * 0.42 / 23));
         this.fxScreen.draw(ctx);
@@ -1083,15 +1099,24 @@ export class BossWallShot extends RushShot {
         const grow = lt > 1.8 ? Math.min(lt, FREEZE_AT) - 1.8 : 0;
         const hFrac = lerp(0.1, 0.42, e) + grow * 0.01;
         const sc = hFrac * H / 73;               // 73 = drawHeight do jogador
-        const float = lt > 1.8 ? Math.sin(Math.min(lt, FREEZE_AT) * 2) * H * 0.003 : 0;
-        const y = H * (lerp(0.5, 0.6, e) - 0.08 * Math.sin(Math.PI * u)) + float;
+        const y = H * (lerp(0.5, 0.6, e) - 0.08 * Math.sin(Math.PI * u));
+        // Float: depois do congelamento cada um flutua sozinho (fases
+        // alternadas), em degraus de 1 pixel de arte (sc) como o resto da UI.
+        const fk = easeInOut(clamp01((lt - FREEZE_AT) / 0.6));
+        const floatY = (phase) => {
+            if (lt <= 1.8) return 0;
+            const amp = lerp(H * 0.003, FLOAT_AMP * sc, fk);
+            return Math.round((Math.sin(lt * FLOAT_SPEED + phase) * amp) / sc) * sc;
+        };
+        const y1 = y + floatY(0), y2 = y + floatY(Math.PI * 0.6);
         const x1 = W * lerp(0.45, 0.25, e), x2 = W * lerp(0.55, 0.75, e);
         const tilt = 0.26 * e;
 
-        // Corda (no espaço escalado: espessura acompanha os bonecos).
+        // Corda (no espaço escalado: espessura acompanha os bonecos); as
+        // pontas seguem o float de cada um, e a serra segue o meio da corda.
         const sdx = saw.dragX, sdy = saw.dragY;
         saw.dragX = 0; saw.dragY = 17;
-        const a = { x: x1 / sc + 8, y: y / sc + 6 }, b = { x: x2 / sc - 8, y: y / sc + 6 };
+        const a = { x: x1 / sc + 8, y: y1 / sc + 6 }, b = { x: x2 / sc - 8, y: y2 / sc + 6 };
         ctx.save();
         ctx.scale(sc, sc);
         saw.drawChain(ctx, a, b);
@@ -1100,7 +1125,7 @@ export class BossWallShot extends RushShot {
         saw.dragX = sdx; saw.dragY = sdy;
 
         // Jogadores: vermelho à esquerda, azul à direita, fúria, inclinados para fora.
-        const pose = (p, x, rot, faceLeft) => {
+        const pose = (p, x, y, rot, faceLeft) => {
             const keep = { x: p.x, y: p.y, tilt: p.tilt, vx: p.vx, vy: p.vy, walkFrame: p.walkFrame, bobPhase: p.bobPhase,
                 facingLeft: p.facingLeft, expression: p.expression, hurtTimer: p.hurtTimer, invulnerableTimer: p.invulnerableTimer };
             Object.assign(p, { x: 0, y: 0, tilt: rot, vx: 0, vy: -0.3, walkFrame: 4, bobPhase: 0,
@@ -1113,8 +1138,8 @@ export class BossWallShot extends RushShot {
             ctx.restore();
             Object.assign(p, keep);
         };
-        pose(p1, x1, -tilt, false);
-        pose(p2, x2, tilt, true);
+        pose(p1, x1, y1, -tilt, false);
+        pose(p2, x2, y2, tilt, true);
 
         // Serra no meio, girando (desenhada à mão, sem o tremor do jogo).
         const img = saw.sprite;

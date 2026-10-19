@@ -1,7 +1,7 @@
 {
   "js/Game.js": {
-    "mtime": 1792371715.4878657,
-    "ast_hash": "1ed1ebc077be272bf7cf5cabc7aa2a45",
+    "mtime": 1792375302.105368,
+    "ast_hash": "38ae0f93320da32270a10ddfbe1abd5f",
     "semantic_hash": ""
   },
   "js/combat/CombatSystem.js": {
@@ -115,8 +115,8 @@
     "semantic_hash": "d3b547eb0c37a92ce3423c78132aec6e"
   },
   "js/main.js": {
-    "mtime": 1792373893.3547983,
-    "ast_hash": "82453a641b802b641d534d3c135957c3",
+    "mtime": 1792376594.6374948,
+    "ast_hash": "bc3bd399bf8aa44ab58acd64df7db74e",
     "semantic_hash": ""
   },
   "js/particles/BloodCanvas.js": {
@@ -670,18 +670,18 @@
     "semantic_hash": "ec463806b1cb228e3af5836c33f94437"
   },
   "js/trailer.js": {
-    "mtime": 1792372418.7022378,
-    "ast_hash": "f456f2e135225ba5d92d0846d0fac2ec",
+    "mtime": 1792375461.727191,
+    "ast_hash": "28fb27365212ce29d36d0b4581193e4b",
     "semantic_hash": ""
   },
   "js/trailer/TrailerPlayer.js": {
-    "mtime": 1792372273.628802,
-    "ast_hash": "ac493f86aa860820fa640c3a969fcb9f",
+    "mtime": 1792376585.0256014,
+    "ast_hash": "5fbf87442208bf495ba667b412d6ed6e",
     "semantic_hash": ""
   },
   "js/trailer/TrailerStage.js": {
-    "mtime": 1792372330.6781542,
-    "ast_hash": "4fcd1418142e62c5ff73e91e6a8747ba",
+    "mtime": 1792375692.8613317,
+    "ast_hash": "8c16eee18f896b38ca108632857e33b8",
     "semantic_hash": ""
   },
   "js/trailer/anim.js": {
@@ -730,13 +730,13 @@
     "semantic_hash": "e7159743d6b02906184c5315957e99d8"
   },
   "js/trailer/scenes/IntroScene.js": {
-    "mtime": 1792372582.125594,
-    "ast_hash": "33447b717dba2f293977403b97579e95",
+    "mtime": 1792374576.5706618,
+    "ast_hash": "27db0ca48c040a4c6bcfce0d69f4b74c",
     "semantic_hash": ""
   },
   "js/trailer/scenes/TitleBloodScene.js": {
-    "mtime": 1792372488.065385,
-    "ast_hash": "a64aa066a3a389333560b2845254efaf",
+    "mtime": 1792374557.6272366,
+    "ast_hash": "dbf64af3ba9bf716b428a7dba8f36fae",
     "semantic_hash": ""
   },
   "js/trailer/scenes/frenzy/FrenzyBeats.js": {
@@ -1175,8 +1175,8 @@
     "semantic_hash": ""
   },
   "js/trailer/scenes/rush/BossWallShot.js": {
-    "mtime": 1792373219.7589848,
-    "ast_hash": "7ec1bcdfda10d34fa73196bea913452f",
+    "mtime": 1792376207.4520974,
+    "ast_hash": "c2adc922da5b08f2f832e4030ee64d27",
     "semantic_hash": ""
   },
   "js/ui/VtuberHud.js": {
@@ -3295,8 +3295,8 @@
     "semantic_hash": ""
   },
   ".kiro/steering/trailer.md": {
-    "mtime": 1792374085.0259447,
-    "ast_hash": "595b0d0b42b65cf9e52a3085170b20a7",
+    "mtime": 1792376690.977643,
+    "ast_hash": "4e77790da9e500f13c6956f4810c42e7",
     "semantic_hash": ""
   },
   "agent/skills/caveman/README.md": {
@@ -3815,8 +3815,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792371341.2393265,
-    "ast_hash": "c410d4d821a63ec99eaad352e2ddbed0",
+    "mtime": 1792376214.990881,
+    "ast_hash": "16dddaba7a6a88be6fa3f636594af4c9",
     "semantic_hash": ""
   },
   "map/README.md": {
@@ -5225,28 +5225,28 @@
     "semantic_hash": ""
   },
   "js/trailer/audio/TrailerAudio.js": {
-    "mtime": 1792373762.9128716,
-    "ast_hash": "5564198bad52cc9c1215669d60875677",
+    "mtime": 1792375371.2104952,
+    "ast_hash": "d30ad1a54c4797d9d71323fac2c7343c",
     "semantic_hash": ""
   },
   "js/ui/PauseScreen.js": {
-    "mtime": 1792370703.8587344,
-    "ast_hash": "fc5039ac310a11a80088b37919d02bbf",
+    "mtime": 1792375153.378354,
+    "ast_hash": "c25f6afd15de92bdc00111eaef5dd226",
     "semantic_hash": ""
   },
   "js/ui/PixelButton.js": {
-    "mtime": 1792371677.059034,
-    "ast_hash": "a854fd5cd6030f40ec4ec949fd5115c7",
+    "mtime": 1792374977.9437332,
+    "ast_hash": "3a6af9506ca5b76012651b1d0f87633f",
     "semantic_hash": ""
   },
   "js/ui/UiSound.js": {
-    "mtime": 1792371667.009384,
-    "ast_hash": "7d76a70ff2cff55f5a1746609d07deed",
+    "mtime": 1792375336.2745774,
+    "ast_hash": "d18ad3360a85c2b12b1aa7f542b0c36f",
     "semantic_hash": ""
   },
   "tools/gen_keyart.py": {
-    "mtime": 1792374071.947505,
-    "ast_hash": "b296710f214bcf9ea058976a6efbcba8",
+    "mtime": 1792376703.2384427,
+    "ast_hash": "526330f11e2a4f3ab34772d2e6e2b9cc",
     "semantic_hash": ""
   },
   "tools/gen_trailer_sfx.py": {
@@ -5527,6 +5527,51 @@
   "assets/audio/ui-open.wav": {
     "mtime": 1792371650.7376623,
     "ast_hash": "aacee8f08a7f5bdc3019d88d9be0c79d",
+    "semantic_hash": ""
+  },
+  "js/core/MasterVolume.js": {
+    "mtime": 1792374915.0494592,
+    "ast_hash": "9686fc85b96ffe655db8b05bd9175331",
+    "semantic_hash": ""
+  },
+  "js/ui/PixelSlider.js": {
+    "mtime": 1792375182.5987792,
+    "ast_hash": "be45c98cd6a70dc37cbe8a3678951c57",
+    "semantic_hash": ""
+  },
+  "tests/_tmp_audio_check.js": {
+    "mtime": 1792366109.2651272,
+    "ast_hash": "9ce06993fe5c59f9545acf1321ee2054",
+    "semantic_hash": ""
+  },
+  ".kiro/Edit project - itch.io.html": {
+    "mtime": 1792370312.7457519,
+    "ast_hash": "74d2af3d6821395a7602582879a2df20",
+    "semantic_hash": ""
+  },
+  "assets/keyart/keyart_1024.png": {
+    "mtime": 1792376703.4090009,
+    "ast_hash": "07db721e46871d47d0cef5e1588a88dc",
+    "semantic_hash": ""
+  },
+  "assets/keyart/keyart_128.png": {
+    "mtime": 1792376703.4015424,
+    "ast_hash": "0b8340dfe6e9a6b5a12418d5a93dbe35",
+    "semantic_hash": ""
+  },
+  "assets/keyart/logo.png": {
+    "mtime": 1792376703.4125063,
+    "ast_hash": "48272e2b726167a4976d77de79a78dd9",
+    "semantic_hash": ""
+  },
+  ".kiro/image.png": {
+    "mtime": 1792375587.8937812,
+    "ast_hash": "1e4b255e4dd975384358b45267e595df",
+    "semantic_hash": ""
+  },
+  "assets/keyart/cover_630x500.png": {
+    "mtime": 1792376703.460044,
+    "ast_hash": "2b65e66ebebccbf0599c2257e2596596",
     "semantic_hash": ""
   }
 }

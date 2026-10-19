@@ -12,8 +12,11 @@ combate). Não é vídeo: é código roteirizado. Tudo em `js/trailer/`.
 ## Onde roda
 
 - `index.html` + `js/main.js`: abertura do jogo (itch.io). Carrega assets do jogo
-  e do trailer juntos, toca o trailer no `#gameCanvas`, mostra `PULAR ▶` após
-  1.2s (Esc também pula) e `COMEÇAR` quando o trailer chega ao fim (Enter/Espaço).
+  e do trailer juntos, toca o trailer no `#gameCanvas`, mostra `PULAR ▶`
+  `SKIP_DELAY_MS` (3s) depois que o trailer COMEÇA de fato (gancho `onBegin`
+  do TrailerPlayer; nunca na tela de gesto; só o botão pula; Esc PAUSA) e
+  `COMEÇAR` quando o trailer chega ao fim
+  (Enter/Espaço, ignorados com o trailer pausado).
   Ao começar: `trailer.stop()` e o `Game` assume o mesmo canvas e o mesmo
   `AssetLoader`.
   - `?skipTrailer` ou `?playtest=true` vão direto pro jogo.
@@ -23,7 +26,8 @@ combate). Não é vídeo: é código roteirizado. Tudo em `js/trailer/`.
   console (também em index.html). `?timer` e `?mute` valem nas duas páginas.
   - Índices de `?cena=N` vão de 0 a 11 (listados no topo de `trailer.js`).
 - CSS do overlay: `css/style.css` (`body.trailer-mode`, `#trailer-overlay`,
-  `.tr-skip`, `.tr-start`).
+  `.tr-skip`, `.tr-start`). SKIP (face `gold`) e START (face `red`, pop +
+  `pixel-idle` como o RESTART da morte) são `PixelButton` em `main.js`.
 
 Importante: crie o `TrailerPlayer` ANTES de `assets.whenReady()` — o stage
 registra no loader as folhas de expressão.
@@ -40,7 +44,18 @@ megasong.mp3` (Megasong, emmama, CC0) e sfx em `assets/audio/trailer/`
   Mostra a logo no centro e o convite em `PixelFont` (escala da logo − 1,
   cache em `_pixelText`); o gesto toca `playUi('uiConfirm')` (mesmo som dos
   botões pixel art; não toca se o gesto foi num botão, que já tem som).
-  Esc continua pulando (main.js). `stop()` faz `audio.stopAll()` (o jogo assume).
+  `stop()` faz `audio.stopAll()` (o jogo assume).
+- Volume geral: `core/MasterVolume.js` (0..1, passos de 5%, padrão 0.8,
+  localStorage `dungeonChained.masterVolume`, ganho = v²), compartilhado com o
+  jogo (AudioManager e fallback do UiSound). No trailer vira o nó `user`
+  depois do compressor.
+- Pausa (`TrailerPlayer.setPaused/togglePause`, getter `paused`): Esc (main.js
+  e trailer.js), START do controle (`_pollPad`: d-pad navega/ajusta, A
+  confirma, B retoma) ou trocar de aba (visibilitychange). Não pausa na tela de
+  gesto. Usa `ui/PauseScreen.js` com `rootId 'trailer-pause'` (criado na 1ª
+  pausa; só RESUME + VOLUME `ui/PixelSlider.js`). `_frame` congela update/
+  render; áudio: `pauseGain` → 0 em 0.15s e `ctx.suspend()`; ao retomar,
+  `ctx.resume()` e rampa de 0.25s. `_begin`/`stop()` despausam.
 - Grafo: música → passa-baixa → humor → duck → master; sfx → passa-baixa da
   câmera lenta → master; leitos (ambiente, rumble) → master; master →
   compressor/limitador. Loops: música, ambiente, rumble, motor da serra, vento.
@@ -411,6 +426,9 @@ Faixa de jogo em Y: `Y_TOP 175 … Y_BOT 520`, meio `Y_MID 345`.
   0.12 até congelar em `FREEZE_AT 2.0`; os dois crescem de 10% a 42% da altura
   (frame de passada, `furia`, inclinados para fora), corda desenhada no espaço
   escalado, serra no meio girando; logo em `TITLE_AT 1.9` (sombra no tamanho dela);
+  depois do congelamento cada jogador FLUTUA (`FLOAT_AMP` px de arte, fases
+  alternadas, em degraus de 1 px de arte; corda e serra acompanham) e o fundo
+  dá uma pulsada vermelha leve a cada `PULSE_PERIOD 1.6`s (mais forte nas bordas);
   brasas de tela seguem em loop.
 
 ## Convenções e armadilhas

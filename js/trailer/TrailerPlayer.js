@@ -63,6 +63,8 @@ export class TrailerPlayer {
      * @param {() => void} [opts.onEnd]  chamado UMA vez quando o trailer chega
      *   ao fim (a última cena segue em loop por baixo).
      * @param {boolean} [opts.showTimer] mostra o cronômetro discreto.
+     * @param {() => void} [opts.onBegin] chamado UMA vez quando o trailer
+     *   começa de fato (depois da tela "clique para começar", se houver).
      */
     constructor(canvas, assets, opts = {}) {
         this.stage = new TrailerStage(canvas, assets);
@@ -82,6 +84,7 @@ export class TrailerPlayer {
             });
         }
         this.onEnd = opts.onEnd || null;
+        this.onBegin = opts.onBegin || null;
         this.showTimer = !!opts.showTimer;
         this.index = 0;
         this.running = false;
@@ -117,7 +120,7 @@ export class TrailerPlayer {
         preloadUi();   // o som de confirmação já sai sem atraso no 1º gesto
         this.stage.audio.ready.then(() => { gate.loaded = true; });
         const go = (e) => {
-            if (e?.key === 'Escape') return;            // Esc = pular (main.js)
+            if (e?.key === 'Escape') return;            // Esc = pausa (não conta como gesto)
             window.removeEventListener('pointerdown', go, true);
             window.removeEventListener('keydown', go, true);
             // Confirmação com o mesmo "uiConfirm" dos botões pixel art. Se o
@@ -219,6 +222,8 @@ export class TrailerPlayer {
             this._last = performance.now();
             this._raf = requestAnimationFrame(this._frame);
         }
+        // 1º começo de verdade (ex.: main.js agenda o SKIP a partir daqui).
+        if (this.onBegin) { const cb = this.onBegin; this.onBegin = null; cb(); }
     }
 
     /** Para o loop e solta os listeners (antes de o jogo assumir o canvas). */

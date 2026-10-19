@@ -141,6 +141,24 @@ export class Chain {
     }
 
     /**
+     * Desconecta SEM empurrão (ex.: um jogador caiu no buraco) e larga a
+     * lâmina no ponto devolvido por `resolveDropPoint(x, y)` — partindo de
+     * onde a serra estava. Retorna true se havia corrente para soltar.
+     */
+    forceDrop(p1, p2, resolveDropPoint) {
+        if (!this.connected) return false;
+        this.connected = false;
+        this.strain = 0;
+        this.reconnectCooldown = this.reconnectDelay;
+        const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
+        const rawX = sp ? sp.x : (p1.x + p2.x) / 2;
+        const rawY = sp ? sp.y : (p1.y + p2.y) / 2;
+        const fixed = resolveDropPoint?.(rawX, rawY) ?? { x: rawX, y: rawY };
+        this.weapon.drop?.(fixed.x, fixed.y);
+        return true;
+    }
+
+    /**
      * Regra de reconexão. Com a lâmina largada no chão, AMBOS os jogadores
      * precisam estar a até `pickupRadius` dela — só se aproximar um do outro
      * não basta. Armas sem estado de drop caem na regra antiga (distância
