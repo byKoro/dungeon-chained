@@ -136,6 +136,11 @@ export class ArrowRunShot extends RushShot {
             // --- Revoada final: cobre a tela e vira transição ---
             if (t >= WIPE_AT && !S.wipe) {
                 S.wipe = new ArrowWipe(A.arrowSprite);
+                // Revoada cobrindo a tela: rajada de flechas + passagem de ar + pancada ao cobrir.
+                const au = S.stage.audio;
+                for (let i = 0; i < 7; i++) au?.play('arrow', { vol: 0.5, delay: i * 0.05, cool: 0, pan: 0.8 - i * 0.25 });
+                au?.play('whoosh', { vol: 0.8, rate: 0.65 });
+                au?.play('impact', { vol: 0.6, delay: 0.4 });
                 S.stage.overlay = S.wipe;
                 A.both(p => { A.expr(p, 'espantado'); A.hop(p, 5); });
                 A.renderer.triggerShake(16);

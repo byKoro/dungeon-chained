@@ -94,7 +94,7 @@ export class LoadingScreen {
         return c;
     }
 
-    show(text = 'Carregando…') {
+    show(text = 'Loading…') {
         // Sem texto na tela: o rótulo vai só para o leitor de tela.
         this.el.setAttribute('aria-label', text);
         this._lit = 0;

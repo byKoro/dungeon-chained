@@ -1,5 +1,8 @@
 import { SIM_STEP, MAX_SIM_STEPS_PER_FRAME, HIT_SLOWMO } from '../config/GameConfig.js';
 
+// Duração (s) da rampa de tempo 0 -> 1 ao sair da pausa.
+const RESUME_RAMP = 0.25;
+
 /**
  * GameLoop — dono do laço principal e do tempo da simulação.
  *
@@ -32,6 +35,8 @@ export class GameLoop {
         this._lastFrameTimestamp = null;
         this._simAccumulator = 0; // tempo acumulado do fixed timestep (s)
         this._slowmoT = 0;        // segundos restantes de slow-motion de abate
+        this._paused = false;     // pausa: a simulação não avança (render segue)
+        this._resumeT = 0;        // segundos restantes da rampa de retomada
         this._running = false;
 
         this._tick = this._tick.bind(this);
@@ -51,6 +56,21 @@ export class GameLoop {
         this._slowmoT = HIT_SLOWMO.duration;
     }
 
+    // Pausa/retoma a simulação. Pausado, o render continua (HUD viva, cena
+    // congelada). Ao retomar, o tempo sobe de 0 até 1 em RESUME_RAMP segundos
+    // (sem tranco, sem contagem).
+    setPaused(paused) {
+        paused = !!paused;
+        if (paused === this._paused) return;
+        this._paused = paused;
+        this._simAccumulator = 0;
+        this._resumeT = paused ? 0 : RESUME_RAMP;
+    }
+
+    get paused() {
+        return this._paused;
+    }
+
     // Fator de velocidade atual da simulação (0..1). Em slow-motion começa em
     // HIT_SLOWMO.minScale (timer cheio) e sobe suavemente até 1 conforme o timer
     // esvazia (easeOutCubic). Sem efeito ativo, retorna 1.
@@ -60,11 +80,18 @@ export class GameLoop {
     }
 
     _timeScale() {
-        if (this._slowmoT <= 0) return 1;
+        if (this._paused) return 0;
+        // Rampa de retomada (smoothstep 0 -> 1), multiplicada pelo slow-mo.
+        let ramp = 1;
+        if (this._resumeT > 0) {
+            const k = 1 - this._resumeT / RESUME_RAMP;
+            ramp = k * k * (3 - 2 * k);
+        }
+        if (this._slowmoT <= 0) return ramp;
         const duration = HIT_SLOWMO.duration || 1;
         const progress = 1 - this._slowmoT / duration; // 0 no pico -> 1 no fim
         const eased = 1 - (1 - progress) ** 3;          // easeOutCubic
-        return HIT_SLOWMO.minScale + (1 - HIT_SLOWMO.minScale) * eased;
+        return ramp * (HIT_SLOWMO.minScale + (1 - HIT_SLOWMO.minScale) * eased);
     }
 
     _tick(timestamp) {
@@ -81,8 +108,10 @@ export class GameLoop {
         // o acumulador, então o mundo desacelera sem perder a independência de
         // framerate.
         const timeScale = this._timeScale();
-        if (this._slowmoT > 0) {
-            this._slowmoT = Math.max(0, this._slowmoT - frameSeconds);
+        // Pausado, nenhum timer de tempo corre (slow-mo/rampa ficam congelados).
+        if (!this._paused) {
+            if (this._slowmoT > 0) this._slowmoT = Math.max(0, this._slowmoT - frameSeconds);
+            if (this._resumeT > 0) this._resumeT = Math.max(0, this._resumeT - frameSeconds);
         }
 
         this._simAccumulator += frameSeconds * timeScale;

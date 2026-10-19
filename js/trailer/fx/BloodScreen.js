@@ -172,6 +172,8 @@ export class BloodScreen {
 
     // Mancha ao bater na "lente": blob irregular + respingos + escorridos.
     _splat(cx, cy, r) {
+        // Gancho de som (px de tela; r em px também).
+        this.onSplat?.(cx * this.cell, cy * this.cell, r * this.cell);
         const R = r * 1.6;
         for (let y = Math.floor(cy - R - 1); y <= cy + R + 1; y++) {
             for (let x = Math.floor(cx - R - 1); x <= cx + R + 1; x++) {

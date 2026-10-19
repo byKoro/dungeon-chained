@@ -97,6 +97,7 @@ class Portrait {
         this.trauma = 0;        // tremor (0..1), forma trauma²
         this.pending = [];      // reações atrasadas [{ t, fn }]
         this.dead = false;
+        this.paused = false;
         // Molas: escala vertical (squash/stretch), pulo (px de arte),
         // recuo lateral (px de arte) e inclinação do olhar (-1..1).
         this.squash = new Spring(1, 320, 13);
@@ -180,6 +181,20 @@ class Portrait {
         });
     }
 
+    // Pausa: pulinho de "percebeu" e passa a olhar para cima (o menu); ao
+    // voltar, outro pulinho e o idle recomeça.
+    setPaused(paused, delay = 0) {
+        if (paused === this.paused) return;
+        this.paused = paused;
+        this.seq = [];
+        this.seqT = 0;
+        this.idleWait = rand(1.5, 3);
+        this._later(delay, () => {
+            this.hop.kick(paused ? -40 : -25);
+            this.squash.set(paused ? 1.1 : 0.92);
+        });
+    }
+
     healed() {
         this.hop.kick(-35);
         this.squash.set(1.08);
@@ -207,7 +222,7 @@ class Portrait {
                 this.seq.shift();
                 this.seqT = 0;
             }
-        } else if (!this.dead) {
+        } else if (!this.dead && !this.paused) {
             // Idle: de tempos em tempos olha ao redor. Com 1 vida fica nervoso
             // (olhadas mais curtas e frequentes).
             this.idleWait -= dt;
@@ -241,10 +256,11 @@ class Portrait {
 
         // Acompanha o boneco do jogo: anda -> balança e inclina junto.
         const speed = player?.speed || 4.2;
-        const moveAmt = player && !this.dead ? clamp((player.speedMag || 0) / speed, 0, 1) : 0;
+        const live = player && !this.dead && !this.paused;
+        const moveAmt = live ? clamp((player.speedMag || 0) / speed, 0, 1) : 0;
         this.walkAmt += (moveAmt - this.walkAmt) * Math.min(1, dt * 8);
         this.walkPhase += dt * (4 + this.walkAmt * 7);
-        const tiltTarget = player && !this.dead ? clamp((player.vx || 0) / speed, -1, 1) * 0.1 : 0;
+        const tiltTarget = live ? clamp((player.vx || 0) / speed, -1, 1) * 0.1 : 0;
         this.tilt += (tiltTarget - this.tilt) * Math.min(1, dt * 6);
 
         this.sink.target = this.dead ? 9 : 0;
@@ -264,7 +280,9 @@ class Portrait {
     _exprName() {
         const step = this.seq[0];
         let name = this.base;
-        if (step) {
+        // Pausa: os dois olham para cima (para o menu), sem reações.
+        if (this.paused && !this.dead) name = 'olhando_cima';
+        else if (step) {
             if (step.expr) name = step.expr;
             else if (step.look === 'up') name = 'olhando_cima';
             else if (step.look === -1 || step.look === 1) {
@@ -516,6 +534,11 @@ export class VtuberHud {
     // Entrou em uma sala (combat = sala com inimigos a enfrentar).
     onRoomEnter(combat) {
         this.entries.forEach((e, i) => e.portrait.roomEnter(combat, i * 0.09));
+    }
+
+    // Jogo pausado/retomado: os retratos olham para o menu (escalonados).
+    setPaused(paused) {
+        this.entries.forEach((e, i) => e.portrait.setPaused(!!paused, i * 0.07));
     }
 
     onRoomCleared() {

@@ -80,6 +80,8 @@ export class GiantSawShot extends RushShot {
             // 1) Fogem e ESBARRAM na parede.
             if (S.phase === 'flee' && m.x < b.minX + 40) {
                 S.phase = 'wall'; tW = t;
+                A.sfx('impact', m.x, m.y, { vol: 0.7, rate: 1.2 });
+                S.stage.audio?.mood(-10, 2500, 0.3);            // encurralados: a trilha encolhe
                 A.renderer.triggerShake(26);
                 A.impactFlash = 0.4;
                 A.slowmo(0.3, 0.3);
@@ -113,6 +115,9 @@ export class GiantSawShot extends RushShot {
                 if (u > 1.3) {
                     // 3) Esticam a corda em direções opostas.
                     S.phase = 'stretch'; tS = t;
+                    // Corda esticando ao máximo: rangido + subida até a serra crescer.
+                    A.sfx('rope', A.mid.x, A.mid.y, { vol: 0.9, rate: 0.8, cool: 0 });
+                    S.stage.audio?.play('riser', { vol: 0.75, rate: 1.3 });
                     A.ropeLen = 720;
                     p1.goal = { x: b.minX + 150, y: b.minY + 34, speed: 8 };
                     p2.goal = { x: b.minX + 150, y: b.maxY - 16, speed: 8 };
@@ -127,6 +132,13 @@ export class GiantSawShot extends RushShot {
                 if (t > tS + 0.55) {
                     // 4) A serra CRESCE e engole o semicírculo.
                     S.phase = 'grow'; tG = t;
+                    // A serra CRESCE: estrondo + música explode.
+                    const au = S.stage.audio;
+                    au?.play('boom', { vol: 0.8, rate: 0.8 });
+                    au?.play('sawPickup', { vol: 0.9, rate: 0.7 });
+                    au?.duck(-8, 0.05, 0.45);
+                    au?.mood(0, 20000, 0.15);
+                    au?.excite(1);
                     A.saw.setStrain(0);
                     A.connectFlash = 1; A._connectAt = { ...A.sawPos };
                     A.renderer.triggerShake(24);
@@ -148,6 +160,8 @@ export class GiantSawShot extends RushShot {
             if (S.phase === 'grow' && t > tG + GROW_DUR + 0.6) {
                 // 5) Mergulho na serra gigante.
                 S.phase = 'zoom'; S._zoomT = t;
+                S.stage.audio?.play('riser', { vol: 0.7, rate: 1.0 });       // mergulho na serra → boss
+                S.stage.audio?.play('whoosh', { vol: 0.6, rate: 0.6, delay: 0.6 });
                 S._z0 = { x: A.renderer.camX, y: A.renderer.camY, z: A.renderer.zoom, rot: A.rot };
             }
 

@@ -687,7 +687,273 @@ def gen_saw_motor() -> None:
     write_wav("saw-motor-loop.wav", loop, rng=np.random.default_rng(800))
 
 
+# --------------------------------------------------------------------------
+# Inimigo surgindo do fogo (intro da sala)
+# --------------------------------------------------------------------------
+def gen_enemy_spawn() -> None:
+    """
+    Casa com a coluna de CHAMA que revela o inimigo: "fwoomp" de fogo
+    acendendo (ruído com banda SUBINDO 250 Hz -> 2.8 kHz), estalos de brasa,
+    baque grave do surgimento e um rosnado curto (dentes-de-serra desafinados
+    com tremolo) — ameaça, sem soar como recompensa. Três variações: vários
+    inimigos surgem escalonados e o sorteio evita a repetição.
+    """
+    for i, (growl_f, seed) in enumerate([(62.0, 901), (55.0, 902), (70.0, 903)], 1):
+        rng = np.random.default_rng(seed)
+        n = n_of(1.0)
+        out = np.zeros(n)
+
+        # Fwoomp: banda sobe (o fogo "acende" e cresce), envelope rápido-lento.
+        nf = n_of(0.75)
+        tf = time_axis(nf)
+        fc = 250.0 * (2800.0 / 250.0) ** np.minimum(1.0, tf / 0.35)
+        fire = svf(rng.standard_normal(nf), fc, q=0.9)
+        fenv = np.minimum(1.0, tf / 0.025) * np.exp(-tf / 0.28)
+        place(out, fire * fenv, 0.0, gain=0.9)
+
+        # Rugido grave do fogo (ar sendo sugado).
+        roar = fft_band(rng.standard_normal(nf), 60.0, 400.0) * fenv
+        place(out, roar, 0.0, gain=0.6)
+
+        # Estalos de brasa esparsos.
+        for _ in range(9):
+            place(out, click(rng.uniform(1.5, 4.0), 2000.0, 9000.0, rng),
+                  rng.uniform(0.03, 0.6), gain=rng.uniform(0.15, 0.4))
+
+        # Baque do surgimento.
+        nt = n_of(0.2)
+        place(out, sweep_sine(nt, 110.0, 45.0) * env_exp(nt, 0.06, attack_s=0.002), 0.0, gain=0.8)
+
+        # Rosnado: 2 dentes-de-serra desafinados + tremolo (~14 Hz), abafados.
+        ng = n_of(0.55)
+        tg = time_axis(ng)
+        saw = sum(2.0 * ((growl_f * k * tg) % 1.0) - 1.0 for k in (1.0, 1.013))
+        saw *= 0.6 + 0.4 * np.sin(2 * np.pi * 14.0 * tg)
+        growl = onepole_lp(softclip(saw, 2.0), 700.0)
+        genv = np.minimum(1.0, tg / 0.06) * np.exp(-tg / 0.2)
+        place(out, growl * genv, 0.08, gain=0.35)
+
+        out = add_reverb(out, 0.3, 1.0, rng, hi=4000.0)
+        write_wav(f"enemy-spawn-0{i}.wav", finish(out, 0.1), rng=rng)
+
+
+# --------------------------------------------------------------------------
+# Jogador recebendo dano
+# --------------------------------------------------------------------------
+def gen_player_hit() -> None:
+    """
+    Impacto no CORPO (não metal, para não confundir com o golpe da serra):
+    transiente seco + "smack" de carne (ruído médio com decaimento de 30 ms)
+    + soco grave (160 -> 50 Hz) + leve saturação. Curto (~0.35 s) para sair
+    junto do flash vermelho e do knockback, sem cauda que atrapalhe o próximo.
+    """
+    for i, (lo, hi, f0, seed) in enumerate([(350, 2400, 160, 911), (300, 2000, 140, 912),
+                                             (420, 2800, 180, 913)], 1):
+        rng = np.random.default_rng(seed)
+        n = n_of(0.38)
+        out = np.zeros(n)
+
+        place(out, click(2.5, 2500.0, 10000.0, rng), 0.0, gain=0.7)
+
+        ns = n_of(0.12)
+        smack = fft_band(rng.standard_normal(ns), lo, hi) * env_exp(ns, 0.03, attack_s=0.001)
+        place(out, smack, 0.0, gain=1.0)
+
+        nt = n_of(0.22)
+        punch = sweep_sine(nt, f0, 50.0) * env_exp(nt, 0.07, attack_s=0.001)
+        place(out, punch, 0.0, gain=0.9)
+
+        # "Crunch" curtinho logo após o impacto (osso/armadura de couro).
+        nc = n_of(0.05)
+        crunch = fft_band(rng.standard_normal(nc), 1200.0, 5000.0)
+        crunch *= (rng.random(nc) > 0.7) * env_exp(nc, 0.015)
+        place(out, crunch, 0.012, gain=0.5)
+
+        out = softclip(out * 1.4, 2.0)
+        out = add_reverb(out, 0.15, 0.5, rng)
+        write_wav(f"player-hit-0{i}.wav", finish(out, 0.04), rng=rng)
+
+
+# --------------------------------------------------------------------------
+# Flecha disparada pela armadilha de parede
+# --------------------------------------------------------------------------
+def gen_arrow_fire() -> None:
+    """
+    Mecanismo de besta embutido na parede: "clack" de madeira/trava, TWANG
+    da corda (tom grave descendo com vibrato curto), baque abafado do
+    mecanismo e o ASSOBIO da flecha saindo (banda estreita descendo, tipo
+    Doppler se afastando). Três variações de tom.
+    """
+    for i, (twang_f, seed) in enumerate([(210.0, 921), (190.0, 922), (235.0, 923)], 1):
+        rng = np.random.default_rng(seed)
+        n = n_of(0.6)
+        out = np.zeros(n)
+
+        # Clack da trava (madeira: banda média, decaimento curtíssimo).
+        nk = n_of(0.04)
+        clack = fft_band(rng.standard_normal(nk), 800.0, 4500.0) * env_exp(nk, 0.008)
+        clack += partials(nk, 1350.0, [1.0, 2.3], [0.5, 0.25], [0.01, 0.006], rng=rng)
+        place(out, clack, 0.0, gain=0.9)
+
+        # Twang: corda solta (fundamental + harmônicos, tom cai ~25%).
+        ntw = n_of(0.3)
+        ttw = time_axis(ntw)
+        f = twang_f * (1.0 + 0.33 * np.exp(-ttw / 0.02)) * (1.0 + 0.015 * np.sin(2 * np.pi * 30 * ttw))
+        ph = 2 * np.pi * np.cumsum(f) / SR
+        twang = np.sin(ph) + 0.5 * np.sin(2 * ph) + 0.25 * np.sin(3 * ph)
+        place(out, twang * env_exp(ntw, 0.07, attack_s=0.001), 0.003, gain=0.35)
+
+        # Baque abafado do mecanismo.
+        nb = n_of(0.1)
+        place(out, sweep_sine(nb, 120.0, 70.0) * env_exp(nb, 0.03), 0.0, gain=0.4)
+
+        # Assobio da flecha saindo: banda estreita 3.5k -> 1.4k.
+        nw = n_of(0.32)
+        fc = 3500.0 * (1400.0 / 3500.0) ** np.linspace(0, 1, nw)
+        whoosh = svf(rng.standard_normal(nw), fc, q=4.0)
+        wenv = np.sin(np.pi * np.linspace(0, 1, nw)) ** 1.5
+        place(out, whoosh * wenv, 0.015, gain=0.45)
+
+        out = add_reverb(out, 0.25, 0.8, rng)
+        write_wav(f"arrow-fire-0{i}.wav", finish(out, 0.06), rng=rng)
+
+
+# --------------------------------------------------------------------------
+# Botão de pressão (placa de pedra no chão)
+# --------------------------------------------------------------------------
+def stone_knock(n_s: float, lo: float, hi: float, decay: float, rng) -> np.ndarray:
+    """Batida de pedra: ruído de banda média com decaimento rápido + corpo grave."""
+    n = n_of(n_s)
+    x = fft_band(rng.standard_normal(n), lo, hi) * env_exp(n, decay, attack_s=0.0008)
+    x += sweep_sine(n, lo * 0.9, lo * 0.5) * env_exp(n, decay * 1.5) * 0.6
+    return x
+
+
+def gen_button_press() -> None:
+    """
+    Pisar na placa (evento PEQUENO, mas tem que soar "ativou algo"):
+      1. clique seco de pedra contra pedra (transiente — sai no quadro do pé);
+      2. baque grave da placa afundando;
+      3. raspado curto (pedra deslizando no encaixe);
+      4. catraca do mecanismo: 3 tiques metálicos acelerando — comunica que
+         ALGO foi armado na parede, sem jingle de interface.
+    Duas variações.
+    """
+    for i, (base, seed) in enumerate([(1.0, 931), (0.93, 932)], 1):
+        rng = np.random.default_rng(seed)
+        n = n_of(0.55)
+        out = np.zeros(n)
+
+        place(out, click(3.0, 1800.0 * base, 7000.0, rng), 0.0, gain=0.8)
+        place(out, stone_knock(0.08, 900.0 * base, 3200.0, 0.012, rng), 0.0, gain=0.7)
+
+        nt = n_of(0.18)
+        thud = sweep_sine(nt, 150.0 * base, 55.0) * env_exp(nt, 0.05, attack_s=0.001)
+        thud += fft_band(rng.standard_normal(nt), 60.0, 350.0) * env_exp(nt, 0.03) * 0.5
+        place(out, thud, 0.004, gain=0.9)
+
+        ng = n_of(0.09)
+        grind = np.cumsum(rng.standard_normal(ng))
+        grind = fft_band(grind - np.linspace(grind[0], grind[-1], ng), 150.0, 1800.0)
+        grind *= np.abs(fft_band(rng.standard_normal(ng), 20.0, 60.0)) * np.hanning(ng)
+        place(out, grind / (np.abs(grind).max() + 1e-9), 0.02, gain=0.3)
+
+        # Catraca: tiques com intervalo encolhendo, ressonância metálica.
+        t, gap = 0.1, 0.055
+        for k in range(3):
+            tick = partials(n_of(0.05), 2400.0 * base, [1.0, 1.47, 2.3], [0.6, 0.35, 0.2],
+                            [0.012, 0.008, 0.005], rng=rng)
+            place(tick, click(1.5, 3000.0, 9000.0, rng), 0.0, gain=0.6)
+            place(out, tick, t, gain=0.32 + 0.06 * k)
+            t += gap
+            gap *= 0.7
+
+        out = add_reverb(out, 0.25, 0.7, rng)
+        write_wav(f"button-press-0{i}.wav", finish(out, 0.05), rng=rng)
+
+
+def gen_button_release() -> None:
+    """
+    Sair da placa: a mola devolve a pedra — "tuk" leve SUBINDO (tom do corpo
+    sobe, oposto do afundar) + clique de destrava. Bem mais baixo e curto que
+    o press (soltar é informação secundária).
+    """
+    rng = np.random.default_rng(941)
+    n = n_of(0.3)
+    out = np.zeros(n)
+    nt = n_of(0.1)
+    up = sweep_sine(nt, 90.0, 170.0) * env_exp(nt, 0.035, attack_s=0.002)
+    place(out, up, 0.0, gain=0.8)
+    place(out, stone_knock(0.05, 1200.0, 4000.0, 0.008, rng), 0.03, gain=0.55)
+    place(out, click(2.0, 2500.0, 8000.0, rng), 0.03, gain=0.4)
+    out = add_reverb(out, 0.2, 0.6, rng)
+    write_wav("button-release.wav", finish(out, 0.04), rng=rng)
+
+
+# --------------------------------------------------------------------------
+# Interface (botões pixel art: foco, confirmar, abrir/fechar pausa)
+# --------------------------------------------------------------------------
+# Regras de som de UI: curto (não atrasa a próxima ação), ataque imediato,
+# tom CONSISTENTE (variação mínima — UI é previsível), sem reverb longo, e
+# hierarquia clara: mover foco << confirmar < abrir/fechar menu.
+def gen_ui() -> None:
+    rng = np.random.default_rng(951)
+
+    # Mover foco: "tic" de madeira com um bip curtinho que cai de tom.
+    n = n_of(0.07)
+    tick = sweep_sine(n, 1900.0, 1300.0) * env_exp(n, 0.012, attack_s=0.0005)
+    place(tick, click(2.0, 2500.0, 8000.0, rng), 0.0, gain=0.5)
+    place(tick, stone_knock(0.04, 900.0, 3000.0, 0.006, rng), 0.0, gain=0.35)
+    write_wav("ui-move.wav", finish(tick, 0.01), rng=rng)
+
+    # Confirmar: clack seco + dois toques metálicos SUBINDO uma quinta
+    # (A5 -> E6) — resposta positiva, combina com o metal da serra.
+    n = n_of(0.4)
+    out = np.zeros(n)
+    place(out, click(3.0, 2000.0, 9000.0, rng), 0.0, gain=0.7)
+    place(out, stone_knock(0.06, 700.0, 2800.0, 0.01, rng), 0.0, gain=0.6)
+    nt = n_of(0.08)
+    place(out, sweep_sine(nt, 180.0, 90.0) * env_exp(nt, 0.025), 0.0, gain=0.5)
+    for k, f in enumerate([880.0, 1318.5]):
+        ring = partials(n_of(0.32), f, [1.0, 2.0, 2.76], [1.0, 0.3, 0.12],
+                        [0.12, 0.06, 0.03], rng=rng) * env_exp(n_of(0.32), 10.0, attack_s=0.001)
+        place(out, ring, 0.012 + k * 0.055, gain=0.28)
+    out = add_reverb(out, 0.15, 0.4, rng)
+    write_wav("ui-confirm.wav", finish(out, 0.05), rng=rng)
+
+    # Abrir pausa: o mundo "afunda" — ruído abafando (filtro descendo) +
+    # tom grave caindo + baque de pedra.
+    n = n_of(0.45)
+    out = np.zeros(n)
+    nw = n_of(0.35)
+    fc = 2600.0 * (300.0 / 2600.0) ** np.linspace(0, 1, nw)
+    place(out, svf(rng.standard_normal(nw), fc, q=1.0) * np.hanning(nw) ** 0.5, 0.0, gain=0.35)
+    nd = n_of(0.3)
+    place(out, sweep_sine(nd, 240.0, 110.0) * env_exp(nd, 0.09, attack_s=0.003), 0.0, gain=0.5)
+    place(out, stone_knock(0.08, 400.0, 1800.0, 0.015, rng), 0.0, gain=0.5)
+    out = add_reverb(out, 0.2, 0.5, rng, hi=3000.0)
+    write_wav("ui-open.wav", finish(out, 0.06), rng=rng)
+
+    # Fechar pausa / voltar ao jogo: o inverso — filtro e tom SUBINDO.
+    n = n_of(0.35)
+    out = np.zeros(n)
+    nw = n_of(0.25)
+    fc = 300.0 * (3200.0 / 300.0) ** np.linspace(0, 1, nw)
+    place(out, svf(rng.standard_normal(nw), fc, q=1.0) * np.hanning(nw) ** 0.5, 0.0, gain=0.3)
+    nd = n_of(0.2)
+    place(out, sweep_sine(nd, 120.0, 260.0) * env_exp(nd, 0.06, attack_s=0.003), 0.0, gain=0.45)
+    place(out, click(2.0, 2500.0, 8000.0, rng), 0.17, gain=0.35)
+    out = add_reverb(out, 0.15, 0.4, rng)
+    write_wav("ui-close.wav", finish(out, 0.05), rng=rng)
+
+
 GROUPS = {
+    "ui": gen_ui,
+    "button_press": gen_button_press,
+    "button_release": gen_button_release,
+    "enemy_spawn": gen_enemy_spawn,
+    "player_hit": gen_player_hit,
+    "arrow_fire": gen_arrow_fire,
     "saw_motor": gen_saw_motor,
     "saw_hit": gen_saw_hit,
     "heart_pickup": gen_heart_pickup,

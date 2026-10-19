@@ -16,8 +16,9 @@ export class SplitShot {
     constructor(stage) {
         this.stage = stage;
         this.cutIn = 'impact';
-        this.left = new ActionArena(stage, { cols: 12, rows: ROWS, doors: { N: true }, seed: 44 });
-        this.right = new ActionArena(stage, { cols: 14, rows: ROWS, doors: { N: true }, seed: 55, ambient: '46, 38, 52' });
+        // panBias: o som de cada metade sai do seu lado (tela dividida).
+        this.left = new ActionArena(stage, { cols: 12, rows: ROWS, doors: { N: true }, seed: 44, panBias: -0.45 });
+        this.right = new ActionArena(stage, { cols: 14, rows: ROWS, doors: { N: true }, seed: 55, ambient: '46, 38, 52', panBias: 0.45 });
         this._holesBuilt = false;
         this.t = 0;
     }

@@ -23,10 +23,11 @@ import { TrailerPlayer } from './trailer/TrailerPlayer.js';
 async function bootstrap() {
     const canvas = document.getElementById('trailerCanvas');
     const assets = new AssetLoader();
-    const trailer = new TrailerPlayer(canvas, assets);
+    const params = new URLSearchParams(location.search);
+    const trailer = new TrailerPlayer(canvas, assets, { audio: !params.has('mute'), showTimer: params.has('timer') });
     window.trailer = trailer;
 
-    await new LoadingScreen().run('Carregando o trailer…', [
+    await new LoadingScreen().run('Loading the trailer…', [
         { task: (p) => assets.whenReady((d, t) => p(t ? d / t : 1)) }
     ]);
 

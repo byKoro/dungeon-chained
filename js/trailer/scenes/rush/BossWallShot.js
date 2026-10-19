@@ -136,9 +136,21 @@ export class BossWallShot extends RushShot {
             else this.t += dt;
             this._tickScreenEmbers(dt);
         } else super.update(dt);
+        // Plano final: título com o golpe de cartela e a trilha de volta, cheia.
+        const au = this.stage.audio;
+        if (this.leapLT >= 0 && !this._titleSnd && this.leapLT >= TITLE_AT) {
+            this._titleSnd = true;
+            au?.play('sting', { vol: 1, noSlow: true });
+            au?.mood(-4, 20000, 1.6);
+        }
+        if (this.leapLT >= 0.9 && !this._beat2) { this._beat2 = true; au?.play('heartbeat', { vol: 0.8, noSlow: true }); }
         if (this._leapPending && this.leapLT < 0) {
             this._leapPending = false;
             this.leapLT = 0;
+            // Salto em câmera lenta: o mundo afunda, só o coração e o ar.
+            au?.play('slowmo', { vol: 0.85, noSlow: true });
+            au?.play('heartbeat', { vol: 0.9, noSlow: true });
+            au?.mood(-15, 520, 0.5);
             // A serra "vem junto" para o primeiro plano: some do fundo.
             this.arena.sawVisible = false;
         }
@@ -157,6 +169,7 @@ export class BossWallShot extends RushShot {
         this.fxScreen.clear();
         this.leapLT = -1;
         this._leapPending = false;
+        this._titleSnd = this._beat2 = this._slowLeap = this._looked = this._looked2 = false;
         this._fired = new Set();
         this._kills = 0;
         this._embAcc = 0;
@@ -264,20 +277,48 @@ export class BossWallShot extends RushShot {
         }
         const s = A.ws(A.mid.x, A.mid.y);
         A.lens.trigger(s.x, s.y, 0.6);
+        // Entrada DE UMA VEZ: pancada + estrondo + chama; a trilha explode.
+        const au = this.stage.audio;
+        A.sfx('impact', B.x, B.y, { vol: 1, cool: 0 });
+        A.sfx('boom', B.x, B.y, { vol: 0.85, rate: 0.7, cool: 0 });
+        A.sfx('flame', B.x, B.y, { vol: 0.7, rate: 0.8 });
+        au?.duck(-12, 0.06, 0.55);
+        au?.mood(0, 20000, 0.25);
+        au?.excite(1);
         if (this.mode === 'calm') this.mode = 'shock';
         else this.mode = 'shock2';
         this._shockT = A.t;
+    }
+
+    // Som da cena: ronco grave enquanto o boss está presente; no plano
+    // final a serra gira em primeiro plano e a câmera lenta só vale até o título.
+    audioState(s) {
+        const B = this.B, lt = this.leapLT;
+        const calmRumble = this.mode === 'calm' ? 0.12 + 0.35 * Math.min(1, this.arena.t / 0.8) : 0;
+        const o = { rumble: calmRumble + (B?.visible ? 0.18 * B.alpha : 0) };
+        if (lt >= 0) {
+            o.players = null;
+            o.saw = { visible: true, spin: lt < FREEZE_AT ? 1 : 0.55, scale: 1.4 };
+            o.slow = lt > TITLE_AT ? 1 : s.slow;
+            o.rumble = 0;
+        }
+        return o;
     }
     _roar(A) {
         const B = this.B;
         B.act = 'roar'; B.actT = A.t;
         A.both(p => { p.shiver = 0.55; A.expr(p, 'assustado'); });
         A.red = 1; A.redHz = 2.2;
+        A.sfx('roar', B.x, B.y, { vol: 1, rate: 0.72, cool: 0 });
+        A.sfx('flame', B.x, B.y, { vol: 0.5, rate: 0.6 });
+        this.stage.audio?.duck(-6, 0.4, 0.8);
     }
     _spit(A, n) {
         const B = this.B;
         B.act = 'spit'; B.actT = A.t; B.spawned = 0; B.spitN = n;
         A.renderer.triggerShake(14);
+        A.sfx('flame', B.x, B.y, { vol: 0.9, rate: 0.85, cool: 0 });
+        A.sfx('roar', B.x, B.y, { vol: 0.4, rate: 1.1, cool: 0 });
     }
     _fight(A, expr = null) {
         this.mode = 'fight';
@@ -288,11 +329,17 @@ export class BossWallShot extends RushShot {
         const B = this.B;
         B.act = 'beam'; B.actT = A.t; B.locked = false; B.firing = false; B.faded = false; B.final = final;
         B.dodgeDir = dodgeDir;
+        // Carga + aviso: zumbido subindo; a trilha recua um pouco (tensão).
+        A.sfx('beamCharge', B.x, B.y, { vol: 0.95, cool: 0 });
+        this.stage.audio?.mood(-5, 7000, 0.4);
     }
     _vanish(A) {
         const B = this.B;
         B.act = 'vanish'; B.actT = A.t;
         A.renderer.triggerShake(16);
+        A.sfx('flame', B.x, B.y, { vol: 1, rate: 0.65, cool: 0 });
+        A.sfx('whoosh', B.x, B.y, { vol: 0.6, rate: 0.7 });
+        this.stage.audio?.mood(-9, 2600, 0.3);
         for (let i = 0; i < 26; i++) {
             this.fx.fire(B.x + rnd(-5, 5) * BS, B.y + rnd(-14, 8) * BS, rnd(-2, 2), rnd(-5, -1), { r: rnd(60, 120), life: rnd(0.5, 0.9) });
         }
@@ -315,6 +362,7 @@ export class BossWallShot extends RushShot {
             if (t < b.at) continue;
             this.blasts.splice(i, 1);
             this.fx.blast(b.x, b.y, b.power, A.renderer.tileset, DEBRIS);
+            A.sfx('boom', b.x, b.y, { vol: 0.35 + 0.2 * b.power, rate: 1.25 - 0.2 * b.power, cool: 0.05 });
             A.killFlashes.push({ x: b.x, y: b.y, life: 1, scale: 3 + b.power });
             A.renderer.triggerShake(26);
         }
@@ -504,6 +552,13 @@ export class BossWallShot extends RushShot {
 
     _onFire(A) {
         this._beamBurst(A);
+        // Disparo: rajada + zumbido áspero; trilha abre espaço e volta empolgada.
+        const mo = this._mouth, au = this.stage.audio;
+        A.sfx('beamFire', mo.x, mo.y, { vol: 1, cool: 0, noSlow: true });
+        A.sfx('impact', mo.x, mo.y, { vol: 0.6, rate: 1.1, cool: 0 });
+        au?.duck(-8, 0.12, 0.6);
+        au?.mood(-1, 20000, 0.4);
+        au?.excite(0.7);
         A.slowmo(0.3, 0.35);
         A.impactFlash = 0.4;
         A.renderer.triggerShake(28);
@@ -517,6 +572,12 @@ export class BossWallShot extends RushShot {
         A.minSpin = 1;
         A.both(p => { p.accel = 0.3; p.wobble = 0.1; p.shiver = 0; A.expr(p, 'furia'); A.hop(p, 4); });
         A.renderer.triggerShake(12);
+        // Investida: a serra cresce (giro subindo) e a trilha vai ao máximo.
+        const m = A.mid, au = this.stage.audio;
+        A.sfx('sawPickup', m.x, m.y, { vol: 1, rate: 0.75, cool: 0 });
+        A.sfx('whoosh', m.x, m.y, { vol: 0.7, rate: 0.8 });
+        au?.mood(0, 20000, 0.15);
+        au?.excite(1);
     }
 
     _impale(A) {
@@ -529,6 +590,11 @@ export class BossWallShot extends RushShot {
         A.renderer.triggerZoomPunch(0.1);
         const s = A.ws(A.sawPos.x, A.sawPos.y);
         A.lens.trigger(s.x, s.y, 0.9);
+        // Serra crava: pancada + rachaduras estalando; trilha foca (abafa um pouco).
+        A.sfx('impact', B.x, B.y, { vol: 0.95, cool: 0 });
+        A.sfx('crack', B.x, B.y, { vol: 1, cool: 0 });
+        A.sfx('sawHit', A.sawPos.x, A.sawPos.y, { vol: 1, rate: 0.7, cool: 0 });
+        this.stage.audio?.mood(-4, 3500, 0.25);
     }
 
     _death(A) {
@@ -539,6 +605,13 @@ export class BossWallShot extends RushShot {
         A.renderer.triggerShake(60);
         A.renderer.triggerZoomPunch(-0.1);
         A.red = 1;
+        // Morte: o maior estrondo do trailer (a trilha abre espaço e volta no máximo).
+        const au = this.stage.audio;
+        A.sfx('boom', B.x, B.y, { vol: 1, rate: 0.6, cool: 0 });
+        A.sfx('impact', B.x, B.y, { vol: 1, rate: 0.8, cool: 0 });
+        A.sfx('roar', B.x, B.y, { vol: 0.7, rate: 0.55, cool: 0 });
+        au?.duck(-14, 0.1, 0.9);
+        au?.excite(1);
         for (const e of A.enemies) A.killEnemy(e, 10);
         this.fx.blast(B.x, B.y - 3 * BS, 3.2, A.renderer.tileset, DEBRIS);
         A.killFlashes.push({ x: B.x, y: B.y, life: 1, scale: 9 });
@@ -567,6 +640,7 @@ export class BossWallShot extends RushShot {
         this.fx.fire(x, y, away * 3, 0, { r: 70, life: 0.45 });
         for (let k = 0; k < 10; k++) this.fx.ember(x, y, away * rnd(2, 9), rnd(-3, 3), { size: rnd(3, 6), life: rnd(0.4, 0.9) });
         A.renderer.triggerShake(8);
+        A.sfx('enemySpawn', x, y, { vol: 0.45, rate: type === 'hellbat' ? 1.3 : 1, cool: 0.06 });
     }
 
     _emberFromFlame(A, n = 1) {
@@ -661,6 +735,8 @@ export class BossWallShot extends RushShot {
                 A.particles.triggerSparkBurst(cx, sp.y, 10, 7, 2);
                 for (let i = 0; i < 4; i++) this.fx.ember(cx, sp.y + rnd(-R, R) * 0.6, away * rnd(3, 10), rnd(-6, 2), { size: rnd(3, 7), life: rnd(0.3, 0.8) });
                 A.renderer.triggerShake(8 + 22 * B.crack);
+                // Serra moendo a caveira (golpes graves em sequência).
+                A.sfx('sawHit', cx, sp.y, { vol: 0.5 + 0.4 * B.crack, rate: 0.6 + 0.3 * B.crack, cool: 0.075 });
             }
             if (u >= 0.75) this._death(A);
             return;

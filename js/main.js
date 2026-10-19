@@ -3,6 +3,8 @@ import { RoomCatalog } from './rooms/RoomCatalog.js';
 import { AssetLoader } from './core/AssetLoader.js';
 import { LoadingScreen } from './ui/LoadingScreen.js';
 import { TrailerPlayer } from './trailer/TrailerPlayer.js';
+import { PixelButton, pixelScale } from './ui/PixelButton.js';
+import { playUi, preloadUi } from './ui/UiSound.js';
 
 /**
  * main.js — ponto de entrada (index.html).
@@ -30,10 +32,13 @@ async function bootstrap() {
     if (!skipTrailer) {
         document.body.classList.add('trailer-mode');
         // ?timer mostra o cronômetro do trailer (para revisar; fora do itch.io).
-        trailer = new TrailerPlayer(canvas, assets, { onEnd: () => ui.showStart(), showTimer: params.has('timer') });
+        // ?mute desliga o som do trailer (sem a tela "clique para começar").
+        trailer = new TrailerPlayer(canvas, assets, {
+            onEnd: () => ui.showStart(), showTimer: params.has('timer'), audio: !params.has('mute')
+        });
     }
 
-    await loading.run('Carregando o calabouço…', [
+    await loading.run('Loading the dungeon…', [
         { weight: 4, task: (p) => assets.whenReady((d, t) => p(t ? d / t : 1)) },
         { weight: 1, task: () => roomCatalog.load() }
     ]);
@@ -47,7 +52,7 @@ async function bootstrap() {
         document.body.classList.remove('trailer-mode');
 
         let game = null;
-        await loading.run('Preparando a masmorra…', [
+        await loading.run('Preparing the dungeon…', [
             {
                 weight: 1,
                 task: async (p) => {
@@ -73,13 +78,40 @@ function buildTrailerUI(onStart) {
     const start = document.getElementById('btn-start');
     if (!root) return { showSkip() {}, showStart() {}, hide() {} };
 
-    skip.addEventListener('click', onStart);
-    start.addEventListener('click', onStart);
+    // SKIP em pixel art (face amarela), um pouco menor que os botões de menu.
+    const skipBtn = new PixelButton(skip, {
+        label: 'SKIP ▶',
+        ariaLabel: 'Skip trailer',
+        face: 'gold',
+        enabled: () => skip.classList.contains('visible'),
+        onPress: onStart
+    });
+    const scaleSkip = () => {
+        const s = Math.max(2, pixelScale() - 2);
+        skipBtn.applyScale(s);
+        skip.style.setProperty('--px', `${s}px`);
+    };
+    scaleSkip();
+    window.addEventListener('resize', scaleSkip);
+    // START (botão HTML simples) e atalhos de teclado não passam pelo
+    // PixelButton: tocam o mesmo "uiConfirm" aqui. Uma vez só (onStart é
+    // idempotente, mas o som não seria).
+    let confirmed = false;
+    const confirmStart = () => {
+        if (!confirmed) playUi('uiConfirm');
+        confirmed = true;
+        onStart();
+    };
+    preloadUi();
+    start.addEventListener('pointerenter', () => {
+        if (start.classList.contains('visible')) playUi('uiMove');
+    });
+    start.addEventListener('click', confirmStart);
     const onKey = (e) => {
-        if (e.key === 'Escape') onStart();
+        if (e.key === 'Escape') confirmStart();
         else if ((e.key === 'Enter' || e.key === ' ') && start.classList.contains('visible')) {
             e.preventDefault();
-            onStart();
+            confirmStart();
         }
     };
     window.addEventListener('keydown', onKey);

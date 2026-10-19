@@ -87,6 +87,39 @@ export class MapGenScene {
     }
 
     reset() { this.t = 0; }
+
+    // Som: câmera própria (sem jogadores/serra); tremor dos pops.
+    audioState() {
+        const c = this._camAt(this.t);
+        return { cam: { x: c.x, y: c.y, zoom: c.z, rot: c.rot }, shake: this.shake, saw: null, players: null, amb: 0.5 };
+    }
+    // Pan aproximado de um ponto do mapa (câmera sem rotação no cálculo).
+    _pan(x, y) {
+        const c = this._camAt(this.t), W = this.stage.canvas.width;
+        return Math.max(-0.8, Math.min(0.8, (x - c.x) * c.z / (W / 2)));
+    }
+    // Cada sala/corredor nascendo = "bloop" (tom sobe com o nível); portas
+    // destravando = clique de pedra; mergulho = subida + passagem de ar.
+    _popSounds(au, t0) {
+        const t = this.t;
+        for (const R of this.D.rooms) {
+            if (R.popT > t0 && R.popT <= t) {
+                au.play('pop', {
+                    vol: 0.34, rate: 0.9 + R.level * 0.14 + Math.random() * 0.08, cool: 0.022,
+                    pan: this._pan((R.gx + R.w / 2) * TILE, (R.gy + R.h / 2) * TILE)
+                });
+            }
+        }
+        for (const C of this.D.corridors) {
+            if (C.popT > t0 && C.popT <= t) au.play('pop', { vol: 0.16, rate: 1.6, cool: 0.03 });
+            if (C.openT > t0 && C.openT <= t && !C.doorA.room.locked) au.play('stoneClick', { vol: 0.14, rate: 1.4, cool: 0.05 });
+        }
+        if (t0 < DIVE_AT - 0.35 && t >= DIVE_AT - 0.35) au.play('riser', { vol: 0.7 });
+        if (t0 < DIVE_AT && t >= DIVE_AT) {
+            au.mood(-2, 20000, DIVE_DUR);
+            au.play('whoosh', { vol: 0.75, rate: 0.7, delay: 0.35 });
+        }
+    }
     // Termina no fim do mergulho; a cena seguinte continua o zoom.
     get isDone() { return this.t >= DIVE_AT + DIVE_DUR; }
     get reachedEnd() { return this.isDone; }
@@ -174,16 +207,25 @@ export class MapGenScene {
 
     // ------------------------------------------------------------------
     update(dt) {
+        const t0 = this.t;
         this.t += dt;
+        const au = this.stage.audio;
         while (this._firedPop < POPS.length && this.t >= POPS[this._firedPop].at + 0.12) {
             this.shake = Math.max(this.shake, 16);
             this.flash = 0.4;
             this._firedPop++;
+            // Pop do nível: passagem de ar do recuo + pancada; a trilha sobe.
+            au?.play('whoosh', { vol: 0.6, rate: 0.8 });
+            au?.play('impact', { vol: 0.5, rate: 1.25 });
+            au?.excite(0.45);
         }
+        if (au) this._popSounds(au, t0);
         // Fim do mergulho: o clarão segue por cima da próxima cena (overlay).
         if (this.isDone && !this._flashHanded) {
             this._flashHanded = true;
             this.stage.overlay = whiteFade(DIVE_FLASH, 0.4);
+            au?.play('impact', { vol: 0.85 });
+            au?.duck(-8, 0.05, 0.6);
         }
         this._acc += dt * 60;
         let n = 0;

@@ -208,7 +208,17 @@ export class FrenzyScene {
     _both(fn) { fn(this.host.p1); fn(this.host.p2); }
     _expr(p, name) { this.host._express(p, name); }
     _blink(p, secs = 0.14) { this.host._expressFor(p, 'olhos_fechados', secs); }
-    _slowmo(secs, scale = 0.3) { this.slowmoT = secs; this._slowScale = scale; }
+    _slowmo(secs, scale = 0.3) {
+        this.slowmoT = secs; this._slowScale = scale;
+        this.host.audio?.slowmo(scale, secs);
+    }
+    // Som posicionado no mundo (pan pela tela).
+    _sfx(name, x, y, o = {}) {
+        const au = this.host.audio;
+        if (!au) return null;
+        const s = this.host.renderer.worldToScreen(x, y);
+        return au.play(name, { pan: au.panX(s.x, this.host.canvas.width), ...o });
+    }
 
     // Dispara cada [tempo, ação] uma única vez ao cruzar o tempo.
     _stage(t, list) {
@@ -222,6 +232,18 @@ export class FrenzyScene {
         this.beatT = 0;
         this._fired = new Set();
         this.beats[i]?.enter?.();
+        // Trilha acompanha o roteiro: correria → choque (abafa) → porta/rugido
+        // → desespero/horda (sobe) → decisão (respira, quase some) → investida (explode).
+        const au = this.host.audio;
+        const M = [[-6, 5000, 0.6], [-14, 1300, 0.5], [-7, 4000, 0.8], [-3, 12000, 0.6],
+            [-4, 9000, 0.4], [-2, 16000, 0.6], [-16, 800, 0.35], [0, 20000, 0.12], [-6, 6000, 1.5]][i];
+        if (au && M) au.mood(M[0], M[1], M[2]);
+        if (au && i === 2) {           // PORTA: rugido infernal da horda
+            au.play('roar', { vol: 0.85, rate: 0.85 });
+            au.play('boom', { vol: 0.35, rate: 0.6 });
+        }
+        if (au && i === 6) au.play('riser', { vol: 0.6, delay: 0.4 });          // decisão → investida
+        if (au && i === 7) { au.play('impact', { vol: 0.85 }); au.play('whoosh', { vol: 0.5 }); au.excite(0.6); }
     }
 
     // Alvo de câmera: SEMPRE os dois jogadores; `lean` inclina o enquadramento
@@ -261,6 +283,8 @@ export class FrenzyScene {
         const e = this.spawner.createEnemy(x, y, 3, i % 3 === 2 ? 'bloodMonster' : 'demon');
         e.animTime = (Math.random() * 40) | 0;
         e._horde = true;
+        // Cada um que passa pela porta rosna (com cooldown: vira um coro).
+        this._sfx('enemySpawn', x, y, { vol: 0.32, rate: 0.85 + Math.random() * 0.3, cool: 0.13 });
         this.enemies.push(e);
         this.horde.add(e);
     }
@@ -349,6 +373,9 @@ export class FrenzyScene {
             this.kills++;
             this._lastKillPos = { x: e.x, y: e.y };
             this.killFlashes.push({ x: e.x, y: e.y, life: 1 });
+            this._sfx('sawHit', e.x, e.y, { vol: 0.8, cool: 0.035 });
+            this._sfx('splat', e.x, e.y, { vol: 0.45, cool: 0.05 });
+            this.host.audio?.excite(0.15);
             this.beats[this.beat].onKill?.(e);
         });
 
@@ -364,6 +391,7 @@ export class FrenzyScene {
             this.enemies.splice(i, 1);
             renderer.triggerShake(8);
             this.screenGore.trigger(this.charging ? 0.3 : 0.6);
+            this._sfx('splat', e.x, e.y, { vol: 0.65, rate: 0.85, cool: 0.04 });
             // Respingos suaves na lente, perto de onde morreu.
             const s = renderer.worldToScreen(e.x, e.y);
             this.lens.trigger(s.x, s.y, this.charging ? 0.6 : 1);
@@ -433,7 +461,10 @@ export class FrenzyScene {
                 // Puxão: devolve a velocidade com sobra (vão de volta ao centro).
                 const j = vrel * 0.85;
                 p1.vx += nx * j; p1.vy += ny * j; p2.vx -= nx * j; p2.vy -= ny * j;
-                if (vrel > 3) this.beats[this.beat].onYank?.();
+                if (vrel > 3) {
+                    this._sfx('rope', (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, { vol: Math.min(0.8, vrel / 8), cool: 0.25 });
+                    this.beats[this.beat].onYank?.();
+                }
             }
         } else if (d < BUMP_DIST) {
             const ex = (BUMP_DIST - d) / 2;
@@ -443,6 +474,7 @@ export class FrenzyScene {
                 p1.vx -= nx * j; p1.vy -= ny * j; p2.vx += nx * j; p2.vy += ny * j;
                 if (-vrel > 2.5) {
                     this.particles.triggerDust((p1.x + p2.x) / 2, (p1.y + p2.y) / 2 + 14, 0, -1, 12);
+                    this._sfx('thud', (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, { vol: 0.7, rate: 1.15, cool: 0.3 });
                     this.beats[this.beat].onBump?.();
                 }
             }

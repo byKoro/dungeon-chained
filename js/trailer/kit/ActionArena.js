@@ -29,6 +29,7 @@ import { WindSystem } from '../../systems/WindSystem.js';
 import { TILE, ROOM_ROWS, BLOOD_COLORS, BLOOD_PIXEL, MAX_ACTIVE_GIBS, WIND } from '../../config/GameConfig.js';
 import { LensSplatter } from '../fx/LensSplatter.js';
 import { renderArena } from './arenaRender.js';
+import { hookRendererAudio } from '../audio/TrailerAudio.js';
 
 const STEP = 1 / 60;
 const BUMP_DIST = 34;
@@ -95,7 +96,18 @@ export class ActionArena {
         this.ropeLen = opts.ropeLen ?? 230;
         // Aproxima todos os enquadramentos (focus/snapCamera) desta arena.
         this.camClose = opts.camClose ?? 1.3;
+        // Som: tremores/zoom do renderer e viés de pan (tela dividida).
+        this.panBias = opts.panBias ?? 0;
+        hookRendererAudio(this.renderer, () => this.stage.audio);
         this.reset();
+    }
+
+    // Efeito sonoro posicionado (pan pela posição na tela desta arena).
+    sfx(name, x, y, o = {}) {
+        const au = this.stage.audio;
+        if (!au) return null;
+        const s = this.ws(x, y);
+        return au.play(name, { pan: au.panX(s.x, this.canvas.width, this.panBias), ...o });
     }
 
     _defaultTorches() {
@@ -209,8 +221,14 @@ export class ActionArena {
         this.particles.triggerBlood(e.x, e.y, 10, 0.9);
         this.kills++;
         this.killFlashes.push({ x: e.x, y: e.y, life: 1 });
+        this._killSound(e);
         this.onKill?.(e);
         return true;
+    }
+    _killSound(e) {
+        this.sfx('sawHit', e.x, e.y, { vol: 0.75, cool: 0.035 });
+        this.sfx('splat', e.x, e.y, { vol: 0.45, cool: 0.05 });
+        this.stage.audio?.excite(0.12);
     }
     // O pé de (x,y) cai num buraco?
     inHole(x, y) {
@@ -270,7 +288,10 @@ export class ActionArena {
     }
     // Desvio rápido (passo lateral) por `secs`.
     swerve(p, vx, vy, secs = 0.3) { p.swerveT = secs; p.swerveVX = vx; p.swerveVY = vy; }
-    slowmo(secs, scale = 0.3) { this.slowmoT = secs; this._slowScale = scale; }
+    slowmo(secs, scale = 0.3) {
+        this.slowmoT = secs; this._slowScale = scale;
+        if (secs < 50) this.stage.audio?.slowmo(scale, secs);
+    }
 
     // ---- Serra / corda ----
     // Corda arrebenta: a serra cai onde estava, com faíscas e clarão.
@@ -282,6 +303,9 @@ export class ActionArena {
         this.particles.triggerFlash(sp.x, sp.y, 14, 1.2);
         this.renderer.triggerShake(16);
         this.impactFlash = 0.6;
+        this.sfx('sawSnap', sp.x, sp.y, { vol: 1 });
+        this.sfx('sawLand', sp.x, sp.y, { vol: 0.7, delay: 0.25 });
+        this.stage.audio?.excite(0.4);
     }
     // Reconexão impactante: clarão azul, anel de choque, faíscas, zoom-punch.
     reconnect() {
@@ -298,6 +322,8 @@ export class ActionArena {
         this.particles.triggerFlash(at.x, at.y, 22, 1.6);
         this.renderer.triggerShake(20);
         this.renderer.triggerZoomPunch(0.08);
+        this.sfx('sawPickup', at.x, at.y, { vol: 1 });
+        this.stage.audio?.excite(0.5);
     }
 
     // ---- Inimigos / flechas ----
@@ -314,6 +340,7 @@ export class ActionArena {
         if (opts.intro) {
             e.beginFrozenSpawn(0);
             this.particles.triggerFlameBurst(e.x, e.footY, [255, 110, 70], { amount: 24 });
+            this.sfx('enemySpawn', e.x, e.y, { vol: 0.6, cool: 0.08 });
         }
         this.enemies.push(e);
         return e;
@@ -326,10 +353,12 @@ export class ActionArena {
         e.animTime = 0;
         e.currentAttack = e.attackKeys?.[(Math.random() * e.attackKeys.length) | 0] ?? 'attack';
         e.facingLeft = tx < e.x;
+        this.sfx('swish', e.x, e.y, { vol: 0.45, cool: 0.09 });
     }
     fireArrow(x, y, vx, vy = 0, opts = {}) {
         const a = { x, y, vx, vy, angle: Math.atan2(vy, vx), stuck: 0, ...opts };
         this.arrows.push(a);
+        this.sfx('arrow', x, y, { vol: 0.32, cool: 0.06 });
         return a;
     }
 
@@ -419,6 +448,7 @@ export class ActionArena {
         this.combat.resolveWeaponHits(saw, this.enemies, p1, p2, armed, (e) => {
             this.kills++;
             this.killFlashes.push({ x: e.x, y: e.y, life: 1 });
+            this._killSound(e);
             this.onKill?.(e);
         });
         // Serra GIGANTE: o disco inteiro (escalado) corta.
@@ -441,6 +471,7 @@ export class ActionArena {
             this.screenGore.trigger(0.35);
             const s = this.ws(e.x, e.y);
             this.lens.trigger(s.x, s.y, 0.7);
+            this.sfx('splat', e.x, e.y, { vol: 0.6, rate: 0.85, cool: 0.04 });
         }
 
         // Pedaços voam e somem ao sair da tela.
@@ -477,7 +508,11 @@ export class ActionArena {
             else if (p.x > b.maxX - 10) { p.x = b.maxX - 10; side = 'E'; }
             if (p.y < b.minY + 12) { p.y = b.minY + 12; side = 'N'; }
             else if (p.y > b.maxY - 6) { p.y = b.maxY - 6; side = 'S'; }
-            if (side) { p.airborne = false; this.onWallHit?.(p, side); }
+            if (side) {
+                p.airborne = false;
+                this.sfx('thud', p.x, p.y, { vol: 1 });
+                this.onWallHit?.(p, side);
+            }
             else if (Math.hypot(p.vx, p.vy) < 1.2) p.airborne = false;
             return;
         }
@@ -529,7 +564,11 @@ export class ActionArena {
         if (vrel > 0) {
             const j = vrel * 0.85;
             p1.vx += nx * j; p1.vy += ny * j; p2.vx -= nx * j; p2.vy -= ny * j;
-            if (vrel > 3) this.onYank?.(vrel);
+            if (vrel > 3) {
+                const m = this.mid;
+                this.sfx('rope', m.x, m.y, { vol: Math.min(0.8, vrel / 8), cool: 0.25 });
+                this.onYank?.(vrel);
+            }
         }
     }
     _bump(p1, p2) {
@@ -545,6 +584,7 @@ export class ActionArena {
             p1.vx -= nx * j; p1.vy -= ny * j; p2.vx += nx * j; p2.vy += ny * j;
             if (-vrel > 2.5) {
                 this.particles.triggerDust((p1.x + p2.x) / 2, (p1.y + p2.y) / 2 + 14, 0, -1, 12);
+                this.sfx('thud', (p1.x + p2.x) / 2, (p1.y + p2.y) / 2, { vol: 0.55, rate: 1.2, cool: 0.3 });
                 this.onBump?.();
             }
         }
@@ -561,9 +601,14 @@ export class ActionArena {
         if (p.faceX !== null && sp < 3.2) p.facingLeft = p.faceX < p.x;
         else if (p.vx < -0.4) p.facingLeft = true;
         else if (p.vx > 0.4) p.facingLeft = false;
+        const wasUp = p.hopZ > 3;
         p.hopV -= 0.55;
         p.hopZ = Math.max(0, p.hopZ + p.hopV);
-        if (p.hopZ === 0 && p.hopV < 0) p.hopV = 0;
+        if (p.hopZ === 0 && p.hopV < 0) {
+            // Pouso de um pulo alto: passo pesado.
+            if (wasUp && p.hopV < -4) this.sfx('footstep', p.x, p.y, { vol: 0.5, rate: 0.8, cool: 0.05 });
+            p.hopV = 0;
+        }
     }
 
     // Inimigo roteirizado: persegue `chase`/`goal`, para a `stopDist`, dá botes.
@@ -627,6 +672,7 @@ export class ActionArena {
                 a.x = hitStop ? a.stopX : (a.vx > 0 ? b.maxX - 4 : b.minX + 4);
                 a.stuck = a.stuckDur ?? 0.9;
                 this.particles.triggerDust(a.x, a.y + (hitStop ? 10 : 0), -Math.sign(a.vx), 0, hitStop ? 7 : 5);
+                this.sfx('thunk', a.x, a.y, { vol: 0.35, cool: 0.05 });
                 continue;
             }
             if (this.arrowsKill) {

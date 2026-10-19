@@ -99,6 +99,7 @@ export class HoleRunShot extends RushShot {
                     if (d > 0 && d < 46 && p.hopZ < 1 && p._gap !== g) {
                         p._gap = g;
                         A.hop(p, 6.6);
+                        A.sfx('whoosh', p.x, p.y, { vol: 0.4, rate: 1.4, cool: 0.08 });
                         A.expr(p, 'espantado');
                         if (p === p1) {
                             jumps++;

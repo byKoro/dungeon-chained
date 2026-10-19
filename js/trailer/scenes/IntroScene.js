@@ -144,6 +144,15 @@ export class IntroScene {
 
     _place(p, pos) { p.x = pos.x; p.y = pos.y; p.vx = 0; p.vy = 0; }
 
+    _sfx(name, o) { return this.stage.audio?.play(name, o); }
+    // Som: serra só existe depois de nascer; ronco segue o tremor da sala.
+    audioState() {
+        return {
+            saw: { visible: this.sawCarried || this.sawVisibleDropped, spin: this.saw.spin, scale: 1 },
+            rumble: this.worldQuake * 0.7, amb: 1
+        };
+    }
+
     // -----------------------------------------------------------------------
     // Roteiro: { dur, enter?, update(k) }, k = progresso 0..1 do beat.
     // -----------------------------------------------------------------------
@@ -183,6 +192,10 @@ export class IntroScene {
                     this.sawCarried = false;
                     this.screenFlashT = 1;
                     this.renderer.triggerShake(10);
+                    // A serra NASCE: baque metálico + pancada curta; a trilha sobe um pouco.
+                    this._sfx('sawLand', { vol: 1 });
+                    this._sfx('impact', { vol: 0.45, rate: 1.3 });
+                    this.stage.audio?.mood(-22, 650, 0.8);
                     this._express(this.p1, 'espantado');
                     this._express(this.p2, 'espantado');
                 },
@@ -248,6 +261,9 @@ export class IntroScene {
                         this._bothExpressFor('assustado', 0.6);
                         this.saw.spin = 0.4;
                         this.renderer.triggerShake(4);
+                        // Pegam a serra: corrente engatando.
+                        this._sfx('sawPickup', { vol: 0.9 });
+                        this._sfx('rope', { vol: 0.5, delay: 0.12 });
                     }
                 }
             },
@@ -260,7 +276,7 @@ export class IntroScene {
                     this._calm(this.p2);
                     this._express(this.redPlayer, 'neutro');
                     this._express(this.bluePlayer, 'desconfiado');
-                    this._speak(this.redPlayer, 'Olha como essa serra é afiada…', 2.4);
+                    this._speak(this.redPlayer, 'Look how sharp this saw is…', 2.4);
                 },
                 update: () => {
                     this._camTo(this.center.x, this.center.y + TILE * 0.35, fit() * 2.7, 0.08);
@@ -280,7 +296,7 @@ export class IntroScene {
                     this._calm(this.p2);
                     this._express(this.bluePlayer, 'neutro');
                     this._express(this.redPlayer, 'neutro');
-                    this._speak(this.bluePlayer, 'Com certeza. Corta qualquer coisa!', 2.2);
+                    this._speak(this.bluePlayer, 'Totally. It cuts through anything!', 2.2);
                 },
                 update: () => {
                     this._camTo(this.center.x, this.center.y + TILE * 0.35, fit() * 2.6, 0.08);
@@ -302,6 +318,9 @@ export class IntroScene {
                 enter: () => {
                     this.worldQuake = 1;
                     this.renderer.triggerShake(22);
+                    // A sala TREME: estrondo + ronco (rumble pelo worldQuake).
+                    this._sfx('boom', { vol: 0.65, rate: 0.7 });
+                    this.stage.audio?.mood(-15, 1100, 0.4);
                     this._express(this.p1, 'espantado');
                     this._express(this.p2, 'espantado');
                 },
@@ -323,6 +342,9 @@ export class IntroScene {
             {
                 dur: 3.6,
                 enter: () => {
+                    // A trilha some junto com a luz (silêncio tenso antes do título).
+                    this.stage.audio?.mood(-34, 300, 3.0);
+                    this._sfx('riser', { vol: 0.35, delay: 2.1 });
                     this._faceFree();
                     this._express(this.p1, 'preocupado');
                     this._express(this.p2, 'preocupado');
@@ -410,6 +432,9 @@ export class IntroScene {
                 this.stage.speech = null;
                 this._express(who, exprs[0]);
                 this.renderer.triggerZoomPunch(0.05);
+                // Close: golpe seco curto (stinger) + tensão subindo na trilha.
+                this._sfx('impact', { vol: 0.4, rate: 1.5 });
+                this.stage.audio?.mood(-20, 900, 0.3);
             },
             update: (k) => {
                 this._camTo(who.x, who.y + FACE_DY, this._zoomFit() * FACE_ZOOM, 0.18);

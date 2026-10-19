@@ -82,6 +82,11 @@ export class ButtonDoorShot extends RushShot {
                 A.both(p => { A.hop(p, 3.5); A.exprFor(p, 'espantado', 0.35); });
                 A.particles.triggerDust(b1.x, b1.y + 10, 0, 1, 8);
                 A.particles.triggerDust(b2.x, b2.y + 10, 0, 1, 8);
+                // Botões afundam juntos; a porta de cima começa a ranger.
+                A.sfx('stoneClick', b1.x, b1.y, { vol: 0.9, cool: 0 });
+                A.sfx('stoneClick', b2.x, b2.y, { vol: 0.9, cool: 0, delay: 0.03 });
+                A.sfx('stoneGrind', doorN.x, doorN.y, { vol: 0.8, delay: 0.2 });
+                S.stage.audio?.mood(-2, 16000, 0.5);
             }
 
             // 2) A porta de cima treme, abre e despeja inimigos.
@@ -102,6 +107,8 @@ export class ButtonDoorShot extends RushShot {
                     A.spawnEnemy(doorN.x + (i % 3 - 1) * 34, doorN.y - 40 - (i % 2) * 20, i % 4 === 3 ? 'bloodMonster' : 'demon',
                         { speed: 2.2 + (i % 3) * 0.3, chase: target, stopDist: 74 + (i % 4) * 26, entering: true });
                     if (i === 0) {
+                        A.sfx('doorOpen', doorN.x, doorN.y, { vol: 0.8 });
+                        A.sfx('roar', doorN.x, doorN.y, { vol: 0.45, rate: 1.3 });
                         A.renderer.triggerShake(14);
                         A.both(p => { A.expr(p, 'assustado'); p.shiver = 0.35; });
                         // Recuam até a parede de baixo, um de cada lado da porta.
@@ -113,6 +120,7 @@ export class ButtonDoorShot extends RushShot {
                 if (u > 2.0 && u < 2.3 && ((t * 60) | 0) % 3 === 0) {
                     A.particles.triggerDust(doorS.x + (Math.random() - 0.5) * 100, doorS.y - 4, 0, -1, 5);
                     A.renderer.triggerShake(6);
+                    A.sfx('thud', doorS.x, doorS.y, { vol: 0.5, rate: 1.4, cool: 0.08 });   // algo batendo na porta
                 }
                 A.doorOpen.S = clamp01((u - 2.25) / 0.14);
                 if (u > 2.3) {
@@ -122,6 +130,11 @@ export class ButtonDoorShot extends RushShot {
                     A.saw.spin = 1; A.saw.bloodTimer = 0;
                     A.connectFlash = 1; A._connectAt = { x: doorS.x, y: doorS.y };
                     A.particles.triggerSparkBurst(doorS.x, doorS.y, 30, 30, 2);
+                    // Porta ARREBENTA e a serra entra cortando sozinha.
+                    A.sfx('boom', doorS.x, doorS.y, { vol: 0.85, rate: 1.1 });
+                    A.sfx('sawPickup', doorS.x, doorS.y, { vol: 0.8 });
+                    S.stage.audio?.duck(-8, 0.05, 0.5);
+                    S.stage.audio?.mood(0, 20000, 0.2);
                     A.renderer.triggerShake(22);
                     A.both(p => { p.shiver = 0; A.exprFor(p, 'espantado', 0.6); A.hop(p, 4); });
                 }

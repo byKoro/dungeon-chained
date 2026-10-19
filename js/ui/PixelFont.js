@@ -94,6 +94,7 @@ const GLYPHS = {
     '(': G(0, '.#', '#.', '#.', '#.', '.#'),
     ')': G(0, '#.', '.#', '.#', '.#', '#.'),
     '…': G(4, '#.#.#'),
+    '▶': G(0, '#..', '##.', '###', '##.', '#..'),
 };
 
 // Acentos (2 linhas, 3 de largura, centralizados sobre a letra base).

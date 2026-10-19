@@ -18,6 +18,7 @@ import { renderSpeechBubble } from '../ui/SpeechBubble.js';
 import { BloodScreen } from './fx/BloodScreen.js';
 import { TILE, ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 import { clamp01, lerp, easeOut } from './anim.js';
+import { hookRendererAudio } from './audio/TrailerAudio.js';
 
 // Expressões faciais (folhas de 8 frames, mesmo layout de player_walk.png),
 // geradas por tools/gen_expressions.py. Carregadas só no trailer.
@@ -242,17 +243,30 @@ export class TrailerStage {
         ctx.fillText('DUNGEON CHAINED', canvas.width / 2 + jx, canvas.height / 2 - 6 + jy);
         ctx.fillStyle = red > 0.5 ? '#b3122a' : '#a7a9be';
         ctx.font = '16px monospace';
-        ctx.fillText('acorrentados no calabouço', canvas.width / 2 + jx * 0.5, canvas.height / 2 + 26 + jy * 0.5);
+        ctx.fillText('chained in the dungeon', canvas.width / 2 + jx * 0.5, canvas.height / 2 + 26 + jy * 0.5);
         ctx.restore();
     }
 
     // ---- Balão de fala ----
-    _speak(who, text, dur) { this.speech = { who, text, t: 0, dur }; }
+    _speak(who, text, dur) { this.speech = { who, text, t: 0, dur, shown: 0 }; }
     tickSpeech(dt) {
         if (!this.speech) return;
-        this.speech.t += dt;
-        if (this.speech.t >= this.speech.dur) this.speech = null;
+        const sp = this.speech;
+        sp.t += dt;
+        // Blip de máquina de escrever por letra nova (mesmo ritmo do balão:
+        // 40 letras/s); tom por personagem, espaços em silêncio.
+        const n = Math.min(sp.text.length, Math.floor(sp.t * 40));
+        for (let i = sp.shown; i < n; i++) {
+            if (sp.text[i] === ' ') continue;
+            const red = sp.who === this.redPlayer;
+            this.audio?.play('blip', { vol: 0.22, rate: (red ? 0.92 : 1.18) * (1 + 0.05 * ((i * 7) % 3 - 1)), cool: 0.018, jitter: 0, noSlow: true });
+        }
+        sp.shown = n;
+        if (sp.t >= sp.dur) this.speech = null;
     }
+
+    // Liga o som aos tremores e pulsos de zoom do renderer do palco.
+    hookAudio() { hookRendererAudio(this.renderer, () => this.audio); }
     // Balão de pedra em pixel art sobre a cabeça de quem fala (máquina de
     // escrever ~40 caracteres/s, pixel = metade do pixel do jogo).
     drawSpeech() {

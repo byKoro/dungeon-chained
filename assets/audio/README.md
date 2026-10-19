@@ -23,4 +23,9 @@ Gerados proceduralmente com numpy, sem amostras de terceiros. Rodar `python tool
 | Serra recolhida (reconexão) | `saw-pickup.wav` |
 | Queda no abismo | `player-fall.wav` |
 | Sala limpa (portas destravam) | `door-open.wav` |
+| Inimigo surgindo da chama | `enemy-spawn-01.wav` a `enemy-spawn-03.wav` |
+| Jogador recebendo dano | `player-hit-01.wav` a `player-hit-03.wav` |
+| Armadilha disparando flecha | `arrow-fire-01.wav` a `arrow-fire-03.wav` |
+| Interface (foco, confirmar, abrir/fechar pausa) | `ui-move.wav`, `ui-confirm.wav`, `ui-open.wav`, `ui-close.wav` |
+| Placa de pressão (pisar / sair) | `button-press-01.wav`, `button-press-02.wav`, `button-release.wav` |
 | Ambiente em loop | `ambience-dungeon.wav` (20 s, estéreo, 22 050 Hz, periódico — emenda sem clique) |

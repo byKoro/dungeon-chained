@@ -156,6 +156,42 @@ export const AUDIO_CONFIG = {
             enabled: true
         },
 
+        enemySpawn: {
+            description: "Inimigo surgindo da chama na intro da sala (fwoomp de fogo + baque + rosnado)",
+            files: [1, 2, 3].map(i => `assets/audio/enemy-spawn-0${i}.wav`),
+            volume: 0.55,
+            rate: 1.0,
+            rateVariance: 0.08,
+            pitchShift: true,
+            cooldownMs: 70,   // spawns escalonados próximos não empilham
+            maxVoices: 4,
+            enabled: true
+        },
+
+        playerHit: {
+            description: "Impacto no corpo do jogador ao perder vida (qualquer fonte: inimigo, flecha, spike)",
+            files: [1, 2, 3].map(i => `assets/audio/player-hit-0${i}.wav`),
+            volume: 0.62,
+            rate: 1.0,
+            rateVariance: 0.07,
+            pitchShift: true,
+            cooldownMs: 50,
+            maxVoices: 2,
+            enabled: true
+        },
+
+        arrowFire: {
+            description: "Armadilha de parede disparando flecha (trava + twang da corda + assobio)",
+            files: [1, 2, 3].map(i => `assets/audio/arrow-fire-0${i}.wav`),
+            volume: 0.5,
+            rate: 1.0,
+            rateVariance: 0.06,
+            pitchShift: true,
+            cooldownMs: 40,   // vários atiradores em fase = um disparo encorpado
+            maxVoices: 4,
+            enabled: true
+        },
+
         sawMotor: {
             description: "Motor da serra em loop (regime do circular-saw.mp3); nível/tom/brilho seguem o giro — ver SawMotorAudio",
             files: ["assets/audio/saw-motor-loop.wav"],
@@ -172,26 +208,72 @@ export const AUDIO_CONFIG = {
             enabled: true
         },
 
-        // Botão de pressão. Sem arquivo dedicado ainda: reaproveita o passo de
-        // pedra ACELERADO (vira um "clack" seco). Troque `files` quando houver
-        // um som de clique próprio.
+        // ---- Interface (botões pixel art) — tocados via js/ui/UiSound.js ----
+        // Hierarquia: mover foco (baixo) < confirmar < abrir/fechar a pausa.
+        // Variação de tom mínima: som de UI deve ser previsível.
+        uiMove: {
+            description: "Foco/hover mudando entre botões (tic curto)",
+            files: ["assets/audio/ui-move.wav"],
+            volume: 0.3,
+            rate: 1.0,
+            rateVariance: 0.02,
+            pitchShift: true,
+            cooldownMs: 40,   // passar o mouse rápido não vira metralhadora
+            maxVoices: 2,
+            enabled: true
+        },
+
+        uiConfirm: {
+            description: "Botão acionado (clack + dois toques metálicos subindo)",
+            files: ["assets/audio/ui-confirm.wav"],
+            volume: 0.55,
+            rate: 1.0,
+            rateVariance: 0.0,
+            cooldownMs: 120,
+            enabled: true
+        },
+
+        uiOpen: {
+            description: "Pausa abrindo (o mundo abafa e afunda)",
+            files: ["assets/audio/ui-open.wav"],
+            volume: 0.5,
+            rate: 1.0,
+            rateVariance: 0.0,
+            cooldownMs: 150,
+            enabled: true
+        },
+
+        uiClose: {
+            description: "Pausa fechando / voltar ao jogo (sobe e abre)",
+            files: ["assets/audio/ui-close.wav"],
+            volume: 0.4,
+            rate: 1.0,
+            rateVariance: 0.0,
+            cooldownMs: 150,
+            enabled: true
+        },
+
+        // Botão de pressão (placa de pedra). O Game sobe o tom quando este
+        // aperto completa o par (os dois botões pressionados = progresso).
         buttonPress: {
-            description: "Botão de pressão afundando (clique ao pisar)",
-            files: ["assets/audio/footstep-stone-02.ogg", "assets/audio/footstep-stone-05.ogg"],
-            volume: 0.8,
-            rate: 1.7,
-            rateVariance: 0.05,
-            pitchShift: true,   // rate também sobe o TOM (clique mais agudo)
+            description: "Placa afundando ao pisar: clique de pedra + baque + raspado + catraca do mecanismo",
+            files: [1, 2].map(i => `assets/audio/button-press-0${i}.wav`),
+            volume: 0.75,
+            rate: 1.0,
+            rateVariance: 0.04,
+            pitchShift: true,
+            cooldownMs: 80,   // pé "tremendo" na borda não vira metralhadora
             enabled: true
         },
 
         buttonRelease: {
-            description: "Botão de pressão voltando (clique leve ao sair)",
-            files: ["assets/audio/footstep-stone-03.ogg"],
-            volume: 0.4,
-            rate: 2.0,
+            description: "Placa voltando ao sair (tuk leve subindo + destrava), bem mais baixo que o aperto",
+            files: ["assets/audio/button-release.wav"],
+            volume: 0.3,
+            rate: 1.0,
             rateVariance: 0.05,
             pitchShift: true,
+            cooldownMs: 80,
             enabled: true
         }
     }

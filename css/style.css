@@ -27,7 +27,40 @@ html, body {
 }
 
 /* ---------------------------------------------------------------------------
-   Tela de morte (js/ui/DeathScreen.js): véu de sangue + botão pixel art
+   Menus pixel art (js/ui/PixelButton.js): botão base compartilhado
+   --------------------------------------------------------------------------- */
+.pixel-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+.pixel-btn canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+.pixel-btn:focus { outline: none; }
+/* Foco por teclado/controle: contorno de 1 pixel de arte nos 4 lados. */
+.pixel-btn:focus-visible canvas {
+    filter:
+        drop-shadow(var(--px) 0 0 #efe3c2)
+        drop-shadow(calc(var(--px) * -1) 0 0 #efe3c2)
+        drop-shadow(0 var(--px) 0 #efe3c2)
+        drop-shadow(0 calc(var(--px) * -1) 0 #efe3c2);
+}
+@keyframes pixel-pop {
+    from { transform: scale(0.2); }
+    to { transform: scale(1); }
+}
+/* "Respira" em degraus de 1 pixel de arte (sem sub-pixel). */
+@keyframes pixel-idle {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(calc(var(--px) * -1)); }
+}
+
+/* ---------------------------------------------------------------------------
+   Tela de morte (js/ui/DeathScreen.js): véu de sangue + botão RESTART
    --------------------------------------------------------------------------- */
 #death-screen {
     --px: 5px; /* 1 pixel de arte do botão (definido pelo JS) */
@@ -51,45 +84,60 @@ html, body {
     /* Entrada com atraso: deixa o golpe final e a HUD reagirem antes. */
     transition: opacity 0.6s ease 0.35s, visibility 0s linear 0s;
 }
-.death-btn {
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    transform: scale(0);
-}
-.death-btn canvas {
-    display: block;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-}
+.death-btn { transform: scale(0); }
 #death-screen.visible .death-btn {
-    animation: death-pop 0.45s cubic-bezier(0.34, 1.7, 0.64, 1) 0.75s both;
+    animation: pixel-pop 0.45s cubic-bezier(0.34, 1.7, 0.64, 1) 0.75s both;
 }
-/* "Respira" em degraus de 1 pixel de arte (sem sub-pixel). */
 #death-screen.visible .death-btn canvas {
-    animation: death-idle 1.4s steps(1, end) 1.4s infinite;
+    animation: pixel-idle 1.4s steps(1, end) 1.4s infinite;
 }
-.death-btn:focus { outline: none; }
-/* Foco por teclado/controle: contorno de 1 pixel de arte nos 4 lados. */
-.death-btn:focus-visible canvas {
-    filter:
-        drop-shadow(var(--px) 0 0 #efe3c2)
-        drop-shadow(calc(var(--px) * -1) 0 0 #efe3c2)
-        drop-shadow(0 var(--px) 0 #efe3c2)
-        drop-shadow(0 calc(var(--px) * -1) 0 #efe3c2);
+
+/* ---------------------------------------------------------------------------
+   Tela de pausa (js/ui/PauseScreen.js): véu de pedra + RESUME / RESTART
+   --------------------------------------------------------------------------- */
+#pause-screen {
+    --px: 5px;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Pedra escura (roxo-acinzentado), sem vermelho; a cena congelada aparece. */
+    background: radial-gradient(ellipse at center, rgba(34, 30, 46, 0.5) 0%, rgba(14, 12, 20, 0.75) 55%, rgba(5, 4, 10, 0.9) 100%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.18s ease, visibility 0s linear 0.18s;
 }
-@keyframes death-pop {
-    from { transform: scale(0.2); }
-    to { transform: scale(1); }
+#pause-screen.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.18s ease, visibility 0s linear 0s;
 }
-@keyframes death-idle {
-    0% { transform: translateY(0); }
-    50% { transform: translateY(calc(var(--px) * -1)); }
+.pause-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--px) * 2);
 }
+.pause-menu .pixel-btn { transform: scale(0); }
+#pause-screen.visible .pixel-btn {
+    animation: pixel-pop 0.38s cubic-bezier(0.34, 1.7, 0.64, 1) both;
+}
+#pause-screen.visible .pixel-btn:nth-child(1) { animation-delay: 0.03s; }
+#pause-screen.visible .pixel-btn:nth-child(2) { animation-delay: 0.11s; }
+/* Só o botão em foco respira. */
+#pause-screen.visible .pixel-btn:focus canvas {
+    animation: pixel-idle 1.4s steps(1, end) 0.5s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-    #death-screen.visible .death-btn { animation: none; transform: none; }
-    #death-screen.visible .death-btn canvas { animation: none; }
+    #death-screen.visible .death-btn,
+    #pause-screen.visible .pixel-btn { animation: none; transform: none; }
+    #death-screen.visible .death-btn canvas,
+    #pause-screen.visible .pixel-btn:focus canvas { animation: none; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -126,25 +174,45 @@ html, body {
     pointer-events: none;
 }
 #trailer-overlay.hidden { display: none; }
+/* SKIP em pixel art (PixelButton, face amarela). Entra com pop elástico,
+   "cutuca" para a direita de tempos em tempos (chama o olho sem piscar) e
+   some rápido quando o START aparece. */
 .tr-skip {
+    --px: 3px;
     position: fixed;
     right: 22px;
     bottom: calc(10vh + 14px);
-    pointer-events: auto;
-    font-family: monospace;
-    font-size: 13px;
-    font-weight: bold;
-    letter-spacing: 2px;
-    color: #a7a9be;
-    background: rgba(16, 14, 24, 0.75);
-    border: 2px solid #4a4458;
-    padding: 8px 14px;
-    cursor: pointer;
+    pointer-events: none;
     opacity: 0;
-    transition: opacity 0.4s ease, color 0.1s;
+    visibility: hidden;
+    transform: scale(0.6);
+    transform-origin: 100% 100%;
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
 }
-.tr-skip.visible { opacity: 0.85; }
-.tr-skip:hover, .tr-skip:focus-visible { color: #fffffe; border-color: #6e6684; opacity: 1; }
+.tr-skip.visible {
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    animation: pixel-pop 0.4s cubic-bezier(0.34, 1.7, 0.64, 1) both;
+    transition: opacity 0.15s ease, visibility 0s linear 0s;
+}
+.tr-skip.visible canvas {
+    animation: skip-nudge 2.6s steps(1, end) 1.2s infinite;
+}
+/* Em foco/hover a cutucada para: o botão já tem a atenção. */
+.tr-skip.visible:focus canvas { animation: none; }
+@keyframes skip-nudge {
+    0%, 78% { transform: translateX(0); }
+    82% { transform: translateX(var(--px)); }
+    86% { transform: translateX(0); }
+    90% { transform: translateX(var(--px)); }
+    94%, 100% { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .tr-skip.visible { animation: none; }
+    .tr-skip.visible canvas { animation: none; }
+}
 .tr-start {
     position: fixed;
     left: 50%;

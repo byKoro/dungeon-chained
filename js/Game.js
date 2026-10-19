@@ -26,6 +26,8 @@ import { PlayerAI } from './systems/PlayerAI.js';
 import { LightingRenderer } from './systems/LightingRenderer.js';
 import { VtuberHud } from './ui/VtuberHud.js';
 import { DeathScreen } from './ui/DeathScreen.js';
+import { PauseScreen } from './ui/PauseScreen.js';
+import { setUiAudio, playUi } from './ui/UiSound.js';
 import { HeartPickup } from './entities/HeartPickup.js';
 import { playerConfigs } from './config/EntityConfig.js';
 
@@ -76,6 +78,15 @@ export class Game {
         });
         // Tela de morte (DOM): véu de sangue + botão REINICIAR em pixel art.
         this.deathScreen = new DeathScreen({ onRestart: () => this.restart() });
+        // Tela de pausa (DOM): véu de pedra + RESUME / RESTART em pixel art.
+        this.pauseScreen = new PauseScreen({
+            // O próprio botão já toca "uiConfirm": fecha a pausa sem o uiClose
+            // por cima (um som por ação). O som de mover o foco é do PixelButton.
+            onResume: () => this.setPaused(false, { silent: true }),
+            onRestart: () => this.restart()
+        });
+        this._started = false;   // só pausa depois que a partida começou
+        this._padPrev = {};      // borda de subida dos botões do controle
 
         // Sprite do item de cura (versão chunky, no pixel do cenário).
         HeartPickup.sheet = this.assets.get("heartPickup");
@@ -106,6 +117,8 @@ export class Game {
         // Áudio: gerenciado centralmente por AudioConfig. Permite alterar sons,
         // volumes por caso de uso, pitch e volume master.
         this.audio = new AudioManager(AUDIO_CONFIG);
+        // Botões de interface passam a usar o mesmo gerenciador (master/mudo).
+        setUiAudio(this.audio);
         if (typeof window !== "undefined") {
             window.audio = this.audio;
             window.audioConfig = AUDIO_CONFIG;
@@ -161,7 +174,7 @@ export class Game {
         // Laço principal: fixed timestep + slow-motion. Os callbacks resolvem
         // leitura de controles, um passo de simulação e o render do quadro.
         this.gameLoop = new GameLoop({
-            onFrameStart: () => { this.input.pollGamepads(); this._pollRestartPad(); this._updateSawMotor(); },
+            onFrameStart: () => { this.input.pollGamepads(); this._pollMenuPad(); this._updateSawMotor(); },
             onStep: (dt) => this._step(dt),
             onRender: () => this._render()
         });
@@ -195,6 +208,7 @@ export class Game {
         this.players = this.playerFactory.create();
         [this.p1, this.p2] = this.players;
         this.newDungeon();
+        this._started = true;
         // Ambiente contínuo da dungeon (Web Audio, emenda sem clique). Entra
         // com fade longo para não "bater" junto com o início da partida.
         this.audio.playLoop("ambience", { fadeMs: 3000 });
@@ -220,9 +234,12 @@ export class Game {
     // clique mais leve ao soltar. A animação (squash, onda, brilho) é do
     // próprio PressureButton.
     _buttonFeedback(challenge) {
+        // Progresso do puzzle co-op no SOM: o aperto que completa o par (todos
+        // pressionados) sai ~2 semitons acima — "falta pouco" sem jingle de UI.
+        const allPressed = challenge.buttons.length >= 2 && challenge.buttons.every(b => b.pressed);
         for (const b of challenge.buttons) {
             if (b.justPressed) {
-                this.audio?.play("buttonPress");
+                this.audio?.play("buttonPress", { rateMultiplier: allPressed ? 1.12 : 1 });
                 this.renderer.triggerShake(3);
                 // Poeira radial saindo da borda da base (triggerDust lança
                 // CONTRA a direção dada, por isso o sinal invertido).
@@ -238,19 +255,40 @@ export class Game {
         }
     }
 
+    // Som do disparo das armadilhas de flecha. Atenuado pela DISTÂNCIA até o
+    // jogador mais próximo: o atirador ao lado soa alto e seco (aviso claro
+    // de perigo), os do fundo do corredor ficam de fundo — sem poluir o mix.
+    _arrowTrapFeedback(challenge) {
+        for (const t of challenge.arrowTraps) {
+            if (!t.justFired) continue;
+            const d = Math.min(
+                Math.hypot(this.p1.x - t.x, this.p1.y - t.y),
+                Math.hypot(this.p2.x - t.x, this.p2.y - t.y)
+            );
+            // 1.0 até 160 px, caindo até 0.35 a partir de 640 px.
+            const k = Math.max(0, Math.min(1, (d - 160) / 480));
+            this.audio?.play("arrowFire", { volumeMultiplier: 1 - 0.65 * k });
+        }
+    }
+
     _bindButtons() {
         // Sem barra de botões: atalhos de teclado (toggle por toque, não por
         // frame). "R" reinicia a qualquer momento; Enter/Espaço reiniciam na
         // tela de fim de jogo. "T" cicla o tileset (teste de texturas).
+        // "Esc" abre/fecha a tela de pausa.
         window.addEventListener("keydown", (e) => {
             if (e.repeat) return;
             const k = e.key.toLowerCase();
-            if (k === "t") this.cycleTileset();
+            if (k === "escape") this.togglePause();
+            else if (k === "t") this.cycleTileset();
             else if (k === "r") this.restart();
             // Com o botão da tela de morte em foco, Enter/Espaço já disparam
             // o clique dele — não reinicia duas vezes.
             else if (this.gameOver && (k === "enter" || k === " ") &&
-                document.activeElement !== this.deathScreen.button) this.restart();
+                document.activeElement !== this.deathScreen.button) {
+                playUi("uiConfirm");
+                this.restart();
+            }
         });
     }
 
@@ -262,17 +300,71 @@ export class Game {
         this.newDungeon();
     }
 
-    // Fim de jogo: botão START (9) de qualquer controle reinicia (borda de
-    // subida, para não reiniciar em loop enquanto segura).
-    _pollRestartPad() {
+    // ---- Pausa ----
+    // Pausa só durante a partida (gameplay, transição e intro de sala); nunca
+    // na tela de morte, no carregamento ou no trailer. A simulação congela; a
+    // HUD segue viva (os vtubers olham para o menu) e o ambiente abaixa.
+    // `silent`: fecha sem o uiClose (quando um botão já tocou o uiConfirm).
+    setPaused(paused, { silent = false } = {}) {
+        paused = !!paused;
+        if (paused === this.gameLoop.paused) return;
+        if (paused && (!this._started || this.gameOver)) return;
+        this.gameLoop.setPaused(paused);
+        this.hud.setPaused(paused);
+        if (paused) {
+            this.pauseScreen.show();
+            this.audio.stopAll();                          // corta os efeitos em curso
+            this.audio.setLoopLevel("ambience", -12, 250); // ambiente recua
+            playUi("uiOpen");                              // depois do stopAll
+        } else {
+            this.pauseScreen.hide();
+            this.audio.setLoopLevel("ambience", 0, 400);
+            if (!silent) playUi("uiClose");
+        }
+    }
+
+    togglePause() {
+        this.setPaused(!this.gameLoop.paused);
+    }
+
+    // Controle (qualquer gamepad), por borda de subida:
+    //   START (9) — fim de jogo: reinicia; senão abre/fecha a pausa.
+    //   Na pausa: d-pad (12/13) / analógico (eixo 1) navegam, A (0) confirma,
+    //   B (1) volta ao jogo. Na tela de morte, A também reinicia.
+    _pollMenuPad() {
         if (typeof navigator === "undefined" || !navigator.getGamepads) return;
         const pads = navigator.getGamepads() || [];
-        let pressed = false;
+        const now = { start: false, a: false, b: false, up: false, down: false };
         for (const pad of pads) {
-            if (pad && this.input.isButtonPressed(pad, 9)) pressed = true;
+            if (!pad) continue;
+            const btn = (i) => this.input.isButtonPressed(pad, i);
+            const ay = pad.axes?.[1] || 0;
+            now.start ||= btn(9);
+            now.a ||= btn(0);
+            now.b ||= btn(1);
+            now.up ||= btn(12) || ay < -0.6;
+            now.down ||= btn(13) || ay > 0.6;
         }
-        if (pressed && !this._padStartHeld && this.gameOver) this.restart();
-        this._padStartHeld = pressed;
+        const prev = this._padPrev;
+        const hit = (k) => now[k] && !prev[k];
+        this._padPrev = now;
+
+        // Reiniciar pelo controle na tela de morte não passa pelo clique do
+        // botão: toca o uiConfirm aqui para soar igual ao mouse/teclado.
+        if (hit("start")) {
+            if (this.gameOver) { playUi("uiConfirm"); this.restart(); }
+            else this.togglePause();
+            return;
+        }
+        if (this.gameOver) {
+            if (hit("a")) { playUi("uiConfirm"); this.restart(); }
+            return;
+        }
+        if (!this.gameLoop.paused) return;
+        if (hit("up")) this.pauseScreen.move(-1);
+        else if (hit("down")) this.pauseScreen.move(1);
+        else if (hit("a")) this.pauseScreen.confirm();
+        else if (hit("b")) this.setPaused(false);
     }
 
     // Troca o tileset do mundo pela próxima variante disponível (ciclo). Como o
@@ -297,6 +389,8 @@ export class Game {
         this.screenGore.clear();
         this.gameOver = false;
         this.deathScreen.hide();
+        // Reiniciar pela pausa: fecha o menu e retoma (com a rampa de tempo).
+        if (this.gameLoop.paused) this.setPaused(false, { silent: true });
         this._sawLandPending = false;
         // Restaura o ambiente após a tela de morte (no-op se já está em 0 dB).
         this.audio.setLoopLevel("ambience", 0, 1500);
@@ -441,7 +535,7 @@ export class Game {
         if (!this.sawMotor || !w) return;
         this.sawMotor.update(w.spinSpeed ?? 0, {
             connected: this.chain.isConnected,
-            active: !this.gameOver && !this.transition && !this.roomIntro,
+            active: !this.gameOver && !this.transition && !this.roomIntro && !this.gameLoop.paused,
             timeScale: this.gameLoop.timeScale
         });
     }
@@ -602,6 +696,8 @@ export class Game {
                     amount: 40, rise: riseH, width: e.drawHeight * 0.6
                 });
                 this.renderer.triggerShake(6);
+                // Som da chama/surgimento no MESMO quadro da erupção de fogo.
+                this.audio.play("enemySpawn");
             } else if (e.spawnFx > 0) {
                 // Alimenta a coluna de fogo durante toda a REVELAÇÃO, para o
                 // fogo acompanhar o sprite surgindo (não some antes da hora).
@@ -742,6 +838,7 @@ export class Game {
         if (room.challenge) {
             room.challenge.update([p1, p2], deltaSeconds);
             this._buttonFeedback(room.challenge);
+            this._arrowTrapFeedback(room.challenge);
         }
 
         // Inimigos: IA + dano no player (feedback via CombatSystem)
@@ -828,6 +925,13 @@ export class Game {
         for (const p of [p1, p2]) {
             if (p._livesSeen !== undefined && p.lives < p._livesSeen) {
                 this.screenGore.triggerFlash();
+                // Impacto no corpo, junto do flash e do knockback. A queda no
+                // abismo já tem som próprio (playerFall), então não duplica.
+                if (!p.falling) {
+                    // O último coração soa mais pesado (tom mais grave).
+                    this.audio.play("playerHit", { rateMultiplier: p.lives <= 1 ? 0.88 : 1 });
+                    this.audio.duck(-6, { attackMs: 10, holdMs: 150, releaseMs: 700 });
+                }
             }
             p._livesSeen = p.lives;
         }

@@ -113,6 +113,8 @@ export class ArrowTrap {
         this.elapsed = ((opts.phaseOffset || 0) % 1) * this.intervalSeconds;
         this.hasFiredThisCycle = false;
         this.pulse = 0;
+        // true SÓ no passo em que disparou (o Game toca o som do disparo).
+        this.justFired = false;
     }
 
     get isWarning() {
@@ -123,6 +125,7 @@ export class ArrowTrap {
         const dt = Math.max(0, deltaSeconds);
         this.elapsed += dt;
         this.pulse += dt * 3;
+        this.justFired = false;
 
         // Dispara no início do último quadro, quando o sprite mostra a flecha saindo.
         const launchAt = this.intervalSeconds - this.warnSeconds * 0.25;
@@ -131,6 +134,7 @@ export class ArrowTrap {
             const sy = this.y + this.dirY * 14;
             onFire(new Arrow(sx, sy, this.dirX, this.dirY, this.arrowSprite));
             this.hasFiredThisCycle = true;
+            this.justFired = true;
         }
 
         if (this.elapsed >= this.intervalSeconds) {

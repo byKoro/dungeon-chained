@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Dungeon Chained</title>
@@ -9,19 +9,28 @@
 
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Tela de morte (js/ui/DeathScreen.js): só o botão REINICIAR em pixel art. -->
+    <!-- Tela de morte (js/ui/DeathScreen.js): só o botão RESTART em pixel art. -->
     <div id="death-screen" aria-hidden="true">
-        <button class="death-btn" type="button"><canvas></canvas></button>
+        <button class="pixel-btn death-btn" type="button"><canvas></canvas></button>
     </div>
-    <!-- Trailer de abertura: PULAR (canto) e COMEÇAR (no fim). -->
+
+    <!-- Tela de pausa (js/ui/PauseScreen.js): RESUME / RESTART em pixel art. -->
+    <div id="pause-screen" role="dialog" aria-label="Paused" aria-hidden="true">
+        <div class="pause-menu">
+            <button class="pixel-btn" type="button"><canvas></canvas></button>
+            <button class="pixel-btn" type="button"><canvas></canvas></button>
+        </div>
+    </div>
+
+    <!-- Trailer de abertura: SKIP (canto) e START (no fim). -->
     <div id="trailer-overlay" class="hidden">
-        <button class="tr-skip" id="btn-skip" type="button">PULAR ▶</button>
-        <button class="tr-start" id="btn-start" type="button">COMEÇAR</button>
+        <button class="tr-skip" id="btn-skip" type="button"><canvas></canvas></button>
+        <button class="tr-start" id="btn-start" type="button">START</button>
     </div>
 
     <!-- Tela de carregamento (js/ui/LoadingScreen.js). Começa visível para
          cobrir o canvas enquanto os módulos e as texturas carregam. -->
-    <div id="loading-screen" role="progressbar" aria-label="Carregando…" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div id="loading-screen" role="progressbar" aria-label="Loading…" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <canvas class="ls-bar" aria-hidden="true"></canvas>
     </div>
 

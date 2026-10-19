@@ -24,6 +24,24 @@ import { HoleRunShot } from './scenes/rush/HoleRunShot.js';
 import { ButtonDoorShot } from './scenes/rush/ButtonDoorShot.js';
 import { GiantSawShot } from './scenes/rush/GiantSawShot.js';
 import { BossWallShot } from './scenes/rush/BossWallShot.js';
+import { TrailerAudio } from './audio/TrailerAudio.js';
+
+// Humor da música ao ENTRAR em cada cena: [dB, passa-baixa Hz, transição s].
+// As cenas ajustam por beat (stage.audio.mood) — isto é só o ponto de partida.
+const SCENE_MOOD = {
+    IntroScene: [-26, 420, 1.5],      // trilha distante, abafada (masmorra)
+    TitleBloodScene: [-14, 1200, 0.2],
+    FrenzyScene: [-7, 4000, 0.8],
+    ZigZagShot: [0, 20000, 0.15],
+    SnapShot: [-1, 20000, 0.2],
+    SplitShot: [-2, 14000, 0.3],
+    MapGenScene: [-8, 5000, 0.6],
+    ArrowRunShot: [-2, 20000, 0.4],
+    HoleRunShot: [-2, 16000, 0.3],
+    ButtonDoorShot: [-5, 9000, 0.3],
+    GiantSawShot: [-3, 14000, 0.3],
+    BossWallShot: [-20, 650, 0.5]
+};
 
 const SCENES = [
     IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene,
@@ -45,7 +63,12 @@ export class TrailerPlayer {
      */
     constructor(canvas, assets, opts = {}) {
         this.stage = new TrailerStage(canvas, assets);
+        // Som: `opts.audio === false` (ex.: ?mute) desliga tudo.
+        this.audio = opts.audio === false ? null : new TrailerAudio();
+        this.stage.audio = this.audio?.available ? this.audio : null;
+        this.stage.hookAudio?.();
         this.scenes = SCENES.map(Scene => new Scene(this.stage));
+        this._gate = null;
         this.onEnd = opts.onEnd || null;
         this.showTimer = !!opts.showTimer;
         this.index = 0;
@@ -61,8 +84,49 @@ export class TrailerPlayer {
 
     get current() { return this.scenes[this.index]; }
 
-    /** Começa (ou recomeça) a partir da cena `from` (índice). */
+    /**
+     * Começa (ou recomeça) a partir da cena `from` (índice). Se o navegador
+     * ainda bloqueia o áudio (sem gesto do usuário), mostra a tela "clique
+     * para começar" e só então começa — o trailer nunca roda mudo.
+     */
     play(from = 0) {
+        const au = this.stage.audio;
+        if (au && !au.running) {
+            this._showGate(from);
+            return;
+        }
+        this._begin(from);
+    }
+
+    _showGate(from) {
+        this.stage.attach();
+        if (this._gate) { this._gate.from = from; return; }
+        const gate = this._gate = { from, t: 0, loaded: false };
+        this.stage.audio.ready.then(() => { gate.loaded = true; });
+        const go = (e) => {
+            if (e?.key === 'Escape') return;            // Esc = pular (main.js)
+            window.removeEventListener('pointerdown', go, true);
+            window.removeEventListener('keydown', go, true);
+            this.stage.audio.unlock().then(() => this.stage.audio.ready).then(() => {
+                if (this._gate !== gate) return;
+                this._gate = null;
+                this._begin(gate.from);
+            });
+        };
+        gate.cancel = () => {
+            window.removeEventListener('pointerdown', go, true);
+            window.removeEventListener('keydown', go, true);
+        };
+        window.addEventListener('pointerdown', go, true);
+        window.addEventListener('keydown', go, true);
+        if (!this.running) {
+            this.running = true;
+            this._last = performance.now();
+            this._raf = requestAnimationFrame(this._frame);
+        }
+    }
+
+    _begin(from = 0) {
         this.stage.attach();
         this.stage.resetActors();
         this.scenes.forEach(s => s.reset?.());
@@ -71,6 +135,8 @@ export class TrailerPlayer {
         this.time = 0;
         this.sceneTime = 0;
         this.impactT = -1;
+        const au = this.stage.audio;
+        if (au) { au.start(); this._applyMood(); }
         this.current.start();
         if (!this.running) {
             this.running = true;
@@ -83,6 +149,9 @@ export class TrailerPlayer {
     stop() {
         this.running = false;
         cancelAnimationFrame(this._raf);
+        this._gate?.cancel?.();
+        this._gate = null;
+        this.stage.audio?.stopAll(0.6);
         this.stage.detach();
         const ctx = this.stage.ctx;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -94,9 +163,65 @@ export class TrailerPlayer {
         if (!this.running) return;
         const dt = Math.min(0.05, (now - this._last) / 1000); // dt limitado
         this._last = now;
-        this.update(dt);
-        this.render();
+        if (this._gate) { this._gate.t += dt; this._drawGate(); }
+        else { this.update(dt); this.render(); }
         this._raf = requestAnimationFrame(this._frame);
+    }
+
+    // Tela de entrada enquanto o áudio está bloqueado pelo navegador.
+    _drawGate() {
+        const { ctx, canvas } = this.stage;
+        const W = canvas.width, H = canvas.height, g = this._gate;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#05030a';
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+        this.stage.drawTitleText(0, Math.min(1, g.t / 0.6));
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.textAlign = 'center';
+        ctx.font = '16px monospace';
+        const blink = 0.55 + 0.45 * Math.sin(g.t * 4);
+        ctx.fillStyle = `rgba(255, 214, 140, ${g.loaded ? blink : 0.4})`;
+        ctx.fillText(g.loaded ? '▶  CLICK OR PRESS ANY KEY  (sound on)' : 'loading sound…', W / 2, H / 2 + 74);
+        ctx.restore();
+        this.stage.drawLetterbox();
+    }
+
+    // Humor da música ao entrar na cena atual.
+    _applyMood() {
+        const m = SCENE_MOOD[this.current.constructor.name];
+        if (m) this.stage.audio?.mood(m[0], m[1], m[2]);
+    }
+
+    // Estado sonoro da cena atual (câmera, serra, jogadores, tremor, câmera lenta).
+    _audioState() {
+        const sc = this.current, st = this.stage;
+        const W = st.canvas.width, H = st.canvas.height;
+        const A = sc.arena ?? sc.left ?? null;
+        let s;
+        if (A) {
+            const r = A.renderer;
+            s = {
+                W, H, slow: A.timeScale,
+                cam: { x: r.camX, y: r.camY, zoom: r.zoom, rot: A.rot },
+                shake: r.screenShake,
+                saw: { visible: A.sawVisible && (A.connected || !!A.freeSaw), spin: A.freeSaw ? 1 : A.saw.spin, scale: A.sawScale },
+                players: [A.p1, A.p2], ws: (x, y) => A.ws(x, y), amb: 0.6
+            };
+        } else {
+            const r = st.renderer;
+            s = {
+                W, H, slow: sc.timeScale ?? 1,
+                cam: { x: r.camX, y: r.camY, zoom: r.zoom, rot: 0 },
+                shake: r.screenShake,
+                saw: { visible: sc.sawCarried ?? true, spin: st.saw.spin, scale: 1 },
+                players: [st.p1, st.p2], ws: (x, y) => r.worldToScreen(x, y), amb: 0.8
+            };
+        }
+        if (sc.audioState) Object.assign(s, sc.audioState(s));
+        return s;
     }
 
     update(dt) {
@@ -108,8 +233,18 @@ export class TrailerPlayer {
             this.index++;
             this.sceneTime = 0;
             this.current.start();
-            if (this.current.cutIn === 'impact') this.impactT = 0;
+            this._applyMood();
+            const au = st.audio;
+            if (this.current.cutIn === 'impact') {
+                this.impactT = 0;
+                // Corte seco: pancada + passagem de ar, música afunda e volta.
+                au?.play('impact', { vol: 0.9 });
+                au?.play('whoosh', { vol: 0.45, rate: 1.25 });
+                au?.duck(-10, 0.05, 0.7);
+                au?.excite(0.5);
+            } else au?.play('whoosh', { vol: 0.35, rate: 0.9 });
         }
+        st.audio?.tick(dt, this._audioState());
         if (this.impactT >= 0) {
             this.impactT += dt;
             if (this.impactT > IMPACT_FLASH) this.impactT = -1;
