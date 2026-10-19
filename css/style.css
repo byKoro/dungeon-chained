@@ -95,7 +95,7 @@ html, body {
 /* ---------------------------------------------------------------------------
    Tela de pausa (js/ui/PauseScreen.js): véu de pedra + RESUME / RESTART
    --------------------------------------------------------------------------- */
-#pause-screen {
+.pause-screen {
     --px: 5px;
     position: fixed;
     inset: 0;
@@ -110,7 +110,7 @@ html, body {
     pointer-events: none;
     transition: opacity 0.18s ease, visibility 0s linear 0.18s;
 }
-#pause-screen.visible {
+.pause-screen.visible {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
@@ -123,21 +123,26 @@ html, body {
     gap: calc(var(--px) * 2);
 }
 .pause-menu .pixel-btn { transform: scale(0); }
-#pause-screen.visible .pixel-btn {
+.pause-screen.visible .pixel-btn {
     animation: pixel-pop 0.38s cubic-bezier(0.34, 1.7, 0.64, 1) both;
 }
-#pause-screen.visible .pixel-btn:nth-child(1) { animation-delay: 0.03s; }
-#pause-screen.visible .pixel-btn:nth-child(2) { animation-delay: 0.11s; }
+.pause-screen.visible .pixel-btn:nth-child(1) { animation-delay: 0.03s; }
+.pause-screen.visible .pixel-btn:nth-child(2) { animation-delay: 0.11s; }
+.pause-screen.visible .pixel-btn:nth-child(3) { animation-delay: 0.19s; }
+/* Slider de volume (js/ui/PixelSlider.js): arrastar sem rolar a página. */
+.pixel-slider { touch-action: none; cursor: ew-resize; display: block; }
+/* O trailer pausa por cima do botão SKIP. */
+#trailer-pause { z-index: 60; }
 /* Só o botão em foco respira. */
-#pause-screen.visible .pixel-btn:focus canvas {
+.pause-screen.visible .pixel-btn:focus canvas {
     animation: pixel-idle 1.4s steps(1, end) 0.5s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
     #death-screen.visible .death-btn,
-    #pause-screen.visible .pixel-btn { animation: none; transform: none; }
+    .pause-screen.visible .pixel-btn { animation: none; transform: none; }
     #death-screen.visible .death-btn canvas,
-    #pause-screen.visible .pixel-btn:focus canvas { animation: none; }
+    .pause-screen.visible .pixel-btn:focus canvas { animation: none; }
 }
 
 /* ---------------------------------------------------------------------------

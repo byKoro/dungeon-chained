@@ -28,6 +28,7 @@ import { VtuberHud } from './ui/VtuberHud.js';
 import { DeathScreen } from './ui/DeathScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { setUiAudio, playUi } from './ui/UiSound.js';
+import { MasterVolume } from './core/MasterVolume.js';
 import { HeartPickup } from './entities/HeartPickup.js';
 import { playerConfigs } from './config/EntityConfig.js';
 
@@ -78,7 +79,7 @@ export class Game {
         });
         // Tela de morte (DOM): véu de sangue + botão REINICIAR em pixel art.
         this.deathScreen = new DeathScreen({ onRestart: () => this.restart() });
-        // Tela de pausa (DOM): véu de pedra + RESUME / RESTART em pixel art.
+        // Tela de pausa (DOM): véu de pedra + RESUME / RESTART / VOLUME em pixel art.
         this.pauseScreen = new PauseScreen({
             // O próprio botão já toca "uiConfirm": fecha a pausa sem o uiClose
             // por cima (um som por ação). O som de mover o foco é do PixelButton.
@@ -117,6 +118,10 @@ export class Game {
         // Áudio: gerenciado centralmente por AudioConfig. Permite alterar sons,
         // volumes por caso de uso, pitch e volume master.
         this.audio = new AudioManager(AUDIO_CONFIG);
+        // Volume GERAL do jogador (slider da pausa, compartilhado com o
+        // trailer): multiplica o master de mixagem da config.
+        const mixMaster = this.audio.getMasterVolume();
+        this._unsubVolume = MasterVolume.subscribe(() => this.audio.setMasterVolume(mixMaster * MasterVolume.gain()));
         // Botões de interface passam a usar o mesmo gerenciador (master/mudo).
         setUiAudio(this.audio);
         if (typeof window !== "undefined") {
@@ -334,16 +339,19 @@ export class Game {
     _pollMenuPad() {
         if (typeof navigator === "undefined" || !navigator.getGamepads) return;
         const pads = navigator.getGamepads() || [];
-        const now = { start: false, a: false, b: false, up: false, down: false };
+        const now = { start: false, a: false, b: false, up: false, down: false, left: false, right: false };
         for (const pad of pads) {
             if (!pad) continue;
             const btn = (i) => this.input.isButtonPressed(pad, i);
+            const ax = pad.axes?.[0] || 0;
             const ay = pad.axes?.[1] || 0;
             now.start ||= btn(9);
             now.a ||= btn(0);
             now.b ||= btn(1);
             now.up ||= btn(12) || ay < -0.6;
             now.down ||= btn(13) || ay > 0.6;
+            now.left ||= btn(14) || ax < -0.6;
+            now.right ||= btn(15) || ax > 0.6;
         }
         const prev = this._padPrev;
         const hit = (k) => now[k] && !prev[k];
@@ -363,6 +371,8 @@ export class Game {
         if (!this.gameLoop.paused) return;
         if (hit("up")) this.pauseScreen.move(-1);
         else if (hit("down")) this.pauseScreen.move(1);
+        else if (hit("left")) this.pauseScreen.adjust(-1);     // volume (slider em foco)
+        else if (hit("right")) this.pauseScreen.adjust(1);
         else if (hit("a")) this.pauseScreen.confirm();
         else if (hit("b")) this.setPaused(false);
     }

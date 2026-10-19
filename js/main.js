@@ -36,6 +36,7 @@ async function bootstrap() {
         trailer = new TrailerPlayer(canvas, assets, {
             onEnd: () => ui.showStart(), showTimer: params.has('timer'), audio: !params.has('mute')
         });
+        window.trailer = trailer;   // depuração no console (como em trailer.html)
     }
 
     await loading.run('Loading the dungeon…', [
@@ -64,15 +65,15 @@ async function bootstrap() {
         game.start();
     };
 
-    const ui = buildTrailerUI(startGame);
+    const ui = buildTrailerUI(startGame, () => trailer?.togglePause(), () => !!trailer?.paused);
     if (skipTrailer) { startGame(); return; }
     trailer.play();
     ui.showSkip();
 }
 
 // Botões sobre o trailer: PULAR (canto) e COMEÇAR (no fim). Enter/Espaço
-// também começam quando o COMEÇAR está na tela; Esc pula.
-function buildTrailerUI(onStart) {
+// também começam quando o COMEÇAR está na tela; Esc pausa (RESUME + volume).
+function buildTrailerUI(onStart, onPause = null, trailerPaused = null) {
     const root = document.getElementById('trailer-overlay');
     const skip = document.getElementById('btn-skip');
     const start = document.getElementById('btn-start');
@@ -108,7 +109,9 @@ function buildTrailerUI(onStart) {
     });
     start.addEventListener('click', confirmStart);
     const onKey = (e) => {
-        if (e.key === 'Escape') confirmStart();
+        // Esc pausa o trailer (RESUME + volume), como no jogo; pular = SKIP.
+        if (e.key === 'Escape') { if (!e.repeat) onPause?.(); }
+        else if (trailerPaused?.()) return;          // pausado: o menu cuida das teclas
         else if ((e.key === 'Enter' || e.key === ' ') && start.classList.contains('visible')) {
             e.preventDefault();
             confirmStart();

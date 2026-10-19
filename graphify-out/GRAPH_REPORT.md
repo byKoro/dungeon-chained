@@ -1,16 +1,16 @@
 # Graph Report - dungeon-chained  (2026-10-18)
 
 ## Corpus Check
-- 638 files · ~532,749 words
+- 643 files · ~546,197 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4014 nodes · 5984 edges · 283 communities (229 shown, 54 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.6)
+- 4180 nodes · 6548 edges · 290 communities (232 shown, 58 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 66 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `930fcbf7`
+- Built from commit: `87a845f3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -22,11 +22,11 @@
 - video/package.json
 - DungeonTileQuery
 - MeleeEnemy
-- ModularGrid.js
+- RoomTemplate
 - ActionArena
 - RoomArchetypes.js
 - IntroScene
-- FrenzyScene.js
+- Game.js
 - test_saw_motor_audio.js
 - test_safe_spawn.js
 - MapGenScene
@@ -34,7 +34,7 @@
 - GameConfig.js
 - Dungeon
 - Scene06_Saw.tsx
-- Game
+- FrenzyScene
 - remotion-best-practices/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx
 - remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx
 - skills/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx
@@ -45,7 +45,7 @@
 - remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs
 - skills/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs
 - skills/remotion-markup/remotion-maps/techniques/maptiler/scripts/prep-geo.mjs
-- arenaRender.js
+- IntroScene.js
 - SawWeapon
 - Root.tsx
 - Renderer
@@ -56,7 +56,7 @@
 - TrailerStage
 - EntityConfig.js
 - template.sh
-- export_scene_room.py
+- sprites_to_gif.py
 - remotion-best-practices/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs
 - remotion-best-practices/remotion-markup/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs
 - skills/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs
@@ -81,22 +81,25 @@
 - PlayerAI
 - Issue tracker: GitHub
 - BossWallShot
+- Game
+- gen_keyart.py
 - LightingRenderer
 - WindSystem
-- TrailerStage.js
+- PixelFont.js
+- RoomTiles
 - ParticleSystem.js
 - ParticleEffects
 - HordeDirector
 - SplitShot
 - gen_sfx.py
-- rushKit.js
+- ArenaShot
 - FlashParticle
 - FlameParticle
 - Triage
 - GameLoop
 - InputHandler
 - SparkParticle
-- TitleBloodScene
+- hash01
 - remotion-best-practices/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts
 - remotion-best-practices/remotion-markup/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts
 - skills/remotion-maps/techniques/maptiler/assets/MapTilerVectorElement.ts
@@ -113,7 +116,7 @@
 - remotion-interactivity/SKILL.md
 - remotion-interactivity/REFERENCE.md
 - Using audio in Remotion
-- Using calculateMetadata
+- DungeonGraph
 - Codebase Design
 - remotion-best-practices/remotion-markup/transitions.md
 - skills/remotion-markup/transitions.md
@@ -131,6 +134,7 @@
 - CombatSystem
 - Using calculateMetadata
 - Ask Matt
+- export_scene_pngs.py
 - remotion-create/REFERENCE.md
 - Diagnosing Bugs
 - Roteiro atual (ordem de `SCENES`)
@@ -139,7 +143,8 @@
 - Test-Driven Development
 - Process
 - writing-for-agents/SKILL.md
-- RoomCatalog
+- export_scene_room.py
+- PauseScreen
 - agent/skills/caveman/SKILL.md
 - Dynamic projected prop shadows
 - .agents/skills/caveman/SKILL.md
@@ -174,6 +179,7 @@
 - skills/remotion-markup/remotion-maps/techniques/maplibre/TECHNIQUE.md
 - Migrate to Shoehorn
 - Player
+- pil
 - Map Explainer — architecture reference
 - Audio Visualization in Remotion
 - Using Animated images in Remotion
@@ -189,7 +195,7 @@
 - Scaffold Exercises
 - to-spec/SKILL.md
 - main.js
-- LoadingScreen
+- Tileset
 - Map Explainer — basemap & geo prep
 - Using `<HtmlInCanvas>` in Remotion
 - remotion-best-practices/remotion-markup/light-leaks.md
@@ -202,12 +208,13 @@
 - Process
 - <Questionnaire title>
 - writing-shape/SKILL.md
+- DeathScreen
 - remotion-best-practices/remotion-maps/REFERENCE.md
 - CesiumJS — 3D flyovers in Remotion
 - Using Three.js and React Three Fiber in Remotion
 - Measuring text in Remotion
 - remotion-best-practices/remotion-markup/remotion-maps/REFERENCE.md
-- CesiumJS — 3D flyovers in Remotion
+- gen_heart.py
 - remotion-best-practices/remotion-markup/timing.md
 - remotion-maps/SKILL.md
 - CesiumJS — 3D flyovers in Remotion
@@ -225,9 +232,9 @@
 - Moving Map Render Stability
 - Map element data sources
 - Moving Map Render Stability
-- Remotion Maps
-- Moving Map Render Stability
-- Moving Map Render Stability
+- LensSplatter
+- gen_expressions.py
+- FrenzyBeats.js
 - Map element data sources
 - Moving Map Render Stability
 - Remotion Maps
@@ -244,7 +251,7 @@
 - Verification record — editor UI/UX refactor (iteration 2)
 - Sections
 - writing-beats/SKILL.md
-- TrailerPlayer
+- PixelButton
 - Flyover data sources
 - 3D Flyover — troubleshooting
 - Using Lottie Animations in Remotion
@@ -260,7 +267,6 @@
 - Implementation Plan — Refatoração UI/UX do Editor de Salas (Dungeon Chained)
 - loop-me/SKILL.md
 - Reference
-- RoomVariantCatalog
 - Peças de Sala (`/map`)
 - remotion-best-practices/remotion-markup/images.md
 - remotion-docs/SKILL.md
@@ -283,41 +289,45 @@
 - CREDITS.md
 - idioma.md
 - public/assets/audio/README.md
-- BossWallShot.js
-- TILE
+- ArrowWipe
+- ChallengeCorridor.js
 
 ## God Nodes (most connected - your core abstractions)
 1. `RoomEditor` - 86 edges
 2. `clamp01()` - 46 edges
-3. `BossWallShot` - 43 edges
-4. `ActionArena` - 42 edges
-5. `IntroScene` - 39 edges
-6. `MapGenScene` - 35 edges
-7. `Game` - 32 edges
-8. `lerp()` - 32 edges
-9. `AudioManager` - 30 edges
-10. `FrenzyScene` - 30 edges
+3. `ActionArena` - 44 edges
+4. `BossWallShot` - 44 edges
+5. `n_of()` - 42 edges
+6. `IntroScene` - 41 edges
+7. `MapGenScene` - 38 edges
+8. `write_wav()` - 38 edges
+9. `finish()` - 37 edges
+10. `Game` - 35 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `frame()` --calls--> `noise()`  [INFERRED]
+  tools/gen_explosion.py → tools/gen_trailer_sfx.py
 - `whiteFade()` --calls--> `clamp01()`  [EXTRACTED]
   js/trailer/scenes/mapgen/MapGenScene.js → js/trailer/anim.js
 - `drawConnectPulse()` --calls--> `easeOut()`  [EXTRACTED]
   js/trailer/kit/arenaRender.js → js/trailer/anim.js
 - `renderArena()` --calls--> `easeOut()`  [EXTRACTED]
   js/trailer/kit/arenaRender.js → js/trailer/anim.js
-- `dressRoom()` --calls--> `mulberry32()`  [EXTRACTED]
-  js/trailer/kit/rushKit.js → js/trailer/scenes/mapgen/mapLayout.js
 - `renderSpeechBubble()` --indirect_call--> `measureText()`  [INFERRED]
   js/ui/SpeechBubble.js → js/ui/PixelFont.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (283 total, 54 thin omitted)
+## Communities (290 total, 58 thin omitted)
 
 ### Community 1 - "mapLayout.js"
 Cohesion: 0.07
-Nodes (56): HOLE_TILES, bakeDungeon(), canvas(), drawSpec(), drawTile16(), silhouette(), AMBIENT_DARK, AMBIENT_MAP (+48 more)
+Nodes (55): HOLE_TILES, bakeDungeon(), canvas(), drawSpec(), drawTile16(), silhouette(), AMBIENT_DARK, AMBIENT_MAP (+47 more)
+
+### Community 3 - "AssetLoader"
+Cohesion: 0.05
+Nodes (5): AssetLoader, bootstrap(), TrailerPlayer, LoadingScreen, PAL
 
 ### Community 4 - "video/package.json"
 Cohesion: 0.05
@@ -327,17 +337,13 @@ Nodes (41): eslint, allowScripts, esbuild, dependencies, react, react-dom, remot
 Cohesion: 0.07
 Nodes (3): MeleeEnemy, BloodStains, GibPiece
 
-### Community 7 - "ModularGrid.js"
-Cohesion: 0.12
-Nodes (7): RoomPresets, ALL_DIRECTIONS, DIRECTION, DIRECTION_DELTA, OPPOSITE_DIRECTION, RoomSocket, RoomTemplate
-
 ### Community 9 - "RoomArchetypes.js"
-Cohesion: 0.19
-Nodes (13): adaptStraightOrDeadendAxis(), adaptTJunctionToWest(), ARCHETYPE, ARCHETYPE_ORIENTATIONS, CANONICAL_BASE_ORIENTATION, detectShapeFromDoors(), flipInnerHorizontal(), getDoorsForOrientation() (+5 more)
-
-### Community 11 - "FrenzyScene.js"
 Cohesion: 0.09
-Nodes (16): BLOOD_COLORS, BLOOD_PIXEL, HEART_DROP, MAX_ACTIVE_GIBS, PLAYER_SAFE_ZONE, WIND, Physics, ScreenGore (+8 more)
+Nodes (19): adaptStraightOrDeadendAxis(), adaptTJunctionToWest(), applyImmutableFrame(), ARCHETYPE, ARCHETYPE_ORIENTATIONS, CANONICAL_BASE_ORIENTATION, detectShapeFromDoors(), flipInnerHorizontal() (+11 more)
+
+### Community 11 - "Game.js"
+Cohesion: 0.09
+Nodes (19): BLOOD_COLORS, BLOOD_PIXEL, CAM_MARGIN, CAMERA_DRONE, HEART_DROP, MAX_ACTIVE_GIBS, MAX_PLAYER_SEPARATION, PLAYER_SAFE_ZONE (+11 more)
 
 ### Community 12 - "test_saw_motor_audio.js"
 Cohesion: 0.08
@@ -348,28 +354,20 @@ Cohesion: 0.08
 Nodes (19): HOLE_FALL, HOLE_TILE, findSafeFloorCell(), isSafeFloorCell(), floor, query, rooms, runUntilFall() (+11 more)
 
 ### Community 14 - "MapGenScene"
-Cohesion: 0.11
-Nodes (4): backOut(), MapGenScene, whiteFade(), levelRectTiles()
+Cohesion: 0.09
+Nodes (5): backOut(), makeShadowSprite(), MapGenScene, viewRect(), levelRectTiles()
 
 ### Community 15 - "AudioManager"
 Cohesion: 0.07
 Nodes (3): AudioManager, dbToLin(), Chain
 
 ### Community 16 - "GameConfig.js"
-Cohesion: 0.09
-Nodes (37): AUDIO_CLIPS, AUDIO_CONFIG, BACKGROUND_TILE, CAM_MARGIN, CAMERA_DRONE, DOOR_ENTER_DEPTH, DOOR_LIGHT, DOOR_STUB_TILES (+29 more)
-
-### Community 17 - "Dungeon"
-Cohesion: 0.11
-Nodes (3): Dungeon, DIRS, DungeonGraph
+Cohesion: 0.08
+Nodes (31): DOOR_ENTER_DEPTH, EMPTY_FLOOR_COLOR, EMPTY_FLOOR_TILE, getPlayerSpawnPositions(), GRID_COLS, GRID_ROWS, HIT_SLOWMO, MAX_SIM_STEPS_PER_FRAME (+23 more)
 
 ### Community 18 - "Scene06_Saw.tsx"
 Cohesion: 0.20
 Nodes (15): DungeonRoom(), roomTileAt(), BloodBurst(), Flash(), ScreenBlood(), TorchGlow(), Vignette(), OnScreenText() (+7 more)
-
-### Community 19 - "Game"
-Cohesion: 0.06
-Nodes (3): Game, FrenzyScene, lerp()
 
 ### Community 20 - "remotion-best-practices/remotion-maps/techniques/maptiler/assets/RiverReveal.tsx"
 Cohesion: 0.10
@@ -411,17 +409,17 @@ Nodes (18): ANCHOR_BBOX, biggestPoly(), borders, COUNTRIES, countryMeta, __dir, 
 Cohesion: 0.08
 Nodes (18): ANCHOR_BBOX, biggestPoly(), borders, COUNTRIES, countryMeta, __dir, flowKm, FRAME_BBOX (+10 more)
 
-### Community 30 - "arenaRender.js"
-Cohesion: 0.27
-Nodes (10): drawArrows(), drawBackground(), drawBigSaw(), drawClosedDoors(), drawConnectPulse(), drawRedMood(), LIGHT, renderArena() (+2 more)
+### Community 30 - "IntroScene.js"
+Cohesion: 0.12
+Nodes (21): BACKGROUND_TILE, DOOR_LIGHT, DOOR_STUB_TILES, LIGHT_PIXEL_SCALE, PLAYER_LIGHT_RADIUS, ACTIVE_BLADE_PROFILE, BUTTON_PROFILE, DOOR_BEAM_PROFILE (+13 more)
 
 ### Community 32 - "Root.tsx"
 Cohesion: 0.14
 Nodes (18): PitchVideo(), SCENE_SECONDS, TOTAL_SECONDS, base, RemotionRoot(), Scene01Forge, Scene02Hela, Scene03SawBorn (+10 more)
 
 ### Community 35 - "clamp01"
-Cohesion: 0.10
-Nodes (18): clamp01(), easeInOut(), easeOut(), hash01(), lerp(), dressRoom(), handheld(), RushShot (+10 more)
+Cohesion: 0.07
+Nodes (31): clamp01(), easeIn(), easeInOut(), easeOut(), lerp(), SawIris, CRATES, dressProps() (+23 more)
 
 ### Community 36 - "Scene05_Couch.tsx"
 Cohesion: 0.16
@@ -431,17 +429,21 @@ Nodes (10): ChainSaw(), Point, DungeonBg(), GameName(), cinzel, rajdhani, BULLET
 Cohesion: 0.04
 Nodes (46): Measuring DOM nodes in Remotion, Measuring element dimensions, `<HtmlInCanvasMotionBlur>`, Motion blur, Color picker, 3D content, Advanced Images, Advanced sequencing (+38 more)
 
+### Community 38 - "TrailerStage"
+Cohesion: 0.06
+Nodes (9): cam0(), clamp(), db(), HEAVY, hookRendererAudio(), LOOPS, SOUNDS, TrailerAudio (+1 more)
+
 ### Community 39 - "EntityConfig.js"
-Cohesion: 0.14
-Nodes (7): ENEMY_TYPE_BY_KEY, ENEMY_TYPES, MELEE_ENEMY_CONFIGS, BLOOD_STAIN_CONFIG, TINY_RPG_ENEMIES, PLAYER_EXPRESSIONS, SpawnSystem
+Cohesion: 0.15
+Nodes (8): ENEMY_TYPE_BY_KEY, ENEMY_TYPES, MELEE_ENEMY_CONFIGS, playerConfigs(), BLOOD_STAIN_CONFIG, TINY_RPG_ENEMIES, PLAYER_EXPRESSIONS, PlayerFactory
 
 ### Community 40 - "template.sh"
 Cohesion: 0.21
 Nodes (17): template.sh script, ask(), ask_secret(), banner(), _clear(), finish(), note(), open_url() (+9 more)
 
-### Community 41 - "export_scene_room.py"
-Cohesion: 0.05
-Nodes (49): Image, Path, pil, build_room(), Exporta a SALA MONTADA em PNGs grandes (nearest-neighbor), replicando o…, Monta a matriz de índices da sala, com abertura dos vãos de porta, exatamente…, Desenha a matriz de índices numa imagem RGBA (1:1 em tiles de 16px)., render() (+41 more)
+### Community 41 - "sprites_to_gif.py"
+Cohesion: 0.18
+Nodes (19): Image, Path, _canvas_size(), crop_cell(), from_files(), from_sheet(), main(), Salva cada frame como PNG numerado, ampliado (NEAREST), com alfa real. Mantem… (+11 more)
 
 ### Community 42 - "remotion-best-practices/remotion-maps/techniques/cesium/scripts/prep-cesium-path.mjs"
 Cohesion: 0.13
@@ -492,8 +494,8 @@ Cohesion: 0.04
 Nodes (44): Cropping, Color picker, 3D content, Advanced Images, Advanced sequencing, Assets, Audio visualization, Available effects (+36 more)
 
 ### Community 60 - "Portrait"
-Cohesion: 0.06
-Nodes (24): DeathScreen, PAL, renderPixelButton(), ACCENTS, COMPOSED, drawText(), GLYPHS, LINE_HEIGHT (+16 more)
+Cohesion: 0.09
+Nodes (9): clamp(), HEART_FRAME, HeartRow, hexA(), pick(), Portrait, rand(), Spring (+1 more)
 
 ### Community 61 - "SawWeapon.js"
 Cohesion: 0.20
@@ -507,21 +509,29 @@ Nodes (30): Before exploring, read these, Domain Docs, File structure, Flag ADR 
 Cohesion: 0.11
 Nodes (3): BossWallShot, clamp(), rnd()
 
-### Community 71 - "TrailerStage.js"
-Cohesion: 0.08
-Nodes (15): ROOM_COLS, ROOM_ROWS, RoomTiles, Tileset, SeamlessTileset, TRAILER_EXPRESSIONS, ref_node_fs, spawnCenter (+7 more)
+### Community 67 - "gen_keyart.py"
+Cohesion: 0.16
+Nodes (21): apply_lighting(), asset(), blob(), build_room(), draw_rope(), draw_title(), drops(), glyph_mask() (+13 more)
+
+### Community 70 - "PixelFont.js"
+Cohesion: 0.18
+Nodes (14): LABELS, renderPixelButton(), ACCENTS, COMPOSED, drawText(), GLYPHS, LINE_HEIGHT, measureText() (+6 more)
+
+### Community 71 - "RoomTiles"
+Cohesion: 0.27
+Nodes (4): RoomTiles, ref_node_fs, DIR, files
 
 ### Community 72 - "ParticleSystem.js"
 Cohesion: 0.22
 Nodes (3): DustPuff, AIR_BLOOD_COLORS, updateAndCompact()
 
 ### Community 76 - "gen_sfx.py"
-Cohesion: 0.08
-Nodes (67): ndarray, os, crop_indices(), export(), export_tiled(), Exporta PNGs GRANDES (nearest-neighbor) de peças do cenário a partir do tileset…, Retângulo (left, top, right, bottom) de um tile pelo índice da grade., Recorta um bloco retangular de tiles (lista em ordem de leitura, linha a linha)… (+59 more)
+Cohesion: 0.07
+Nodes (115): ndarray, os, add_reverb(), bell(), chain_rattle(), click(), convolve(), db_to_lin() (+107 more)
 
-### Community 77 - "rushKit.js"
-Cohesion: 0.14
-Nodes (6): ArenaShot, CRATES, dressProps(), LOOT, RUBBLE, mulberry32()
+### Community 77 - "ArenaShot"
+Cohesion: 0.12
+Nodes (3): ArenaShot, SnapShot, ZigZagShot
 
 ### Community 79 - "FlashParticle"
 Cohesion: 0.29
@@ -530,6 +540,10 @@ Nodes (3): FlashParticle, getGlowSprite(), _glowCache
 ### Community 81 - "Triage"
 Cohesion: 0.06
 Nodes (29): Bad agent brief, Behavioral, not procedural, Complete acceptance criteria, Durability over precision, Examples, Explicit scope boundaries, Good agent brief (bug), Good agent brief (enhancement) (+21 more)
+
+### Community 85 - "hash01"
+Cohesion: 0.25
+Nodes (3): hash01(), TITLE_TIMING, TitleBloodScene
 
 ### Community 90 - "package.json"
 Cohesion: 0.40
@@ -564,12 +578,8 @@ Cohesion: 0.08
 Nodes (20): Effects should be inline too, Animate using `interpolate()`, Choose schema fields, Effects should be inline too, Give every independently editable item its own JSX node, Give interactive elements a descriptive name, Keep all CSS styles inline, Keep composition metadata inline (+12 more)
 
 ### Community 104 - "Using audio in Remotion"
-Cohesion: 0.08
-Nodes (21): Delaying, Importing Audio, Looping, Muting, Pitch, Prerequisites, Speed, Trimming (+13 more)
-
-### Community 105 - "Using calculateMetadata"
-Cohesion: 0.09
-Nodes (20): Matching dimensions of a video, Return value, Setting a default outName, Setting duration based on a video, Setting duration based on multiple videos, Transforming props, Using calculateMetadata, Getting video dimensions (+12 more)
+Cohesion: 0.04
+Nodes (41): Delaying, Importing Audio, Looping, Muting, Pitch, Prerequisites, Speed, Trimming (+33 more)
 
 ### Community 106 - "Codebase Design"
 Cohesion: 0.09
@@ -631,6 +641,10 @@ Nodes (13): Matching dimensions of a video, Return value, Setting a default outN
 Cohesion: 0.12
 Nodes (14): Phase boundaries, Primary and secondary sources, The five options, The tree, These are judgement calls, Ask Matt, Codebase health, Context hygiene (+6 more)
 
+### Community 123 - "export_scene_pngs.py"
+Cohesion: 0.24
+Nodes (10): crop_indices(), export(), export_tiled(), Exporta PNGs GRANDES (nearest-neighbor) de peças do cenário a partir do tileset…, Retângulo (left, top, right, bottom) de um tile pelo índice da grade., Recorta um bloco retangular de tiles (lista em ordem de leitura, linha a linha)…, Amplia com NEAREST mantendo pixel art nítido., Repete um único tile numa grade nx*ny (piso contínuo tileável). (+2 more)
+
 ### Community 124 - "remotion-create/REFERENCE.md"
 Cohesion: 0.13
 Nodes (11): Designing a video, Empty folder, Follow-up, Interactivity Best Practices, Is this a multi-scene video?, Is this a timeline of clips?, Non-empty folder, Open the preview before building the video (+3 more)
@@ -640,8 +654,8 @@ Cohesion: 0.13
 Nodes (14): Completion criterion: a tight loop that goes red, Diagnosing Bugs, Minimise, Non-deterministic bugs, Phase 1: Build a feedback loop, Phase 2: Reproduce + minimise, Phase 3: Hypothesise, Phase 4: Instrument (+6 more)
 
 ### Community 126 - "Roteiro atual (ordem de `SCENES`)"
-Cohesion: 0.13
-Nodes (14): 0 — IntroScene (sala padrão, porta S, iluminação sombria), 11 — BossWallShot (boss "parede de fogo", última cena), 1 — TitleBloodScene, 2 — FrenzyScene (arena 22×13, 4 portas, horda pela porta LESTE), 3–5 — Montagem (ActionArena), 6 — MapGenScene (geração de mapas), 7–10 — Sequência "desespero" (RushShot), Arquitetura (+6 more)
+Cohesion: 0.12
+Nodes (15): 0 — IntroScene (sala padrão, porta S, iluminação sombria), 11 — BossWallShot (boss "parede de fogo", última cena), 1 — TitleBloodScene, 2 — FrenzyScene (arena 22×13, 4 portas, horda pela porta LESTE), 3–5 — Montagem (ActionArena), 6 — MapGenScene (geração de mapas), 7–10 — Sequência "desespero" (RushShot), Arquitetura (+7 more)
 
 ### Community 127 - "remotion-create/SKILL.md"
 Cohesion: 0.15
@@ -663,9 +677,9 @@ Nodes (12): 1. Gather context, 2. Explore the codebase (optional), 3. Draft vert
 Cohesion: 0.15
 Nodes (11): Context pointers, Information hierarchy, Leading words, Invocation, Router skills, Skill mechanics, Splitting by invocation, Pruning (+3 more)
 
-### Community 133 - "RoomCatalog"
-Cohesion: 0.25
-Nodes (5): applyImmutableFrame(), catalogKey(), doorSignature(), pieceType(), RoomCatalog
+### Community 132 - "export_scene_room.py"
+Cohesion: 0.21
+Nodes (9): build_room(), Exporta a SALA MONTADA em PNGs grandes (nearest-neighbor), replicando o…, Monta a matriz de índices da sala, com abertura dos vãos de porta, exatamente…, Desenha a matriz de índices numa imagem RGBA (1:1 em tiles de 16px)., render(), save(), tile_at(), tile_img() (+1 more)
 
 ### Community 134 - "agent/skills/caveman/SKILL.md"
 Cohesion: 0.17
@@ -752,12 +766,12 @@ Cohesion: 0.20
 Nodes (9): 1. Provider initialization, 2. The camera path — structure & generation, 3. Camera animation per frame (position, heading, pitch, bank), 3D Flyover — architecture reference, 4. The feel — proven water-wars values, 5. The complete component, 6. Render, City (+1 more)
 
 ### Community 155 - "remotion-best-practices/remotion-markup/remotion-maps/techniques/mapbox/TECHNIQUE.md"
-Cohesion: 0.20
-Nodes (9): Animated flight route example, Basic map example, Camera guidance, Core rules, Lines, Markers and labels, Prerequisites, Rendering (+1 more)
+Cohesion: 0.12
+Nodes (14): Moving Map Render Stability, Plate sizing and sharpness, Required pattern: fixed map plate, Symptom and cause, Verification, Animated flight route example, Basic map example, Camera guidance (+6 more)
 
 ### Community 156 - "remotion-best-practices/remotion-markup/remotion-maps/techniques/maplibre/TECHNIQUE.md"
-Cohesion: 0.20
-Nodes (9): Animated flight route example, Basic map example, Camera guidance, Core rules, Lines, Markers and labels, Prerequisites, Rendering (+1 more)
+Cohesion: 0.12
+Nodes (14): Moving Map Render Stability, Plate sizing and sharpness, Required pattern: fixed map plate, Symptom and cause, Verification, Animated flight route example, Basic map example, Camera guidance (+6 more)
 
 ### Community 157 - "3D Flyover — architecture reference"
 Cohesion: 0.20
@@ -800,8 +814,12 @@ Cohesion: 0.20
 Nodes (9): `as Type` → `fromPartial()`, `as unknown as Type` → `fromAny()`, Install, Large objects with few needed properties, Migrate to Shoehorn, Migration patterns, When to use each, Why shoehorn? (+1 more)
 
 ### Community 167 - "Player"
-Cohesion: 0.10
-Nodes (5): playerConfigs(), Enemy, Entity, Player, PlayerFactory
+Cohesion: 0.12
+Nodes (3): Enemy, Entity, Player
+
+### Community 168 - "pil"
+Cohesion: 0.24
+Nodes (8): pil, ease_out(), frame(), main(), Gera a folha de EXPLOSÃO em pixel art do trailer (boss de fogo). Bola de fogo…, Ruído de valor 2D suave (grade 4 px), determinístico pela semente., value_noise(), Gera assets/tileset/_preview.png com cada tile numerado (índice da grade). O…
 
 ### Community 169 - "Map Explainer — architecture reference"
 Cohesion: 0.22
@@ -860,8 +878,8 @@ Cohesion: 0.22
 Nodes (8): Further Notes, Implementation Decisions, Out of Scope, Problem Statement, Process, Solution, Testing Decisions, User Stories
 
 ### Community 183 - "main.js"
-Cohesion: 0.28
-Nodes (4): bootstrap(), buildTrailerUI(), bootstrap(), PAL
+Cohesion: 0.19
+Nodes (12): AUDIO_CLIPS, AUDIO_CONFIG, bootstrap(), buildTrailerUI(), FACES, FRAME, pixelScale(), playUi() (+4 more)
 
 ### Community 185 - "Map Explainer — basemap & geo prep"
 Cohesion: 0.25
@@ -928,12 +946,12 @@ Cohesion: 0.29
 Nodes (6): Best practices, Checking text overflow, Fitting text to a width, Measuring text dimensions, Measuring text in Remotion, Prerequisites
 
 ### Community 202 - "remotion-best-practices/remotion-markup/remotion-maps/REFERENCE.md"
-Cohesion: 0.29
-Nodes (3): Build, Overlays and Interactivity, Static map
+Cohesion: 0.10
+Nodes (16): [CesiumJS](techniques/cesium/TECHNIQUE.md), [Mapbox](techniques/mapbox/TECHNIQUE.md), [MapLibre](techniques/maplibre/TECHNIQUE.md), [MapTiler](techniques/maptiler/TECHNIQUE.md), Remotion Maps, [Static map](techniques/static-map/TECHNIQUE.md), Build the flight, Camera behavior (+8 more)
 
-### Community 203 - "CesiumJS — 3D flyovers in Remotion"
-Cohesion: 0.29
-Nodes (7): Build the flight, Camera behavior, CesiumJS — 3D flyovers in Remotion, Credentials, Files, Mechanics, Modes
+### Community 203 - "gen_heart.py"
+Cohesion: 0.50
+Nodes (7): crack_col(), half_left(), half_right(), main(), paint(), Gera o sprite do coração (HUD e item de cura) em pixel art chunky. Saída:…, Pinta SHAPE na posição ox. keep(row, col) -> False descarta o pixel; crack=True…
 
 ### Community 204 - "remotion-best-practices/remotion-markup/timing.md"
 Cohesion: 0.29
@@ -1003,17 +1021,13 @@ Nodes (5): Custom geodata mode, Decision rule, Hybrid mode, Map element data sou
 Cohesion: 0.33
 Nodes (5): Moving Map Render Stability, Plate sizing and sharpness, Required pattern: fixed map plate, Symptom and cause, Verification
 
-### Community 221 - "Remotion Maps"
-Cohesion: 0.33
-Nodes (6): [CesiumJS](techniques/cesium/TECHNIQUE.md), [Mapbox](techniques/mapbox/TECHNIQUE.md), [MapLibre](techniques/maplibre/TECHNIQUE.md), [MapTiler](techniques/maptiler/TECHNIQUE.md), Remotion Maps, [Static map](techniques/static-map/TECHNIQUE.md)
+### Community 222 - "gen_expressions.py"
+Cohesion: 0.43
+Nodes (6): apply(), find_eye_y(), main(), palette(), Gera variações de expressão (olhos + sobrancelhas) dos jogadores. Lê…, Extrai as cores do próprio personagem a partir do frame original.
 
-### Community 222 - "Moving Map Render Stability"
-Cohesion: 0.33
-Nodes (5): Moving Map Render Stability, Plate sizing and sharpness, Required pattern: fixed map plate, Symptom and cause, Verification
-
-### Community 223 - "Moving Map Render Stability"
-Cohesion: 0.33
-Nodes (5): Moving Map Render Stability, Plate sizing and sharpness, Required pattern: fixed map plate, Symptom and cause, Verification
+### Community 223 - "FrenzyBeats.js"
+Cohesion: 0.53
+Nodes (5): buildFrenzyBeats(), clamp01(), HORDE, lerp(), smooth()
 
 ### Community 224 - "Map element data sources"
 Cohesion: 0.33
@@ -1171,33 +1185,33 @@ Nodes (3): File format, What is a fragment, Writing rhythm
 Cohesion: 0.25
 Nodes (3): BLOOD_STEPS, MAX_FOOTPRINTS, Footprint
 
-### Community 291 - "BossWallShot.js"
-Cohesion: 0.10
-Nodes (12): easeIn(), ArrowWipe, SawIris, BEAM, BEAM_LIGHT, BOSS_LIGHT, CRACK_LIGHT, DEBRIS (+4 more)
+### Community 276 - "Efeitos sonoros"
+Cohesion: 0.40
+Nodes (4): Efeitos sonoros, Música do trailer, Sons do trailer (`tools/gen_trailer_sfx.py`), Sons sintetizados (`tools/gen_sfx.py`)
 
-### Community 295 - "TILE"
-Cohesion: 0.13
-Nodes (5): HAZARDS, TILE, Arrow, ArrowTrap, SpikeTrap
+### Community 295 - "ChallengeCorridor.js"
+Cohesion: 0.14
+Nodes (4): HAZARDS, Arrow, ArrowTrap, SpikeTrap
 
 ## Knowledge Gaps
-- **1564 isolated node(s):** `block-dangerous-git.sh script`, `FlyoverMode`, `__dir`, `START`, `clip` (+1559 more)
+- **1574 isolated node(s):** `block-dangerous-git.sh script`, `FlyoverMode`, `__dir`, `START`, `clip` (+1569 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **54 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **58 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Game` connect `Game` to `GameConfig.js`, `main.js`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **Why does `TILE` connect `TILE` to `mapLayout.js`, `clamp01`, `ModularGrid.js`, `TrailerStage.js`, `Player`, `FrenzyScene.js`, `test_safe_spawn.js`, `rushKit.js`, `GameConfig.js`, `arenaRender.js`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **Why does `RoomEditor` connect `RoomEditor` to `GameConfig.js`?**
+- **Why does `PressureButton` connect `PressureButton` to `mapLayout.js`, `clamp01`, `ChallengeCorridor.js`?**
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **Why does `RoomEditor` connect `RoomEditor` to `GameConfig.js`, `Renderer`?**
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Why does `TILE` connect `GameConfig.js` to `mapLayout.js`, `clamp01`, `ChallengeCorridor.js`, `Game.js`, `test_safe_spawn.js`, `IntroScene.js`?**
   _High betweenness centrality (0.011) - this node is a cross-community bridge._
 - **What connects `block-dangerous-git.sh script`, `FlyoverMode`, `__dir` to the rest of the system?**
-  _1564 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1574 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `RoomEditor` be split into smaller, more focused modules?**
-  _Cohesion score 0.07523939808481532 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07647058823529412 - nodes in this community are weakly interconnected._
 - **Should `mapLayout.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.06779661016949153 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
 - **Should `ModularGrid` be split into smaller, more focused modules?**
   _Cohesion score 0.09388335704125178 - nodes in this community are weakly interconnected._

@@ -1,7 +1,7 @@
 {
   "js/Game.js": {
-    "mtime": 1792366009.091705,
-    "ast_hash": "4ad9ddead2f83a6ba22378f2b318c17c",
+    "mtime": 1792369458.4325607,
+    "ast_hash": "7b8136cc704d002f8af19336350a160c",
     "semantic_hash": ""
   },
   "js/combat/CombatSystem.js": {
@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "js/core/AudioManager.js": {
-    "mtime": 1792365924.2290225,
-    "ast_hash": "af86dc9fba395579465c5d71e6ba3a67",
+    "mtime": 1792369330.6313365,
+    "ast_hash": "9f8e55ce8dc00c1890aeb0f9e74cced7",
     "semantic_hash": ""
   },
   "js/core/Dungeon.js": {
@@ -361,8 +361,8 @@
     "semantic_hash": "1ad77a09007eecfe72c27d6979372fb9"
   },
   "js/config/AudioConfig.js": {
-    "mtime": 1792365943.242631,
-    "ast_hash": "af5edb81cf9b3f39d159ad147429ba25",
+    "mtime": 1792369371.927109,
+    "ast_hash": "2b8618b115e9958fcb9a65c6d9ec41c5",
     "semantic_hash": ""
   },
   ".agents/skills/diagnosing-bugs/scripts/hitl-loop.template.sh": {
@@ -631,9 +631,9 @@
     "semantic_hash": "b554e54687d763a1ec65687865fb797b"
   },
   "js/core/GameLoop.js": {
-    "mtime": 1792292967.626299,
-    "ast_hash": "527be8aa17d40baa212ad09c01d0f6e9",
-    "semantic_hash": "527be8aa17d40baa212ad09c01d0f6e9"
+    "mtime": 1792369372.8581107,
+    "ast_hash": "2d080b90b5f9d2925b9be07cab74200a",
+    "semantic_hash": ""
   },
   "js/particles/FlameParticle.js": {
     "mtime": 1792344039.6531575,
@@ -1171,8 +1171,8 @@
     "semantic_hash": "5cde63fa575dcaff3398d76a9c3ff794"
   },
   "js/trailer/fx/FxParticles.js": {
-    "mtime": 1792367049.5828981,
-    "ast_hash": "514540bcef1f727fa809417b7c814b45",
+    "mtime": 1792369403.8096125,
+    "ast_hash": "5d3b1b1d98d20f9b35e7043f4fd1419a",
     "semantic_hash": ""
   },
   "js/trailer/fx/SawIris.js": {
@@ -1181,8 +1181,8 @@
     "semantic_hash": ""
   },
   "js/trailer/scenes/rush/BossWallShot.js": {
-    "mtime": 1792367050.6839843,
-    "ast_hash": "690035edaeaa76799a4b51f192ab953e",
+    "mtime": 1792369645.628999,
+    "ast_hash": "129a7e52bd243547d54dc85fc8b89dd8",
     "semantic_hash": ""
   },
   "js/ui/VtuberHud.js": {
@@ -3301,8 +3301,8 @@
     "semantic_hash": ""
   },
   ".kiro/steering/trailer.md": {
-    "mtime": 1792368334.558874,
-    "ast_hash": "b7beb1e93528d45d22e265688956f12a",
+    "mtime": 1792369877.6720839,
+    "ast_hash": "11952880f056467f260704e02a5952fe",
     "semantic_hash": ""
   },
   "agent/skills/caveman/README.md": {
@@ -3316,8 +3316,8 @@
     "semantic_hash": ""
   },
   "assets/audio/README.md": {
-    "mtime": 1792365952.325584,
-    "ast_hash": "4ee19e60052258cec2ab46f844c6163e",
+    "mtime": 1792369397.0673144,
+    "ast_hash": "e9a69ea0d55463f5795dcd187d77cfe6",
     "semantic_hash": ""
   },
   "data/skills/ask-matt/PHASE-BOUNDARIES.md": {
@@ -5141,8 +5141,8 @@
     "semantic_hash": ""
   },
   "tools/gen_sfx.py": {
-    "mtime": 1792365682.9621868,
-    "ast_hash": "4377225fabefe7ea17dac0a23c676f13",
+    "mtime": 1792369194.2800567,
+    "ast_hash": "195ad3f7fa185733e61ea43b3a035e44",
     "semantic_hash": ""
   },
   "assets/audio/ambience-dungeon.wav": {
@@ -5208,6 +5208,26 @@
   "assets/audio/circular-saw.mp3": {
     "mtime": 1792366255.2024012,
     "ast_hash": "b5b0f24b1bf002ae235e33a527e61598",
+    "semantic_hash": ""
+  },
+  "js/core/LoopVoice.js": {
+    "mtime": 1792369326.0159996,
+    "ast_hash": "48f9df891116313bf8779021531b9ee0",
+    "semantic_hash": ""
+  },
+  "js/weapons/SawMotorAudio.js": {
+    "mtime": 1792369364.2701554,
+    "ast_hash": "3b46039fb24cac3f8a5a818dc4ea05bb",
+    "semantic_hash": ""
+  },
+  "tests/test_saw_motor_audio.js": {
+    "mtime": 1792369420.5778813,
+    "ast_hash": "52d8d49f98dbc8f4d66520f2c7b3729b",
+    "semantic_hash": ""
+  },
+  "assets/audio/saw-motor-loop.wav": {
+    "mtime": 1792369286.2535484,
+    "ast_hash": "6f1d76f1bddb0017236c2ad4e1a5be20",
     "semantic_hash": ""
   }
 }

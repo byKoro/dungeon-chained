@@ -20,13 +20,49 @@ combate). Não é vídeo: é código roteirizado. Tudo em `js/trailer/`.
   - `?timer` mostra o cronômetro discreto (`12.4s · cena 3 ZigZagShot +1.2s`).
 - `trailer.html` + `js/trailer.js`: página de edição. `?cena=N` começa na cena N,
   botão `↻ REPETIR CENA`/Espaço/Enter repete, `window.trailer` exposto no
-  console. Não passa `showTimer` (o cronômetro só existe via `index.html?timer`).
+  console (também em index.html). `?timer` e `?mute` valem nas duas páginas.
   - Índices de `?cena=N` vão de 0 a 11 (listados no topo de `trailer.js`).
 - CSS do overlay: `css/style.css` (`body.trailer-mode`, `#trailer-overlay`,
   `.tr-skip`, `.tr-start`).
 
 Importante: crie o `TrailerPlayer` ANTES de `assets.whenReady()` — o stage
 registra no loader as folhas de expressão.
+
+## Som (js/trailer/audio/TrailerAudio.js)
+
+Web Audio próprio do trailer (não usa o AudioManager do jogo). `stage.audio`
+(null com `?mute` ou sem Web Audio). Arquivos: trilha `assets/audio/music/
+megasong.mp3` (Megasong, emmama, CC0) e sfx em `assets/audio/trailer/`
+(`tools/gen_trailer_sfx.py`) + sons do jogo (serra, passos, flechas...).
+
+- Tela "CLICK OR PRESS ANY KEY" (`TrailerPlayer._showGate/_drawGate`) quando o
+  navegador bloqueia o áudio: o trailer só começa depois do gesto (nunca mudo).
+  Mostra a logo no centro e o convite em `PixelFont` (escala da logo − 1,
+  cache em `_pixelText`); o gesto toca `playUi('uiConfirm')` (mesmo som dos
+  botões pixel art; não toca se o gesto foi num botão, que já tem som).
+  Esc continua pulando (main.js). `stop()` faz `audio.stopAll()` (o jogo assume).
+- Grafo: música → passa-baixa → humor → duck → master; sfx → passa-baixa da
+  câmera lenta → master; leitos (ambiente, rumble) → master; master →
+  compressor/limitador. Loops: música, ambiente, rumble, motor da serra, vento.
+- Dinâmica: `mood(db, lpHz, s)` por cena (`SCENE_MOOD` no TrailerPlayer) e por
+  beat nas cenas; `excite(k)` (abates/impactos sobem a música e abrem o filtro,
+  decai ~0.55/s); `duck(db, hold, rel)` nas pancadas grandes; câmera lenta
+  (`timeScale`) abafa a música e baixa o tom dos sfx (`noSlow` ignora).
+- `tick(dt, estado)` a cada quadro com `TrailerPlayer._audioState()` (câmera,
+  tremor, serra, jogadores, câmera lenta; arenas detectadas por `scene.arena`/
+  `scene.left`, palco pelo `stage.renderer`); a cena pode sobrescrever com
+  `audioState(base)`. Daí saem: vento da câmera (velocidade na TELA: pan +
+  zoom + giro), ronco pelo `screenShake` (+ `rumble` extra), motor da serra
+  (giro/escala), passos pela distância andada (pan pela tela).
+- Ganchos genéricos: `hookRendererAudio(renderer)` — tremor forte (≥16) vira
+  pancada/baque, `triggerZoomPunch` vira passagem de ar; `ActionArena.sfx(name,
+  x, y, o)` (pan pela tela da arena + `panBias` na tela dividida) já toca em
+  abates, gibs, snap/reconnect, spawn com intro, botes, flechas (disparo e
+  cravada), parede, tranco da corda, trombada, pouso e `slowmo`.
+- `play(name, {vol, rate, pan, jitter, cool, delay, noSlow})`: sorteia o
+  arquivo (sem repetir), varia tom/volume, cooldown por nome, teto de 28 vozes.
+  Blips de fala em `TrailerStage.tickSpeech` (40 letras/s, tom por personagem);
+  gotas do `BloodScreen` via `onSplat`.
 
 ## Arquitetura
 
@@ -95,7 +131,10 @@ opcionais `reset()`, `reachedEnd`, `cutIn = 'impact'`.
   usam múltiplos dele), `_camTo(x, y, zoom, k)` interpola sem clamp.
 - Efeitos: `_drawSawGlow` (azul-aço aditivo), névoa (`tickFog`, `_drawFog`,
   `drawFogOn(ctx,w,h,ph)` para outros canvas), `drawLetterbox`,
-  `drawTitleText(red, alpha)` ("DUNGEON CHAINED" / "acorrentados no calabouço").
+  `drawTitleLogo(red, alpha, cy)` (logo `assets/keyart/logo.png` de
+  `tools/gen_keyart.py`, escala inteira ~50% da largura, versão vermelha acima
+  de `red` 0.5 + tremor; usada no fim da intro, na cartela e na tela de
+  entrada e no plano final da cena 11).
 - Fala: `_speak(who, text, dur)` + `drawSpeech()` — balão de pedra pixel art
   (`ui/SpeechBubble.js`), máquina de escrever ~40 chars/s, pixel = 0.5× o do jogo.
 - `resetActors()` limpa atores/serra/sangue/shake/zoom ao (re)começar.
@@ -371,7 +410,7 @@ Faixa de jogo em Y: `Y_TOP 175 … Y_BOT 520`, meio `Y_MID 345`.
 - Plano final em TELA (`_drawLeap`, tempo real `leapLT`): fundo em câmera lenta
   0.12 até congelar em `FREEZE_AT 2.0`; os dois crescem de 10% a 42% da altura
   (frame de passada, `furia`, inclinados para fora), corda desenhada no espaço
-  escalado, serra no meio girando; título em `TITLE_AT 1.9` (com sombra);
+  escalado, serra no meio girando; logo em `TITLE_AT 1.9` (sombra no tamanho dela);
   brasas de tela seguem em loop.
 
 ## Convenções e armadilhas

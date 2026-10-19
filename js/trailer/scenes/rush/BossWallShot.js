@@ -1150,19 +1150,24 @@ export class BossWallShot extends RushShot {
 
         if (lt > TITLE_AT) {
             const ta = easeInOut(clamp01((lt - TITLE_AT) / 0.5));
-            // Sombra suave atrás do título (legível sobre a explosão).
+            // Sombra suave atrás da logo (legível sobre a explosão), no
+            // tamanho da logo desenhada.
+            const logo = this.stage.logo, ls = this.stage.logoScale();
+            const lw = (logo?.naturalWidth || 113) * (ls || 4);
+            const lh = (logo?.naturalHeight || 41) * (ls || 4);
+            const R = lw * 0.7;
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.translate(W / 2, H / 2 + 6);
-            ctx.scale(1, 0.32);
-            const dg = ctx.createRadialGradient(0, 0, 0, 0, 0, 260);
+            ctx.scale(1, (lh * 1.1) / R);
+            const dg = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
             dg.addColorStop(0, `rgba(10, 2, 4, ${0.7 * ta})`);
             dg.addColorStop(0.6, `rgba(10, 2, 4, ${0.4 * ta})`);
             dg.addColorStop(1, 'rgba(10, 2, 4, 0)');
             ctx.fillStyle = dg;
-            ctx.fillRect(-260, -260, 520, 520);
+            ctx.fillRect(-R, -R, R * 2, R * 2);
             ctx.restore();
-            this.stage.drawTitleText(0, ta);
+            this.stage.drawTitleLogo(0, ta);
         }
     }
 }

@@ -572,7 +572,8 @@ export class IntroScene {
         ctx.fillStyle = `rgba(3, 2, 8, ${a})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.restore();
-        if (this.beatIndex > last) this.stage.drawTitleText();
+        // Último quadro = primeiro da cartela (TitleBloodScene): mesma logo.
+        if (this.beatIndex > last) this.stage.drawTitleLogo();
     }
 
     // Luzes do quadro (jogadores, tochas, serra), escurecidas por SPOT_DIM.
