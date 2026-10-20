@@ -54,8 +54,11 @@ export class Player extends Entity {
 
         // --- Queda em buraco/abismo ---
         // Ao pisar num tile de buraco (floor === -1), o jogador cai: encolhe e
-        // afunda por `fallDuration` frames e então morre (perde TODAS as vidas).
+        // afunda por `fallDuration` frames. Ao fim da animação `fallComplete`
+        // liga e o Game decide: renasce na entrada da sala (ver respawnAt) ou,
+        // sem vidas sobrando, fim de jogo.
         this.falling = false;
+        this.fallComplete = false;
         this.fallTimer = 0;
         this.fallDuration = 34;   // ~0.57s de animação de queda
         this.fallX = 0;           // centro do tile em que caiu (trava a posição)
@@ -63,14 +66,27 @@ export class Player extends Entity {
     }
 
     // Dispara a queda no buraco (uma vez). Trava o jogador no centro do tile e
-    // zera a velocidade; a morte é concluída ao fim da animação (ver update).
+    // zera a velocidade; o desfecho vem ao fim da animação (ver update).
     startFalling(tileCenterX, tileCenterY) {
         if (this.falling) return;
         this.falling = true;
+        this.fallComplete = false;
         this.fallTimer = this.fallDuration;
         this.fallX = tileCenterX;
         this.fallY = tileCenterY;
         this.vx = 0; this.vy = 0;
+    }
+
+    // Renasce após cair no buraco: sai do estado de queda, reaparece em (x, y)
+    // parado e fica invulnerável por `invulnFrames` (pisca, como após dano).
+    respawnAt(x, y, invulnFrames = 0) {
+        this.falling = false;
+        this.fallComplete = false;
+        this.fallTimer = 0;
+        this.holeGrace = 0;
+        this.x = x; this.y = y;
+        this.vx = 0; this.vy = 0;
+        this.invulnerableTimer = Math.max(this.invulnerableTimer, invulnFrames);
     }
 
     // Seleciona a folha e o frame corretos conforme o estado atual do player.
@@ -153,7 +169,8 @@ export class Player extends Entity {
     }
 
     takeDamage(sourceX, sourceY) {
-        if (this.invulnerableTimer > 0) return false;
+        // Caindo no buraco: a queda já cobra seu preço, golpes não somam.
+        if (this.falling || this.invulnerableTimer > 0) return false;
         
         this.lives--;
         this.invulnerableTimer = 65;
@@ -175,7 +192,7 @@ export class Player extends Entity {
             this.vx = 0; this.vy = 0;
             if (this.fallTimer > 0) {
                 this.fallTimer--;
-                if (this.fallTimer === 0) this.lives = 0; // morte instantânea
+                if (this.fallTimer === 0) this.fallComplete = true; // Game resolve (renasce/morre)
             }
             return;
         }

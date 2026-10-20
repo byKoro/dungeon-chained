@@ -18,6 +18,8 @@
  *     câmera, motor, passos e ronco contínuos — nada de silêncio).
  */
 
+import { MasterVolume } from '../../core/MasterVolume.js';
+
 const A = 'assets/audio/', T = 'assets/audio/trailer/';
 const nums = (base, n, ext = 'wav') => Array.from({ length: n }, (_, i) => `${base}-0${i + 1}.${ext}`);
 
@@ -69,9 +71,33 @@ export class TrailerAudio {
     }
 
     get available() { return !!this.ctx; }
-    get running() { return !!this.ctx && this.ctx.state === 'running'; }
+    get running() { return !!this.ctx && (this.ctx.state === 'running' || this.paused); }
     get now() { return this.ctx ? this.ctx.currentTime : 0; }
     unlock() { return this.ctx?.resume?.() ?? Promise.resolve(); }
+
+    /**
+     * Pausa: abafa e some em ~0.15 s e então congela o relógio de áudio (a
+     * trilha e os sons em curso continuam exatamente de onde pararam).
+     */
+    pause() {
+        if (!this.ctx || this.paused) return;
+        this.paused = true;
+        const g = this.pauseGain.gain, t = this.ctx.currentTime;
+        g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
+        g.linearRampToValueAtTime(0.0001, t + 0.15);
+        clearTimeout(this._pauseTimer);
+        this._pauseTimer = setTimeout(() => { if (this.paused) this.ctx.suspend?.(); }, 170);
+    }
+    resume() {
+        if (!this.ctx || !this.paused) return;
+        this.paused = false;
+        clearTimeout(this._pauseTimer);
+        this.ctx.resume?.().then(() => {
+            const g = this.pauseGain.gain, t = this.ctx.currentTime;
+            g.cancelScheduledValues(t); g.setValueAtTime(Math.max(0.0001, g.value), t);
+            g.linearRampToValueAtTime(1, t + 0.25);
+        });
+    }
 
     // ---- Grafo ----
     _build() {
@@ -79,8 +105,13 @@ export class TrailerAudio {
         this.comp = c.createDynamicsCompressor();
         this.comp.threshold.value = -10; this.comp.knee.value = 6; this.comp.ratio.value = 10;
         this.comp.attack.value = 0.003; this.comp.release.value = 0.25;
-        this.master = c.createGain(); this.master.gain.value = 0.9;
-        this.master.connect(this.comp); this.comp.connect(c.destination);
+        this.master = c.createGain(); this.master.gain.value = 0.8;    // headroom antes do limitador
+        // Volume geral do jogador (slider da pausa) e o "fade" da pausa, depois do limitador.
+        this.user = c.createGain(); this.user.gain.value = MasterVolume.gain();
+        this.pauseGain = c.createGain(); this.pauseGain.gain.value = 1;
+        this.master.connect(this.comp); this.comp.connect(this.user);
+        this.user.connect(this.pauseGain); this.pauseGain.connect(c.destination);
+        MasterVolume.subscribe(() => this.user.gain.setTargetAtTime(MasterVolume.gain(), c.currentTime, 0.03));
 
         this.musicLP = c.createBiquadFilter(); this.musicLP.type = 'lowpass'; this.musicLP.frequency.value = 20000; this.musicLP.Q.value = 0.5;
         this.musicGain = c.createGain(); this.musicGain.gain.value = 0;

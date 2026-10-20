@@ -56,6 +56,11 @@ export class TrailerStage {
         this.bluePlayer = this.p2;
         this._loadExpressions();
 
+        // Logo do jogo (mesma da keyart, gerada por tools/gen_keyart.py):
+        // resolução nativa, ampliada em escala INTEIRA sem suavizar.
+        this.logo = assets.get('logo') || assets.load('logo', 'assets/keyart/logo.png');
+        this._logoRed = null;   // versão tingida de vermelho (criada sob demanda)
+
         this.saw = new SawWeapon(assets.saw, assets.cable);
 
         // Camada de sangue em TELA (cartela -> frenesi). Desenhada pelo player
@@ -229,22 +234,55 @@ export class TrailerStage {
         ctx.restore();
     }
 
-    // Nome do jogo no centro. `red` 0..1 tinge de vermelho e treme.
-    drawTitleText(red = 0, alpha = 1) {
+    // Escala inteira da logo: ~50% da largura e no máximo ~40% da altura.
+    logoScale() {
+        const img = this.logo;
+        if (!img?.naturalWidth) return 0;
+        const { width: W, height: H } = this.canvas;
+        return Math.max(1, Math.floor(Math.min(W * 0.5 / img.naturalWidth, H * 0.4 / img.naturalHeight)));
+    }
+
+    // Logo do jogo centrada em (W/2, cy). `red` 0..1 troca para a versão
+    // vermelha (acima de 0.5) e treme; posição sempre em px inteiros.
+    // Retorna o retângulo desenhado (ou null se a imagem não carregou).
+    drawTitleLogo(red = 0, alpha = 1, cy = this.canvas.height / 2) {
         const { ctx, canvas } = this;
-        const jx = red > 0 ? (Math.random() - 0.5) * 6 * red : 0;
-        const jy = red > 0 ? (Math.random() - 0.5) * 4 * red : 0;
+        const img = this.logo;
+        const s = this.logoScale();
+        if (!s) return null;
+        const w = img.naturalWidth * s, h = img.naturalHeight * s;
+        const jx = red > 0 ? Math.round((Math.random() - 0.5) * 6 * red) : 0;
+        const jy = red > 0 ? Math.round((Math.random() - 0.5) * 4 * red) : 0;
+        const x = Math.round((canvas.width - w) / 2) + jx;
+        const y = Math.round(cy - h / 2) + jy;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.imageSmoothingEnabled = false;
         ctx.globalAlpha = alpha;
-        ctx.textAlign = 'center';
-        ctx.fillStyle = red > 0.5 ? '#ff3344' : '#fffffe';
-        ctx.font = 'bold 42px monospace';
-        ctx.fillText('DUNGEON CHAINED', canvas.width / 2 + jx, canvas.height / 2 - 6 + jy);
-        ctx.fillStyle = red > 0.5 ? '#b3122a' : '#a7a9be';
-        ctx.font = '16px monospace';
-        ctx.fillText('chained in the dungeon', canvas.width / 2 + jx * 0.5, canvas.height / 2 + 26 + jy * 0.5);
+        ctx.drawImage(red > 0.5 ? this._redLogo() : img, x, y, w, h);
         ctx.restore();
+        return { x, y, w, h };
+    }
+
+    // Versão vermelha da logo (mesmos pixels, rampa de sangue pela luminância).
+    _redLogo() {
+        if (this._logoRed) return this._logoRed;
+        const img = this.logo;
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0);
+        const data = g.getImageData(0, 0, c.width, c.height);
+        const d = data.data;
+        for (let i = 0; i < d.length; i += 4) {
+            const l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            d[i] = Math.min(255, 40 + l * 1.05);
+            d[i + 1] = l * 0.2;
+            d[i + 2] = l * 0.27;
+        }
+        g.putImageData(data, 0, 0);
+        return (this._logoRed = c);
     }
 
     // ---- Balão de fala ----

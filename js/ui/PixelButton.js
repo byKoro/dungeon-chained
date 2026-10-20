@@ -15,7 +15,7 @@
 import { drawText, measureText } from './PixelFont.js';
 import { playUi } from './UiSound.js';
 
-const FRAME = {
+export const FRAME = {
     outline: '#0b0910',
     stone: '#4a4458',
     stoneLight: '#6e6684',
@@ -28,7 +28,7 @@ const FRAME = {
 };
 
 // Paletas da face (normal / destaque) + texto.
-const FACES = {
+export const FACES = {
     red: {
         base: '#8a1424', baseHover: '#a3192b',
         light: '#c22a3c', lightHover: '#e0384b',
@@ -53,10 +53,45 @@ const FACES = {
     },
 };
 
-const PAD_X = 7;   // respiro lateral do texto dentro da face
-const FACE_H = 11; // altura da face (texto de 5 px + respiro)
-const LIP = 2;     // "espessura" da face (some quando apertada)
-const DRIPS = 4;   // linhas extras abaixo para as gotas de sangue
+export const PAD_X = 7;   // respiro lateral do texto dentro da face
+export const FACE_H = 11; // altura da face (texto de 5 px + respiro)
+export const LIP = 2;     // "espessura" da face (some quando apertada)
+export const DRIPS = 4;   // linhas extras abaixo para as gotas de sangue
+
+/** Largura/altura (px de arte) do corpo de um controle com texto de largura T. */
+export function controlSize(T) {
+    return { W: T + PAD_X * 2 + 6, H: 1 + 2 + FACE_H + LIP + 2 + 1 };
+}
+
+/**
+ * Sombra + moldura de pedra chanfrada (bisel, juntas de tijolo, rebites) +
+ * poço escuro — a base comum dos botões e do slider.
+ */
+export function drawStoneFrame(ctx, W, H) {
+    const px = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
+    const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+    const chamfer = (x, y, w, h, c) => { rect(x + 1, y, w - 2, h, c); rect(x, y + 1, w, h - 2, c); };
+    ctx.globalAlpha = 0.5;
+    chamfer(1, 1, W, H, '#000');
+    ctx.globalAlpha = 1;
+    chamfer(0, 0, W, H, FRAME.outline);
+    chamfer(1, 1, W - 2, H - 2, FRAME.stone);
+    rect(2, 1, W - 4, 1, FRAME.stoneLight);
+    rect(1, 2, 1, H - 4, FRAME.stoneLight);
+    rect(2, H - 2, W - 4, 1, FRAME.stoneDark);
+    rect(W - 2, 2, 1, H - 4, FRAME.stoneDark);
+    for (let x = 8, i = 0; x < W - 7; x += 9 + (i++ % 3)) {
+        px(x, 1, FRAME.seam);
+        px(x + 1, 1, FRAME.stoneLight);
+    }
+    for (let x = 12, i = 0; x < W - 7; x += 8 + (i++ % 4)) px(x, H - 2, FRAME.seam);
+    rect(3, 3, W - 6, FACE_H + LIP, FRAME.well);
+    const rivet = (x, y) => {
+        px(x, y, FRAME.ironLight); px(x + 1, y, FRAME.iron);
+        px(x, y + 1, FRAME.iron); px(x + 1, y + 1, FRAME.ironDark);
+    };
+    rivet(1, 1); rivet(W - 3, 1); rivet(1, H - 3); rivet(W - 3, H - 3);
+}
 
 /** Escala inteira (px de tela por px de arte) a partir da altura da janela. */
 export function pixelScale() {
@@ -76,41 +111,20 @@ export function renderPixelButton(text, state = 'idle', canvas = document.create
     const F = FACES[opts.face] || FACES.red;
     const textW = measureText(text);
     const T = Math.max(textW, opts.minTextW || 0);
-    const W = T + PAD_X * 2 + 6;               // contorno(1) + pedra(2) por lado
-    const H = 1 + 2 + FACE_H + LIP + 2 + 1;
+    const { W, H } = controlSize(T);           // contorno(1) + pedra(2) por lado
     canvas.width = W + 1;                       // +1 da sombra projetada
     canvas.height = H + DRIPS + 1;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const px = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
     const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-    const chamfer = (x, y, w, h, c) => { rect(x + 1, y, w - 2, h, c); rect(x, y + 1, w, h - 2, c); };
 
     const hover = state === 'hover';
     const pressed = state === 'pressed';
 
-    // --- Sombra projetada ---
-    ctx.globalAlpha = 0.5;
-    chamfer(1, 1, W, H, '#000');
-    ctx.globalAlpha = 1;
-
-    // --- Moldura de pedra chanfrada com bisel ---
-    chamfer(0, 0, W, H, FRAME.outline);
-    chamfer(1, 1, W - 2, H - 2, FRAME.stone);
-    rect(2, 1, W - 4, 1, FRAME.stoneLight);
-    rect(1, 2, 1, H - 4, FRAME.stoneLight);
-    rect(2, H - 2, W - 4, 1, FRAME.stoneDark);
-    rect(W - 2, 2, 1, H - 4, FRAME.stoneDark);
-    // Juntas dos tijolos (topo/base).
-    for (let x = 8, i = 0; x < W - 7; x += 9 + (i++ % 3)) {
-        px(x, 1, FRAME.seam);
-        px(x + 1, 1, FRAME.stoneLight);
-    }
-    for (let x = 12, i = 0; x < W - 7; x += 8 + (i++ % 4)) px(x, H - 2, FRAME.seam);
-
-    // --- Poço escuro onde a face assenta ---
-    const x0 = 3, y0 = 3, w = W - 6, h = FACE_H + LIP;
-    rect(x0, y0, w, h, FRAME.well);
+    // --- Sombra, moldura de pedra, rebites e poço (comum ao slider) ---
+    drawStoneFrame(ctx, W, H);
+    const x0 = 3, y0 = 3, w = W - 6;
 
     // --- Face (afunda LIP px quando apertada) ---
     const fy = pressed ? y0 + LIP : y0;
@@ -125,13 +139,6 @@ export function renderPixelButton(text, state = 'idle', canvas = document.create
     px(x0 + 2, fy + 1, F.spec);
     px(x0 + 1, fy + 2, F.spec);
     if (!pressed) rect(x0, fy + FACE_H, w, LIP, F.lip); // espessura da face
-
-    // --- Rebites de ferro nos 4 cantos da moldura ---
-    const rivet = (x, y) => {
-        px(x, y, FRAME.ironLight); px(x + 1, y, FRAME.iron);
-        px(x, y + 1, FRAME.iron); px(x + 1, y + 1, FRAME.ironDark);
-    };
-    rivet(1, 1); rivet(W - 3, 1); rivet(1, H - 3); rivet(W - 3, H - 3);
 
     // --- Texto (PixelFont) com sombra de 1 px, centrado na face ---
     const tx = x0 + Math.floor((w - textW) / 2);

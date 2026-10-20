@@ -25,6 +25,9 @@ import { ButtonDoorShot } from './scenes/rush/ButtonDoorShot.js';
 import { GiantSawShot } from './scenes/rush/GiantSawShot.js';
 import { BossWallShot } from './scenes/rush/BossWallShot.js';
 import { TrailerAudio } from './audio/TrailerAudio.js';
+import { PauseScreen } from '../ui/PauseScreen.js';
+import { playUi, preloadUi } from '../ui/UiSound.js';
+import { drawText, measureText } from '../ui/PixelFont.js';
 
 // Humor da música ao ENTRAR em cada cena: [dB, passa-baixa Hz, transição s].
 // As cenas ajustam por beat (stage.audio.mood) — isto é só o ponto de partida.
@@ -60,6 +63,8 @@ export class TrailerPlayer {
      * @param {() => void} [opts.onEnd]  chamado UMA vez quando o trailer chega
      *   ao fim (a última cena segue em loop por baixo).
      * @param {boolean} [opts.showTimer] mostra o cronômetro discreto.
+     * @param {() => void} [opts.onBegin] chamado UMA vez quando o trailer
+     *   começa de fato (depois da tela "clique para começar", se houver).
      */
     constructor(canvas, assets, opts = {}) {
         this.stage = new TrailerStage(canvas, assets);
@@ -69,7 +74,17 @@ export class TrailerPlayer {
         this.stage.hookAudio?.();
         this.scenes = SCENES.map(Scene => new Scene(this.stage));
         this._gate = null;
+        this._paused = false;
+        this.pauseScreen = null;      // criada na 1ª pausa (#trailer-pause: RESUME + VOLUME)
+        this._padPrev = {};
+        // Trocou de aba/janela: pausa (não perde o trailer nem toca no escuro).
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && this.running && !this._gate) this.setPaused(true);
+            });
+        }
         this.onEnd = opts.onEnd || null;
+        this.onBegin = opts.onBegin || null;
         this.showTimer = !!opts.showTimer;
         this.index = 0;
         this.running = false;
@@ -102,11 +117,15 @@ export class TrailerPlayer {
         this.stage.attach();
         if (this._gate) { this._gate.from = from; return; }
         const gate = this._gate = { from, t: 0, loaded: false };
+        preloadUi();   // o som de confirmação já sai sem atraso no 1º gesto
         this.stage.audio.ready.then(() => { gate.loaded = true; });
         const go = (e) => {
-            if (e?.key === 'Escape') return;            // Esc = pular (main.js)
+            if (e?.key === 'Escape') return;            // Esc = pausa (não conta como gesto)
             window.removeEventListener('pointerdown', go, true);
             window.removeEventListener('keydown', go, true);
+            // Confirmação com o mesmo "uiConfirm" dos botões pixel art. Se o
+            // gesto foi num botão (ex.: SKIP), ele mesmo toca: não duplica.
+            if (!e?.target?.closest?.('.pixel-btn, button')) playUi('uiConfirm');
             this.stage.audio.unlock().then(() => this.stage.audio.ready).then(() => {
                 if (this._gate !== gate) return;
                 this._gate = null;
@@ -126,7 +145,67 @@ export class TrailerPlayer {
         }
     }
 
+    // ---- Pausa (Esc / START do controle / trocar de aba) ----
+    get paused() { return this._paused; }
+
+    /**
+     * Congela o trailer (quadro parado, áudio abafa e para exatamente onde
+     * estava) e mostra a tela de pausa: RESUME + slider de volume geral.
+     * `silent`: fecha sem o uiClose (o botão já tocou o uiConfirm).
+     */
+    setPaused(paused, { silent = false } = {}) {
+        paused = !!paused;
+        if (paused === this._paused) return;
+        if (paused && (this._gate || !this.running)) return;
+        this._paused = paused;
+        if (!this.pauseScreen && typeof document !== 'undefined') {
+            this.pauseScreen = new PauseScreen({
+                rootId: 'trailer-pause',
+                onResume: () => this.setPaused(false, { silent: true })
+            });
+        }
+        if (paused) {
+            this.stage.audio?.pause();
+            this.pauseScreen?.show();
+            playUi('uiOpen');
+        } else {
+            this.pauseScreen?.hide();
+            this.stage.audio?.resume();
+            if (!silent) playUi('uiClose');
+            this._last = performance.now();      // sem salto de dt ao voltar
+        }
+    }
+    togglePause() { this.setPaused(!this._paused); }
+
+    // Controle: START pausa/retoma; na pausa, d-pad/analógico navegam e
+    // mexem no volume, A confirma, B retoma (mesmo esquema do jogo).
+    _pollPad() {
+        if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
+        const now = { start: false, a: false, b: false, up: false, down: false, left: false, right: false };
+        for (const pad of navigator.getGamepads() || []) {
+            if (!pad) continue;
+            const btn = (i) => !!pad.buttons?.[i]?.pressed;
+            const ax = pad.axes?.[0] || 0, ay = pad.axes?.[1] || 0;
+            now.start ||= btn(9); now.a ||= btn(0); now.b ||= btn(1);
+            now.up ||= btn(12) || ay < -0.6; now.down ||= btn(13) || ay > 0.6;
+            now.left ||= btn(14) || ax < -0.6; now.right ||= btn(15) || ax > 0.6;
+        }
+        const prev = this._padPrev;
+        const hit = (k) => now[k] && !prev[k];
+        this._padPrev = now;
+        if (hit('start')) { this.togglePause(); return; }
+        if (!this._paused || !this.pauseScreen) return;
+        const ps = this.pauseScreen;
+        if (hit('up')) ps.move(-1);
+        else if (hit('down')) ps.move(1);
+        else if (hit('left')) ps.adjust(-1);
+        else if (hit('right')) ps.adjust(1);
+        else if (hit('a')) ps.confirm();
+        else if (hit('b')) this.setPaused(false);
+    }
+
     _begin(from = 0) {
+        if (this._paused) this.setPaused(false, { silent: true });
         this.stage.attach();
         this.stage.resetActors();
         this.scenes.forEach(s => s.reset?.());
@@ -143,6 +222,8 @@ export class TrailerPlayer {
             this._last = performance.now();
             this._raf = requestAnimationFrame(this._frame);
         }
+        // 1º começo de verdade (ex.: main.js agenda o SKIP a partir daqui).
+        if (this.onBegin) { const cb = this.onBegin; this.onBegin = null; cb(); }
     }
 
     /** Para o loop e solta os listeners (antes de o jogo assumir o canvas). */
@@ -151,6 +232,7 @@ export class TrailerPlayer {
         cancelAnimationFrame(this._raf);
         this._gate?.cancel?.();
         this._gate = null;
+        if (this._paused) { this._paused = false; this.pauseScreen?.hide(); }
         this.stage.audio?.stopAll(0.6);
         this.stage.detach();
         const ctx = this.stage.ctx;
@@ -163,7 +245,9 @@ export class TrailerPlayer {
         if (!this.running) return;
         const dt = Math.min(0.05, (now - this._last) / 1000); // dt limitado
         this._last = now;
+        if (!this._gate) this._pollPad();
         if (this._gate) { this._gate.t += dt; this._drawGate(); }
+        else if (this._paused) { /* quadro congelado sob a tela de pausa */ }
         else { this.update(dt); this.render(); }
         this._raf = requestAnimationFrame(this._frame);
     }
@@ -177,16 +261,38 @@ export class TrailerPlayer {
         ctx.fillStyle = '#05030a';
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
-        this.stage.drawTitleText(0, Math.min(1, g.t / 0.6));
+        // Logo do jogo no centro; o convite fica logo abaixo dela.
+        const logo = this.stage.drawTitleLogo(0, Math.min(1, g.t / 0.6), H / 2 - 16);
+        const promptY = logo ? logo.y + logo.h + 36 : H / 2 + 64;
+        // Convite na fonte pixel da UI (PixelFont), ampliado em escala
+        // inteira um passo abaixo da logo (fica um pouco mais estreito que ela).
+        const text = g.loaded ? '▶ CLICK OR PRESS ANY KEY  (sound on)' : 'loading sound…';
+        const art = this._pixelText(text);
+        const s = Math.max(2, (this.stage.logoScale() || 3) - 1);
+        const blink = 0.55 + 0.45 * Math.sin(g.t * 4);
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.textAlign = 'center';
-        ctx.font = '16px monospace';
-        const blink = 0.55 + 0.45 * Math.sin(g.t * 4);
-        ctx.fillStyle = `rgba(255, 214, 140, ${g.loaded ? blink : 0.4})`;
-        ctx.fillText(g.loaded ? '▶  CLICK OR PRESS ANY KEY  (sound on)' : 'loading sound…', W / 2, H / 2 + 74);
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = g.loaded ? blink : 0.4;
+        ctx.drawImage(art, Math.round((W - art.width * s) / 2), Math.round(promptY), art.width * s, art.height * s);
         ctx.restore();
         this.stage.drawLetterbox();
+    }
+
+    // Texto em PixelFont num canvas em resolução de arte (com sombra de 1px),
+    // guardado em cache por texto.
+    _pixelText(text) {
+        this._pixelTextCache ??= new Map();
+        let c = this._pixelTextCache.get(text);
+        if (c) return c;
+        c = document.createElement('canvas');
+        c.width = measureText(text) + 1;
+        c.height = 7;                  // maiúsculas (5) + descendente + sombra
+        const g = c.getContext('2d');
+        drawText(g, text, 0, 1, '#3a2408');   // sombra (1px abaixo)
+        drawText(g, text, 0, 0, '#ffd68c');
+        this._pixelTextCache.set(text, c);
+        return c;
     }
 
     // Humor da música ao entrar na cena atual.

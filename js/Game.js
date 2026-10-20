@@ -28,6 +28,7 @@ import { VtuberHud } from './ui/VtuberHud.js';
 import { DeathScreen } from './ui/DeathScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { setUiAudio, playUi } from './ui/UiSound.js';
+import { MasterVolume } from './core/MasterVolume.js';
 import { HeartPickup } from './entities/HeartPickup.js';
 import { playerConfigs } from './config/EntityConfig.js';
 
@@ -37,7 +38,7 @@ import {
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
-    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO
+    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL
 } from './config/GameConfig.js';
 
 /**
@@ -78,7 +79,7 @@ export class Game {
         });
         // Tela de morte (DOM): véu de sangue + botão REINICIAR em pixel art.
         this.deathScreen = new DeathScreen({ onRestart: () => this.restart() });
-        // Tela de pausa (DOM): véu de pedra + RESUME / RESTART em pixel art.
+        // Tela de pausa (DOM): véu de pedra + RESUME / RESTART / VOLUME em pixel art.
         this.pauseScreen = new PauseScreen({
             // O próprio botão já toca "uiConfirm": fecha a pausa sem o uiClose
             // por cima (um som por ação). O som de mover o foco é do PixelButton.
@@ -117,6 +118,10 @@ export class Game {
         // Áudio: gerenciado centralmente por AudioConfig. Permite alterar sons,
         // volumes por caso de uso, pitch e volume master.
         this.audio = new AudioManager(AUDIO_CONFIG);
+        // Volume GERAL do jogador (slider da pausa, compartilhado com o
+        // trailer): multiplica o master de mixagem da config.
+        const mixMaster = this.audio.getMasterVolume();
+        this._unsubVolume = MasterVolume.subscribe(() => this.audio.setMasterVolume(mixMaster * MasterVolume.gain()));
         // Botões de interface passam a usar o mesmo gerenciador (master/mudo).
         setUiAudio(this.audio);
         if (typeof window !== "undefined") {
@@ -334,16 +339,19 @@ export class Game {
     _pollMenuPad() {
         if (typeof navigator === "undefined" || !navigator.getGamepads) return;
         const pads = navigator.getGamepads() || [];
-        const now = { start: false, a: false, b: false, up: false, down: false };
+        const now = { start: false, a: false, b: false, up: false, down: false, left: false, right: false };
         for (const pad of pads) {
             if (!pad) continue;
             const btn = (i) => this.input.isButtonPressed(pad, i);
+            const ax = pad.axes?.[0] || 0;
             const ay = pad.axes?.[1] || 0;
             now.start ||= btn(9);
             now.a ||= btn(0);
             now.b ||= btn(1);
             now.up ||= btn(12) || ay < -0.6;
             now.down ||= btn(13) || ay > 0.6;
+            now.left ||= btn(14) || ax < -0.6;
+            now.right ||= btn(15) || ax > 0.6;
         }
         const prev = this._padPrev;
         const hit = (k) => now[k] && !prev[k];
@@ -363,6 +371,8 @@ export class Game {
         if (!this.gameLoop.paused) return;
         if (hit("up")) this.pauseScreen.move(-1);
         else if (hit("down")) this.pauseScreen.move(1);
+        else if (hit("left")) this.pauseScreen.adjust(-1);     // volume (slider em foco)
+        else if (hit("right")) this.pauseScreen.adjust(1);
         else if (hit("a")) this.pauseScreen.confirm();
         else if (hit("b")) this.setPaused(false);
     }
@@ -421,6 +431,7 @@ export class Game {
             this.tiles.ensureSafeSpawn(this.p1, rect);
             this.tiles.ensureSafeSpawn(this.p2, rect);
         }
+        this._rememberEntrySpawns();
 
         const center = this.rooms.cellCenter();
         this.renderer.camX = center.x;
@@ -446,6 +457,7 @@ export class Game {
 
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
+        this._rememberEntrySpawns();
 
         // Saíram DESARMADOS: a lâmina largada ficaria presa na sala anterior
         // (coordenadas de outra célula) e nunca mais poderia ser recolhida.
@@ -463,6 +475,56 @@ export class Game {
 
         // Retratos da HUD reagem à sala nova (combate = espanto -> raiva).
         this.hud.onRoomEnter(combat);
+    }
+
+    // Guarda onde cada jogador entrou na sala atual (tile à frente da porta,
+    // ou o spawn inicial). É ali que ele renasce se cair num buraco.
+    _rememberEntrySpawns() {
+        this._entrySpawns = new Map([
+            [this.p1, { x: this.p1.x, y: this.p1.y }],
+            [this.p2, { x: this.p2.x, y: this.p2.y }]
+        ]);
+    }
+
+    // Primeiro quadro da queda: se a corrente estava conectada, ela solta e a
+    // serra cai num ponto SEGURO (longe da beirada) alcançável pelo jogador
+    // que ficou de pé e pela entrada onde o caído vai renascer.
+    _dropSawOnFall() {
+        const { p1, p2 } = this;
+        const seeds = [p1, p2].filter(p => !p.falling);
+        for (const p of [p1, p2]) {
+            if (p.falling) seeds.push(this._entrySpawns?.get(p) ?? p);
+        }
+        const dropped = this.chain.forceDrop(p1, p2,
+            (x, y) => this.tiles.safeDropPoint(x, y, seeds));
+        if (!dropped) return;
+        // Mesmo feedback da ruptura, sem o shake grande (a queda já tem o seu).
+        this.audio.play("sawSnap");
+        this.sawMotor?.onSnap();
+        this._sawLandPending = true;
+        const r = this.chain.weapon?.discRadius ?? 24;
+        const w = this.chain.weapon;
+        if (w?.dropped) this.particleSystem.triggerSparkBurst(w.dropX, w.dropY, r, 8, 1);
+        this.renderer.triggerShake(6);
+    }
+
+    // Fim da animação de queda: perde HOLE_FALL.livesLost corações e renasce
+    // na entrada por onde entrou na sala. Sem vidas sobrando fica "no fundo"
+    // (lives = 0) e o fim de jogo é tratado no fim do passo.
+    _resolveFall(p) {
+        if (!p.falling || !p.fallComplete) return;
+        p.lives = Math.max(0, p.lives - (HOLE_FALL.livesLost ?? 1));
+        if (p.lives <= 0) { p.fallComplete = false; return; }
+
+        const spot = this._entrySpawns?.get(p) ?? this.rooms.cellCenter();
+        p.respawnAt(spot.x, spot.y, HOLE_FALL.respawnInvulnFrames ?? 0);
+        this.tiles.ensureSafeSpawn(p, this.rooms.cellRect());
+        p._fallSeen = false;
+        // Feedback do coração perdido (flash) sem o som de golpe: a queda já
+        // teve o seu. Atualiza o "visto" para o detector de dano não repetir.
+        this.screenGore.triggerFlash();
+        p._livesSeen = p.lives;
+        this.particleSystem.triggerFlash(p.x, p.y, 10, 0.8);
     }
 
     // Instancia os inimigos autorais pendentes da sala atual. Com a intro
@@ -730,6 +792,9 @@ export class Game {
 
         p1.update(this.input, this.arenaBounds);
         p2.update(this.input, this.arenaBounds);
+        // Quem terminou de cair renasce na entrada (ou fica sem vidas).
+        this._resolveFall(p1);
+        this._resolveFall(p2);
 
         this.effects.processPlayer(p1);
         this.effects.processPlayer(p2);
@@ -881,15 +946,17 @@ export class Game {
         rooms.clampPlayer(p2, this.arenaBounds, doors, canPass);
 
         // Queda em buracos/abismos COM RESISTÊNCIA (HOLE_FALL): na beirada o
-        // jogador é freado e empurrado de volta ao piso; só cai (e morre) se
-        // insistir além dela por alguns frames. A posição já está confinada acima.
+        // jogador é freado e empurrado de volta ao piso; só cai se insistir além
+        // dela por alguns frames. A posição já está confinada acima.
         this.tiles.checkHoleFalls([p1, p2]);
         // Som de queda na BORDA de subida de `falling` (uma vez por queda), com
-        // ducking longo: o vento descendo domina o momento da morte.
+        // ducking longo: o vento descendo domina o momento. No mesmo quadro a
+        // serra solta e cai num lugar seguro para ser recolhida depois.
         for (const p of [p1, p2]) {
             if (p.falling && !p._fallSeen) {
                 this.audio.play("playerFall");
                 this.audio.duck(-8, { attackMs: 30, holdMs: 500, releaseMs: 1200 });
+                this._dropSawOnFall();
             }
             p._fallSeen = p.falling;
         }

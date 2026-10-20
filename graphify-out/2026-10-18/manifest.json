@@ -1,7 +1,7 @@
 {
   "js/Game.js": {
-    "mtime": 1792366009.091705,
-    "ast_hash": "4ad9ddead2f83a6ba22378f2b318c17c",
+    "mtime": 1792375302.105368,
+    "ast_hash": "38ae0f93320da32270a10ddfbe1abd5f",
     "semantic_hash": ""
   },
   "js/combat/CombatSystem.js": {
@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   "js/core/AudioManager.js": {
-    "mtime": 1792365924.2290225,
-    "ast_hash": "af86dc9fba395579465c5d71e6ba3a67",
+    "mtime": 1792369330.6313365,
+    "ast_hash": "9f8e55ce8dc00c1890aeb0f9e74cced7",
     "semantic_hash": ""
   },
   "js/core/Dungeon.js": {
@@ -70,9 +70,9 @@
     "semantic_hash": ""
   },
   "js/entities/ArrowTrap.js": {
-    "mtime": 1792258551.0167255,
-    "ast_hash": "31a127fc62e921c219393166c8b21655",
-    "semantic_hash": "31a127fc62e921c219393166c8b21655"
+    "mtime": 1792370914.3214116,
+    "ast_hash": "f5ac2b1bb7df7c4ca4124531e7181bf3",
+    "semantic_hash": ""
   },
   "js/entities/Enemy.js": {
     "mtime": 1790304009.6239815,
@@ -115,9 +115,9 @@
     "semantic_hash": "d3b547eb0c37a92ce3423c78132aec6e"
   },
   "js/main.js": {
-    "mtime": 1792344039.651157,
-    "ast_hash": "67671360d4a37818a7b661f95d9b8e81",
-    "semantic_hash": "67671360d4a37818a7b661f95d9b8e81"
+    "mtime": 1792376229.8346255,
+    "ast_hash": "d388835cadc5eefbb3b8a6d917198cf7",
+    "semantic_hash": ""
   },
   "js/particles/BloodCanvas.js": {
     "mtime": 1791168618.9311173,
@@ -272,12 +272,6 @@
     "ast_hash": "",
     "semantic_hash": ""
   },
-  "map/room_nes_0.json": {
-    "mtime": 1791241702.9199388,
-    "seen": 1791241872.2286136,
-    "ast_hash": "",
-    "semantic_hash": ""
-  },
   "map/room_nesw_0.json": {
     "mtime": 1791241702.9199388,
     "seen": 1791241872.2286146,
@@ -361,8 +355,8 @@
     "semantic_hash": "1ad77a09007eecfe72c27d6979372fb9"
   },
   "js/config/AudioConfig.js": {
-    "mtime": 1792365943.242631,
-    "ast_hash": "af5edb81cf9b3f39d159ad147429ba25",
+    "mtime": 1792371660.9528427,
+    "ast_hash": "ddca21d2baf6d83b05a643884c15f769",
     "semantic_hash": ""
   },
   ".agents/skills/diagnosing-bugs/scripts/hitl-loop.template.sh": {
@@ -631,9 +625,9 @@
     "semantic_hash": "b554e54687d763a1ec65687865fb797b"
   },
   "js/core/GameLoop.js": {
-    "mtime": 1792292967.626299,
-    "ast_hash": "527be8aa17d40baa212ad09c01d0f6e9",
-    "semantic_hash": "527be8aa17d40baa212ad09c01d0f6e9"
+    "mtime": 1792370626.7847452,
+    "ast_hash": "66ed8533b7c2a7f660f4eaba0354c7b7",
+    "semantic_hash": ""
   },
   "js/particles/FlameParticle.js": {
     "mtime": 1792344039.6531575,
@@ -676,18 +670,18 @@
     "semantic_hash": "ec463806b1cb228e3af5836c33f94437"
   },
   "js/trailer.js": {
-    "mtime": 1792362615.5119612,
-    "ast_hash": "a122a134022e085bd43cfcd5e3c56b42",
+    "mtime": 1792375461.727191,
+    "ast_hash": "28fb27365212ce29d36d0b4581193e4b",
     "semantic_hash": ""
   },
   "js/trailer/TrailerPlayer.js": {
-    "mtime": 1792362613.8820124,
-    "ast_hash": "9709c312efaf47ce178cc11b639c6aa0",
+    "mtime": 1792375717.917508,
+    "ast_hash": "da908f994f5a7e7b6246ab1806f4eef7",
     "semantic_hash": ""
   },
   "js/trailer/TrailerStage.js": {
-    "mtime": 1792362085.5889719,
-    "ast_hash": "e656e5090f52755d207b71ff619e8488",
+    "mtime": 1792375692.8613317,
+    "ast_hash": "8c16eee18f896b38ca108632857e33b8",
     "semantic_hash": ""
   },
   "js/trailer/anim.js": {
@@ -701,9 +695,9 @@
     "semantic_hash": "ec84f83fbaa06f77be0b89e70782a7de"
   },
   "js/trailer/fx/BloodScreen.js": {
-    "mtime": 1792344039.6674154,
-    "ast_hash": "f56116f91b356ee5096b9650d4ab15db",
-    "semantic_hash": "f56116f91b356ee5096b9650d4ab15db"
+    "mtime": 1792372540.701298,
+    "ast_hash": "8d5cd8f0fc1722964dbd66af8feb8ff5",
+    "semantic_hash": ""
   },
   "js/trailer/fx/LensSplatter.js": {
     "mtime": 1792344039.66864,
@@ -711,8 +705,8 @@
     "semantic_hash": "50e13024fd0958295b5627bffb039aea"
   },
   "js/trailer/kit/ActionArena.js": {
-    "mtime": 1792362219.2534935,
-    "ast_hash": "463d29effee1d40ec4c5a5471f6d230c",
+    "mtime": 1792372391.944611,
+    "ast_hash": "55fadce41d5d41dc3c216059e98e4079",
     "semantic_hash": ""
   },
   "js/trailer/kit/ArenaShot.js": {
@@ -736,14 +730,14 @@
     "semantic_hash": "e7159743d6b02906184c5315957e99d8"
   },
   "js/trailer/scenes/IntroScene.js": {
-    "mtime": 1792344039.6736412,
-    "ast_hash": "357b1c217ac474b01b617c263b3a445a",
-    "semantic_hash": "357b1c217ac474b01b617c263b3a445a"
+    "mtime": 1792374576.5706618,
+    "ast_hash": "27db0ca48c040a4c6bcfce0d69f4b74c",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/TitleBloodScene.js": {
-    "mtime": 1792344039.6747816,
-    "ast_hash": "bee5ecd8147e76f29c1a77d43efd3a2e",
-    "semantic_hash": "bee5ecd8147e76f29c1a77d43efd3a2e"
+    "mtime": 1792374557.6272366,
+    "ast_hash": "dbf64af3ba9bf716b428a7dba8f36fae",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/frenzy/FrenzyBeats.js": {
     "mtime": 1792344039.6757815,
@@ -751,9 +745,9 @@
     "semantic_hash": "7c38524afe2027141a962bad61567fe2"
   },
   "js/trailer/scenes/frenzy/FrenzyScene.js": {
-    "mtime": 1792344039.6772852,
-    "ast_hash": "d4cde0cbcbf4930df4421c86e4d1dd0a",
-    "semantic_hash": "d4cde0cbcbf4930df4421c86e4d1dd0a"
+    "mtime": 1792372697.0560029,
+    "ast_hash": "4328f1e2b2234556f702a76a1503da5f",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/frenzy/HordeDirector.js": {
     "mtime": 1792344039.6782892,
@@ -761,9 +755,9 @@
     "semantic_hash": "c184f7c50847f30e40458ee8ab628696"
   },
   "js/trailer/scenes/mapgen/MapGenScene.js": {
-    "mtime": 1792357220.6154912,
-    "ast_hash": "90d7fa299c17a2dfcd6f51373b146c0c",
-    "semantic_hash": "90d7fa299c17a2dfcd6f51373b146c0c"
+    "mtime": 1792372796.8816319,
+    "ast_hash": "40c751484dfaf432d592c012bfdcb3ff",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/mapgen/mapBake.js": {
     "mtime": 1792345487.0410147,
@@ -781,9 +775,9 @@
     "semantic_hash": "8b35caf93169af4cf15c32e8e6297f65"
   },
   "js/trailer/scenes/montage/SplitShot.js": {
-    "mtime": 1792346132.1734128,
-    "ast_hash": "3549c0e6b12f58f20033364ba38735cc",
-    "semantic_hash": "3549c0e6b12f58f20033364ba38735cc"
+    "mtime": 1792372752.6226292,
+    "ast_hash": "4e62dcd7768743bf1225a16cd2507dfb",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/montage/ZigZagShot.js": {
     "mtime": 1792344039.680288,
@@ -791,29 +785,29 @@
     "semantic_hash": "ebc1fa8f8f288fb407a61ba0302ad6e2"
   },
   "js/trailer/scenes/rush/ArrowRunShot.js": {
-    "mtime": 1792355176.8519444,
-    "ast_hash": "4994ded75985262fbb18c912f5f49194",
-    "semantic_hash": "4994ded75985262fbb18c912f5f49194"
+    "mtime": 1792372846.9948037,
+    "ast_hash": "a9c44b89f0a8c3da87d8ecf99d7730d8",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/rush/ButtonDoorShot.js": {
-    "mtime": 1792355280.1405969,
-    "ast_hash": "086b0252e11bdad62b63688f37a33e6b",
-    "semantic_hash": "086b0252e11bdad62b63688f37a33e6b"
+    "mtime": 1792372883.300303,
+    "ast_hash": "52bcbefcd5fa4df0abd67653c1ffab56",
+    "semantic_hash": ""
   },
   "js/trailer/scenes/rush/HoleRunShot.js": {
-    "mtime": 1792355188.743944,
-    "ast_hash": "3b0902a4f4bbac021f68f1cce3cf6fed",
-    "semantic_hash": "3b0902a4f4bbac021f68f1cce3cf6fed"
+    "mtime": 1792372848.3042662,
+    "ast_hash": "7ee0bbd1f8fef561358a75cc8e5240d1",
+    "semantic_hash": ""
   },
   "js/ui/LoadingScreen.js": {
-    "mtime": 1792365524.888171,
-    "ast_hash": "351df48606c5f75087ad2024251a9566",
+    "mtime": 1792370996.0500393,
+    "ast_hash": "e189333253934665b5ffc1fd66d7db52",
     "semantic_hash": ""
   },
   "js/ui/PixelFont.js": {
-    "mtime": 1792344039.6822882,
-    "ast_hash": "6323d5e0b1de65a4d49b7f68addfcc7e",
-    "semantic_hash": "6323d5e0b1de65a4d49b7f68addfcc7e"
+    "mtime": 1792371338.145451,
+    "ast_hash": "b923e8b8bd142ce53f19f0a787858f94",
+    "semantic_hash": ""
   },
   "js/ui/SpeechBubble.js": {
     "mtime": 1792344039.6822882,
@@ -1161,8 +1155,8 @@
     "semantic_hash": "5d509dba69b68916fc362b43f3a58b0e"
   },
   "js/trailer/scenes/rush/GiantSawShot.js": {
-    "mtime": 1792362226.9199283,
-    "ast_hash": "83416358509b7f686d98b6f8712d00cc",
+    "mtime": 1792372891.358694,
+    "ast_hash": "e76952424eae955f8552f579a16b0c87",
     "semantic_hash": ""
   },
   "tools/build_tinyrpg_enemies.py": {
@@ -1171,8 +1165,8 @@
     "semantic_hash": "5cde63fa575dcaff3398d76a9c3ff794"
   },
   "js/trailer/fx/FxParticles.js": {
-    "mtime": 1792367049.5828981,
-    "ast_hash": "514540bcef1f727fa809417b7c814b45",
+    "mtime": 1792369403.8096125,
+    "ast_hash": "5d3b1b1d98d20f9b35e7043f4fd1419a",
     "semantic_hash": ""
   },
   "js/trailer/fx/SawIris.js": {
@@ -1181,13 +1175,13 @@
     "semantic_hash": ""
   },
   "js/trailer/scenes/rush/BossWallShot.js": {
-    "mtime": 1792367050.6839843,
-    "ast_hash": "690035edaeaa76799a4b51f192ab953e",
+    "mtime": 1792376207.4520974,
+    "ast_hash": "c2adc922da5b08f2f832e4030ee64d27",
     "semantic_hash": ""
   },
   "js/ui/VtuberHud.js": {
-    "mtime": 1792362436.0416365,
-    "ast_hash": "7a1ec620b2b410da168ed722f904572a",
+    "mtime": 1792370973.6279492,
+    "ast_hash": "8fc3afb08c2f84614a951f98f276c90b",
     "semantic_hash": ""
   },
   "tools/gen_heart.py": {
@@ -3301,8 +3295,8 @@
     "semantic_hash": ""
   },
   ".kiro/steering/trailer.md": {
-    "mtime": 1792368334.558874,
-    "ast_hash": "b7beb1e93528d45d22e265688956f12a",
+    "mtime": 1792376369.8217967,
+    "ast_hash": "9aae4306776aa8ce3d7b18e8191b890c",
     "semantic_hash": ""
   },
   "agent/skills/caveman/README.md": {
@@ -3316,8 +3310,8 @@
     "semantic_hash": ""
   },
   "assets/audio/README.md": {
-    "mtime": 1792365952.325584,
-    "ast_hash": "4ee19e60052258cec2ab46f844c6163e",
+    "mtime": 1792374047.700532,
+    "ast_hash": "da819760f319d0d41d66fb568c84e059",
     "semantic_hash": ""
   },
   "data/skills/ask-matt/PHASE-BOUNDARIES.md": {
@@ -3821,8 +3815,8 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1792365437.4527318,
-    "ast_hash": "708322e646ec958c828479e0f830262a",
+    "mtime": 1792376214.990881,
+    "ast_hash": "16dddaba7a6a88be6fa3f636594af4c9",
     "semantic_hash": ""
   },
   "map/README.md": {
@@ -3856,8 +3850,8 @@
     "semantic_hash": ""
   },
   "trailer.html": {
-    "mtime": 1792344039.6884158,
-    "ast_hash": "16d3f39f41f203db786a971bb2acdf73",
+    "mtime": 1792371019.8837981,
+    "ast_hash": "330675027c508bd12ab4abb324a8c42f",
     "semantic_hash": ""
   },
   ".agents/skills/remotion-best-practices/assets/remotion-icon.svg": {
@@ -5126,8 +5120,8 @@
     "semantic_hash": ""
   },
   "js/ui/DeathScreen.js": {
-    "mtime": 1792364638.5451517,
-    "ast_hash": "080e7a2905f0f68555f0cec24c4ee5b8",
+    "mtime": 1792370683.4297528,
+    "ast_hash": "94ee173932ad14a7ae9547048fa64d43",
     "semantic_hash": ""
   },
   "tools/gen_explosion.py": {
@@ -5141,8 +5135,8 @@
     "semantic_hash": ""
   },
   "tools/gen_sfx.py": {
-    "mtime": 1792365682.9621868,
-    "ast_hash": "4377225fabefe7ea17dac0a23c676f13",
+    "mtime": 1792371601.1237166,
+    "ast_hash": "da7f104ba3d209455189313b28515142",
     "semantic_hash": ""
   },
   "assets/audio/ambience-dungeon.wav": {
@@ -5208,6 +5202,366 @@
   "assets/audio/circular-saw.mp3": {
     "mtime": 1792366255.2024012,
     "ast_hash": "b5b0f24b1bf002ae235e33a527e61598",
+    "semantic_hash": ""
+  },
+  "js/core/LoopVoice.js": {
+    "mtime": 1792369326.0159996,
+    "ast_hash": "48f9df891116313bf8779021531b9ee0",
+    "semantic_hash": ""
+  },
+  "js/weapons/SawMotorAudio.js": {
+    "mtime": 1792369364.2701554,
+    "ast_hash": "3b46039fb24cac3f8a5a818dc4ea05bb",
+    "semantic_hash": ""
+  },
+  "tests/test_saw_motor_audio.js": {
+    "mtime": 1792369420.5778813,
+    "ast_hash": "52d8d49f98dbc8f4d66520f2c7b3729b",
+    "semantic_hash": ""
+  },
+  "assets/audio/saw-motor-loop.wav": {
+    "mtime": 1792369286.2535484,
+    "ast_hash": "6f1d76f1bddb0017236c2ad4e1a5be20",
+    "semantic_hash": ""
+  },
+  "js/trailer/audio/TrailerAudio.js": {
+    "mtime": 1792375371.2104952,
+    "ast_hash": "d30ad1a54c4797d9d71323fac2c7343c",
+    "semantic_hash": ""
+  },
+  "js/ui/PauseScreen.js": {
+    "mtime": 1792375153.378354,
+    "ast_hash": "c25f6afd15de92bdc00111eaef5dd226",
+    "semantic_hash": ""
+  },
+  "js/ui/PixelButton.js": {
+    "mtime": 1792374977.9437332,
+    "ast_hash": "3a6af9506ca5b76012651b1d0f87633f",
+    "semantic_hash": ""
+  },
+  "js/ui/UiSound.js": {
+    "mtime": 1792375336.2745774,
+    "ast_hash": "d18ad3360a85c2b12b1aa7f542b0c36f",
+    "semantic_hash": ""
+  },
+  "tools/gen_keyart.py": {
+    "mtime": 1792374504.1042638,
+    "ast_hash": "dfb8ca1e5b9025530f77f0a9d0c69b7f",
+    "semantic_hash": ""
+  },
+  "tools/gen_trailer_sfx.py": {
+    "mtime": 1792371883.1199913,
+    "ast_hash": "a7664b297da051495a1d2b2b628da5ea",
+    "semantic_hash": ""
+  },
+  "assets/audio/arrow-fire-01.wav": {
+    "mtime": 1792372012.5428903,
+    "ast_hash": "3b59ce84785c50c65f93407dc0c1248e",
+    "semantic_hash": ""
+  },
+  "assets/audio/arrow-fire-02.wav": {
+    "mtime": 1792372012.560439,
+    "ast_hash": "5af70516cc3e903b63fa6b6147beb348",
+    "semantic_hash": ""
+  },
+  "assets/audio/arrow-fire-03.wav": {
+    "mtime": 1792372012.5790489,
+    "ast_hash": "a19e36fb23b1efb9c698c6f609893545",
+    "semantic_hash": ""
+  },
+  "assets/audio/button-press-01.wav": {
+    "mtime": 1792371262.5277255,
+    "ast_hash": "46290c052cf9bc0e9f9ab50686ebb99f",
+    "semantic_hash": ""
+  },
+  "assets/audio/button-press-02.wav": {
+    "mtime": 1792371262.534858,
+    "ast_hash": "0175e1f5886ecb3c02797c697792f949",
+    "semantic_hash": ""
+  },
+  "assets/audio/button-release.wav": {
+    "mtime": 1792371262.5398583,
+    "ast_hash": "9e1ed71b921ca1bb03b3abbcf9657ee6",
+    "semantic_hash": ""
+  },
+  "assets/audio/enemy-spawn-01.wav": {
+    "mtime": 1792372012.4508257,
+    "ast_hash": "4be8fccab2c55805fc1b3cfe91f5a8b1",
+    "semantic_hash": ""
+  },
+  "assets/audio/enemy-spawn-02.wav": {
+    "mtime": 1792372012.4878614,
+    "ast_hash": "038a7bf32c640ba9443c49854a85ba68",
+    "semantic_hash": ""
+  },
+  "assets/audio/enemy-spawn-03.wav": {
+    "mtime": 1792372012.5258214,
+    "ast_hash": "3e5c8a2811242b1bd0f780115239479a",
+    "semantic_hash": ""
+  },
+  "assets/audio/music/megasong.mp3": {
+    "mtime": 1792371026.2812667,
+    "ast_hash": "d5a83dac888d983d40f6eb40e18a4bd0",
+    "semantic_hash": ""
+  },
+  "assets/audio/player-hit-01.wav": {
+    "mtime": 1792370897.730899,
+    "ast_hash": "49b1c9c81ee8485d40cf02072bbfab2b",
+    "semantic_hash": ""
+  },
+  "assets/audio/player-hit-02.wav": {
+    "mtime": 1792370897.7354033,
+    "ast_hash": "a143ceceecb2bc5f25a191f790beb798",
+    "semantic_hash": ""
+  },
+  "assets/audio/player-hit-03.wav": {
+    "mtime": 1792370897.7414038,
+    "ast_hash": "575dad424227077fc4d22e3c680e15fa",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/beam-charge.wav": {
+    "mtime": 1792371940.5619943,
+    "ast_hash": "000112b75ccf484b64895f80a789326d",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/beam-fire.wav": {
+    "mtime": 1792371940.6106112,
+    "ast_hash": "281ea49ad2d9197ee03f46573f527bfe",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/blip-01.wav": {
+    "mtime": 1792371940.7556503,
+    "ast_hash": "54f4d5340faa126020a3b4e61fe56fbf",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/blip-02.wav": {
+    "mtime": 1792371940.756649,
+    "ast_hash": "afca65860edfc0441d942393918e7450",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/boom-01.wav": {
+    "mtime": 1792371940.1882372,
+    "ast_hash": "7a03ad1f2b4bcda8226d129e84a50760",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/boom-02.wav": {
+    "mtime": 1792371940.219014,
+    "ast_hash": "d931764a948405b406310b02869b4711",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/boom-03.wav": {
+    "mtime": 1792371940.2500236,
+    "ast_hash": "daef7e37ff47a35a41a43669a3c9f43a",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/crack.wav": {
+    "mtime": 1792371940.8014858,
+    "ast_hash": "e4f5d9419df9db7ba7fc6a776ad5efba",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/flame-01.wav": {
+    "mtime": 1792371940.4763327,
+    "ast_hash": "48759d2fa6e120024c4ace5d6eee7415",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/flame-02.wav": {
+    "mtime": 1792371940.5196612,
+    "ast_hash": "c41d1889df165eb0c1e0ba0d80a9cb86",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/heartbeat.wav": {
+    "mtime": 1792371940.8880825,
+    "ast_hash": "542cde76ceedc382f3e2ae6bf5e98564",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/impact-01.wav": {
+    "mtime": 1792371940.1190138,
+    "ast_hash": "15743eadcbb068890135d9ccb6c29d9d",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/impact-02.wav": {
+    "mtime": 1792371940.1400304,
+    "ast_hash": "164f8f4dbc33cc52d6f54cd70254caa7",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/impact-03.wav": {
+    "mtime": 1792371940.1605866,
+    "ast_hash": "d2cfb1039032164220647fe54a6cf3ac",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/pop-01.wav": {
+    "mtime": 1792371940.7451382,
+    "ast_hash": "70aa1a11c4a7b1827e352b7f311daa3f",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/pop-02.wav": {
+    "mtime": 1792371940.749139,
+    "ast_hash": "4bb74a7ce8e1168ace1dfc2e35ff7f81",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/pop-03.wav": {
+    "mtime": 1792371940.7546482,
+    "ast_hash": "693631cfe3307b0f14d2817e865b09cd",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/riser.wav": {
+    "mtime": 1792371940.3238175,
+    "ast_hash": "a36705a882537c52b1bb9645c0ed22fe",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/roar.wav": {
+    "mtime": 1792371940.7386293,
+    "ast_hash": "995cfde0254278378cbe2b3258ded060",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/rope-01.wav": {
+    "mtime": 1792371940.8691034,
+    "ast_hash": "4b26ff4cc47c9fd7e549fcef1c55cf9f",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/rope-02.wav": {
+    "mtime": 1792371940.8786101,
+    "ast_hash": "dbe5b06a4824d00af8d50092b5c4f278",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/rumble-loop.wav": {
+    "mtime": 1792371940.2716835,
+    "ast_hash": "184c1b43b2d0916406ed4c20c3824e8f",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/slowmo.wav": {
+    "mtime": 1792371940.8595986,
+    "ast_hash": "35a41d72cf0fb00cfcf5cb6c0d81208b",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/splat-01.wav": {
+    "mtime": 1792371940.4201357,
+    "ast_hash": "ab870683b41820f3e8aa4567edf71ead",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/splat-02.wav": {
+    "mtime": 1792371940.4276457,
+    "ast_hash": "c3a6ba7b229a2e200fb7a967218acd66",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/splat-03.wav": {
+    "mtime": 1792371940.4336438,
+    "ast_hash": "3d056ae5030bca39c12402f3ad56a082",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/splat-04.wav": {
+    "mtime": 1792371940.4418738,
+    "ast_hash": "e0fd42c754ca4581863bca76c9a6f07d",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/sting.wav": {
+    "mtime": 1792371940.411624,
+    "ast_hash": "68c50e4bedddd18615386dc2ada9a57d",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/stone-click.wav": {
+    "mtime": 1792371940.7616477,
+    "ast_hash": "21a9794fc9c78069d8f40f66157f9b28",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/stone-grind.wav": {
+    "mtime": 1792371940.7769728,
+    "ast_hash": "f154f6e5eb26952471db85118740ca35",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/thud.wav": {
+    "mtime": 1792371940.787476,
+    "ast_hash": "2c434bf6a2bb6188a9ddf25d1bee07d4",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/thunk-01.wav": {
+    "mtime": 1792371940.7789724,
+    "ast_hash": "a9f3cd2a9e4f79567af09c1ea5829bc5",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/thunk-02.wav": {
+    "mtime": 1792371940.7809732,
+    "ast_hash": "062e998ceebe068f936ce5f0f97b4b43",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/whoosh-01.wav": {
+    "mtime": 1792371940.0128574,
+    "ast_hash": "d8eaf534486bf7eaa316b2f4cb44d958",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/whoosh-02.wav": {
+    "mtime": 1792371940.04588,
+    "ast_hash": "d9d400b4644b269034131e97a3c34b99",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/whoosh-03.wav": {
+    "mtime": 1792371940.0948348,
+    "ast_hash": "6fe1b1ec5c867f0046f8d86ac389b70c",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/zap-01.wav": {
+    "mtime": 1792371940.8039887,
+    "ast_hash": "f8266f29cbc4db5ff3ed1015b60cc31d",
+    "semantic_hash": ""
+  },
+  "assets/audio/trailer/zap-02.wav": {
+    "mtime": 1792371940.8059926,
+    "ast_hash": "035a65ffd29f1597cc711383f1f7c8bd",
+    "semantic_hash": ""
+  },
+  "assets/audio/ui-close.wav": {
+    "mtime": 1792371650.7521703,
+    "ast_hash": "8a8dbde33b60dab4e2cf14bf9a3164cd",
+    "semantic_hash": ""
+  },
+  "assets/audio/ui-confirm.wav": {
+    "mtime": 1792371650.715617,
+    "ast_hash": "e9623610297a63bd6f6307c2d920ef7a",
+    "semantic_hash": ""
+  },
+  "assets/audio/ui-move.wav": {
+    "mtime": 1792371650.7101104,
+    "ast_hash": "a676131113100f0a54bfc4fa547845fe",
+    "semantic_hash": ""
+  },
+  "assets/audio/ui-open.wav": {
+    "mtime": 1792371650.7376623,
+    "ast_hash": "aacee8f08a7f5bdc3019d88d9be0c79d",
+    "semantic_hash": ""
+  },
+  "js/core/MasterVolume.js": {
+    "mtime": 1792374915.0494592,
+    "ast_hash": "9686fc85b96ffe655db8b05bd9175331",
+    "semantic_hash": ""
+  },
+  "js/ui/PixelSlider.js": {
+    "mtime": 1792375182.5987792,
+    "ast_hash": "be45c98cd6a70dc37cbe8a3678951c57",
+    "semantic_hash": ""
+  },
+  "tests/_tmp_audio_check.js": {
+    "mtime": 1792366109.2651272,
+    "ast_hash": "9ce06993fe5c59f9545acf1321ee2054",
+    "semantic_hash": ""
+  },
+  ".kiro/Edit project - itch.io.html": {
+    "mtime": 1792370312.7457519,
+    "ast_hash": "74d2af3d6821395a7602582879a2df20",
+    "semantic_hash": ""
+  },
+  "assets/keyart/keyart_1024.png": {
+    "mtime": 1792374528.6039104,
+    "ast_hash": "07db721e46871d47d0cef5e1588a88dc",
+    "semantic_hash": ""
+  },
+  "assets/keyart/keyart_128.png": {
+    "mtime": 1792374528.596408,
+    "ast_hash": "0b8340dfe6e9a6b5a12418d5a93dbe35",
+    "semantic_hash": ""
+  },
+  "assets/keyart/logo.png": {
+    "mtime": 1792374528.6079166,
+    "ast_hash": "48272e2b726167a4976d77de79a78dd9",
     "semantic_hash": ""
   }
 }

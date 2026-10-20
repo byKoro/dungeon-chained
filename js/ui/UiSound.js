@@ -9,6 +9,7 @@
  */
 import { AudioManager } from '../core/AudioManager.js';
 import { AUDIO_CONFIG } from '../config/AudioConfig.js';
+import { MasterVolume } from '../core/MasterVolume.js';
 
 const UI_CUES = ['uiMove', 'uiConfirm', 'uiOpen', 'uiClose'];
 
@@ -20,11 +21,15 @@ function standalone() {
         const cues = Object.fromEntries(
             UI_CUES.filter(n => AUDIO_CONFIG.cues[n]).map(n => [n, AUDIO_CONFIG.cues[n]])
         );
+        const mix = AUDIO_CONFIG.masterVolume;
         fallback = new AudioManager({
-            masterVolume: AUDIO_CONFIG.masterVolume,
+            masterVolume: mix,
             muted: AUDIO_CONFIG.muted,
             cues
         });
+        // Volume geral do jogador (slider das pausas) também na UI do trailer.
+        const ui = fallback;
+        MasterVolume.subscribe(() => ui.setMasterVolume(mix * MasterVolume.gain()));
     }
     return fallback;
 }

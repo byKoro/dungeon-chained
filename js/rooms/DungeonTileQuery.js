@@ -175,6 +175,66 @@ export class DungeonTileQuery {
         const tiles = this._floor();
         if (!tiles) return { x, y };
         const rect = this.rooms.cellRect();
+        const ok = this._reachableTest(tiles, rect, players);
+
+        const { col, row } = this._toTile(x, y, rect);
+        if (ok(col, row)) return { x, y };
+        return this._nearestTileCenter(tiles, rect, x, y, ok) ?? { x, y };
+    }
+
+    /**
+     * Ponto SEGURO para largar a serra quando um jogador cai no buraco: centro
+     * do tile alcançável (a partir de `seeds`) mais próximo de (x, y) que não
+     * encosta em buraco nenhum (vizinhança 3x3) — pegar a lâmina não exige
+     * pisar na beirada. Sem tile assim, aceita qualquer alcançável.
+     *
+     * @param {number} x  onde a serra estava (mundo)
+     * @param {number} y
+     * @param {{x:number,y:number}[]} seeds  pontos de partida (jogadores de pé, entradas)
+     * @returns {{x:number,y:number}}
+     */
+    safeDropPoint(x, y, seeds) {
+        const tiles = this._floor();
+        if (!tiles) return { x, y };
+        const rect = this.rooms.cellRect();
+        const ok = this._reachableTest(tiles, rect, seeds);
+        const awayFromHoles = (c, r) => {
+            if (!ok(c, r)) return false;
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (this._tileValue(tiles, c + dc, r + dr) === HOLE_TILE) return false;
+                }
+            }
+            return true;
+        };
+        return this._nearestTileCenter(tiles, rect, x, y, awayFromHoles)
+            ?? this._nearestTileCenter(tiles, rect, x, y, ok)
+            ?? { x, y };
+    }
+
+    // Centro (mundo) do tile que passa em `test(c, r)` mais próximo de (x, y).
+    _nearestTileCenter(tiles, rect, x, y, test) {
+        let best = null;
+        let bestDist = Infinity;
+        for (let r = 0; r < tiles.rows; r++) {
+            for (let c = 0; c < tiles.cols; c++) {
+                if (!test(c, r)) continue;
+                const cx = rect.x + (c + 0.5) * TILE;
+                const cy = rect.y + (r + 0.5) * TILE;
+                const d = (cx - x) ** 2 + (cy - y) ** 2;
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = { x: cx, y: cy };
+                }
+            }
+        }
+        return best;
+    }
+
+    // Teste (c, r) -> bool dos tiles pisáveis alcançáveis a partir dos pontos
+    // dados. Busca em largura com 4 vizinhos (conservadora: não conta "passar
+    // pela quina" entre dois buracos/paredes).
+    _reachableTest(tiles, rect, players) {
         const wallSet = new Set((tiles.walls || []).map(w => `${w.col},${w.row}`));
         const walkable = (c, r) => this._isWalkable(tiles, c, r, wallSet);
 
@@ -202,27 +262,7 @@ export class DungeonTileQuery {
                 queue.push([nc, nr]);
             }
         }
-        const ok = (c, r) => anyWalkable ? walkable(c, r) : reached.has(`${c},${r}`);
-
-        const { col, row } = this._toTile(x, y, rect);
-        if (ok(col, row)) return { x, y };
-
-        // Tile alcançável cujo centro está mais perto do ponto pedido.
-        let best = null;
-        let bestDist = Infinity;
-        for (let r = 0; r < tiles.rows; r++) {
-            for (let c = 0; c < tiles.cols; c++) {
-                if (!ok(c, r)) continue;
-                const cx = rect.x + (c + 0.5) * TILE;
-                const cy = rect.y + (r + 0.5) * TILE;
-                const d = (cx - x) ** 2 + (cy - y) ** 2;
-                if (d < bestDist) {
-                    bestDist = d;
-                    best = { x: cx, y: cy };
-                }
-            }
-        }
-        return best ?? { x, y };
+        return (c, r) => anyWalkable ? walkable(c, r) : reached.has(`${c},${r}`);
     }
 
     // Garante que um jogador não nasça sobre um buraco: se o tile atual não for

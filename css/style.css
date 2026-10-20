@@ -95,7 +95,7 @@ html, body {
 /* ---------------------------------------------------------------------------
    Tela de pausa (js/ui/PauseScreen.js): véu de pedra + RESUME / RESTART
    --------------------------------------------------------------------------- */
-#pause-screen {
+.pause-screen {
     --px: 5px;
     position: fixed;
     inset: 0;
@@ -110,7 +110,7 @@ html, body {
     pointer-events: none;
     transition: opacity 0.18s ease, visibility 0s linear 0.18s;
 }
-#pause-screen.visible {
+.pause-screen.visible {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
@@ -123,21 +123,26 @@ html, body {
     gap: calc(var(--px) * 2);
 }
 .pause-menu .pixel-btn { transform: scale(0); }
-#pause-screen.visible .pixel-btn {
+.pause-screen.visible .pixel-btn {
     animation: pixel-pop 0.38s cubic-bezier(0.34, 1.7, 0.64, 1) both;
 }
-#pause-screen.visible .pixel-btn:nth-child(1) { animation-delay: 0.03s; }
-#pause-screen.visible .pixel-btn:nth-child(2) { animation-delay: 0.11s; }
+.pause-screen.visible .pixel-btn:nth-child(1) { animation-delay: 0.03s; }
+.pause-screen.visible .pixel-btn:nth-child(2) { animation-delay: 0.11s; }
+.pause-screen.visible .pixel-btn:nth-child(3) { animation-delay: 0.19s; }
+/* Slider de volume (js/ui/PixelSlider.js): arrastar sem rolar a página. */
+.pixel-slider { touch-action: none; cursor: ew-resize; display: block; }
+/* O trailer pausa por cima do botão SKIP. */
+#trailer-pause { z-index: 60; }
 /* Só o botão em foco respira. */
-#pause-screen.visible .pixel-btn:focus canvas {
+.pause-screen.visible .pixel-btn:focus canvas {
     animation: pixel-idle 1.4s steps(1, end) 0.5s infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
     #death-screen.visible .death-btn,
-    #pause-screen.visible .pixel-btn { animation: none; transform: none; }
+    .pause-screen.visible .pixel-btn { animation: none; transform: none; }
     #death-screen.visible .death-btn canvas,
-    #pause-screen.visible .pixel-btn:focus canvas { animation: none; }
+    .pause-screen.visible .pixel-btn:focus canvas { animation: none; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -213,37 +218,30 @@ html, body {
     .tr-skip.visible { animation: none; }
     .tr-skip.visible canvas { animation: none; }
 }
+/* START em pixel art (PixelButton, face vermelha), mesmo padrão do RESTART da
+   tela de morte: entra com pop elástico e "respira" em degraus de 1 pixel de
+   arte. `translate` centraliza sem brigar com o `transform` do pop. */
 .tr-start {
+    --px: 5px; /* 1 pixel de arte do botão (definido pelo JS) */
     position: fixed;
     left: 50%;
-    bottom: calc(10vh + 30px);
-    transform: translateX(-50%) scale(0.92);
-    pointer-events: auto;
-    font-family: monospace;
-    font-size: 22px;
-    font-weight: bold;
-    letter-spacing: 4px;
-    color: #fffffe;
-    background: #6e0f1c;
-    border: 4px solid #4a4458;
-    box-shadow: 0 0 0 4px #0b0910, inset 0 4px 0 #a3192b, 0 6px 0 4px rgba(0, 0, 0, 0.5);
-    padding: 14px 34px;
-    cursor: pointer;
+    bottom: calc(10vh + 22px);
+    translate: -50% 0;
+    pointer-events: none;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.6s ease, transform 0.6s ease, background 0.1s;
+    transform: scale(0);
 }
 .tr-start.visible {
+    pointer-events: auto;
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) scale(1);
-    animation: tr-pulse 1.6s ease-in-out 0.6s infinite;
+    animation: pixel-pop 0.45s cubic-bezier(0.34, 1.7, 0.64, 1) 0.15s both;
 }
-.tr-start:hover, .tr-start:focus-visible { background: #8a1424; outline: none; }
-@keyframes tr-pulse {
-    0%, 100% { box-shadow: 0 0 0 4px #0b0910, inset 0 4px 0 #a3192b, 0 6px 0 4px rgba(0, 0, 0, 0.5); }
-    50% { box-shadow: 0 0 0 4px #0b0910, inset 0 4px 0 #a3192b, 0 0 24px 6px rgba(194, 42, 60, 0.55); }
+.tr-start.visible canvas {
+    animation: pixel-idle 1.4s steps(1, end) 0.8s infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-    .tr-start.visible { animation: none; }
+    .tr-start.visible { animation: none; transform: none; }
+    .tr-start.visible canvas { animation: none; }
 }

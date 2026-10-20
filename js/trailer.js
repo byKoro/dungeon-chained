@@ -35,6 +35,9 @@ async function bootstrap() {
     const replay = () => trailer.play(from);
     document.getElementById('btn-replay')?.addEventListener('click', replay);
     window.addEventListener('keydown', (e) => {
+        // Esc pausa/retoma (RESUME + volume); pausado, o menu cuida das teclas.
+        if (e.key === 'Escape') { if (!e.repeat) trailer.togglePause(); return; }
+        if (trailer.paused) return;
         if (e.key === ' ' || e.key === 'Enter') replay();
     });
     replay();

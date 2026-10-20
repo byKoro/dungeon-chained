@@ -14,18 +14,17 @@
         <button class="pixel-btn death-btn" type="button"><canvas></canvas></button>
     </div>
 
-    <!-- Tela de pausa (js/ui/PauseScreen.js): RESUME / RESTART em pixel art. -->
-    <div id="pause-screen" role="dialog" aria-label="Paused" aria-hidden="true">
-        <div class="pause-menu">
-            <button class="pixel-btn" type="button"><canvas></canvas></button>
-            <button class="pixel-btn" type="button"><canvas></canvas></button>
-        </div>
+    <!-- Tela de pausa do jogo (js/ui/PauseScreen.js): RESUME / RESTART / VOLUME
+         em pixel art (os controles são montados pelo JS). O trailer cria a
+         sua (#trailer-pause: RESUME / VOLUME). -->
+    <div id="pause-screen" class="pause-screen" role="dialog" aria-label="Paused" aria-hidden="true">
+        <div class="pause-menu"></div>
     </div>
 
     <!-- Trailer de abertura: SKIP (canto) e START (no fim). -->
     <div id="trailer-overlay" class="hidden">
         <button class="tr-skip" id="btn-skip" type="button"><canvas></canvas></button>
-        <button class="tr-start" id="btn-start" type="button">START</button>
+        <button class="tr-start" id="btn-start" type="button"><canvas></canvas></button>
     </div>
 
     <!-- Tela de carregamento (js/ui/LoadingScreen.js). Começa visível para

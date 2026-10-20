@@ -1,5 +1,5 @@
 /**
- * TitleBloodScene — cartela "DUNGEON CHAINED" que começa a piscar em
+ * TitleBloodScene — cartela com a LOGO do jogo que começa a piscar em
  * vermelho, gotas GRANDES de sangue voam e enchem a tela; com a tela coberta
  * o sangue começa a ESCORRER (BloodScreen.startDrain) e a cena termina — a
  * próxima é revelada por baixo do sangue escorrendo (sem corte).
@@ -94,6 +94,6 @@ export class TitleBloodScene {
             red = on ? Math.max(0.6, amt) : amt * 0.4;
         }
         ctx.restore();
-        this.stage.drawTitleText(red);
+        this.stage.drawTitleLogo(red);
     }
 }
