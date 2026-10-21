@@ -37,9 +37,14 @@ export class BloodScreen {
     // Prepara a grade conforme o tamanho atual da tela.
     _setupGrid() {
         const { width: W, height: H } = this.canvas;
-        this.cell = Math.max(4, Math.round(H / 110));
+        // Pixel grosso pelo LADO CURTO (em paisagem = altura): no vídeo
+        // vertical o sangue tem o mesmo "pixel" e o mesmo nº de células.
+        this.cell = Math.max(4, Math.round(Math.min(W, H) / 110));
         this.cols = Math.ceil(W / this.cell);
         this.rows = Math.ceil(H / this.cell);
+        // Tela mais alta que larga: escorre proporcionalmente mais rápido
+        // (a cortina leva o mesmo tempo para descer). Paisagem: 1.
+        this._drainK = Math.max(1, this.rows / Math.ceil(Math.min(W, H) / this.cell));
         this.mask = new Uint8Array(this.cols * this.rows);   // 0 = vazio, 1 = sangue
         this.tone = new Uint8Array(this.cols * this.rows);   // variação de cor
         this.buf = document.createElement('canvas');
@@ -141,8 +146,9 @@ export class BloodScreen {
             const smooth = 0.5 + 0.5 * Math.sin(u * 9 + seeds[0]) * Math.sin(u * 23 + seeds[1]);
             const jitter = Math.random() * 0.35;
             const slow = Math.random() < 0.08 ? 0.35 : 1;
-            this.colAcc[c] = (0.006 + 0.03 * (smooth + jitter)) * slow;
-            this.colVel[c] = 0.05 + Math.random() * 0.1;
+            const k = this._drainK ?? 1;
+            this.colAcc[c] = (0.006 + 0.03 * (smooth + jitter)) * slow * k;
+            this.colVel[c] = (0.05 + Math.random() * 0.1) * k;
             // Começa com uma leve ondulação (topo já irregular).
             this.colOff[c] = smooth * 2;
         }

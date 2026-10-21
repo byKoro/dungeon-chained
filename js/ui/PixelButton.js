@@ -200,7 +200,8 @@ export class PixelButton {
             this._pointerFocus = false;
         });
         el.addEventListener('focus', (e) => {
-            const fromButton = e.relatedTarget?.classList?.contains('pixel-btn');
+            // closest: o foco pode vir de dentro de um controle aninhado.
+            const fromButton = !!e.relatedTarget?.closest?.('.pixel-btn');
             if (this.enabled() && (this._pointerFocus || fromButton)) playUi('uiMove');
         });
         el.addEventListener('pointerleave', () => { this._pressed = false; this.refresh(); });

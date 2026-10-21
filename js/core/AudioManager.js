@@ -269,6 +269,12 @@ export class AudioManager {
         if (cue?.pitchShift) audio.preservesPitch = false;
         audio.currentTime = 0;
 
+        // Modo online (host): o efeito passa pelo grafo do Web Audio para
+        // também entrar no stream do convidado. O ganho fica num GainNode
+        // (pré-master) e o elemento toca a 1.0 — o master do grafo aplica o
+        // volume do host, igual ao caminho normal.
+        if (this._sfxBus) this._routeToGraph(audio, baseVolume * volumeMultiplier);
+
         this.active.add(audio);
         voices.push(audio);
         const release = () => {
@@ -304,8 +310,13 @@ export class AudioManager {
             return null;
         }
         this._masterNode = this._ctx.createGain();
+        // Pré-master: soma de tudo ANTES do volume do jogador. É daqui que
+        // sai o áudio transmitido no modo online (createStreamTap), para o
+        // volume do host não mexer no que o convidado ouve.
+        this._preNode = this._ctx.createGain();
+        this._preNode.connect(this._masterNode);
         this._duckNode = this._ctx.createGain();
-        this._duckNode.connect(this._masterNode);
+        this._duckNode.connect(this._preNode);
         this._masterNode.connect(this._ctx.destination);
         this._syncMaster();
         this._unlockOnGesture();
@@ -327,6 +338,44 @@ export class AudioManager {
             window.addEventListener(ev, resume, true);
         }
         ctx.resume?.().catch(() => {});
+    }
+
+    /**
+     * Abre uma "saída de transmissão": um MediaStream com a mixagem do jogo
+     * ANTES do volume do jogador (o convidado do modo online regula o dele).
+     * A partir daqui os efeitos (HTMLAudio) também passam pelo grafo.
+     * @param {number} [gain=1] ganho da transmissão (ex.: master de mixagem)
+     * @returns {MediaStream|null} null sem Web Audio / MediaStreamDestination
+     */
+    createStreamTap(gain = 1) {
+        const ctx = this._ensureContext();
+        if (!ctx || typeof ctx.createMediaStreamDestination !== "function") return null;
+        if (!this._tapDest) {
+            this._tapDest = ctx.createMediaStreamDestination();
+            this._tapGain = ctx.createGain();
+            this._tapGain.connect(this._tapDest);
+            this._preNode.connect(this._tapGain);
+            this._sfxBus = ctx.createGain();
+            this._sfxBus.connect(this._preNode);
+        }
+        this._tapGain.gain.value = gain;
+        return this._tapDest.stream;
+    }
+
+    // Liga um efeito HTMLAudio ao grafo (pré-master). Se o navegador recusar,
+    // volta ao volume no próprio elemento (o host continua ouvindo).
+    _routeToGraph(audio, volume) {
+        const before = audio.volume;
+        try {
+            const src = this._ctx.createMediaElementSource(audio);
+            const g = this._ctx.createGain();
+            g.gain.value = Math.max(0, Math.min(1, volume));
+            src.connect(g);
+            g.connect(this._sfxBus);
+            audio.volume = 1;
+        } catch (_) {
+            audio.volume = before;
+        }
     }
 
     // Master e mudo também valem para os loops (nó master do grafo).
@@ -450,7 +499,7 @@ export class AudioManager {
         ctx?.resume?.().catch(() => {});
         return new LoopVoice({
             ctx,
-            output: this._masterNode,
+            output: this._preNode,
             buffer: ctx ? this._loadBuffer(path) : null,
             path,
             volume: cue.volume ?? 0.5,

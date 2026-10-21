@@ -129,6 +129,8 @@ export function buildFrenzyBeats(S) {
             cam: () => {
                 const t = S.beatT;
                 const k = smooth(t / 0.9) * (1 - smooth((t - 2.1) / 0.9));
+                // Vídeo vertical: chicoteia até a porta (horda entrando) e volta.
+                if (S.host.portrait) return S._camLookAt(S.door, k);
                 return S._camFocus({ lean: S.door, leanK: 0.12 + 0.4 * k, zoom: lerp(2.2, 1.45, k) });
             }
         },
@@ -245,7 +247,9 @@ export function buildFrenzyBeats(S) {
                 ]);
                 if (t > 0.8) S._both(p => S._face(p, hm.x));
             },
-            cam: () => S._camFocus({ lean: S.horde.mass, leanK: 0.35, zoom: 1.7 })
+            // Vídeo vertical: centra quase no meio entre os dois e a horda
+            // (senão ela fica cortada na borda do quadro estreito).
+            cam: () => S._camFocus({ lean: S.horde.mass, leanK: S.host.portrait ? 0.8 : 0.35, zoom: 1.7 })
         },
 
         // 6 — DECISÃO: se olham, raiva e entram em formação.

@@ -54,8 +54,13 @@ export class ArrowRunShot extends RushShot {
 
         // Câmera: começa com a sala inteira (continuação do mergulho do mapa).
         const W = A.canvas.width, H = A.canvas.height;
-        const zFit = Math.min(W / A.rect.w, H * 0.8 / A.rect.h);
-        const camStart = { x: A.center.x, y: A.center.y, z: zFit, rot: 0.32 };
+        // Vídeo vertical: a sala comprida inteira viraria um risco no meio do
+        // quadro; começa com a ALTURA da sala quase enchendo a tela.
+        const zFit = this.stage.portrait
+            ? 0.72 * (H - 2 * this.stage.barH) / A.rect.h
+            : Math.min(W / A.rect.w, H * 0.8 / A.rect.h);
+        // (Vertical: já perto dos dois — o quadro estreito não mostra a sala toda.)
+        const camStart = { x: this.stage.portrait ? x0 - 150 : A.center.x, y: A.center.y, z: zFit, rot: 0.32 };
         const camAt = (t) => {
             const m = A.mid, z = lerp(1.7, 2.05, clamp01(t / 3.6)) * A.zoomRef * A.camClose;
             const h = handheld(t, 1.2);

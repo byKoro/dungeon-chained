@@ -146,11 +146,44 @@ export class TrailerStage {
         }
     }
 
+    // ---- Retrato (vídeo vertical 9:16, ex.: Reels) ----
+    // As cenas nasceram em paisagem. Em RETRATO (altura > largura) a base de
+    // escala é o LADO CURTO (personagens do mesmo tamanho que em paisagem) e
+    // cada cena adapta o enquadramento ao quadro alto. Em paisagem nada muda.
+    get portrait() { return this.canvas.height > this.canvas.width; }
+    get refSize() { return Math.min(this.canvas.width, this.canvas.height); }
+    // Barras de cinema: 10% do lado curto (em paisagem = 10% da altura).
+    get barH() { return Math.round(this.refSize * 0.10); }
+    // Área útil dos `fit` (meia largura / meia altura, em frações da tela).
+    // Em retrato sobra folga para a interface do Reels (topo, legenda, botões).
+    get fitW() { return this.portrait ? 0.45 : 0.5; }
+    get fitH() { return this.portrait ? 0.36 : 0.4; }
+    // Retrato: abaixo do centro a área útil é menor — o rodapé do Reels
+    // (nome do perfil, legenda, áudio) cobre a parte de baixo do vídeo.
+    get fitDown() { return this.portrait ? 0.30 : this.fitH; }
+
+    /**
+     * Retrato: segura o centro Y da câmera para a parte visível do quadro
+     * (fora das barras de cinema) não passar de [top, bottom] do mundo — sem
+     * faixa de vazio acima/abaixo da sala. Se a faixa for mais baixa que o
+     * quadro, centraliza. `rot` (drone) aumenta a meia altura visível.
+     * Em paisagem devolve `y` intacto.
+     */
+    portraitClampY(y, zoom, top, bottom, { w = this.canvas.width, h = this.canvas.height, inset = this.barH, rot = 0 } = {}) {
+        if (!this.portrait || !(zoom > 0)) return y;
+        const c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
+        const half = ((w / 2) * s + (h / 2 - inset) * c) / zoom;
+        const lo = top + half, hi = bottom - half;
+        return lo <= hi ? Math.max(lo, Math.min(hi, y)) : (lo + hi) / 2;
+    }
+
     // ---- Câmera ----
     // Zoom de REFERÊNCIA: o que faz uma sala padrão do jogo caber na tela.
-    // As cenas expressam seus zooms como múltiplos dele.
+    // As cenas expressam seus zooms como múltiplos dele. Em retrato vale o
+    // mesmo zoom da paisagem (pela altura da sala no lado curto).
     _zoomFit() {
         const margin = 90;
+        if (this.portrait) return this.refSize / (ROOM_ROWS * TILE + margin * 2);
         return Math.min(
             this.canvas.width / (ROOM_COLS * TILE + margin * 2),
             this.canvas.height / (ROOM_ROWS * TILE + margin * 2)
@@ -225,7 +258,7 @@ export class TrailerStage {
     // Barras pretas de cinema.
     drawLetterbox() {
         const { ctx, canvas } = this;
-        const barH = Math.round(canvas.height * 0.10);
+        const barH = this.barH;
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.fillStyle = '#000';
@@ -234,12 +267,14 @@ export class TrailerStage {
         ctx.restore();
     }
 
-    // Escala inteira da logo: ~50% da largura e no máximo ~40% da altura.
+    // Escala inteira da logo: ~50% da largura (retrato: ~86%) e no máximo
+    // ~40% da altura.
     logoScale() {
         const img = this.logo;
         if (!img?.naturalWidth) return 0;
         const { width: W, height: H } = this.canvas;
-        return Math.max(1, Math.floor(Math.min(W * 0.5 / img.naturalWidth, H * 0.4 / img.naturalHeight)));
+        const wk = this.portrait ? 0.86 : 0.5;
+        return Math.max(1, Math.floor(Math.min(W * wk / img.naturalWidth, H * 0.4 / img.naturalHeight)));
     }
 
     // Logo do jogo centrada em (W/2, cy). `red` 0..1 troca para a versão
@@ -328,7 +363,7 @@ export class TrailerStage {
         const { canvas: art, tipX, tipY } = this._bubbleCache;
 
         const gamePx = (TILE / 16) * scr.zoom;
-        const maxP = Math.floor((canvas.width * 0.55) / art.width);
+        const maxP = Math.floor((canvas.width * (this.portrait ? 0.86 : 0.55)) / art.width);
         const baseP = Math.max(2, Math.min(Math.round(gamePx * BUBBLE_PIXEL_RATIO), maxP));
         const P = baseP * scale;
         const dw = Math.round(art.width * P);
@@ -336,7 +371,7 @@ export class TrailerStage {
         const rise = (1 - inK) * 4 * P;
         let dx = Math.round(scr.x - tipX * P);
         let dy = Math.round(scr.y - 6 - tipY * P + rise);
-        const margin = Math.round(canvas.height * 0.10) + 8;
+        const margin = this.barH + 8;
         dx = Math.max(8, Math.min(dx, canvas.width - dw - 8));
         dy = Math.max(margin, dy);
 

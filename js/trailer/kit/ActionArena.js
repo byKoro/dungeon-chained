@@ -150,6 +150,7 @@ export class ActionArena {
         this.minSpin = 0;
         this.rot = 0;
         this.camGoal = null;
+        this.clampY = undefined;   // retrato: faixa Y do mundo que o quadro pode mostrar
         this.script = null;
         this.onKill = this.onWallHit = this.onYank = this.onBump = null;
         this.onDrawFloor = this.onDrawTop = null;   // ganchos de desenho (mundo)
@@ -161,6 +162,7 @@ export class ActionArena {
         this.red = 0;            // clima vermelho (luz + vinheta pulsando) 0..1
         this.redHz = 1.6;
         this.doorOpen = {};      // dir -> 0..1 (ausente = aberta)
+        this.flat = 0;           // visual "de papel" 0..1 (match cut; ver arenaRender)
         const s = this.saw;
         s.spin = 0; s.rotation = 0; s.dragX = s.dragY = 0; s.dropped = false; s.bloodTimer = 0;
         this.particles.clear();
@@ -190,8 +192,9 @@ export class ActionArena {
             this.ctx.imageSmoothingEnabled = false;
         }
     }
-    // Zoom de referência pela ALTURA (igual em tela cheia e meia tela).
-    get zoomRef() { return this.canvas.height / (ROOM_ROWS * TILE + 180); }
+    // Zoom de referência pelo LADO CURTO da tela do palco (= altura em
+    // paisagem): igual em tela cheia, meia tela e no vídeo vertical.
+    get zoomRef() { return this.stage.refSize / (ROOM_ROWS * TILE + 180); }
     get mid() { return { x: (this.p1.x + this.p2.x) / 2, y: (this.p1.y + this.p2.y) / 2 }; }
     get sawPos() {
         if (this.freeSaw) return this.freeSaw;
@@ -251,7 +254,27 @@ export class ActionArena {
             // Margem reduzida e área útil maior: enquadramento colado nos dois.
             const pd = pad * 0.65;
             const rw = hw * c + hh * s + pd, rh = hw * s + hh * c + pd;
-            z = Math.min(z, (W * 0.5) / rw, (H * 0.4) / rh);
+            z = Math.min(z, (W * this.stage.fitW) / rw, (H * this.stage.fitH) / rh);
+            // Vídeo vertical em tela cheia: nenhum ponto passa de `fitDown`
+            // abaixo do centro (projeção exata na tela girada pelo drone), para
+            // não cair sob a legenda do Reels.
+            const st = this.stage;
+            if (st.portrait && H === st.canvas.height) {
+                const sn = Math.sin(rot), cs = Math.cos(rot);
+                let down = 0;
+                for (const p of fit) { if (p) down = Math.max(down, (p.x - x) * sn + (p.y - y) * cs); }
+                if (down > 0) z = Math.min(z, (H * st.fitDown) / (down + pd));
+            }
+        }
+        // Vídeo vertical: o quadro alto não mostra o vazio acima/abaixo da
+        // sala (`clampY` = [topo, base] do mundo; false desliga).
+        const st = this.stage;
+        if (st.portrait && this.clampY !== false) {
+            const [top, bottom] = this.clampY ?? [-40, this.rect.h + 60];
+            const full = this.canvas.height === st.canvas.height;
+            y = st.portraitClampY(y, z, top, bottom, {
+                w: this.canvas.width, h: this.canvas.height, inset: full ? st.barH : st.barH / 2, rot
+            });
         }
         this.camGoal = { x, y, zoom: z, rot, k };
     }

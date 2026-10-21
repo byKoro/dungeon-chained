@@ -74,8 +74,23 @@ export class IntroScene {
     _express(p, n) { this.stage._express(p, n); }
     _bothExpressFor(n, s) { this.stage._bothExpressFor(n, s); }
     _speak(w, t, d) { this.stage._speak(w, t, d); }
-    _camTo(x, y, z, k) { this.stage._camTo(x, y, z, k); }
+    _camTo(x, y, z, k, close = false) {
+        const c = this._portraitCam(y, z, close);
+        this.stage._camTo(x, c.y, c.z, k);
+    }
     _zoomFit() { return this.stage._zoomFit(); }
+
+    // Vídeo vertical: um pouco mais perto (sobra altura, a largura ainda cabe
+    // os dois e a serra) e nunca tão aberto que apareça o vazio acima/abaixo
+    // da sala — a sala (+ o corredor da porta S) enche o quadro alto.
+    // `close` = close de rosto (já colado: fica como está).
+    _portraitCam(y, z, close = false) {
+        const st = this.stage;
+        if (!st.portrait) return { y, z };
+        const top = -40, bottom = this.rect.h + 1.5 * TILE + 10;
+        if (!close) z = Math.max(z * 1.15, (st.canvas.height - 2 * st.barH) / (bottom - top));
+        return { y: st.portraitClampY(y, z, top, bottom), z };
+    }
 
     // Tochas nas paredes + props no piso.
     _decorateRoom() {
@@ -135,9 +150,10 @@ export class IntroScene {
         this.p1.facingLeft = this.p2.facingLeft = false;
         this._faceFree();
         // Câmera começa BEM PERTO da porta.
+        const c0 = this._portraitCam(this.doorWorld.y - TILE, this._zoomFit() * 2.0);
         this.renderer.camX = this.doorWorld.x;
-        this.renderer.camY = this.doorWorld.y - TILE;
-        this.renderer.zoom = this._zoomFit() * 2.0;
+        this.renderer.camY = c0.y;
+        this.renderer.zoom = c0.z;
     }
 
     get isDone() { return this.beatIndex >= this.beats.length; }
@@ -437,7 +453,7 @@ export class IntroScene {
                 this.stage.audio?.mood(-20, 900, 0.3);
             },
             update: (k) => {
-                this._camTo(who.x, who.y + FACE_DY, this._zoomFit() * FACE_ZOOM, 0.18);
+                this._camTo(who.x, who.y + FACE_DY, this._zoomFit() * FACE_ZOOM, 0.18, true);
                 this._idle(this.p1);
                 this._idle(this.p2);
                 this._faceSaw();

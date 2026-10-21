@@ -44,8 +44,19 @@ export class ButtonDoorShot extends RushShot {
         A.red = 0.55; A.redHz = 1.8;
 
         const standY = (b) => b.y - 19;   // pés na tampa
-        A.initPlayer(p1, A.bounds.minX + 70, 240, 4, 0);
-        A.initPlayer(p2, A.bounds.maxX - 70, 250, -4, 0);
+        // Vídeo vertical: o quadro estreito só cabe os botões, então os dois
+        // vêm de BAIXO (cada um sob o seu botão), já dentro do quadro alto.
+        const portrait = this.stage.portrait;
+        if (portrait) {
+            A.initPlayer(p1, b1.x + 10, b1.y + 170, 0, -4);
+            A.initPlayer(p2, b2.x - 10, b2.y + 160, 0, -4);
+        } else {
+            A.initPlayer(p1, A.bounds.minX + 70, 240, 4, 0);
+            A.initPlayer(p2, A.bounds.maxX - 70, 250, -4, 0);
+        }
+        // Recuo até a parede de baixo, um de cada lado da porta S (mais
+        // juntos no vertical para caberem com a serra).
+        const spread = portrait ? 125 : 190;
         p1.goal = { x: b1.x, y: standY(b1), speed: 5.6 };
         p2.goal = { x: b2.x, y: standY(b2), speed: 5.6 };
         A.both(p => { p.accel = 0.16; p.wobble = 0.35; A.expr(p, 'preocupado'); });
@@ -112,8 +123,8 @@ export class ButtonDoorShot extends RushShot {
                         A.renderer.triggerShake(14);
                         A.both(p => { A.expr(p, 'assustado'); p.shiver = 0.35; });
                         // Recuam até a parede de baixo, um de cada lado da porta.
-                        p1.goal = { x: doorS.x - 190, y: doorS.y - 50, speed: 3.6 };
-                        p2.goal = { x: doorS.x + 190, y: doorS.y - 50, speed: 3.6 };
+                        p1.goal = { x: doorS.x - spread, y: doorS.y - 50, speed: 3.6 };
+                        p2.goal = { x: doorS.x + spread, y: doorS.y - 50, speed: 3.6 };
                     }
                 }
                 // 3) A porta de baixo arrebenta e a serra entra sozinha.
@@ -171,6 +182,16 @@ export class ButtonDoorShot extends RushShot {
             S._camera(A, t, { tP, tSaw, doorN });
         };
         A.snapCamera(A.center.x, 300, 2.3 * A.zoomRef, 0.3);
+        // A serra entra voando pela porta de baixo: o quadro alto pode mostrar
+        // um pouco do corredor da porta S.
+        A.clampY = [-40, A.rect.h + 90];
+        if (portrait) {
+            // Vertical: o 1º quadro já nasce no enquadramento do roteiro
+            // (o zoom do corte esconderia os dois chegando por baixo).
+            this._camera(A, 0, { tP: 0, doorN });
+            const g = A.camGoal;
+            A.setCam(g.x, g.y, g.zoom, g.rot);
+        }
     }
 
     _camera(A, t, { tP, doorN }) {
@@ -178,7 +199,14 @@ export class ButtonDoorShot extends RushShot {
         const h = handheld(t, 1.2);
         const m = A.mid;
         if (this.phase === 'run') {
-            A.focus({ x: m.x + h.x, y: m.y + 10 + h.y, zoom: 2.4, rot: lerp(0.3, 0.12, clamp01(t / 1.4)) + h.r, k: 0.14, fit: [p1, p2], pad: 60 });
+            // Vídeo vertical: enquadra os BOTÕES e os dois subindo até eles
+            // (vêm de baixo, dentro da largura dos botões; caber os dois desde
+            // as paredes laterais deixaria tudo minúsculo).
+            const portrait = this.stage.portrait;
+            const fit = portrait ? [...this.buttons, p1, p2] : [p1, p2];
+            const fx = portrait ? A.center.x : m.x;
+            const fy = portrait ? (this.buttons[0].y + m.y) / 2 : m.y + 10;
+            A.focus({ x: fx + h.x, y: fy + h.y, zoom: 2.4, rot: lerp(0.3, 0.12, clamp01(t / 1.4)) + h.r, k: 0.14, fit, pad: 60 });
         } else if (this.phase === 'pressed' && t - tP < 2.1) {
             // Olha para a porta de cima com os dois no quadro.
             A.focus({ x: m.x + h.x, y: lerp(m.y, doorN.y, 0.45) + h.y, zoom: 2.4, rot: -0.22 + h.r, k: 0.12, fit: [p1, p2, doorN], pad: 90 });
@@ -186,9 +214,19 @@ export class ButtonDoorShot extends RushShot {
             A.focus({ x: m.x + h.x, y: A.bounds.maxY - 120 + h.y, zoom: 2.7, rot: 0.08 + h.r, k: 0.14, fit: [p1, p2], pad: 70 });
         } else {
             const f = A.freeSaw;
+            let cx = lerp(m.x, f.x, 0.6), cy = lerp(m.y, f.y, 0.6), fit = [f, m], pad = 170;
+            if (this.stage.portrait) {
+                // Vídeo vertical: com só o MEIO dos dois no `fit`, cada um
+                // sairia por uma borda do quadro estreito. Cabe a serra + os
+                // dois, centrado na caixa deles.
+                fit = [f, p1, p2]; pad = 110;
+                const xs = fit.map(p => p.x), ys = fit.map(p => p.y);
+                cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+                cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+            }
             A.focus({
-                x: lerp(m.x, f.x, 0.6) + h.x, y: lerp(m.y, f.y, 0.6) + h.y, zoom: 2.5,
-                rot: 0.2 * Math.sin(t * 1.4) + h.r, k: 0.13, fit: [f, m], pad: 170
+                x: cx + h.x, y: cy + h.y, zoom: 2.5,
+                rot: 0.2 * Math.sin(t * 1.4) + h.r, k: 0.13, fit, pad
             });
         }
     }

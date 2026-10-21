@@ -28,11 +28,20 @@ export class SplitShot {
     get isDone() { return this.t > 6.4; }
     get reachedEnd() { return this.t > 6.2; }
 
+    // Tamanho de cada metade: lado a lado em paisagem; no vídeo vertical a
+    // tela divide em CIMA/EMBAIXO (cada metade fica quase quadrada, como as
+    // metades da paisagem).
+    _half() {
+        const { canvas } = this.stage;
+        return this.stage.portrait
+            ? [canvas.width, Math.ceil(canvas.height / 2)]
+            : [Math.ceil(canvas.width / 2), canvas.height];
+    }
+
     start() {
         this.t = 0;
-        const { canvas } = this.stage;
-        const hw = Math.ceil(canvas.width / 2);
-        for (const A of [this.left, this.right]) { A.reset(); A.ensureSize(hw, canvas.height); }
+        const [hw, hh] = this._half();
+        for (const A of [this.left, this.right]) { A.reset(); A.ensureSize(hw, hh); }
         this._setupLeft(this.left);
         this._setupRight(this.right);
         this.left.renderer.triggerShake(18);
@@ -93,11 +102,14 @@ export class SplitShot {
                 }
             }
             A.focus({
-                x: mx, y: my - 120, zoom: 1.8,
+                x: mx, y: my - ahead, zoom: 1.8,
                 rot: 0.22 + Math.sin(t * 0.9) * 0.08, k: 0.13, fit: [A.p1, A.p2], pad: 80
             });
         };
-        A.snapCamera(pathX(y0), y0 - 120, 1.8 * A.zoomRef, 0.22);
+        // Vídeo vertical: a metade de cima é larga e baixa; olhar tão à frente
+        // derrubaria o zoom (o `fit` mede a altura a partir do centro).
+        const ahead = this.stage.portrait ? 90 : 120;
+        A.snapCamera(pathX(y0), y0 - ahead, 1.8 * A.zoomRef, 0.22);
     }
 
     // ---- Direita: separados, flechas cruzando a tela ----
@@ -106,7 +118,10 @@ export class SplitShot {
         const y0 = A.bounds.maxY - 80;
         A.connected = false;
         A.sawVisible = false;
-        A.initPlayer(A.p1, A.center.x - 170, y0 - 150, 0, -SPEED);
+        // Vídeo vertical: a metade de baixo é larga e baixa; menos degrau entre
+        // os dois para o de trás não cair no rodapé do Reels.
+        const stag = this.stage.portrait ? 70 : 150;
+        A.initPlayer(A.p1, A.center.x - 170, y0 - stag, 0, -SPEED);
         A.initPlayer(A.p2, A.center.x + 170, y0, 0, -SPEED);
         A.both(p => { p.wobble = 0.45; p.accel = 0.12; p.goal = { vx: 0, vy: -SPEED, holdX: p.x }; A.expr(p, 'assustado'); });
 
@@ -137,11 +152,15 @@ export class SplitShot {
             if (t > 6.0) A.both(p => { if (p.goal) { p.goal = null; p.shiver = 0.35; A.expr(p, 'preocupado'); } });
             const m = A.mid;
             A.focus({
-                x: m.x, y: m.y - 110, zoom: 1.7,
+                x: m.x, y: m.y - ahead, zoom: 1.7,
                 rot: -0.18 + Math.sin(t * 0.7 + 1) * 0.07, k: 0.12, fit: [A.p1, A.p2], pad: 90
             });
         };
-        A.snapCamera(A.mid.x, A.mid.y - 110, 1.7 * A.zoomRef, -0.18);
+        // Vídeo vertical (metade de baixo): a câmera fica um pouco ATRÁS deles
+        // (ahead negativo), para os dois ficarem na parte de cima da metade.
+        // O rodapé do Reels (legenda/nome do perfil) cobre a parte de baixo.
+        const ahead = this.stage.portrait ? -30 : 110;
+        A.snapCamera(A.mid.x, A.mid.y - ahead, 1.7 * A.zoomRef, -0.18);
     }
 
     update(dt) {
@@ -153,6 +172,23 @@ export class SplitShot {
     render() {
         const { ctx, canvas } = this.stage;
         const W = canvas.width, H = canvas.height, hw = Math.ceil(W / 2);
+        if (this.stage.portrait) {
+            // Vídeo vertical: esquerda (zigue-zague) em cima, direita (flechas) embaixo.
+            const hh = Math.ceil(H / 2);
+            this.left.render(W, hh);
+            this.right.render(W, H - hh);
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.drawImage(this.left.canvas, 0, 0);
+            ctx.drawImage(this.right.canvas, 0, hh);
+            const bar = Math.max(6, Math.round(W / 120));
+            ctx.fillStyle = '#0b0910';
+            ctx.fillRect(0, hh - bar, W, bar * 2);
+            ctx.fillStyle = '#4a4458';
+            ctx.fillRect(0, hh - 1, W, 2);
+            ctx.restore();
+            return;
+        }
         this.left.render(hw, H);
         this.right.render(W - hw, H);
         ctx.save();

@@ -1,6 +1,57 @@
 {
+  "name": "dungeon-chained",
+  "version": "1.0.0",
+  "description": "Dungeon Chained — co-op local roguelike (build desktop).",
   "type": "module",
-  "dependencies": {
-    "caveman": "^0.1.6"
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64",
+    "pack": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.dungeonchained.game",
+    "productName": "Dungeon Chained",
+    "directories": {
+      "output": "dist/desktop"
+    },
+    "files": [
+      "electron/main.cjs",
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "map/**/*",
+      "assets/**/*",
+      "pitch/print/**/*",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Dungeon Chained"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
   }
 }

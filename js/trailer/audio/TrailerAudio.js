@@ -34,7 +34,10 @@ const SOUNDS = {
     sawHit: nums(A + 'saw-hit', 3), sawSnap: [A + 'saw-snap.wav'], sawLand: nums(A + 'saw-land', 2),
     sawPickup: [A + 'saw-pickup.wav'], footstep: nums(A + 'footstep-stone', 6, 'ogg'),
     swish: nums(A + 'enemy-attack', 3), doorOpen: [A + 'door-open.wav'], fall: [A + 'player-fall.wav'],
-    enemySpawn: nums(A + 'enemy-spawn', 3), arrow: nums(A + 'arrow-fire', 3)
+    enemySpawn: nums(A + 'enemy-spawn', 3), arrow: nums(A + 'arrow-fire', 3),
+    // Sons do jogo usados pelos clipes do Bloco 3 (js/trailer/b3/).
+    playerHit: nums(A + 'player-hit', 3), buttonPress: nums(A + 'button-press', 2),
+    buttonRelease: [A + 'button-release.wav']
 };
 const LOOPS = {
     music: 'assets/audio/music/megasong.mp3',
@@ -150,17 +153,21 @@ export class TrailerAudio {
     }
 
     // ---- Começo / fim ----
-    /** Liga trilha + leitos (chamar depois do unlock, ao começar o trailer). */
-    start() {
+    /**
+     * Liga trilha + leitos (chamar depois do unlock, ao começar o trailer).
+     * `music: false` = só SFX e leitos (clipes do match cut: a trilha entra na edição).
+     */
+    start({ music = true } = {}) {
         if (!this.ctx) return;
         this.stopAll(0.05);
+        this._gen = (this._gen || 0) + 1;   // loops pendentes de um começo antigo não entram
         const c = this.ctx, t = c.currentTime;
         this._mood = { db: -60, lp: 20000 };
         this.excitement = 0;
         this._prevCam = null;
         this.musicDuck.gain.cancelScheduledValues(t); this.musicDuck.gain.setValueAtTime(1, t);
         this.musicGain.gain.cancelScheduledValues(t); this.musicGain.gain.setValueAtTime(0, t);
-        this._loop('music', this.musicLP, 1);
+        if (music) this._loop('music', this.musicLP, 1);
         this._loop('amb', this.bed, 0);
         this._loop('rumble', this.bed, 0);
         this._loop('saw', this.sfx, 0);
@@ -172,15 +179,25 @@ export class TrailerAudio {
         this.loops.wind = { src, gain: g, filter: bp };
         this.started = true;
     }
-    _loop(name, dest, gain) {
+    _loop(name, dest, gain, offset = 0) {
         const buf = this.buffers['loop:' + name];
-        if (!buf) return;
         const c = this.ctx;
+        if (!buf) {
+            // Ainda decodificando (ex.: navegador liberou o áudio sem a tela
+            // de gesto e o trailer começou antes da trilha de 5 MB chegar):
+            // entra assim que carregar, já no ponto em que estaria.
+            const gen = this._gen, t0 = c.currentTime;
+            this.ready.then(() => {
+                if (this._gen !== gen || !this.started || !this.buffers['loop:' + name]) return;
+                this._loop(name, dest, gain, c.currentTime - t0);
+            });
+            return;
+        }
         const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
         const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 20000;
         const g = c.createGain(); g.gain.value = gain;
         src.connect(lp); lp.connect(g); g.connect(dest);
-        src.start();
+        src.start(0, offset > 0 ? offset % buf.duration : 0);
         this.loops[name] = { src, gain: g, filter: lp };
     }
     /** Para tudo com fade (ex.: o jogo assume). */

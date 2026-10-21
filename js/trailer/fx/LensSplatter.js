@@ -16,7 +16,7 @@ export class LensSplatter {
     /** (sx, sy) = posição de TELA da morte. `power` 0..1 escala tamanho/quantidade. */
     trigger(sx, sy, power = 1) {
         const { width: W, height: H } = this.canvas;
-        const cell = Math.max(4, Math.round(H / 110));
+        const cell = Math.max(4, Math.round(Math.min(W, H) / 110));   // = BloodScreen
         const n = 1 + Math.round(Math.random() * 2 * power);
         for (let i = 0; i < n; i++) {
             // Maioria perto da morte; um ou outro numa borda da tela.

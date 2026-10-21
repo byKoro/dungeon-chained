@@ -28,14 +28,33 @@ import { HOLE_TILES } from '../../../config/GameConfig.js';
 
 export const CELL_W = 18;
 export const CELL_H = 13;
-export const GRID_W = 15;
-export const GRID_H = 9;
-export const CENTER = { i: 7, j: 4 };
-export const MAP_W = GRID_W * CELL_W;
-export const MAP_H = GRID_H * CELL_H;
 
-// Meia-extensão (em células) de cada nível de zoom: 1 sala, 3x3, 7x5, 15x9.
-export const LEVEL_SPAN = [[0, 0], [1, 1], [3, 2], [7, 4]];
+// Grades disponíveis. `span` = meia-extensão (em células) de cada nível de
+// zoom. Paisagem: 1 sala, 3x3, 7x5, 15x9. RETRATO (vídeo vertical): 1 sala,
+// 3x5, 5x9, 7x15 — cada nível já nasce no formato do quadro alto.
+const GRIDS = {
+    landscape: { w: 15, h: 9, center: { i: 7, j: 4 }, span: [[0, 0], [1, 1], [3, 2], [7, 4]] },
+    portrait: { w: 7, h: 15, center: { i: 3, j: 7 }, span: [[0, 0], [1, 2], [2, 4], [3, 7]] }
+};
+
+// Grade ATIVA (ligações vivas do módulo: quem importa enxerga a troca).
+export let GRID = 'landscape';
+export let GRID_W = 15;
+export let GRID_H = 9;
+export let CENTER = { i: 7, j: 4 };
+export let MAP_W = GRID_W * CELL_W;
+export let MAP_H = GRID_H * CELL_H;
+export let LEVEL_SPAN = [[0, 0], [1, 1], [3, 2], [7, 4]];
+
+/** Troca a grade ativa ('landscape' | 'portrait') antes de buildDungeon(). */
+export function useGrid(name = 'landscape') {
+    const g = GRIDS[name] ?? GRIDS.landscape;
+    GRID = GRIDS[name] ? name : 'landscape';
+    GRID_W = g.w; GRID_H = g.h;
+    CENTER = { ...g.center };
+    MAP_W = GRID_W * CELL_W; MAP_H = GRID_H * CELL_H;
+    LEVEL_SPAN = g.span.map(s => [...s]);
+}
 
 export function levelOf(i, j) {
     const dx = Math.abs(i - CENTER.i), dy = Math.abs(j - CENTER.j);

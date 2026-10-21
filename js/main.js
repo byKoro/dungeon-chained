@@ -9,12 +9,14 @@ import { playUi, preloadUi } from './ui/UiSound.js';
 /**
  * main.js — ponto de entrada (index.html).
  *
- * Fluxo de abertura (ex.: itch.io):
+ * Fluxo de abertura:
  *   1. Tela de carregamento: texturas (jogo + trailer) e catálogo de salas.
  *   2. TRAILER no mesmo canvas. Botão PULAR a qualquer momento; no fim
  *      aparece COMEÇAR (o trailer segue em loop por baixo).
- *   3. COMEÇAR/PULAR: tela de carregamento curta (áudio + montagem do jogo) e
- *      o jogo começa já com tudo decodificado (sem travar no início).
+ *   3. COMEÇAR/PULAR: começa o jogo (co-op local, dois jogadores na mesma
+ *      máquina).
+ *   4. Jogo: tela de carregamento curta (áudio + montagem do jogo) e o jogo
+ *      começa já com tudo decodificado (sem travar no início).
  *
  * `?playtest=true` (editor) e `?skipTrailer` vão direto para o jogo.
  */
@@ -31,10 +33,11 @@ async function bootstrap() {
     let trailer = null;
     if (!skipTrailer) {
         document.body.classList.add('trailer-mode');
-        // ?timer mostra o cronômetro do trailer (para revisar; fora do itch.io).
+        // ?timer mostra o cronômetro do trailer (para revisar).
         // ?mute desliga o som do trailer (sem a tela "clique para começar").
         trailer = new TrailerPlayer(canvas, assets, {
-            onEnd: () => ui.showStart(),
+            // No fim do trailer, aparece o botão COMEÇAR.
+            onEnd: () => { if (!started) ui.showStart(); },
             // SKIP só depois que o trailer começa de fato (não na tela de gesto).
             onBegin: () => ui.showSkip(),
             showTimer: params.has('timer'), audio: !params.has('mute')
@@ -48,12 +51,18 @@ async function bootstrap() {
     ]);
 
     let started = false;
-    const startGame = async () => {
-        if (started) return;
-        started = true;
+    // Sai da abertura (trailer, botões) antes de o jogo assumir.
+    const leaveOpening = () => {
         ui.hide();
         trailer?.stop();
         document.body.classList.remove('trailer-mode');
+    };
+
+    // Jogo co-op local (dois jogadores na mesma máquina).
+    const startGame = async () => {
+        if (started) return;
+        started = true;
+        leaveOpening();
 
         let game = null;
         await loading.run('Preparing the dungeon…', [
@@ -68,6 +77,7 @@ async function bootstrap() {
         game.start();
     };
 
+    // START / SKIP começam o jogo direto (o trailer é parado em leaveOpening).
     const ui = buildTrailerUI(startGame, () => trailer?.togglePause(), () => !!trailer?.paused);
     if (skipTrailer) { startGame(); return; }
     trailer.play();

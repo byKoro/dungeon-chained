@@ -121,6 +121,8 @@ export class Game {
         // Volume GERAL do jogador (slider da pausa, compartilhado com o
         // trailer): multiplica o master de mixagem da config.
         const mixMaster = this.audio.getMasterVolume();
+        // Master de mixagem da config: o slider do jogador multiplica este valor.
+        this.mixMaster = mixMaster;
         this._unsubVolume = MasterVolume.subscribe(() => this.audio.setMasterVolume(mixMaster * MasterVolume.gain()));
         // Botões de interface passam a usar o mesmo gerenciador (master/mudo).
         setUiAudio(this.audio);

@@ -32,6 +32,31 @@ combate). Não é vídeo: é código roteirizado. Tudo em `js/trailer/`.
 Importante: crie o `TrailerPlayer` ANTES de `assets.whenReady()` — o stage
 registra no loader as folhas de expressão.
 
+- Vídeo MP4: `node tools/trailer-render/render.mjs [--fps 60] [--from N]
+  [--max S] [--hold S] [--out ...]` → `dist/trailer/dungeon-chained-trailer-1080p60.mp4`
+  (1920×1080, H.264 crf 14 + AAC 256k; ~12 q/s, ~10 min). Sem deps npm: servidor
+  local + Chrome headless via DevTools Protocol + ffmpeg (o do Remotion em
+  `pitch/video/node_modules` ou `--ffmpeg`). `tools/trailer-render/record.html`
+  troca `performance.now`/rAF por relógio virtual e o `AudioContext` por um
+  `OfflineAudioContext` avançado por `suspend/resume` a cada quadro (imagem e
+  som sincronizados). Sem gesto/SKIP/START/pausa; no fim, no lugar do START, a
+  CTA `js/trailer/fx/ItchCta.js` (placa vermelha "DOWNLOAD NOW" no estilo do
+  PixelButton + `imkoro.itch.io/dungeon-chained` na barra de baixo), segura
+  `--hold` 6s e escurece imagem e som no último 1s.
+- Vídeo vertical (Reels/Shorts): `--vertical` (1080×1920; `--size WxH` muda) →
+  `dist/trailer/dungeon-chained-trailer-reels-1080x1920-60fps.mp4`. Prévia
+  rápida: `--snap 0.5 --fps 30 --frames [--snapdir DIR]` (snaps + folhas de
+  contato `sheet_NN_Cena_P.png` + `index.json`, sem MP4).
+  - Retrato = `stage.portrait` (H > W). TODA adaptação fica atrás dele: a
+    paisagem não pode mudar.
+  - Escala pelo lado curto (`stage.refSize`; `zoomRef`/`_zoomFit` usam ele).
+  - Área útil do `fit` em retrato: `fitW 0.45`, `fitH 0.36` e `fitDown 0.30`
+    (nada abaixo de 30% do centro em tela cheia: rodapé do Reels).
+    `portraitClampY`/`A.clampY` não mostram o vazio acima/abaixo da sala.
+  - Por cena: Split divide CIMA/BAIXO; MapGen usa grade retrato 7×15
+    (`useGrid('portrait')`); BossWall tem `DIST.portrait` e zoom ×1.2;
+    CTA (`ItchCta._drawPortrait`) com logo a ~25% e placa a ~67% da altura.
+
 ## Som (js/trailer/audio/TrailerAudio.js)
 
 Web Audio próprio do trailer (não usa o AudioManager do jogo). `stage.audio`
@@ -454,3 +479,93 @@ Faixa de jogo em Y: `Y_TOP 175 … Y_BOT 520`, meio `Y_MID 345`.
   reações); preferir aumentar `camClose`/`CAM_CLOSE` a afastar.
 - Pedido de ajuste fino: abrir `index.html?timer` e informar
   "cena N, +X.Xs" do cronômetro.
+
+## Match cuts do vídeo de apresentação (js/trailer/matchcut/)
+
+Clipes curtos papel -> jogo do `pitch/04-video-apresentacao.md`, tocados pelo
+MESMO `TrailerPlayer` com `{ scenes: [Shot], letterbox: false, music: false }`
+(o trailer não muda; `TrailerAudio.start({ music })`).
+
+- `layout.json` = fonte da verdade (câmera, pose-base, props, ator de cada
+  plano). Lido pelo jogo (`MatchShot.js`, via fetch + top-level await) e por
+  `tools/matchcut_layout.py` (folha 4 `tools/gen_boss_room.py`, folha 5
+  `tools/gen_matchcut_pieces.py`, conferência `tools/check_matchcut_align.py`).
+  Mexeu nele: regerar as folhas e reimprimir.
+- Geometria: arena 18×11; a folha A4 paisagem (3508×2480, 351 px/tile) é a
+  janela centrada na câmera (576, 352), zoom 3 em 1920 de largura (192 px/tile,
+  10 tiles = largura da folha). Canvas fixo 1920×1080.
+- `MatchShot` (base): sem impacto/shake no corte, câmera travada (`setCam`),
+  `FREEZE 0.5` s congelado (sem `arena.update`) = quadro do papel, depois
+  `A.flat` 1 -> 0 em `MOOD_IN 0.4` s (luz ambiente branca -> clima, vinheta,
+  e `arenaRender` some com sombras/névoa/vento/brilho da serra enquanto
+  `flat > 0`), `TAIL 1` s de sobra. `poseBase` = P1 olhando para a direita,
+  P2 espelhado, serra parada.
+- Câmera: `camTo({x, y, z, rot, k})` = mola em TEMPO REAL (z = multiplicador
+  do zoom do papel; não estica na câmera lenta); `hitstop(secs)` pula o
+  `arena.update` por um instante. Arena com `smoothZoom`.
+- Planos (`shots.js`, tecla = letra): A `KillShot` (demônio empurrado de cima para baixo ->
+  bote -> hit-stop + soco de câmera com giro + faíscas/tranco -> gibs com 2º
+  tranco -> fúria, câmera assenta e deriva); B `PullShot` (P2 dispara para a
+  direita -> `onYank` da corda: hit-stop + soco de câmera no meio da corda,
+  P1 arrancado (hop + impulso) e arrastado -> P2 freia e olha para trás ->
+  P1 pousa cambaleando e fecha a cara; câmera segue `A.mid`); C `BreakShot`
+  (cabo de guerra: `saw.setStrain` + `setVignetteBreath` + câmera fechando ->
+  `A.snap()` com hit-stop, câmera abre com giro, os dois arremessados ->
+  pousam, olham a serra e um para o outro -> voltam juntos (`BACK_SPEED 4.6`)
+  -> `A.reconnect()` com soco de câmera; garantia 1.9 s após o snap; 4.7 s);
+  D `WideShot` (arena com `doors:{N:true}`, fora da janela do papel: andam
+  para a esquerda até `SPOT` com a corda em pé enquanto a câmera recua a
+  `WIDE` z 0.56 = sala inteira -> 3 pancadas + porta N abre (`doorOpen.N`,
+  `red`) -> horda de 12 em girassol achatado no `BLOB`, cada um guarda a sua
+  faixa `e._lane` -> investida reta (`CHARGE_V`); na investida a horda anda
+  reto para a esquerda NA SUA FAIXA (quem ainda desce converge rápido; faixas
+  fora da `PLAYER_SAFE_ZONE` 46 dos dois — o corte é o SEGMENTO p1–p2, não a
+  corda curvada) -> freia 0.25 s depois do último abate (ou `BRAKE_X`/garantia
+  2.2 s), se viram, câmera assenta; 7 s); E `CardShot` (cartas de
+  `pitch/print/cartas/` — PNG = arte 62×82 ampliada 10×, desenhada sem
+  suavizar a `shots.E.artPx` px de mundo por px de arte, em `onDrawOver` —
+  nas posições de `shots.E.cards`; as de fora saem voando para os lados,
+  Arremesso sobe/treme/brilha e vira blocos 2×2 da própria arte que estouram
+  e são sugados pela serra -> clarão + brilho vermelho -> câmera recua a
+  `WIDE` z 0.56 enquanto demônios nascem em `ENEMY_ARC` (distâncias ao longo
+  do caminho; pula os que ficam a < 150 px dos jogadores) -> fúria ->
+  `A.freeSaw` com `BOUNCES` 4 reflexões nas paredes (caixa = limites menos o
+  raio do disco) -> volta mirando `A.mid` (`HOME_TURN`), `_catch` =
+  `saw.drop` + `A.reconnect()` + soco de câmera; garantia `RETURN_GUARANTEE`
+  2.75 s de voo; 6.3 s). O roteiro atual do doc 04 tem um único match cut:
+  B–E são extras.
+- Prévia: `matchcut.html?shot=A` (`?timer`, `?mute`, `?noloop`). MP4:
+  `render.mjs --set matchcut --shot A [--mute]` -> `dist/matchcut/`;
+  `--still` = PNG do quadro 0; `--snap` também funciona com `--set`.
+
+## Clipes do Bloco 3 do vídeo de apresentação (js/trailer/b3/)
+
+Um clipe por fala do B3 (`pitch/04-video-apresentacao.md`), tocados pelo mesmo
+`TrailerPlayer` (sem letterbox, sem música, só SFX, sem HUD). 1920×1080 60 fps.
+
+- `B3Shot` (base, estende `ArenaShot`): `cutIn = 'dry'` (corte seco: o
+  TrailerPlayer só toca o whoosh se `cutIn !== 'dry'`), `TAIL` 1 s,
+  ambiente `44,36,54`, vinheta 0.72, `camClose 1`, `smoothZoom`. Câmera
+  `frame(A, t, {x, y, zoom, k, fit, pad, amp})` = de cima + `handheld` leve
+  (sem giro de drone). Mecânica real decide o resultado (`ArenaHazards` em
+  `arenaHazards.js` porta `SpikeTrap`/`ArrowTrap`/`PressureButton`; buraco
+  com `HOLE_FALL`; dano por `Player.takeDamage`), com garantias de tempo.
+  O wrapper de `A.script` decrementa `invulnerableTimer`/`scaredTimer`,
+  preenche `moveX/moveY` pela velocidade (> 0.3; o `_assist` do
+  PressureButton solta o pé de quem sai) e detecta dano pela queda de
+  `lives` → `onHurt` (flash, shake 10, `hitstop 0.05`, `playerHit`).
+  `unlockDoors(A)` = feixe amarelo `DOOR_LIGHT` + zoom-punch + `doorOpen`.
+  Lower-third só com `?labels` (`this.label`).
+- Clipes (`shots.js`, 0..6): `OpenShot` (~2,5 s, tranco da corda + câmera
+  revela a sala), `HoleShot` (~5 s, bote do demônio, P2 escorrega, corda
+  segura), `SpikeShot` (3,6 s, flecha → P2 pula → P1 arrastado pros
+  espinhos), `ButtonShot` (3,6 s, botões co-op → porta N), `LockShot` (4,6 s,
+  entra pela W, portas batem em 0.4, 4 inimigos, último com hitstop/slowmo →
+  unlock → sai pela E), `MapShot` (~5 s, sala padrão cresce em lobos com
+  paleta própria por hue-rotate do `tileset.png`, peças de `map/*.json`,
+  clarão → 2ª run; layout em `mapGrow.js`), `CouchShot` (3,2 s, dois
+  controles em pixel art nas cores P1 `#ffd166` / P2 `#6bb4db`).
+- SFX novos no `TrailerAudio`: `playerHit`, `buttonPress`, `buttonRelease`.
+- Prévia: `b3.html?shot=0..6|all` (`?labels`, `?timer`, `?mute`, `?noloop`).
+  MP4: `render.mjs --set b3 --shot all|N [--mute]` ->
+  `dist/b3/b3-<SHOT>-1920x1080-60fps.mp4`; `--still`, `--snap` valem.

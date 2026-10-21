@@ -262,16 +262,45 @@ export class FrenzyScene {
         if (lean) { leanK *= 0.6; x = lerp(x, lean.x, leanK); y = lerp(y, lean.y, leanK); }
 
         // Garante os DOIS (e o ponto de interesse) dentro do quadro.
-        const W = this.host.canvas.width, H = this.host.canvas.height;
+        const host = this.host;
+        const W = host.canvas.width, H = host.canvas.height;
         const xs = [p1.x, p2.x], ys = [p1.y, p2.y];
-        if (lean && leanK > 0.2) { xs.push(lean.x); ys.push(lean.y); }
-        // Margem menor e área útil maior: câmera mais colada nos dois.
-        const halfW = Math.max(...xs.map(v => Math.abs(v - x))) + 70;
-        const halfH = Math.max(...ys.map(v => Math.abs(v - y))) + 80;
         // 0.5 da largura / 0.4 da altura = metade visível (fora do letterbox):
-        // garante os pontos DENTRO do quadro.
-        const fitZoom = Math.min((W * 0.5) / halfW, (H * 0.4) / halfH);
-        return { x, y, zoom: Math.min(this.host._zoomFit() * zoom * CAM_CLOSE, fitZoom) };
+        // garante os pontos DENTRO do quadro. Margem menor e área útil
+        // maior: câmera mais colada nos dois.
+        const fitOf = (px, py) => Math.min(
+            (W * host.fitW) / (Math.max(...px.map(v => Math.abs(v - x))) + 70),
+            (H * host.fitH) / (Math.max(...py.map(v => Math.abs(v - y))) + 80));
+        const fitPlayers = fitOf(xs, ys);
+        if (lean && leanK > 0.2) {
+            // Vídeo vertical: garante só a FRENTE do ponto de interesse (70% do
+            // caminho até ele) — senão o quadro estreito abriria demais.
+            const f = host.portrait ? 0.7 : 1;
+            xs.push(lerp(x, lean.x, f)); ys.push(lerp(y, lean.y, f));
+        }
+        const base = host._zoomFit() * zoom * CAM_CLOSE;
+        let z = Math.min(base, fitOf(xs, ys));
+        if (host.portrait) {
+            // Vídeo vertical: não abre além da altura da arena só para caber o
+            // ponto de interesse (ele pode ficar na borda); os DOIS sempre cabem.
+            const minZ = (H - 2 * host.barH) / (this.rect.h + 80);
+            z = Math.max(z, Math.min(minZ, fitPlayers, base));
+            // Sem faixa de vazio acima/abaixo da arena.
+            y = host.portraitClampY(y, z, -40, this.rect.h + 40);
+        }
+        return { x, y, zoom: z };
+    }
+
+    // Vídeo vertical: mistura o enquadramento dos dois com um plano no ponto
+    // `pt` (k = 0 só os dois, 1 só o ponto), zoom em escala logarítmica. Usado
+    // na PORTA: a câmera chicoteia até ela e volta (abrir até caber tudo
+    // deixaria a arena numa faixa fina no meio do quadro).
+    _camLookAt(pt, k, zoom = 1.55) {
+        const a = this._camFocus({ zoom: 2.2 });
+        const zb = this.host._zoomFit() * zoom * CAM_CLOSE;
+        const z = Math.exp(lerp(Math.log(a.zoom), Math.log(zb), k));
+        const y = this.host.portraitClampY(lerp(a.y, pt.y, k), z, -40, this.rect.h + 40);
+        return { x: lerp(a.x, pt.x - 40, k), y, zoom: z };
     }
 
     // ---- Horda ----

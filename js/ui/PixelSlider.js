@@ -123,7 +123,7 @@ export class PixelSlider {
         el.addEventListener('pointerenter', () => { if (this.enabled()) el.focus({ preventScroll: true }); });
         el.addEventListener('focus', (e) => {
             // Mesmo som de "mover o foco" dos botões (só vindo de outro controle).
-            if (this.enabled() && e.relatedTarget?.classList?.contains('pixel-btn')) playUi('uiMove');
+            if (this.enabled() && e.relatedTarget?.closest?.('.pixel-btn')) playUi('uiMove');
             this.refresh();
         });
         el.addEventListener('blur', () => { this._drag = false; this.refresh(true); });

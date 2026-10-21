@@ -48,8 +48,16 @@ export function renderArena(A, w, h) {
     A.particles.drawSmoke(ctx);
     A.onDrawFloor?.(ctx);
 
-    for (const p of [p1, p2]) renderer.drawRoundShadow(p.x, p.y, 14 - Math.min(6, p.hopZ * 0.4), 0);
-    for (const e of A.enemies) if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0);
+    // `A.flat` (0..1): visual "de papel" (match cut) — sem sombras, névoa,
+    // vento nem brilho da serra. 0 = normal (padrão de todas as cenas).
+    const solid = 1 - (A.flat || 0);
+    ctx.save();
+    ctx.globalAlpha = solid;
+    if (solid > 0.01) {
+        for (const p of [p1, p2]) renderer.drawRoundShadow(p.x, p.y, 14 - Math.min(6, p.hopZ * 0.4), 0);
+        for (const e of A.enemies) if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0);
+    }
+    ctx.restore();
 
     if (A.sawVisible && A.connected) {
         ctx.save();
@@ -76,14 +84,24 @@ export function renderArena(A, w, h) {
     drawArrows(A, ctx);
     A.onDrawTop?.(ctx);
     A.particles.drawAir(ctx);
-    A.wind.draw(ctx);
+    if (solid > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = solid;
+        A.wind.draw(ctx);
+        ctx.restore();
+    }
 
     ctx.restore();
     renderer.endFrame();
 
     renderLights(A);
     A.post.draw();
-    A.stage.drawFogOn(ctx, W, H, A.fogPhase ?? 0);
+    if (solid > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = solid;
+        A.stage.drawFogOn(ctx, W, H, A.fogPhase ?? 0);
+        ctx.restore();
+    }
     drawRedMood(A, ctx, W, H);
     A.screenGore.draw(ctx);
     A.lens.draw(ctx);
@@ -104,7 +122,12 @@ export function renderArena(A, w, h) {
         const sp = A.sawPos, s = A.sawScale;
         if (s > 1.05) drawBigSaw(A, ctx, sp, s, worldTf);
         else {
-            A.stage._drawSawGlow(ctx, sp);
+            if (solid > 0.01) {
+                ctx.save();
+                ctx.globalAlpha = solid;
+                A.stage._drawSawGlow(ctx, sp);
+                ctx.restore();
+            }
             if (A.freeSaw) { const f = { x: sp.x, y: sp.y }; saw.draw(ctx, f, f); }
             else if (A.connected) saw.draw(ctx, p1, p2);
             else if (saw.dropped) saw.drawDropped(ctx);

@@ -32,15 +32,17 @@ export class PauseScreen {
      * @param {() => void} [o.onMove]  foco mudou (ex.: som de clique)
      * @param {string} [o.rootId]      id do elemento da tela (criado se não existir)
      * @param {boolean} [o.volume]     mostra o slider de volume geral
+     * @param {string} [o.restartLabel] texto do 2º botão (ex.: 'LEAVE' no
+     *   convidado do modo online, que sai da sala em vez de reiniciar)
      */
-    constructor({ onResume, onRestart = null, onMove = null, rootId = 'pause-screen', volume = true }) {
+    constructor({ onResume, onRestart = null, onMove = null, rootId = 'pause-screen', volume = true, restartLabel = LABELS.restart }) {
         this.onMove = onMove;
         this.root = document.getElementById(rootId) || this._createRoot(rootId);
         this.root.classList.add('pause-screen');
         let menu = this.root.querySelector('.pause-menu');
         if (!menu) { menu = document.createElement('div'); menu.className = 'pause-menu'; this.root.appendChild(menu); }
         menu.innerHTML = '';
-        const labels = [LABELS.resume, ...(onRestart ? [LABELS.restart] : [])];
+        const labels = [LABELS.resume, ...(onRestart ? [restartLabel] : [])];
         const minTextW = Math.max(...labels.map(measureText), measureText(LABELS.restart));
         const mk = (tag) => { const el = document.createElement(tag); el.appendChild(document.createElement('canvas')); menu.appendChild(el); return el; };
 
@@ -52,7 +54,7 @@ export class PauseScreen {
         ];
         if (onRestart) {
             this.buttons.push(new PixelButton(mk('button'), {
-                label: LABELS.restart, ariaLabel: 'Restart', face: 'stone', minTextW,
+                label: restartLabel, ariaLabel: restartLabel === LABELS.restart ? 'Restart' : restartLabel.toLowerCase(), face: 'stone', minTextW,
                 enabled: () => this.visible, onPress: () => onRestart?.()
             }));
         }

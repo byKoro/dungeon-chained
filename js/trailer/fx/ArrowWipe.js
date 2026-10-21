@@ -27,7 +27,9 @@ export class ArrowWipe {
         const lead = W * 1.05 - W * 1.45 * easeIn(clamp01(t / this.cover)) ** 0.7;
         const kr = clamp01((t - this.cover - this.hold) / this.reveal);
         const trail = W * 1.35 - W * 1.95 * easeIn(kr) ** 0.75;
-        const rowH = H / ROWS;
+        // Mais faixas numa tela alta (vídeo vertical): flecha do mesmo tamanho.
+        const rowsN = Math.max(ROWS, Math.round(ROWS * H / Math.min(W, H)));
+        const rowH = H / rowsN;
         const L = rowH * 1.9;                 // comprimento da flecha (px de tela)
         const img = this.img;
         const ready = img && img.complete && img.naturalWidth > 0;
@@ -35,7 +37,7 @@ export class ArrowWipe {
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = false;
-        for (let i = 0; i < ROWS; i++) {
+        for (let i = 0; i < rowsN; i++) {
             const y0 = i * rowH;
             const a = lead + hash01(i * 3.7) * W * 0.16;
             const b = trail + hash01(i * 9.1 + 4) * W * 0.22;

@@ -105,6 +105,15 @@ function glowLayer() {
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const rnd = (a, b) => a + Math.random() * (b - a);
 
+// Distâncias horizontais da luta a partir da parede (px de mundo). No vídeo
+// VERTICAL o quadro é estreito: a luta fica mais perto da caveira, para que
+// caveira + jogadores caibam na largura com zoom alto (a altura da sala enche
+// o quadro, sem faixa de vazio).
+const DIST = {
+    landscape: { appear: 650, shock: 760, shockAmp: 50, fight: 600, fightAmp: 230, lo: 330, hi: 900, warn: 420, dodgeAmp: 150 },
+    portrait: { appear: 380, shock: 430, shockAmp: 30, fight: 360, fightAmp: 80, lo: 280, hi: 440, warn: 380, dodgeAmp: 60 }
+};
+
 export class BossWallShot extends RushShot {
     constructor(stage) {
         const torches = [];
@@ -240,9 +249,13 @@ export class BossWallShot extends RushShot {
         ];
 
         A.snapCamera(X0 + 110, Y_MID - 10, 1.5 * A.zoomRef, 0.04);
+        // Vídeo vertical: o quadro alto vai da parede de cima (tochas) até a
+        // de baixo — nada de vazio acima/abaixo da sala.
+        A.clampY = [-10, A.rect.h + 4];
     }
 
     get away() { return this.B.side === 'R' ? -1 : 1; }   // do boss para os jogadores
+    get dist() { return DIST[this.stage.portrait ? 'portrait' : 'landscape']; }
 
     // ---- Eventos ----
     _appear(A, side) {
@@ -250,7 +263,7 @@ export class BossWallShot extends RushShot {
         B.side = side;
         B.visible = true;
         B.alpha = 1; B.stretch = 1; B.crack = 0;
-        B.tx = m.x - this.away * 650;
+        B.tx = m.x - this.away * this.dist.appear;
         B.y = clamp(m.y, 280, 410);
         B.act = 'slam'; B.actT = A.t; B.landed = false;
         B.x = B.tx - this.away * 950;
@@ -491,7 +504,8 @@ export class BossWallShot extends RushShot {
         if (yc > Y_BOT + 20 || yc < Y_TOP - 10) { dir = -dir; yc = B.beamY + dir * 175; }
         yc = clamp(yc, Y_TOP - 10, Y_BOT + 20);
         // Mantém distância da caveira (nunca colados nela durante o raio).
-        const xm = this.away > 0 ? Math.max(A.mid.x, B.x + 420) : Math.min(A.mid.x, B.x - 420);
+        const wd = this.dist.warn;
+        const xm = this.away > 0 ? Math.max(A.mid.x, B.x + wd) : Math.min(A.mid.x, B.x - wd);
         this.mode = 'dodge';
         this._dodge = { x: xm, y: yc, t: A.t };
         p1.goal = { x: xm - 85, y: yc, speed: 10 };
@@ -678,8 +692,8 @@ export class BossWallShot extends RushShot {
         }
         if (this.mode === 'shock' || this.mode === 'shock2') {
             // Recuam cambaleando (vaivém curto), sem ficar plantados.
-            const u = t - (this._shockT ?? t);
-            this._formation(A, B.tx + away * (760 + 50 * Math.sin(u * 5)), Y_MID + 40 * Math.sin(u * 3.4), 90, 4.5);
+            const u = t - (this._shockT ?? t), Dd = this.dist;
+            this._formation(A, B.tx + away * (Dd.shock + Dd.shockAmp * Math.sin(u * 5)), Y_MID + 40 * Math.sin(u * 3.4), 90, 4.5);
             if (this.mode === 'shock2' && t - this._shockT > 0.35) this._fight(A, 'furia');
             return;
         }
@@ -691,14 +705,15 @@ export class BossWallShot extends RushShot {
             // minion mais próximo (caçam a leva). A corda fica de través ao
             // movimento (varre como lâmina) e gira devagar.
             const u = t;   // tempo global: o caminho não "pula" ao voltar à luta
-            let mx = B.tx + away * (600 + 230 * Math.sin(u * 2.4 + 0.6));
+            const Dd = this.dist;
+            let mx = B.tx + away * (Dd.fight + Dd.fightAmp * Math.sin(u * 2.4 + 0.6));
             let my = Y_MID + 150 * Math.sin(u * 1.75) + 40 * Math.sin(u * 4.3);
             const prey = this._nearestMinion(A, A.mid);
             if (prey) {
                 const k = 0.6;
                 mx = lerp(mx, prey.x, k); my = lerp(my, prey.y, k);
             }
-            const lo = away > 0 ? B.tx + 330 : B.tx - 900, hi = away > 0 ? B.tx + 900 : B.tx - 330;
+            const lo = away > 0 ? B.tx + Dd.lo : B.tx - Dd.hi, hi = away > 0 ? B.tx + Dd.hi : B.tx - Dd.lo;
             mx = clamp(mx, lo, hi);
             my = clamp(my, Y_TOP + 20, Y_BOT - 10);
             this._formation(A, mx, my, 95, 10);
@@ -709,7 +724,7 @@ export class BossWallShot extends RushShot {
             const g = this._dodge;
             if (g) {
                 const u = t - g.t;
-                const x = g.x + away * 150 * Math.sin(u * 3.2);
+                const x = g.x + away * this.dist.dodgeAmp * Math.sin(u * 3.2);
                 A.both(p => {
                     const off = (p === p1 ? -1 : 1) * 85;
                     p.goal = { follow: true, x: x + off, y: g.y + Math.sin(u * 6 + (p === p1 ? 0 : 2)) * 12, gain: 0.22, max: 10 };
@@ -803,16 +818,29 @@ export class BossWallShot extends RushShot {
             A.focus({ x: lerp(m.x, B.x, 0.45) + h.x * 0.5, y: clamp(B.y - 20, 260, 360) + h.y * 0.5, zoom: 1.45, rot: -0.05 * this.away + h.r, k: 0.1 });
             return;
         }
-        const z = FIGHT_ZOOM * A.zoomRef * A.camClose;
+        // Vídeo vertical: planos um pouco mais fechados (a altura da sala enche
+        // o quadro alto) e centrados entre a caveira e os dois (ver abaixo).
+        const portrait = this.stage.portrait;
+        const pz = portrait ? 1.2 : 1;
+        const z = FIGHT_ZOOM * pz * A.zoomRef * A.camClose;
         const hw = W / (2 * z);
         // Boss sumindo: a câmera já vai para o lado onde ele vai ressurgir
         // (a entrada "de uma vez" acontece dentro do quadro).
         const switching = (B.act === 'vanish' && A.t - B.actT > 0.15) || B.act === 'gone';
         if (switching || this.mode === 'shock' || this.mode === 'shock2' || !B.visible) {
             let tx = B.tx, aw = this.away;
-            if (switching) { aw = -this.away; tx = m.x - aw * 650; }
+            if (switching) { aw = -this.away; tx = m.x - aw * this.dist.appear; }
             const k = switching || this.mode === 'shock2' ? 0.11 : 0.09;
-            A.focus({ x: tx + aw * 0.7 * hw + h.x, y: CAM_Y + h.y, zoom: FIGHT_ZOOM, rot: h.r, k });
+            // Vídeo vertical: com o boss na borda (como na paisagem) os dois
+            // sairiam pela OUTRA borda do quadro estreito; centra entre os dois
+            // e a caveira, um pouco mais perto deles (a caveira é enorme).
+            // Se a onda do impacto os afasta demais, eles mandam (a caveira
+            // fica na borda). Conta o mais LONGE dos dois, não o meio: com a
+            // corda deitada um deles sairia pela borda.
+            const D = Math.abs(m.x - tx);
+            const far = Math.max(Math.abs(A.p1.x - tx), Math.abs(A.p2.x - tx));
+            const off = portrait ? Math.max(0.55 * D, far - (hw - 80)) : 0.7 * hw;
+            A.focus({ x: tx + aw * off + h.x, y: CAM_Y + h.y, zoom: FIGHT_ZOOM * pz, rot: h.r, k });
             return;
         }
 
@@ -856,6 +884,15 @@ export class BossWallShot extends RushShot {
                 cx = B.tx + away * 0.72 * hw; cy = CAM_Y; zoom = 1.0; rot = 0.08 * away; k = 0.12; break;
             case 'charge':    // investida: colado neles correndo para a caveira
                 cx = lerp(m.x, skull.x, 0.5); cy = lerp(m.y, B.y, 0.5); zoom = 1.45; rot = -0.09 * away; k = 0.1; break;
+        }
+        // Vídeo vertical: o `fit` é medido a partir do centro da câmera, então
+        // um centro torto (boss na borda) derrubaria o zoom no quadro estreito.
+        // Centra no MEIO entre a caveira e o mais longe dos dois (com um resto
+        // do enquadramento do plano) e fecha um pouco o zoom.
+        if (portrait) {
+            const xs = fit.map(p => p.x);
+            cx = lerp((Math.min(...xs) + Math.max(...xs)) / 2, cx, 0.2);
+            zoom *= pz;
         }
         // Tranco no abate: a câmera dá um puxão para o ponto e gira um pouco.
         const kk = this._kick && t - this._kick.t < 0.3 ? 1 - (t - this._kick.t) / 0.3 : 0;
@@ -1047,16 +1084,25 @@ export class BossWallShot extends RushShot {
     // ---- Plano final (tela): salto em câmera lenta na direção da câmera ----
     _tickScreenEmbers(dt) {
         const W = this.stage.canvas.width, H = this.stage.canvas.height;
+        const base = this.stage.refSize;   // escala dos bonecos (= H em paisagem)
         this._embAcc += dt * 60;
         const steps = Math.floor(this._embAcc);
         this._embAcc -= steps;
         for (let i = 0; i < steps; i++) {
             for (let k = 0; k < 1; k++) {
                 this.fxScreen.ember(rnd(0, W), H * rnd(0.85, 1.0), rnd(-1.5, 1.5), rnd(-5, -2),
-                    { size: rnd(3, 8) * H / 900, life: rnd(1.2, 2.4) });
+                    { size: rnd(3, 8) * base / 900, life: rnd(1.2, 2.4) });
             }
         }
         this.fxScreen.update(steps);
+    }
+
+    // Plano final no vídeo VERTICAL: logo em cima, os dois no meio e espaço
+    // embaixo para a chamada "DOWNLOAD NOW" (ItchCta), tudo dentro da área
+    // que a interface do Reels não cobre. Em paisagem: logo no centro.
+    get logoCy() {
+        const H = this.stage.canvas.height;
+        return this.stage.portrait ? Math.round(H * 0.25) : H / 2;
     }
 
     _drawLeap() {
@@ -1091,25 +1137,33 @@ export class BossWallShot extends RushShot {
             ctx.fillStyle = pg;
             ctx.fillRect(0, 0, W, H);
         }
+        // Tamanho dos bonecos pelo LADO CURTO (= H em paisagem): no vídeo
+        // vertical eles cabem na largura, lado a lado.
+        const portrait = this.stage.portrait, base = this.stage.refSize;
         // Brasas na grade de pixel dos bonecos gigantes (≈ altura × 0.42 / 23 px de arte).
-        this.fxScreen.pixel = Math.max(2, Math.round(H * 0.42 / 23));
+        this.fxScreen.pixel = Math.max(2, Math.round(base * 0.42 / 23));
         this.fxScreen.draw(ctx);
 
         // Escala "3D falsa": crescem vindo na direção da câmera.
         const grow = lt > 1.8 ? Math.min(lt, FREEZE_AT) - 1.8 : 0;
-        const hFrac = lerp(0.1, 0.42, e) + grow * 0.01;
-        const sc = hFrac * H / 73;               // 73 = drawHeight do jogador
-        const y = H * (lerp(0.5, 0.6, e) - 0.08 * Math.sin(Math.PI * u));
+        const hFrac = lerp(0.1, portrait ? 0.4 : 0.42, e) + grow * 0.01;
+        const sc = hFrac * base / 73;            // 73 = drawHeight do jogador
+        // Vertical: param no meio entre a logo (acima) e a chamada (abaixo),
+        // com a serra livre acima da placa.
+        const y = portrait
+            ? H * (lerp(0.5, 0.485, e) - 0.05 * Math.sin(Math.PI * u))
+            : H * (lerp(0.5, 0.6, e) - 0.08 * Math.sin(Math.PI * u));
         // Float: depois do congelamento cada um flutua sozinho (fases
         // alternadas), em degraus de 1 pixel de arte (sc) como o resto da UI.
         const fk = easeInOut(clamp01((lt - FREEZE_AT) / 0.6));
         const floatY = (phase) => {
             if (lt <= 1.8) return 0;
-            const amp = lerp(H * 0.003, FLOAT_AMP * sc, fk);
+            const amp = lerp(base * 0.003, FLOAT_AMP * sc, fk);
             return Math.round((Math.sin(lt * FLOAT_SPEED + phase) * amp) / sc) * sc;
         };
         const y1 = y + floatY(0), y2 = y + floatY(Math.PI * 0.6);
-        const x1 = W * lerp(0.45, 0.25, e), x2 = W * lerp(0.55, 0.75, e);
+        const xe = portrait ? 0.27 : 0.25;
+        const x1 = W * lerp(0.45, xe, e), x2 = W * lerp(0.55, 1 - xe, e);
         const tilt = 0.26 * e;
 
         // Corda (no espaço escalado: espessura acompanha os bonecos); as
@@ -1181,9 +1235,10 @@ export class BossWallShot extends RushShot {
             const lw = (logo?.naturalWidth || 113) * (ls || 4);
             const lh = (logo?.naturalHeight || 41) * (ls || 4);
             const R = lw * 0.7;
+            const cy = this.logoCy;
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.translate(W / 2, H / 2 + 6);
+            ctx.translate(W / 2, cy + 6);
             ctx.scale(1, (lh * 1.1) / R);
             const dg = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
             dg.addColorStop(0, `rgba(10, 2, 4, ${0.7 * ta})`);
@@ -1192,7 +1247,7 @@ export class BossWallShot extends RushShot {
             ctx.fillStyle = dg;
             ctx.fillRect(-R, -R, R * 2, R * 2);
             ctx.restore();
-            this.stage.drawTitleLogo(0, ta);
+            this.stage.drawTitleLogo(0, ta, cy);
         }
     }
 }

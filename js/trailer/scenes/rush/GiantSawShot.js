@@ -175,18 +175,21 @@ export class GiantSawShot extends RushShot {
         const h = handheld(t, 1.3);
         const m = A.mid;
         const ph = this.phase;
+        // Vídeo vertical: o quadro é estreito, os desvios laterais encolhem
+        // (senão os dois saem pela borda esquerda).
+        const lx = this.stage.portrait ? 0.4 : 1;
         if (ph === 'flee' || ph === 'wall') {
             // À frente deles, horda no quadro atrás (direita).
-            A.focus({ x: m.x + 220 + h.x, y: m.y + h.y, zoom: 2.0, rot: lerp(0.36, 0.08, clamp01(t / 1.6)) + h.r, k: 0.15, fit: [p1, p2], pad: 70 });
+            A.focus({ x: m.x + 220 * lx + h.x, y: m.y + h.y, zoom: 2.0, rot: lerp(0.36, 0.08, clamp01(t / 1.6)) + h.r, k: 0.15, fit: [p1, p2], pad: 70 });
         } else if (ph === 'trapped') {
             const u = t - tT;
             // Closes rápidos (chicote do drone): vermelho, azul, depois os dois.
-            if (u < 0.5) A.focus({ x: m.x + 120 + h.x, y: m.y + h.y, zoom: 2.0, rot: -0.12 + h.r, k: 0.16 });
+            if (u < 0.5) A.focus({ x: m.x + 120 * lx + h.x, y: m.y + h.y, zoom: 2.0, rot: -0.12 + h.r, k: 0.16 });
             else if (u < 0.95) A.focus({ x: p1.x + 10, y: p1.y - 14, zoom: 3.8, rot: 0.22, k: 0.3 });
             else A.focus({ x: p2.x + 10, y: p2.y - 14, zoom: 3.8, rot: -0.24, k: 0.3 });
         } else if (ph === 'stretch' || ph === 'grow') {
             const sp = A.sawPos;
-            A.focus({ x: sp.x + 170 + h.x, y: sp.y + h.y, zoom: 1.7, rot: 0.1 * Math.sin(t * 2) + h.r, k: 0.12, fit: [p1, p2], pad: 90 });
+            A.focus({ x: sp.x + 170 * lx + h.x, y: sp.y + h.y, zoom: 1.7, rot: 0.1 * Math.sin(t * 2) + h.r, k: 0.12, fit: [p1, p2], pad: 90 });
         } else {
             // Mergulho: zoom exponencial no centro do disco, girando.
             const z0 = this._z0, sp = A.sawPos;

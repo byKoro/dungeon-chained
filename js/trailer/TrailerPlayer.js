@@ -65,14 +65,23 @@ export class TrailerPlayer {
      * @param {boolean} [opts.showTimer] mostra o cronômetro discreto.
      * @param {() => void} [opts.onBegin] chamado UMA vez quando o trailer
      *   começa de fato (depois da tela "clique para começar", se houver).
+     * @param {Function[]} [opts.scenes] outra sequência de cenas (padrão: o
+     *   trailer). Ex.: os clipes do match cut (js/trailer/matchcut/).
+     * @param {boolean} [opts.letterbox] barras de cinema (padrão true).
+     * @param {boolean} [opts.music] trilha (padrão true; false = só SFX).
+     * @param {(stage: TrailerStage) => void} [opts.setupStage] ajuste do palco
+     *   antes de criar as cenas (ex.: canvas de tamanho fixo).
      */
     constructor(canvas, assets, opts = {}) {
         this.stage = new TrailerStage(canvas, assets);
+        opts.setupStage?.(this.stage);
         // Som: `opts.audio === false` (ex.: ?mute) desliga tudo.
         this.audio = opts.audio === false ? null : new TrailerAudio();
         this.stage.audio = this.audio?.available ? this.audio : null;
         this.stage.hookAudio?.();
-        this.scenes = SCENES.map(Scene => new Scene(this.stage));
+        this.letterbox = opts.letterbox !== false;
+        this.music = opts.music !== false;
+        this.scenes = (opts.scenes || SCENES).map(Scene => new Scene(this.stage));
         this._gate = null;
         this._paused = false;
         this.pauseScreen = null;      // criada na 1ª pausa (#trailer-pause: RESUME + VOLUME)
@@ -156,7 +165,9 @@ export class TrailerPlayer {
     setPaused(paused, { silent = false } = {}) {
         paused = !!paused;
         if (paused === this._paused) return;
-        if (paused && (this._gate || !this.running)) return;
+        // allowPause = false: há um menu por cima (escolha do modo / salas
+        // online) e o trailer só segue de fundo — Esc/START são do menu.
+        if (paused && (this._gate || !this.running || this.allowPause === false)) return;
         this._paused = paused;
         if (!this.pauseScreen && typeof document !== 'undefined') {
             this.pauseScreen = new PauseScreen({
@@ -215,7 +226,7 @@ export class TrailerPlayer {
         this.sceneTime = 0;
         this.impactT = -1;
         const au = this.stage.audio;
-        if (au) { au.start(); this._applyMood(); }
+        if (au) { au.start({ music: this.music }); this._applyMood(); }
         this.current.start();
         if (!this.running) {
             this.running = true;
@@ -348,7 +359,8 @@ export class TrailerPlayer {
                 au?.play('whoosh', { vol: 0.45, rate: 1.25 });
                 au?.duck(-10, 0.05, 0.7);
                 au?.excite(0.5);
-            } else au?.play('whoosh', { vol: 0.35, rate: 0.9 });
+            } else if (this.current.cutIn !== 'dry') au?.play('whoosh', { vol: 0.35, rate: 0.9 });
+            // cutIn = 'dry': corte seco puro, sem som (clipes do Bloco 3).
         }
         st.audio?.tick(dt, this._audioState());
         if (this.impactT >= 0) {
@@ -375,7 +387,7 @@ export class TrailerPlayer {
         this.stage.bloodScreen.draw(ctx);
         this.stage.overlay?.draw(ctx);
         this._drawImpact(ctx, canvas);
-        this.stage.drawLetterbox();
+        if (this.letterbox) this.stage.drawLetterbox();
         if (this.showTimer) this._drawTimer(ctx, canvas);
     }
 

@@ -24,7 +24,7 @@ import { ArrowTrap } from '../../../entities/ArrowTrap.js';
 import { SpawnSystem } from '../../../systems/SpawnSystem.js';
 import { PostProcessor } from '../../../systems/PostProcessor.js';
 import {
-    buildDungeon, levelRectTiles, levelOf, CENTER, CELL_W, CELL_H, GRID_W, GRID_H, MAP_W
+    buildDungeon, levelRectTiles, levelOf, useGrid, CENTER, CELL_W, CELL_H, GRID_W, GRID_H, MAP_W
 } from './mapLayout.js';
 import { bakeDungeon, drawTile16 } from './mapBake.js';
 import { clamp01, lerp, easeInOut, hash01 } from '../../anim.js';
@@ -70,20 +70,29 @@ export class MapGenScene {
     constructor(stage) {
         this.stage = stage;
         this.cutIn = 'impact';
-        this.D = buildDungeon(SEED);
-        this.center = this.D.rooms.find(R => R.level === 0);
-        this.cellRoom = new Map(this.D.rooms.map(R => [`${R.i},${R.j}`, R]));
         this.post = new PostProcessor(stage.canvas, stage.ctx, {
             lighting: { ambient: AMBIENT_DARK.join(', ') },
             vignette: { strength: 0.7 }
         });
+        this._build();
+        this.t = 0;
+    }
+
+    // Gera a dungeon na grade do formato atual da tela: paisagem (15x9
+    // células) ou RETRATO (7x15, vídeo vertical: os níveis crescem para cima e
+    // para baixo e enchem o quadro alto).
+    _build() {
+        this._grid = this.stage.portrait ? 'portrait' : 'landscape';
+        useGrid(this._grid);
+        this.D = buildDungeon(SEED);
+        this.center = this.D.rooms.find(R => R.level === 0);
+        this.cellRoom = new Map(this.D.rooms.map(R => [`${R.i},${R.j}`, R]));
         this._baked = false;
         this._schedule();
         // Sala do mergulho: retangular, perto do centro (não a do centro).
         const rects = this.D.rooms.filter(R => R.shape === 'rect' && R.level >= 1 && R.level <= 2);
         rects.sort((a, b) => a.d - b.d);
         this.diveRoom = rects[0] || this.center;
-        this.t = 0;
     }
 
     reset() { this.t = 0; }
@@ -156,6 +165,9 @@ export class MapGenScene {
         this._firedPop = 0;
         this._flashHanded = false;
         this.fogPhase = 0;
+        // A tela trocou de formato (paisagem <-> retrato): outra dungeon.
+        if (this._grid !== (this.stage.portrait ? 'portrait' : 'landscape')) this._build();
+        else useGrid(this._grid);
         if (!this._baked) {
             bakeDungeon(this.D, this.stage.assets.tileset);
             this._shadow = makeShadowSprite();
@@ -351,12 +363,18 @@ export class MapGenScene {
     }
 
     // ---- Câmera ----
+    // Altura útil: dentro das barras de cinema (em paisagem = 0.78 da altura).
+    get _usableH() { return (this.stage.canvas.height - 2 * this.stage.barH) * 0.975; }
     _fit(r, rot) {
         const { canvas } = this.stage;
         const c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
         const rw = r.w * c + r.h * s, rh = r.w * s + r.h * c;
-        // Área útil: dentro das barras de cinema (10% em cima e embaixo).
-        return Math.min(canvas.width * 0.94 / rw, canvas.height * 0.78 / rh);
+        return Math.min(canvas.width * 0.94 / rw, this._usableH / rh);
+    }
+    // Vídeo vertical: a ALTURA do retângulo enche a área útil (corta os lados).
+    _fitH(r, rot) {
+        const c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
+        return this._usableH / (r.w * s + r.h * c);
     }
     _levelRect(k) {
         if (k === 0) {
@@ -373,10 +391,12 @@ export class MapGenScene {
             const u = easeInOut(clamp01(t / (POPS[0].at + 0.3)));
             const rot = lerp(-0.12, 0.05, u);
             // Panorâmica: quase a sala inteira na altura, deslizando de lado.
+            // (Vertical: a altura da sala enche o quadro e a câmera atravessa
+            // a sala de lado — o quadro estreito mostra uma fatia dela.)
             return {
                 x: r.x + r.w * (0.5 + lerp(-0.2, 0.17, u)),
                 y: r.y + r.h * (0.5 + lerp(-0.02, -0.05, u)),
-                z: this._fit(r, rot) * lerp(1.3, 1.17, u),
+                z: this.stage.portrait ? this._fitH(r, rot) * lerp(1.06, 1.0, u) : this._fit(r, rot) * lerp(1.3, 1.17, u),
                 rot
             };
         }
@@ -403,7 +423,8 @@ export class MapGenScene {
         const r = { x: R.gx * TILE, y: R.gy * TILE, w: R.w * TILE, h: R.h * TILE };
         const u = clamp01((t - DIVE_AT) / DIVE_DUR);
         const rot = lerp(A.rot, 0.32, easeInOut(u));
-        const zB = this._fit(r, rot) * 1.15;
+        // (Vertical: a sala enche o quadro pela altura.)
+        const zB = (this.stage.portrait ? this._fitH(r, rot) : this._fit(r, rot)) * 1.15;
         const w = Math.pow(u, 2.2);
         const pw = easeInOut(clamp01(u * 1.25));
         return {

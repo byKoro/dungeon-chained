@@ -53,6 +53,11 @@ export class ZigZagShot extends ArenaShot {
             A.exprFor(p, kills % 3 ? 'furia' : 'raiva', 0.5);
         };
 
+        // Câmera à frente da dupla. Vídeo vertical: o quadro alto já mostra o
+        // corredor à frente; com o avanço da paisagem a dupla desceria para a
+        // faixa da legenda do Reels (~75% da altura) — menos avanço = ~62%.
+        const lead = this.stage.portrait ? 90 : 150;
+
         // Roteiro: alvo de subida + zigue-zague; inimigos dão bote ao chegar perto.
         A.script = (t) => {
             const my = y0 - SPEED * 60 * t;
@@ -68,11 +73,11 @@ export class ZigZagShot extends ArenaShot {
             // Drone: à frente da dupla, girando de -20° a +9° e aproximando.
             const k = clamp01(t / 3.2);
             A.focus({
-                x: mx, y: my - 150, zoom: lerp(1.9, 2.5, k),
+                x: mx, y: my - lead, zoom: lerp(1.9, 2.5, k),
                 rot: lerp(-0.35, 0.16, k) + Math.sin(t * 2.1) * 0.03,
                 k: 0.14, fit: [A.p1, A.p2], pad: 90
             });
         };
-        A.snapCamera(pathX(y0), y0 - 150, 1.9 * A.zoomRef, -0.35);
+        A.snapCamera(pathX(y0), y0 - lead, 1.9 * A.zoomRef, -0.35);
     }
 }
