@@ -1,0 +1,32 @@
+# Dependências e artefatos de build do empacotamento desktop (Electron).
+node_modules/
+dist/
+
+# Logs e temporários
+*.log
+run-out.txt
+run-err.txt
+build-log.txt
+__pycache__/
+
+# --- Reorganização: fora do versionamento (ficam só no disco) ---
+# Guarda-chuva de tudo que não é o jogo (configs de IA, análises, tools, mídia).
+/_local/
+
+# Material de vídeo/marketing e documentação (não entram no git).
+/pitch/
+/docs/
+
+# Saída da ferramenta de análise de grafo (regenerável).
+/graphify-out/
+
+# Configs de ferramentas de IA (não têm relação com o jogo).
+/.agents/
+/.aider-desk/
+/.claude/
+
+# Material-fonte e arquivos soltos de rascunho.
+*.zip
+/_tiles.png
+/_w.png
+tests/_tmp_audio_check.js

@@ -1,1 +1,0 @@
-{"nodes": [{"id": "assets_tileset_preview", "label": "Tileset preview with indices", "file_type": "image", "source_file": "assets/tileset/_preview.png"}], "edges": [{"source": "assets_tileset_preview", "target": "assets_tileset_tileset", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "assets/tileset/_preview.png"}], "hyperedges": []}
