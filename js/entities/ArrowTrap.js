@@ -1,9 +1,5 @@
 import { HAZARDS, TILE } from '../config/GameConfig.js';
 
-/**
- * Arrow — projétil de flecha. Viaja em linha reta na direção (dirX,dirY) até
- * sair dos bounds ou acertar um player. Forma geométrica por enquanto.
- */
 export class Arrow {
     constructor(x, y, dirX, dirY, sprite = null) {
         this.x = x;
@@ -20,7 +16,6 @@ export class Arrow {
         this.lifeSeconds = cfg.maxLifeFrames / 60;
     }
 
-    // Avança e checa colisão. Devolve o player atingido (ou null).
     update(players, bounds, deltaSeconds = 1 / 60) {
         const frameScale = Math.max(0, deltaSeconds) * 60;
         this.x += this.dx * frameScale;
@@ -28,8 +23,6 @@ export class Arrow {
         this.lifeSeconds -= Math.max(0, deltaSeconds);
         if (this.lifeSeconds <= 0) { this.dead = true; return null; }
 
-        // A flecha nasce dentro do tile da parede. Mantém-se viva até cruzar
-        // a parede oposta, em vez de morrer ao sair dos bounds de piso.
         const m = TILE;
         if (this.x < bounds.minX - m || this.x > bounds.maxX + m ||
             this.y < bounds.minY - m || this.y > bounds.maxY + m) {
@@ -54,13 +47,13 @@ export class Arrow {
         ctx.rotate(this.angle);
         if (this.sprite && this.sprite.complete && this.sprite.naturalWidth > 0) {
             const length = cfg.length + 12;
-            // Compensa o eixo do sprite para que a ponta siga a direção do voo.
+
             ctx.rotate(-Math.PI / 2);
             ctx.drawImage(this.sprite, -length / 2, -length / 2, length, length);
             ctx.restore();
             return;
         }
-        // Haste
+
         ctx.strokeStyle = cfg.color;
         ctx.lineWidth = cfg.width;
         ctx.lineCap = "round";
@@ -68,7 +61,7 @@ export class Arrow {
         ctx.moveTo(-cfg.length / 2, 0);
         ctx.lineTo(cfg.length / 2, 0);
         ctx.stroke();
-        // Ponta
+
         ctx.fillStyle = cfg.headColor;
         ctx.beginPath();
         ctx.moveTo(cfg.length / 2 + 6, 0);
@@ -80,23 +73,8 @@ export class Arrow {
     }
 }
 
-/**
- * ArrowTrap — atirador de flechas montado numa parede, com indicador visível.
- *
- * A cada `intervalFrames` ele telegrafa (indicador pulsa/muda de cor por
- * `warnFrames`) e então dispara uma flecha atravessando o corredor na direção
- * `dir`. Usa os sprites de assets/arrow, com fallback geométrico.
- *
- * O trap NÃO guarda as flechas: ao disparar, chama `onFire(arrow)` para que o
- * dono (Room/Game) as gerencie num pool compartilhado.
- */
 export class ArrowTrap {
-    /**
-     * @param {number} x posição do emissor (na parede)
-     * @param {number} y
-     * @param {{x:number,y:number}} dir direção de disparo (será normalizada)
-     * @param {object} opts { phaseOffset:0..1, sprites, arrowSprite }
-     */
+
     constructor(x, y, dir, opts = {}) {
         this.x = x;
         this.y = y;
@@ -113,7 +91,7 @@ export class ArrowTrap {
         this.elapsed = ((opts.phaseOffset || 0) % 1) * this.intervalSeconds;
         this.hasFiredThisCycle = false;
         this.pulse = 0;
-        // true SÓ no passo em que disparou (o Game toca o som do disparo).
+
         this.justFired = false;
     }
 
@@ -127,7 +105,6 @@ export class ArrowTrap {
         this.pulse += dt * 3;
         this.justFired = false;
 
-        // Dispara no início do último quadro, quando o sprite mostra a flecha saindo.
         const launchAt = this.intervalSeconds - this.warnSeconds * 0.25;
         if (!this.hasFiredThisCycle && this.elapsed >= launchAt) {
             const sx = this.x + this.dirX * 14;
@@ -147,19 +124,19 @@ export class ArrowTrap {
         const cfg = this.cfg;
         const warn = this.isWarning;
         const s = cfg.indicatorSize;
-        // Pulso mais rápido/forte durante o warn.
+
         const pulse = warn ? (0.6 + 0.4 * Math.abs(Math.sin(this.pulse * 1.6))) : 0.75;
 
         ctx.save();
         ctx.translate(this.x, this.y);
-        // Alinha o eixo da sequência do sprite com a direção do disparo.
+
         ctx.rotate(Math.atan2(this.dirY, this.dirX) - Math.PI / 2);
 
         const warnProgress = this.warnSeconds > 0
             ? Math.max(0, Math.min(0.999, (this.elapsed - (this.intervalSeconds - this.warnSeconds)) / this.warnSeconds))
             : 0;
-        // A animação sai do quadro vazio e avança até a flecha estendida durante o aviso.
-        const firingFrames = [1, 2, 3, 0]; // quadro vazio, flecha saindo, totalmente estendida
+
+        const firingFrames = [1, 2, 3, 0];
         const spriteIndex = warn ? firingFrames[Math.floor(warnProgress * firingFrames.length)] : 1;
         const sprite = this.sprites && this.sprites[spriteIndex];
         if (sprite && sprite.complete && sprite.naturalWidth > 0) {
@@ -171,7 +148,6 @@ export class ArrowTrap {
             return;
         }
 
-        // Base montada na parede (losango).
         ctx.fillStyle = "#2a2330";
         ctx.strokeStyle = "#4a4055";
         ctx.lineWidth = 2;
@@ -184,7 +160,6 @@ export class ArrowTrap {
         ctx.fill();
         ctx.stroke();
 
-        // Olho/boca apontando na direção de disparo (triângulo).
         ctx.globalAlpha = pulse;
         ctx.fillStyle = warn ? cfg.indicatorWarnColor : cfg.indicatorColor;
         ctx.beginPath();

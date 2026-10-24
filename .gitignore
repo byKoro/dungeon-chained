@@ -9,24 +9,32 @@ run-err.txt
 build-log.txt
 __pycache__/
 
-# --- Reorganização: fora do versionamento (ficam só no disco) ---
-# Guarda-chuva de tudo que não é o jogo (configs de IA, análises, tools, mídia).
+# --- Reorganização: fora do versionamento ---
+# Guarda-chuva de arquivos locais e rascunhos fora do jogo.
 /_local/
 
-# Material de vídeo/marketing e documentação (não entram no git).
+# Material de vídeo/marketing e documentação externa.
 /pitch/
 /docs/
 
 # Saída da ferramenta de análise de grafo (regenerável).
 /graphify-out/
 
-# Configs de ferramentas de IA (não têm relação com o jogo).
-/.agents/
+# Configs residuais de ferramentas antigas
 /.aider-desk/
 /.claude/
+/.kiro/
 
-# Material-fonte e arquivos soltos de rascunho.
+# Arquivos compactados e temporários de teste
 *.zip
+*.rar
+*.7z
+*.tar.gz
+tests/_tmp_*.js
 /_tiles.png
 /_w.png
-tests/_tmp_audio_check.js
+
+# Arquivos de sistema operacional
+.DS_Store
+Thumbs.db
+

@@ -1,46 +1,28 @@
 import { HAZARDS } from '../config/GameConfig.js';
 
-/**
- * SpikeTrap — espinhos de chão que sobem e descem num ciclo.
- *
- * Ciclo de sprites: peaks_3 -> peaks_0 -> peaks_1 -> peaks_2.
- *
- * Só peaks_2 causa dano. Se os sprites não carregarem, desenha uma
- * forma geométrica (triângulos) como fallback.
- *
- * O ciclo pode receber um `phase` (0..1) inicial para dessincronizar spikes
- * vizinhos (ondas), e um `delay` em frames.
- */
 export class SpikeTrap {
-    /**
-     * @param {number} x centro no mundo
-     * @param {number} y centro no mundo
-     * @param {object} peaks array [img0..img3] dos frames (ou null p/ geométrico)
-     * @param {object} opts { phaseOffset:0..1, cfg }
-     */
+
     constructor(x, y, peaks = null, opts = {}) {
         this.x = x;
         this.y = y;
-        this.hitRadius = 0; // não participa de colisões de empurrão
+        this.hitRadius = 0;
         this.peaks = peaks;
         this.cfg = opts.cfg || HAZARDS.spike;
 
-        // Metade das durações anteriores; não depende da taxa do RAF.
         const timingProfiles = { fast: [0.5, 0.1, 0.1, 0.8], normal: [1, 0.15, 0.15, 2], slow: [2, 0.3, 0.3, 3] };
         this.durations = Array.isArray(opts.durations) && opts.durations.length === 4
             ? opts.durations.map(value => Math.max(0.01, Number(value) || 0.01))
             : [...(timingProfiles[opts.timing] || timingProfiles.normal)];
         this.cycle = this.durations.reduce((sum, seconds) => sum + seconds, 0);
-        // Deslocamento de fase para criar ondas entre spikes vizinhos.
+
         this.elapsed = ((opts.phaseOffset || 0) * this.cycle) % this.cycle;
         this.initialDelay = Math.max(0, Number(opts.delay) || 0);
 
         this.state = "hidden";
-        this.extend = 0; // 0 (recolhido) .. 1 (totalmente para fora)
+        this.extend = 0;
         this.frameIndex = 3;
     }
 
-    // Fase atual -> estado + nível de extensão (0..1).
     _advance(deltaSeconds) {
         this.elapsed = (this.elapsed + deltaSeconds) % this.cycle;
         if (this.elapsed < this.durations[0]) {
@@ -62,7 +44,6 @@ export class SpikeTrap {
         }
     }
 
-    // Fere quando quase/totalmente estendido (letal perto do topo do ciclo).
     get isDangerous() {
         return this.frameIndex === 2;
     }
@@ -83,7 +64,7 @@ export class SpikeTrap {
         const r = this.cfg.damageRadius;
         for (const p of players) {
             if (Math.hypot(p.x - this.x, p.y - this.y) < r + p.hitRadius * 0.4) {
-                // A fonte do empurrão é o próprio spike (empurra para fora dele).
+
                 p.takeDamage(this.x, this.y);
             }
         }
@@ -93,7 +74,6 @@ export class SpikeTrap {
         const size = this.cfg.drawSize;
         const half = size / 2;
 
-        // Sprite animado, se disponível.
         const frames = this.peaks;
         const img = frames && frames[this.frameIndex];
         if (img && img.complete && img.naturalWidth > 0) {
@@ -101,8 +81,6 @@ export class SpikeTrap {
             return;
         }
 
-        // --- Fallback geométrico ---
-        // Base (buraco no chão) sempre visível.
         ctx.save();
         ctx.fillStyle = "#1b1620";
         ctx.beginPath();

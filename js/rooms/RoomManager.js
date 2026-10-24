@@ -5,45 +5,20 @@ import {
     DOOR_ENTER_DEPTH, scatterPropsOnFloor
 } from '../config/GameConfig.js';
 
-/**
- * RoomManager — API única para gerenciar a criação e o ciclo de vida das salas.
- *
- * Consolida o que antes estava espalhado:
- *   - geração/cache de layout de tiles (ex-`getRoomTiles` do main.js);
- *   - população de inimigos (ex-`enterRoom` do main.js);
- *   - estado "limpa/trancada" (ex-`roomStates` do main + `cleared`/`visited`
- *     do Dungeon);
- *   - geometria de portas e confinamento do jogador aos vãos.
- *
- * Fachada principal:
- *   rooms.reset()                  -> gera uma nova dungeon
- *   rooms.enter(key?)              -> prepara/popula a sala (lazy, cacheada)
- *   rooms.current                  -> a Room ativa
- *   rooms.isLocked()               -> portas trancadas?
- *   rooms.tryClearCurrent()        -> marca limpa quando sem inimigos
- *   rooms.doorsOfCurrent()         -> vãos de porta no mundo
- *   rooms.transitionTo(door)       -> move para a sala vizinha
- *   rooms.clampEnemy / clampPlayer -> confinamento físico
- */
 export class RoomManager {
-    /**
-     * @param {object} opts
-     * @param {SpawnSystem} opts.spawnSystem
-     * @param {() => number} opts.getFloor  retorna o andar atual
-     */
+
     constructor({ spawnSystem, getFloor, roomCatalog = null }) {
         this.spawnSystem = spawnSystem;
         this.getFloor = getFloor;
-        this.roomCatalog = roomCatalog;  // peças autorais de /map (ou null)
-        this.rooms = new Map();   // key "gx,gy" -> Room
+        this.roomCatalog = roomCatalog;
+        this.rooms = new Map();
         this.dungeon = null;
         this.reset();
     }
 
-    // Gera uma nova dungeon do zero ou carrega a sala do editor se estiver em modo playtest.
     reset() {
         let customGraph = null;
-        // Spawn escolhido no editor para o teste ({ p1:{col,row}, p2:{col,row} }).
+
         this.playtestSpawn = null;
         if (typeof window !== "undefined" && window.sessionStorage) {
             const isPlaytest = window.location.search.includes("playtest=true");
@@ -64,7 +39,6 @@ export class RoomManager {
                     const cells = new Map();
                     const key = `${midGx},${midGy}`;
 
-                    // Props: respeita o modo da peça (manual x aleatório).
                     let props = data.props;
                     if (data.scatterProps && data.scatterProps.enabled && Array.isArray(data.floor)) {
                         const occupied = new Set();
@@ -110,10 +84,7 @@ export class RoomManager {
             tile: TILE, roomCols: ROOM_COLS, roomRows: ROOM_ROWS,
             graph: customGraph || null
         });
-        // Semente única desta dungeon: faz a escolha de variações MUDAR entre
-        // partidas, mas permanecer ESTÁVEL dentro da mesma (a sala não troca de
-        // layout ao reentrar). Sem ela, salas em posição fixa (ex.: a start)
-        // sorteariam sempre a mesma variação.
+
         this.runSeed = (Math.random() * 0xffffffff) >>> 0;
         this.rooms.clear();
         return this.dungeon;
@@ -127,7 +98,6 @@ export class RoomManager {
         return this.dungeon.current;
     }
 
-    // Bounds jogáveis da sala atual (o antigo "arenaBounds").
     get currentBounds() {
         return this.dungeon.currentBounds();
     }
@@ -136,14 +106,11 @@ export class RoomManager {
         return this.dungeon.doorHalfWidth;
     }
 
-    // Obtém (ou cria) a Room de uma célula.
     _roomFor(cell) {
         const key = `${cell.gx},${cell.gy}`;
         let room = this.rooms.get(key);
         if (!room) {
-            // Sorteia uma peça autoral (/map) com a assinatura de portas do slot
-            // e anexa seu conteúdo ao cell. Determinístico por posição da célula
-            // para a sala não "trocar" de layout ao reentrar nela.
+
             this._applyAuthoredPiece(cell);
             room = new Room(cell, this.dungeon.cellBounds(cell.gx, cell.gy));
             this.rooms.set(key, room);
@@ -151,22 +118,14 @@ export class RoomManager {
         return room;
     }
 
-    /**
-     * Escolhe uma peça autoral para a célula (se houver no catálogo) e copia
-     * seu conteúdo para os campos custom* do cell, que a Room já consome. Se não
-     * houver peça para a assinatura de portas, não faz nada (fallback procedural
-     * do RoomTiles). A escolha é determinística pela posição da célula.
-     */
     _applyAuthoredPiece(cell) {
         if (!this.roomCatalog || cell._authored) return;
-        cell._authored = true; // marca para não re-sortear ao reentrar
+        cell._authored = true;
 
-        // Peças de playtest/custom já trazem o conteúdo embutido: respeita.
         if (cell.customFloor) return;
 
         const rng = this._cellRng(cell.gx, cell.gy);
-        // Tipo da célula: salas usam cell.type (start/boss/normal); corredores
-        // são "normal" (desafios agora vêm só das peças autorais com botões).
+
         const type = cell.type || "normal";
         const piece = this.roomCatalog.pick(cell.doors, type, rng);
         if (!piece) return;
@@ -179,11 +138,9 @@ export class RoomManager {
         if (piece.lock) cell.customLock = piece.lock;
         if (piece.name) cell.customName = piece.name;
 
-        // Props: ou AUTORAIS (manuais) ou ALEATÓRIOS pelo chão (exclusivo).
         const scatter = piece.scatterProps;
         if (scatter && scatter.enabled && Array.isArray(piece.floor)) {
-            // Evita colocar props sobre inimigos (os perigos usam px, não tile;
-            // ficam fora do piso liso de qualquer forma).
+
             const occupied = new Set();
             for (const foe of (piece.enemies || [])) occupied.add(`${foe.col},${foe.row}`);
             cell.customProps = scatterPropsOnFloor(piece.floor, {
@@ -197,8 +154,6 @@ export class RoomManager {
         }
     }
 
-    // RNG determinístico por célula DENTRO de uma dungeon (estável ao reentrar),
-    // mas que varia entre partidas via runSeed.
     _cellRng(gx, gy) {
         let a = ((gx * 73856093) ^ (gy * 19349663) ^ (this.getFloor() * 83492791) ^ (this.runSeed || 0)) >>> 0;
         return function () {
@@ -213,10 +168,6 @@ export class RoomManager {
         return this._roomFor(this.dungeon.current);
     }
 
-    /**
-     * Entra na sala atual (ou numa chave específica): cria/popula sob demanda e
-     * sincroniza o estado "cleared" com o Dungeon.
-     */
     enter() {
         const room = this.current;
         room.populate(this.spawnSystem, this.getFloor(), this.spawnSystem.assets);
@@ -241,7 +192,6 @@ export class RoomManager {
         return false;
     }
 
-    // Layout de tiles da sala atual (ex-getRoomTiles).
     get currentTiles() {
         return this.current.tiles;
     }
@@ -258,24 +208,16 @@ export class RoomManager {
         return this.dungeon.doorsOfCurrent();
     }
 
-    // Move para a sala vizinha através de uma porta e popula a nova sala.
     transitionTo(door) {
         this.dungeon.moveTo(door.gx, door.gy);
         return this.enter();
     }
 
-    // ---- Física de confinamento (ex-main.js) ----
-
-    // Prende um inimigo dentro dos bounds da sala.
     clampEnemy(entity, bounds = this.currentBounds) {
         entity.x = Math.max(bounds.minX + entity.hitRadius, Math.min(bounds.maxX - entity.hitRadius, entity.x));
         entity.y = Math.max(bounds.minY + entity.hitRadius, Math.min(bounds.maxY - entity.hitRadius, entity.y));
     }
 
-    /**
-     * Clampa o jogador aos bounds, mas permite ADENTRAR o vão de uma porta
-     * aberta (avançar além da parede, dentro da passagem, até DOOR_ENTER_DEPTH).
-     */
     clampPlayer(player, bounds, doors, canPass) {
         const doorHalf = this.doorHalfWidth;
         const r = player.hitRadius;
@@ -299,8 +241,6 @@ export class RoomManager {
         const maxY = has.S ? bounds.maxY + DOOR_ENTER_DEPTH : bounds.maxY - r;
         player.y = Math.max(minY, Math.min(maxY, player.y));
 
-        // Confinamento no corredor: dentro do vão, não deslizar lateralmente
-        // para dentro da parede (as quinas da entrada viram parede).
         const inset = r;
         if (has.N && player.y < bounds.minY) {
             player.x = Math.max(has.N.x - doorHalf + inset, Math.min(has.N.x + doorHalf - inset, player.x));
@@ -316,14 +256,12 @@ export class RoomManager {
         }
     }
 
-    // O jogador está alinhado com o vão da porta (eixo perpendicular)?
     playerAlignedToDoor(player, door) {
         const doorHalf = this.doorHalfWidth;
         if (door.dir === "N" || door.dir === "S") return Math.abs(player.x - door.x) < doorHalf;
         return Math.abs(player.y - door.y) < doorHalf;
     }
 
-    // Quão fundo o jogador entrou no vão (0 = na borda, cresce ao adentrar).
     doorEntryDepth(player, door, bounds) {
         if (door.dir === "N") return bounds.minY - player.y;
         if (door.dir === "S") return player.y - bounds.maxY;

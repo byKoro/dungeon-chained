@@ -1,26 +1,3 @@
-/**
- * LoadingScreen — tela de carregamento em DOM (cobre o canvas).
- *
- * Minimalista: fundo escuro e SÓ a barra, em pixel art chunky (mesma
- * linguagem do botão da tela de morte: moldura de pedra chanfrada, rebites de
- * ferro, poço escuro e blocos vermelho-sangue). A barra é um canvas pequeno em
- * resolução de ARTE ampliado por uma escala inteira (pixels nítidos).
- *
- * Game feel: cada bloco que acende dá um clarão e assenta no vermelho; o
- * próximo bloco vazio pulsa fraco (mostra que está vivo mesmo se o progresso
- * travar um instante).
- *
- * Para não "piscar" em carregamentos instantâneos, só aparece depois de
- * `delayMs`; e, uma vez visível, fica pelo menos `minVisibleMs`.
- *
- * Uso:
- *   const loading = new LoadingScreen();
- *   await loading.run('Carregando o calabouço…', [
- *       { weight: 3, task: (p) => assets.whenReady((d, t) => p(d / t)) },
- *       { weight: 1, task: () => catalog.load() },
- *   ]);
- *   // run() esconde a tela ao terminar.
- */
 const PAL = {
     outline: '#0b0910',
     stone: '#4a4458',
@@ -39,13 +16,12 @@ const PAL = {
     flash: '#ffd6de',
 };
 
-const SEGMENTS = 12;  // blocos da barra (progresso em degraus de 1/12)
-const SEG_W = 4;      // largura de um bloco (px de arte)
-const GAP = 1;        // junta entre blocos
-const SEG_H = 3;      // altura de um bloco
-const FLASH_MS = 160; // clarão ao acender um bloco
+const SEGMENTS = 12;
+const SEG_W = 4;
+const GAP = 1;
+const SEG_H = 3;
+const FLASH_MS = 160;
 
-// Geometria (px de arte): contorno 1 + pedra 2 + poço com 1 px de folga.
 const WELL_W = SEGMENTS * SEG_W + (SEGMENTS - 1) * GAP + 2;
 const WELL_H = SEG_H + 2;
 const W = WELL_W + 6;
@@ -58,19 +34,18 @@ export class LoadingScreen {
         this.el = document.getElementById('loading-screen') || this._build();
         this.canvas = this.el.querySelector('canvas.ls-bar') || this._ensureCanvas();
         this.ctx = this.canvas.getContext('2d');
-        this.canvas.width = W + 1;   // +1 da sombra projetada
+        this.canvas.width = W + 1;
         this.canvas.height = H + 1;
         this._shownAt = 0;
         this._timer = 0;
-        this._lit = 0;               // blocos acesos
+        this._lit = 0;
         this._litAt = new Array(SEGMENTS).fill(-1e9);
         this._raf = 0;
         this._onResize = () => this._applyScale();
         window.addEventListener('resize', this._onResize);
         this._applyScale();
         this._draw(performance.now());
-        // A tela começa visível no index.html (cobre o canvas enquanto os
-        // módulos carregam): já anima desde agora.
+
         if (!this.el.classList.contains('ls-hidden')) this._startLoop();
     }
 
@@ -95,13 +70,13 @@ export class LoadingScreen {
     }
 
     show(text = 'Loading…') {
-        // Sem texto na tela: o rótulo vai só para o leitor de tela.
+
         this.el.setAttribute('aria-label', text);
         this._lit = 0;
         this._litAt.fill(-1e9);
         this.setProgress(0);
         clearTimeout(this._timer);
-        // Só aparece se demorar (evita flash em carregamentos instantâneos).
+
         this._timer = setTimeout(() => {
             this.el.classList.remove('ls-hidden');
             this._shownAt = performance.now();
@@ -112,7 +87,7 @@ export class LoadingScreen {
     setProgress(k) {
         const v = Math.max(0, Math.min(1, k || 0));
         this.el.setAttribute('aria-valuenow', String(Math.round(v * 100)));
-        // Progresso em blocos inteiros; os novos acendem com clarão.
+
         const lit = Math.floor(v * SEGMENTS + 1e-6);
         const now = performance.now();
         for (let i = this._lit; i < lit; i++) this._litAt[i] = now + (i - this._lit) * 40;
@@ -127,16 +102,12 @@ export class LoadingScreen {
         }
         this.el.classList.add('ls-hidden');
         this._shownAt = 0;
-        // Para o loop depois do fade de saída.
+
         setTimeout(() => {
             if (this.el.classList.contains('ls-hidden')) this._stopLoop();
         }, 400);
     }
 
-    /**
-     * Executa tarefas em paralelo e mostra o progresso combinado (por peso).
-     * Cada tarefa recebe `report(0..1)` para progresso parcial.
-     */
     async run(text, tasks) {
         this.show(text);
         const parts = tasks.map(() => 0);
@@ -166,7 +137,6 @@ export class LoadingScreen {
         this._raf = 0;
     }
 
-    // Escala INTEIRA a partir da janela (a barra ocupa ~1/3 da largura).
     _applyScale() {
         const byW = Math.floor((window.innerWidth * 0.34) / W);
         const byH = Math.floor(window.innerHeight / 120);
@@ -182,12 +152,10 @@ export class LoadingScreen {
         const chamfer = (x, y, w, h, c) => { rect(x + 1, y, w - 2, h, c); rect(x, y + 1, w, h - 2, c); };
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // --- Sombra projetada ---
         ctx.globalAlpha = 0.5;
         chamfer(1, 1, W, H, '#000');
         ctx.globalAlpha = 1;
 
-        // --- Moldura de pedra chanfrada com bisel ---
         chamfer(0, 0, W, H, PAL.outline);
         chamfer(1, 1, W - 2, H - 2, PAL.stone);
         rect(2, 1, W - 4, 1, PAL.stoneLight);
@@ -200,19 +168,17 @@ export class LoadingScreen {
         }
         for (let x = 14, i = 0; x < W - 8; x += 9 + (i++ % 4)) px(x, H - 2, PAL.seam);
 
-        // --- Poço escuro com sombra interna no topo ---
         rect(3, 3, WELL_W, WELL_H, PAL.well);
         rect(3, 3, WELL_W, 1, PAL.wellShade);
 
-        // --- Blocos ---
         const sx0 = 4, sy = 4;
         for (let i = 0; i < SEGMENTS; i++) {
             const x = sx0 + i * (SEG_W + GAP);
             if (i < this._lit) {
                 const age = now - this._litAt[i];
-                if (age < 0) continue; // ainda vai acender (escalonado)
+                if (age < 0) continue;
                 if (age < FLASH_MS * 0.5) {
-                    rect(x, sy, SEG_W, SEG_H, PAL.flash);           // clarão
+                    rect(x, sy, SEG_W, SEG_H, PAL.flash);
                 } else {
                     const fresh = age < FLASH_MS;
                     rect(x, sy, SEG_W, SEG_H, fresh ? PAL.redLight : PAL.red);
@@ -221,13 +187,12 @@ export class LoadingScreen {
                     px(x, sy, PAL.redSpec);
                 }
             } else if (i === this._lit) {
-                // Próximo bloco: pulso fraco (a barra "respira" enquanto espera).
+
                 const on = Math.floor(now / 380) % 2 === 0;
                 if (on) rect(x, sy + 1, SEG_W, 1, PAL.redDark);
             }
         }
 
-        // --- Rebites de ferro nas pontas ---
         const rivet = (x, y) => {
             px(x, y, PAL.ironLight); px(x + 1, y, PAL.iron);
             px(x, y + 1, PAL.iron); px(x + 1, y + 1, PAL.ironDark);

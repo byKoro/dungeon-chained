@@ -1,42 +1,15 @@
 import { SpikeTrap } from '../entities/SpikeTrap.js';
-import { ArrowTrap, Arrow } from '../entities/ArrowTrap.js';
+import { ArrowTrap } from '../entities/ArrowTrap.js';
 import { PressureButton } from '../entities/PressureButton.js';
 import { HAZARDS, TILE, ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 
-/**
- * ChallengeCorridor — instancia e gerencia os perigos/botões de uma peça
- * autoral (os hazards vêm do arquivo da sala desenhada no editor).
- *
- * Responsabilidades:
- *  - Converter coordenadas normalizadas (u ao longo / v através) do layout para
- *    posições de MUNDO, respeitando a ORIENTAÇÃO do corredor (N-S ou E-W).
- *  - Hospedar spikes, atiradores (ArrowTrap), as flechas em voo e os 2 botões.
- *  - Rodar o update de tudo e aplicar dano via Player.takeDamage.
- *  - Resolver o puzzle co-op: enquanto os DOIS botões não estiverem
- *    pressionados ao mesmo tempo (por holdFrames), o corredor fica TRANCADO.
- *
- * Orientação:
- *   O corredor liga duas portas opostas. Deduzimos o eixo pelas portas da
- *   célula: se tem N e S -> eixo vertical (along = Y); se E e W -> horizontal
- *   (along = X). O sentido "entrada->saída" (u 0->1) segue a ordem natural
- *   (cima->baixo ou esquerda->direita); como o layout é simétrico o bastante,
- *   o sentido não quebra a jogabilidade.
- */
 export class ChallengeCorridor {
-    /**
-     * @param {object} layout  definição (de ChallengeLayouts)
-     * @param {object} bounds   bounds jogáveis da célula { minX,maxX,minY,maxY }
-     * @param {object} doors    { N,S,E,W: bool } portas da célula
-     * @param {object} assets   AssetLoader (sprites dos perigos)
-     */
+
     constructor(layout, bounds, doors, assets) {
         this.layout = layout;
         this.bounds = bounds;
         this.name = layout.name;
 
-        // Eixo principal do corredor. Regra simples e robusta: se há porta
-        // vertical (N ou S) trata como vertical; se só há portas horizontais
-        // (E/W), trata como horizontal.
         this.vertical = !!(doors && (doors.N || doors.S));
         if (doors && (doors.E || doors.W) && !(doors.N || doors.S)) this.vertical = false;
 
@@ -45,19 +18,14 @@ export class ChallengeCorridor {
         this.arrows = [];
         this.buttons = [];
 
-        // Sem 2 botões não há puzzle de botões a resolver: nasce "resolvido"
-        // (quem controla o trancamento é a regra da sala — ver Room.lockRule).
         this.solved = false;
         this.holdTimer = 0;
 
-        // Margem interna para não colar os elementos nas paredes.
         this._pad = 36;
 
         this._build(assets);
     }
 
-    // Centro de mundo (px) do tile (col,row). A célula tem 1 tile de parede, de
-    // modo que bounds.minX/minY coincidem com o início do tile de índice 1.
     _tileToWorld(col, row) {
         return {
             x: this.bounds.minX + (col - 1 + 0.5) * TILE,
@@ -65,8 +33,6 @@ export class ChallengeCorridor {
         };
     }
 
-    // Resolve a posição de mundo de um elemento: por tile (col,row) se o editor
-    // forneceu, senão pelas coordenadas normalizadas (u,v) do layout autoral.
     _elemWorld(el, u = el.u, v = el.v) {
         if (el.col !== undefined && el.row !== undefined) {
             return this._tileToWorld(el.col, el.row);
@@ -74,8 +40,6 @@ export class ChallengeCorridor {
         return this._toWorld(u, v);
     }
 
-    // Converte (u,v) normalizados -> (x,y) no mundo.
-    // u = ao longo do corredor (0 entrada -> 1 saída); v = através (0..1).
     _toWorld(u, v) {
         const b = this.bounds;
         const pad = this._pad;
@@ -90,9 +54,6 @@ export class ChallengeCorridor {
         }
     }
 
-    // Direção de disparo de um atirador conforme o código do layout.
-    //   across+/across- = perpendicular ao corredor (atravessa a passagem)
-    //   along+/along-   = ao longo do corredor (na direção do movimento)
     _fireDir(code) {
         if (this.vertical) {
             switch (code) {
@@ -112,9 +73,8 @@ export class ChallengeCorridor {
         return { x: 1, y: 0 };
     }
 
-    // Dispara para dentro, na direção oposta à parede de montagem.
     _fireDirFromWall(side) {
-        // Dispara para dentro da sala, afastando-se da parede.
+
         switch (side) {
             case "top": return { x: 0, y: 1 };
             case "bottom": return { x: 0, y: -1 };
@@ -140,22 +100,19 @@ export class ChallengeCorridor {
                 }
                 case "spikeRow": {
                     const count = el.count || 4;
-                    // Direção da onda. Sem `dir` (peças antigas): fileira
-                    // horizontal com a onda correndo para a esquerda, como antes.
+
                     const dir = el.dir || "left";
                     const vertical = dir === "up" || dir === "down";
-                    // Fase maior = espinho adiantado no ciclo. Para a onda ir
-                    // para a direita/baixo, a fase diminui ao longo da fileira.
+
                     const step = (dir === "right" || dir === "down") ? -(el.wave || 0) : (el.wave || 0);
                     for (let i = 0; i < count; i++) {
                         const phase = ((((el.phase || 0) + i * step) % 1) + 1) % 1;
                         let p;
                         if (byTile) {
-                            // Tiles consecutivos a partir de (col,row): para a
-                            // direita (horizontal) ou para baixo (vertical).
+
                             p = vertical ? this._tileToWorld(el.col, el.row + i) : this._tileToWorld(el.col + i, el.row);
                         } else {
-                            // Distribui ao longo do eixo "através" (v de 0..1).
+
                             const v = (i + 0.5) / count;
                             p = this._toWorld(el.u, v);
                         }
@@ -169,8 +126,7 @@ export class ChallengeCorridor {
                         : el.row === ROOM_ROWS - 1 ? "bottom"
                             : el.col === 0 ? "left"
                                 : el.col === ROOM_COLS - 1 ? "right" : null);
-                    // Flechas em paredes editáveis internas usam a face oposta
-                    // à convenção histórica das bordas para os lados E/W.
+
                     const isCustomLateralWall = byTile && el.col > 0 && el.col < ROOM_COLS - 1 &&
                         el.row > 0 && el.row < ROOM_ROWS - 1 &&
                         (inferredSide === "left" || inferredSide === "right");
@@ -188,16 +144,14 @@ export class ChallengeCorridor {
         }
     }
 
-    // O corredor começa TRANCADO e só abre quando o puzzle é resolvido.
     get locked() {
         return !this.solved;
     }
 
     update(players, deltaSeconds = 1 / 60) {
-        // Spikes
+
         for (const s of this.spikes) s.update(players, deltaSeconds);
 
-        // Atiradores + flechas
         const onFire = (arrow) => this.arrows.push(arrow);
         for (const t of this.arrowTraps) t.update(onFire, deltaSeconds);
         for (let i = this.arrows.length - 1; i >= 0; i--) {
@@ -205,7 +159,6 @@ export class ChallengeCorridor {
             if (this.arrows[i].dead) this.arrows.splice(i, 1);
         }
 
-        // Botões + resolução co-op (os DOIS pressionados ao mesmo tempo).
         for (const b of this.buttons) b.update(players);
         if (!this.solved) {
             const allPressed = this.buttons.length >= 2 && this.buttons.every(b => b.pressed);
@@ -218,21 +171,14 @@ export class ChallengeCorridor {
         }
     }
 
-    // Spikes: rentes ao chão, desenhados ANTES do sangue (a mancha cai por
-    // cima do tile deles).
     drawFloorLayer(ctx) {
         for (const s of this.spikes) s.draw(ctx);
     }
 
-    // Botões: objetos com ALTURA. Desenhados DEPOIS do sangue e das pegadas
-    // (nada mancha a tampa) e antes das sombras/entidades.
     drawButtons(ctx) {
         for (const b of this.buttons) b.draw(ctx);
     }
 
-    // Passo de oclusão dos botões dentro da ordenação por profundidade: cada
-    // botão vira um "drawable" com chave Y própria; ele só se redesenha se há
-    // entidade atrás dele (a tampa cobre os pés de quem passa por trás).
     buttonOccluders(entities) {
         return this.buttons.map(b => ({
             y: b.sortY,
@@ -240,7 +186,6 @@ export class ChallengeCorridor {
         }));
     }
 
-    // true se (x, y) está sobre algum botão (bloqueia pegadas/carimbos).
     coversButton(x, y) {
         for (const b of this.buttons) if (b.covers(x, y)) return true;
         return false;

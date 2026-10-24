@@ -6,7 +6,6 @@ export class Weapon {
 
     update() {}
 
-    // Camada ao fundo da arma (ex.: a corrente da serra). Opcional.
     drawChain(ctx, p1, p2) {}
 
     draw(ctx, p1, p2) {}

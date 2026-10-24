@@ -1,38 +1,21 @@
-/**
- * EditorApp.js — Aplicação do Editor Visual de Salas e Corredores.
- *
- * Funcionalidades focadas:
- *  - Presets com posições de portas fixas (sem desalinhamento por espelhamento vertical ímpar).
- *  - Piso e tochas gerados automaticamente de forma procedural (RoomTiles).
- *  - Definição de Buracos / Sem Piso (abismos onde ninguém pode pisar).
- *  - Traps & Perigos (Botões co-op, espinhos em onda, disparadores de flechas).
- *  - Spawn de Inimigos com sprites recortados corretamente (frame 0 de demon e bloodMonster).
- *  - Indicação visual dos Spawns dos Players (P1 Amarelo & P2 Azul) nas entradas das portas ativas.
- *  - Alerta automático de segurança se armadilhas ou buracos obstruírem o spawn dos players.
- *  - Exportação e importação JSON e código JS pronto para o projeto.
- *  - Teste jogável instantâneo no motor do jogo!
- */
-
 import { AssetLoader } from '../core/AssetLoader.js';
 import { Tileset } from '../core/Tileset.js';
-import { RoomSocket, RoomTemplate } from '../rooms/RoomSocket.js';
+import { RoomSocket } from '../rooms/RoomSocket.js';
 import { RoomPresets } from '../rooms/RoomPresets.js';
 import { RoomCatalog, doorSignature } from '../rooms/RoomCatalog.js';
 import { RoomTiles } from '../core/RoomTiles.js';
-import { ROOM_COLS, ROOM_ROWS, PLAYER_DOOR_SPAWN_TILES, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor, EMPTY_FLOOR_TILE, EMPTY_FLOOR_COLOR } from '../config/GameConfig.js';
-import { ENEMY_TYPES, ENEMY_TYPE_BY_KEY, playerConfigs } from '../config/EntityConfig.js';
+import { ROOM_COLS, ROOM_ROWS, getPlayerSpawnPositions, holeTileFor, TORCHES, scatterPropsOnFloor, EMPTY_FLOOR_TILE, EMPTY_FLOOR_COLOR } from '../config/GameConfig.js';
+import { ENEMY_TYPES, ENEMY_TYPE_BY_KEY } from '../config/EntityConfig.js';
 
 class RoomEditor {
     constructor() {
         this.assets = new AssetLoader();
         this.tileset = null;
 
-        // Dimensões padrão
-        this.tilePx = 64; // Tamanho do tile em tela (px)
+        this.tilePx = 64;
         this.cols = ROOM_COLS;
         this.rows = ROOM_ROWS;
 
-        // Estado da Sala Atual
         this.room = {
             id: "room_cross_4way",
             name: "Sala de Quatro Vias",
@@ -46,65 +29,54 @@ class RoomEditor {
                 E: new RoomSocket({ dir: "E", offset: 3, span: 2 }),
                 W: new RoomSocket({ dir: "W", offset: 3, span: 2 })
             },
-            floor: [],            // matriz [r][c] de índices de tile
-            floorOverrides: {}, // tiles visuais personalizados do editor
-            holes: new Set(),     // coordenadas "c,r" onde NÃO haverá piso (abismo)
-            hazards: [],          // perigos { type, u, v, count, phase, wave, dir }
-            walls: [],            // paredes sólidas { col, row, tile }
-            enemies: [],          // inimigos { type, col, row }
-            torches: [],          // tochas (luz) { col, row, side }
-            props: [],            // decoração manual { col, row, index, flip }
-            // Props aleatórios: quando enabled, o jogo espalha props no chão na
-            // geração (exclusivo com props manuais).
+            floor: [],
+            floorOverrides: {},
+            holes: new Set(),
+            hazards: [],
+            walls: [],
+            enemies: [],
+            torches: [],
+            props: [],
+
             scatterProps: { enabled: false, density: 0.08 },
-            // Regra de trancamento das portas: "auto" (deduz), "none" (nunca),
-            // "enemies" (até matar todos), "buttons" (puzzle de 2 botões).
+
             lock: "auto"
         };
 
-        // Estado das Ferramentas
-        this.activeTab = "tab-holes"; // tab-holes, tab-torches, tab-props, tab-challenges, tab-enemies, tab-spawns
+        this.activeTab = "tab-holes";
         this.selectedHazard = "button";
         this.spikeTiming = "normal";
         this.spikeDelay = 0;
-        this.spikeRowDir = "right";   // direção da onda da fileira (right/left/down/up)
-        this.spikeRowCount = 4;       // quantidade de tiles da fileira
+        this.spikeRowDir = "right";
+        this.spikeRowCount = 4;
         this.selectedEnemy = "demon";
         this.selectedProp = 59;
         this.selectedTorchType = "torch";
 
-        // Spawn usado SÓ pelo botão "Testar" (não vai para o JSON da peça).
-        // mode: "CENTER" | "N" | "S" | "E" | "W" | "custom". Em "custom",
-        // p1/p2 guardam os tiles escolhidos com clique no canvas.
         this.testSpawn = this._loadTestSpawn();
 
-        // Navegador de formas/variações
-        this.shapeIndex = 0;        // forma atual (ver _allShapes)
-        this.variantIndex = 0;      // variação atual (0..n-1 = existentes; n = nova)
-        this.catalog = null;        // RoomCatalog carregado (peças de /map)
+        this.shapeIndex = 0;
+        this.variantIndex = 0;
+        this.catalog = null;
 
-        // Viewport (Zoom e Pan)
         this.zoom = 1.0;
         this.panX = 0;
         this.panY = 0;
         this.isPanning = false;
         this.lastMouse = { x: 0, y: 0 };
         this.isMouseDown = false;
-        this.hoverTile = null;         // Tile sob o cursor { col, row }
-        this.lastToggledHole = null;   // Evita toggle repetido ao arrastar
+        this.hoverTile = null;
+        this.lastToggledHole = null;
 
-        // Configurações de Exibição
         this.showGrid = true;
         this.showCoords = true;
         this.showDoors = true;
         this.showPlayerSpawns = true;
 
-        // Referências DOM
         this.canvas = document.getElementById("roomCanvas");
         this.ctx = this.canvas.getContext("2d");
         this.container = document.getElementById("canvas-container");
 
-        // Inicialização
         this._initEvents();
         this._initAssets();
     }
@@ -114,12 +86,9 @@ class RoomEditor {
         this.tileset = new Tileset(this.assets.tileset, 16, 10);
         this._drawEnemyChoiceThumbs();
 
-        // Carrega o catálogo de peças (/map) para o navegador de formas/variações.
         this.catalog = new RoomCatalog();
         await this.catalog.load();
 
-        // Restaura a última cena editada (localStorage) para não perder trabalho
-        // ao ir/voltar do teste; senão, abre na primeira forma.
         if (!this._loadSavedState()) {
             this.shapeIndex = 0;
             this.variantIndex = 0;
@@ -129,11 +98,6 @@ class RoomEditor {
         this.render();
     }
 
-    /* --------------------------------------------------------------------------
-     * NAVEGADOR DE FORMAS & VARIAÇÕES (setas no header)
-     * -------------------------------------------------------------------------- */
-
-    // Lista canônica de TODAS as formas navegáveis (ordem das setas).
     _allShapes() {
         const d = (N, E, S, W) => ({ N: !!N, E: !!E, S: !!S, W: !!W });
         return [
@@ -157,7 +121,6 @@ class RoomEditor {
         ];
     }
 
-    // Peças existentes no catálogo para a forma atual (mesmo tipo + assinatura).
     _variantsForShape(shape) {
         if (!this.catalog) return [];
         const want = doorSignature(shape.doors);
@@ -171,14 +134,14 @@ class RoomEditor {
     _navShape(delta) {
         const shapes = this._allShapes();
         this.shapeIndex = (this.shapeIndex + delta + shapes.length) % shapes.length;
-        this.variantIndex = 0; // começa na 1ª variação (ou "nova" se não houver)
+        this.variantIndex = 0;
         this._loadCurrentShapeVariant();
     }
 
     _navVariant(delta) {
         const shape = this._allShapes()[this.shapeIndex];
         const variants = this._variantsForShape(shape);
-        const slots = variants.length + 1; // +1 = slot "nova variação"
+        const slots = variants.length + 1;
         this.variantIndex = (this.variantIndex + delta + slots) % slots;
         this._loadCurrentShapeVariant();
     }
@@ -186,26 +149,24 @@ class RoomEditor {
     _newVariant() {
         const shape = this._allShapes()[this.shapeIndex];
         const variants = this._variantsForShape(shape);
-        this.variantIndex = variants.length; // o slot "nova"
+        this.variantIndex = variants.length;
         this._loadCurrentShapeVariant();
     }
 
-    // Carrega na tela a variação atual: uma peça existente ou o molde limpo.
     _loadCurrentShapeVariant() {
         const shape = this._allShapes()[this.shapeIndex];
         const variants = this._variantsForShape(shape);
 
         if (this.variantIndex < variants.length) {
-            // Variação existente: carrega a peça do catálogo.
+
             this._importFromData(variants[this.variantIndex]);
         } else {
-            // Slot "nova": molde limpo com as portas da forma.
+
             this._loadBlankShape(shape);
         }
         this._updateShapeNavUI();
     }
 
-    // Monta um molde limpo (moldura + portas + piso) para a forma dada.
     _loadBlankShape(shape) {
         this.cols = ROOM_COLS;
         this.rows = ROOM_ROWS;
@@ -265,7 +226,6 @@ class RoomEditor {
         }
     }
 
-    // Aponta o navegador para a forma que corresponde à cena atual (doors+tipo).
     _syncShapeIndexToCurrentRoom() {
         const doors = {
             N: !!this.room.sockets.N, E: !!this.room.sockets.E,
@@ -282,9 +242,6 @@ class RoomEditor {
         this.variantIndex = 0;
     }
 
-    /* --------------------------------------------------------------------------
-     * PERSISTÊNCIA DA CENA (localStorage) — sobrevive a recarregar/testar
-     * -------------------------------------------------------------------------- */
     _sceneToData() {
         return {
             id: this.room.id,
@@ -316,7 +273,7 @@ class RoomEditor {
         try {
             localStorage.setItem("editor_scene_state", JSON.stringify(this._sceneToData()));
         } catch (e) {
-            // Silencioso: se o localStorage estiver indisponível, apenas não persiste.
+
         }
     }
 
@@ -326,7 +283,7 @@ class RoomEditor {
             if (!raw) return false;
             const data = JSON.parse(raw);
             this._importFromData(data);
-            // Sincroniza o navegador com a forma restaurada (sem trocar a cena).
+
             this._syncShapeIndexToCurrentRoom();
             this._updateShapeNavUI();
             return true;
@@ -335,9 +292,6 @@ class RoomEditor {
         }
     }
 
-    /* --------------------------------------------------------------------------
-     * GERENCIAMENTO DE PRESETS & CARREGAMENTO (PORTAS FIXAS)
-     * -------------------------------------------------------------------------- */
     _loadInitialPreset(presetKey) {
         if (presetKey === "custom_new") {
             this._createBlankRoom();
@@ -389,7 +343,6 @@ class RoomEditor {
         this.room.scatterProps = { enabled: false, density: 0.08 };
         this.room.lock = "auto";
 
-        // Portas fixas do template
         this.room.sockets = {
             N: template.getSockets("N")[0] ? template.getSockets("N")[0].clone() : null,
             S: template.getSockets("S")[0] ? template.getSockets("S")[0].clone() : null,
@@ -397,7 +350,6 @@ class RoomEditor {
             W: template.getSockets("W")[0] ? template.getSockets("W")[0].clone() : null
         };
 
-        // Reconstrói layout de piso procedural
         this._rebuildAutotile();
         this._updateUIFromState();
         this.render();
@@ -432,10 +384,6 @@ class RoomEditor {
         this.render();
     }
 
-    /**
-     * Gera a grade de tiles usando as mesmas regras determinísticas da engine (RoomTiles).
-     * O piso e as tochas são colocados automaticamente.
-     */
     _rebuildAutotile() {
         const doors = {
             N: !!this.room.sockets.N,
@@ -447,28 +395,22 @@ class RoomEditor {
         const rt = new RoomTiles(this.cols, this.rows, doors, 12345, this.room.kind === "room");
         this.room.floor = rt.floor;
 
-        // Aplica tiles visuais pintados pelo editor e, depois, os buracos.
         for (const [key, tile] of Object.entries(this.room.floorOverrides || {})) {
             const [c, r] = key.split(",").map(Number);
             if (r >= 0 && r < this.rows && c >= 0 && c < this.cols) this.room.floor[r][c] = tile;
         }
-        // Aplica os buracos definidos
+
         for (const holeKey of this.room.holes) {
             const [c, r] = holeKey.split(",").map(Number);
             if (r >= 0 && r < this.rows && c >= 0 && c < this.cols) {
-                this.room.floor[r][c] = -1; // -1 indica ausência de piso (abismo)
+                this.room.floor[r][c] = -1;
             }
         }
     }
 
-    /* --------------------------------------------------------------------------
-     * CÁLCULO DAS ZONAS DE ENTRADA & SPAWNS DOS JOGADORES
-     * Regra do jogo: cada jogador nasce em um tile específico logo à frente da porta.
-     * -------------------------------------------------------------------------- */
     _getPlayerSpawns() {
         const spawns = [];
 
-        // Se for a sala inicial (Start Hub) ou centro
         if (this.room.type === "start" || this.room.id === "room_start_hub") {
             const data = getPlayerSpawnPositions("CENTER", 0, 0, this.tilePx);
             spawns.push({
@@ -480,7 +422,6 @@ class RoomEditor {
             });
         }
 
-        // Portas ativas determinam onde os players surgem ao entrar na sala
         const dirConfigs = [
             { dir: "N", id: "north", label: "Entrada Norte (Vindo do Norte)" },
             { dir: "S", id: "south", label: "Entrada Sul (Vindo do Sul)" },
@@ -505,8 +446,7 @@ class RoomEditor {
     }
 
     _checkSpawnSafety() {
-        // O alerta de spawn e o badge de segurança foram removidos da UI.
-        // Guard clause: sem os elementos no DOM, este método é um no-op seguro.
+
         const warnBox = document.getElementById("spawn-warning-box");
         const statSafety = document.getElementById("stat-spawns-safety");
         if (!warnBox || !statSafety) return;
@@ -515,7 +455,7 @@ class RoomEditor {
         const warnings = [];
 
         for (const sp of spawns) {
-            // Verifica buracos nos tiles específicos de spawn
+
             if (this.room.holes.has(`${sp.p1.col},${sp.p1.row}`)) {
                 warnings.push(`Buraco sem piso sobre o tile de spawn do P1 [Col ${sp.p1.col}, Linha ${sp.p1.row}] na ${sp.label}!`);
             }
@@ -523,7 +463,6 @@ class RoomEditor {
                 warnings.push(`Buraco sem piso sobre o tile de spawn do P2 [Col ${sp.p2.col}, Linha ${sp.p2.row}] na ${sp.label}!`);
             }
 
-            // Verifica armadilhas / hazards nos tiles de spawn (por tile).
             for (const h of this.room.hazards) {
                 for (const t of this._hazardTiles(h)) {
                     if (t.col === sp.p1.col && t.row === sp.p1.row) {
@@ -553,11 +492,6 @@ class RoomEditor {
         }
     }
 
-    /* --------------------------------------------------------------------------
-     * SPAWN DO TESTE (botão "Testar")
-     * Configuração só do editor: persiste no localStorage à parte da cena, para
-     * não vazar para o JSON salvo em /map.
-     * -------------------------------------------------------------------------- */
     _loadTestSpawn() {
         const fallback = { mode: "CENTER", p1: null, p2: null };
         try {
@@ -576,11 +510,10 @@ class RoomEditor {
         try {
             localStorage.setItem("editor_test_spawn", JSON.stringify(this.testSpawn));
         } catch (e) {
-            // Silencioso: sem localStorage, a escolha só vale nesta sessão.
+
         }
     }
 
-    // Tile interno onde um player pode nascer (sem borda, parede ou buraco).
     _isTestSpawnTileFree(col, row) {
         if (col <= 0 || row <= 0 || col >= this.cols - 1 || row >= this.rows - 1) return false;
         if (this.room.holes.has(`${col},${row}`)) return false;
@@ -588,8 +521,6 @@ class RoomEditor {
         return true;
     }
 
-    // Resolve o spawn do teste em tiles + px. Se o modo escolhido não existir
-    // mais na sala atual (porta removida, tile virou buraco), cai no centro.
     _resolveTestSpawn() {
         const ts = this.testSpawn;
         const toPos = (t) => ({
@@ -612,8 +543,6 @@ class RoomEditor {
         return { mode: "CENTER", p1: d.p1, p2: d.p2 };
     }
 
-    // Clique no canvas (aba Spawns): P1 no tile clicado, P2 no primeiro vizinho
-    // livre. Ficam colados para a corrente não arrebentar ao iniciar.
     _setCustomTestSpawn(col, row) {
         if (!this._isTestSpawnTileFree(col, row)) return;
         const neighbors = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -624,7 +553,7 @@ class RoomEditor {
                 break;
             }
         }
-        if (!p2) return; // tile isolado: sem espaço para os dois players
+        if (!p2) return;
 
         this.testSpawn = { mode: "custom", p1: { col, row }, p2 };
         this._saveTestSpawn();
@@ -645,7 +574,7 @@ class RoomEditor {
         options.push({ value: "custom", label: "Personalizado (clique no mapa)" });
 
         const resolved = this._resolveTestSpawn();
-        // Mantém "Personalizado" visível como escolha mesmo antes do 1º clique.
+
         const current = this.testSpawn.mode === "custom" ? "custom" : resolved.mode;
         sel.innerHTML = options
             .map(o => `<option value="${o.value}"${o.value === current ? " selected" : ""}>${o.label}</option>`)
@@ -659,7 +588,6 @@ class RoomEditor {
         }
     }
 
-    // Marcador verde do spawn do teste no canvas (distinto das entradas).
     _renderTestSpawn(ctx, tileW) {
         const sp = this._resolveTestSpawn();
         ctx.save();
@@ -675,7 +603,6 @@ class RoomEditor {
         this._drawPlayerSprite(ctx, sp.p1.x, sp.p1.y, "p1", "#ffd166", "P1");
         this._drawPlayerSprite(ctx, sp.p2.x, sp.p2.y, "p2", "#6bb4db", "P2");
 
-        // Etiqueta "TESTE" acima do par.
         const labelX = (Math.min(sp.p1.col, sp.p2.col)) * tileW + 4;
         const labelY = (Math.min(sp.p1.row, sp.p2.row)) * tileW + 4;
         ctx.font = "bold 11px sans-serif";
@@ -687,19 +614,14 @@ class RoomEditor {
         ctx.restore();
     }
 
-    /* --------------------------------------------------------------------------
-     * ATUALIZAÇÃO DA INTERFACE A PARTIR DO ESTADO
-     * -------------------------------------------------------------------------- */
     _updateUIFromState() {
-        // Regra de trancamento das portas (único controle que reflete metadados).
+
         const lockSel = document.getElementById("lock-rule");
         if (lockSel) lockSel.value = this.room.lock || "auto";
 
-        // Buracos
         const holesCount = document.getElementById("holes-count");
         if (holesCount) holesCount.textContent = this.room.holes.size;
 
-        // Listas de Perigos, Inimigos, Tochas e Props
         this._updateWallsListUI();
         this._updateHazardsListUI();
         this._updateEnemiesListUI();
@@ -709,11 +631,9 @@ class RoomEditor {
         this._updateSpawnsListUI();
         this._updateTestSpawnUI();
 
-        // Segurança de spawn (no-op com guard) e persistência da cena.
         this._checkSpawnSafety();
         this._updateCodeOutput();
 
-        // Status bar
         const statusDims = document.getElementById("status-dims");
         if (statusDims) statusDims.textContent = `${this.cols} x ${this.rows} tiles (${this.cols * this.tilePx} x ${this.rows * this.tilePx} px)`;
     }
@@ -1884,7 +1804,6 @@ class RoomEditor {
             this._setCustomTestSpawn(col, row);
         }
     }
-
 
     _toggleWallAt(col, row) {
         const onBorder = col === 0 || col === this.cols - 1 || row === 0 || row === this.rows - 1;

@@ -41,35 +41,17 @@ import {
     SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL
 } from './config/GameConfig.js';
 
-/**
- * Game — orquestrador do jogo.
- *
- * Possui todos os subsistemas (render, input, física, salas, combate,
- * partículas) e roda o loop principal. Toda a lógica que antes vivia solta no
- * main.js mora aqui, encapsulada em estado de instância e métodos coesos.
- *
- * Uso:
- *   const game = new Game(document.getElementById("gameCanvas"));
- *   game.start();
- */
 export class Game {
     constructor(canvas, opts = {}) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.ctx.imageSmoothingEnabled = false;
 
-        // Catálogo de peças autorais (/map); pode ser null (cai no fallback).
         this.roomCatalog = opts.roomCatalog || null;
 
-        // Assets e tela
-        // Pode receber um loader já carregado (ex.: o mesmo do trailer), para
-        // não baixar/decodificar as texturas de novo ao começar.
         this.assets = opts.assets || new AssetLoader();
         this._bindResize();
 
-        // HUD no canvas: retratos "vtuber" (P1 à esquerda, P2 à direita) com os
-        // corações voltados para o centro. Os getters resolvem os jogadores
-        // atuais (recriados no restart).
         const cfgs = playerConfigs(this.assets);
         this.hud = new VtuberHud({
             assets: this.assets,
@@ -77,82 +59,62 @@ export class Game {
             spriteConfigs: cfgs.map(c => c.sprite),
             colors: cfgs.map(c => c.color)
         });
-        // Tela de morte (DOM): véu de sangue + botão REINICIAR em pixel art.
+
         this.deathScreen = new DeathScreen({ onRestart: () => this.restart() });
-        // Tela de pausa (DOM): véu de pedra + RESUME / RESTART / VOLUME em pixel art.
+
         this.pauseScreen = new PauseScreen({
-            // O próprio botão já toca "uiConfirm": fecha a pausa sem o uiClose
-            // por cima (um som por ação). O som de mover o foco é do PixelButton.
+
             onResume: () => this.setPaused(false, { silent: true }),
             onRestart: () => this.restart()
         });
-        this._started = false;   // só pausa depois que a partida começou
-        this._padPrev = {};      // borda de subida dos botões do controle
+        this._started = false;
+        this._padPrev = {};
 
-        // Sprite do item de cura (versão chunky, no pixel do cenário).
         HeartPickup.sheet = this.assets.get("heartPickup");
 
-        // Subsistemas de render / mundo
         this.renderer = new Renderer(canvas, this.ctx);
         this.renderer.setTileset(new Tileset(this.assets.tileset, 16, 10));
         this.renderer.setAssets(this.assets);
-        // Alternador de tileset (tecla "T" / botão): índice da variante atual.
+
         this._tilesetIndex = 0;
-        // Informa o tamanho do tile no mundo para a quantização do zoom
-        // (mantém a grade de tiles alinhada ao pixel de tela — tiles fixos).
+
         this.renderer.setTileWorldSize(TILE);
 
-        // Pós-processamento de tela (vinheta de masmorra).
         this.postProcessor = new PostProcessor(canvas, this.ctx);
 
-        // Feedback de "kill" em espaço de tela (sangue voando + flash vermelho).
         this.screenGore = new ScreenGore(canvas);
 
-        // Poeira/vento ambiente (atmosfera viva).
         this.wind = new WindSystem();
 
-        // Sangue cobre o mundo inteiro
         this.bloodCanvas = new BloodCanvas(WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL);
         this.particleSystem = new ParticleSystem(this.bloodCanvas);
 
-        // Áudio: gerenciado centralmente por AudioConfig. Permite alterar sons,
-        // volumes por caso de uso, pitch e volume master.
         this.audio = new AudioManager(AUDIO_CONFIG);
-        // Volume GERAL do jogador (slider da pausa, compartilhado com o
-        // trailer): multiplica o master de mixagem da config.
+
         const mixMaster = this.audio.getMasterVolume();
-        // Master de mixagem da config: o slider do jogador multiplica este valor.
+
         this.mixMaster = mixMaster;
         this._unsubVolume = MasterVolume.subscribe(() => this.audio.setMasterVolume(mixMaster * MasterVolume.gain()));
-        // Botões de interface passam a usar o mesmo gerenciador (master/mudo).
+
         setUiAudio(this.audio);
         if (typeof window !== "undefined") {
             window.audio = this.audio;
             window.audioConfig = AUDIO_CONFIG;
         }
 
-        // Entrada e armas
         this.input = new InputHandler();
-        // IA opcional do Jogador 1 (apenas para testar o jogo sozinho). Fica
-        // DESLIGADA por padrão; alterna com a tecla "I" ou window.playerAI.
-        // Os getters resolvem p1/p2/sala em tempo real (são recriados no
-        // restart), então a IA sempre age sobre as instâncias atuais.
+
         this.playerAI = new PlayerAI({
             input: this.input,
             getP1: () => this.p1,
             getP2: () => this.p2,
             getRoom: () => this.rooms?.current,
-            // Testa se um ponto do MUNDO cai sobre um buraco (ou fora da sala),
-            // para a IA desviar de abismos. Reaproveita a grade de tiles.
+
             isHoleAt: (x, y) => this.tiles.isHoleAtWorld(x, y),
-            // Portas abertas da sala atual (para a IA acompanhar o humano ao
-            // atravessar). Vazio quando a sala está trancada.
+
             getDoors: () => (this.rooms?.isLocked() ? [] : this.rooms.doorsOfCurrent())
         });
-        // A corrente une os jogadores e porta a arma ativa. Se insistirem em se
-        // separar além do limite, ela ARREBENTA (empurrão elástico) e os
-        // jogadores ficam DESARMADOS até os dois voltarem até a serra caída
-        // (pickupRadius). Ajuste os "dials" (tensão, ruptura, reconexão) aqui.
+
         this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], {
             rest: 130,
             stiffness: 0.02,
@@ -165,33 +127,27 @@ export class Game {
             playerSafeZone: PLAYER_SAFE_ZONE
         });
 
-        // Fábricas / sistemas
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio });
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
-        // Pegadas não marcam os botões do corredor-desafio.
+
         this.effects.stepBlocker = (x, y) => !!this.rooms?.current?.challenge?.coversButton(x, y);
         this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
 
-        // Consultas de grade de tiles (buracos, spawn seguro) sobre a sala atual.
         this.tiles = new DungeonTileQuery({ rooms: this.rooms });
-        // Montagem das luzes de tela do quadro (jogadores, serra, tochas, portas).
+
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
-        // Laço principal: fixed timestep + slow-motion. Os callbacks resolvem
-        // leitura de controles, um passo de simulação e o render do quadro.
+
         this.gameLoop = new GameLoop({
             onFrameStart: () => { this.input.pollGamepads(); this._pollMenuPad(); this._updateSawMotor(); },
             onStep: (dt) => this._step(dt),
             onRender: () => this._render()
         });
 
-        // Modo de teste do editor: carrega UMA sala custom e desabilita a
-        // troca de salas (não há vizinhas — transicionar causaria crash).
         this.playtest = typeof window !== "undefined" &&
             !!window.location && window.location.search.includes("playtest=true");
 
-        // Estado de jogo
         this.floor = 1;
         this.gameOver = false;
         this.players = [];
@@ -199,9 +155,9 @@ export class Game {
         this.p2 = null;
         this.arenaBounds = null;
         this.gibs = [];
-        this.transition = null; // { phase: "out"|"in", t, door }
-        this.roomIntro = null;   // { phase, t } sequência de entrada na sala
-        this._doorFlashT = 0;    // segundos restantes do flash de "porta aberta"
+        this.transition = null;
+        this.roomIntro = null;
+        this._doorFlashT = 0;
 
         this._bindButtons();
     }
@@ -210,19 +166,16 @@ export class Game {
         return this.chain.weapon;
     }
 
-    // ---- Bootstrap ----
     start() {
         this.players = this.playerFactory.create();
         [this.p1, this.p2] = this.players;
         this.newDungeon();
         this._started = true;
-        // Ambiente contínuo da dungeon (Web Audio, emenda sem clique). Entra
-        // com fade longo para não "bater" junto com o início da partida.
+
         this.audio.playLoop("ambience", { fadeMs: 3000 });
-        // Motor da serra: loop contínuo cujo nível/tom/brilho seguem o giro
-        // (começa em silêncio; atualizado a cada quadro em _updateSawMotor).
+
         this.sawMotor ??= new SawMotorAudio(this.audio.createLoopVoice("sawMotor"));
-        if (typeof window !== "undefined") window.sawMotor = this.sawMotor; // debug, como window.audio
+        if (typeof window !== "undefined") window.sawMotor = this.sawMotor;
         this.gameLoop.start();
     }
 
@@ -236,20 +189,14 @@ export class Game {
         window.addEventListener("resize", resize);
     }
 
-    // Feedback dos botões de pressão (tier "pequeno" de game feel): som de
-    // clique, tremidinha de câmera e poeira saindo da base ao apertar; um
-    // clique mais leve ao soltar. A animação (squash, onda, brilho) é do
-    // próprio PressureButton.
     _buttonFeedback(challenge) {
-        // Progresso do puzzle co-op no SOM: o aperto que completa o par (todos
-        // pressionados) sai ~2 semitons acima — "falta pouco" sem jingle de UI.
+
         const allPressed = challenge.buttons.length >= 2 && challenge.buttons.every(b => b.pressed);
         for (const b of challenge.buttons) {
             if (b.justPressed) {
                 this.audio?.play("buttonPress", { rateMultiplier: allPressed ? 1.12 : 1 });
                 this.renderer.triggerShake(3);
-                // Poeira radial saindo da borda da base (triggerDust lança
-                // CONTRA a direção dada, por isso o sinal invertido).
+
                 const n = 8;
                 for (let i = 0; i < n; i++) {
                     const a = (i / n) * Math.PI * 2 + Math.random() * 0.3;
@@ -262,9 +209,6 @@ export class Game {
         }
     }
 
-    // Som do disparo das armadilhas de flecha. Atenuado pela DISTÂNCIA até o
-    // jogador mais próximo: o atirador ao lado soa alto e seco (aviso claro
-    // de perigo), os do fundo do corredor ficam de fundo — sem poluir o mix.
     _arrowTrapFeedback(challenge) {
         for (const t of challenge.arrowTraps) {
             if (!t.justFired) continue;
@@ -272,25 +216,21 @@ export class Game {
                 Math.hypot(this.p1.x - t.x, this.p1.y - t.y),
                 Math.hypot(this.p2.x - t.x, this.p2.y - t.y)
             );
-            // 1.0 até 160 px, caindo até 0.35 a partir de 640 px.
+
             const k = Math.max(0, Math.min(1, (d - 160) / 480));
             this.audio?.play("arrowFire", { volumeMultiplier: 1 - 0.65 * k });
         }
     }
 
     _bindButtons() {
-        // Sem barra de botões: atalhos de teclado (toggle por toque, não por
-        // frame). "R" reinicia a qualquer momento; Enter/Espaço reiniciam na
-        // tela de fim de jogo. "T" cicla o tileset (teste de texturas).
-        // "Esc" abre/fecha a tela de pausa.
+
         window.addEventListener("keydown", (e) => {
             if (e.repeat) return;
             const k = e.key.toLowerCase();
             if (k === "escape") this.togglePause();
             else if (k === "t") this.cycleTileset();
             else if (k === "r") this.restart();
-            // Com o botão da tela de morte em foco, Enter/Espaço já disparam
-            // o clique dele — não reinicia duas vezes.
+
             else if (this.gameOver && (k === "enter" || k === " ") &&
                 document.activeElement !== this.deathScreen.button) {
                 playUi("uiConfirm");
@@ -299,7 +239,6 @@ export class Game {
         });
     }
 
-    // Recomeça do andar 1 com jogadores novos (a HUD detecta a troca e zera).
     restart() {
         this.floor = 1;
         this.players = this.playerFactory.create();
@@ -307,11 +246,6 @@ export class Game {
         this.newDungeon();
     }
 
-    // ---- Pausa ----
-    // Pausa só durante a partida (gameplay, transição e intro de sala); nunca
-    // na tela de morte, no carregamento ou no trailer. A simulação congela; a
-    // HUD segue viva (os vtubers olham para o menu) e o ambiente abaixa.
-    // `silent`: fecha sem o uiClose (quando um botão já tocou o uiConfirm).
     setPaused(paused, { silent = false } = {}) {
         paused = !!paused;
         if (paused === this.gameLoop.paused) return;
@@ -320,9 +254,9 @@ export class Game {
         this.hud.setPaused(paused);
         if (paused) {
             this.pauseScreen.show();
-            this.audio.stopAll();                          // corta os efeitos em curso
-            this.audio.setLoopLevel("ambience", -12, 250); // ambiente recua
-            playUi("uiOpen");                              // depois do stopAll
+            this.audio.stopAll();
+            this.audio.setLoopLevel("ambience", -12, 250);
+            playUi("uiOpen");
         } else {
             this.pauseScreen.hide();
             this.audio.setLoopLevel("ambience", 0, 400);
@@ -334,10 +268,6 @@ export class Game {
         this.setPaused(!this.gameLoop.paused);
     }
 
-    // Controle (qualquer gamepad), por borda de subida:
-    //   START (9) — fim de jogo: reinicia; senão abre/fecha a pausa.
-    //   Na pausa: d-pad (12/13) / analógico (eixo 1) navegam, A (0) confirma,
-    //   B (1) volta ao jogo. Na tela de morte, A também reinicia.
     _pollMenuPad() {
         if (typeof navigator === "undefined" || !navigator.getGamepads) return;
         const pads = navigator.getGamepads() || [];
@@ -359,8 +289,6 @@ export class Game {
         const hit = (k) => now[k] && !prev[k];
         this._padPrev = now;
 
-        // Reiniciar pelo controle na tela de morte não passa pelo clique do
-        // botão: toca o uiConfirm aqui para soar igual ao mouse/teclado.
         if (hit("start")) {
             if (this.gameOver) { playUi("uiConfirm"); this.restart(); }
             else this.togglePause();
@@ -373,23 +301,19 @@ export class Game {
         if (!this.gameLoop.paused) return;
         if (hit("up")) this.pauseScreen.move(-1);
         else if (hit("down")) this.pauseScreen.move(1);
-        else if (hit("left")) this.pauseScreen.adjust(-1);     // volume (slider em foco)
+        else if (hit("left")) this.pauseScreen.adjust(-1);
         else if (hit("right")) this.pauseScreen.adjust(1);
         else if (hit("a")) this.pauseScreen.confirm();
         else if (hit("b")) this.setPaused(false);
     }
 
-    // Troca o tileset do mundo pela próxima variante disponível (ciclo). Como o
-    // Tileset desenha a partir de .img, basta trocar a imagem — sem recriar
-    // nada nem recarregar a sala.
     cycleTileset() {
         const variants = this.assets.tilesetVariants;
-        if (!variants || variants.length <= 1) return; // nada para alternar
+        if (!variants || variants.length <= 1) return;
         this._tilesetIndex = (this._tilesetIndex + 1) % variants.length;
         this.renderer.tileset.img = variants[this._tilesetIndex];
     }
 
-    // Gera uma nova dungeon e posiciona os jogadores na sala inicial.
     newDungeon() {
         this.rooms.reset();
         this.gibs = [];
@@ -401,13 +325,12 @@ export class Game {
         this.screenGore.clear();
         this.gameOver = false;
         this.deathScreen.hide();
-        // Reiniciar pela pausa: fecha o menu e retoma (com a rampa de tempo).
+
         if (this.gameLoop.paused) this.setPaused(false, { silent: true });
         this._sawLandPending = false;
-        // Restaura o ambiente após a tela de morte (no-op se já está em 0 dB).
+
         this.audio.setLoopLevel("ambience", 0, 1500);
 
-        // A corrente começa conectada a cada nova dungeon.
         this.chain.reset();
 
         this.rooms.enter();
@@ -415,7 +338,7 @@ export class Game {
 
         const rect = this.rooms.cellRect();
         const spawns = getPlayerSpawnPositions("CENTER", rect.x, rect.y, TILE);
-        // Teste do editor: usa o spawn escolhido na aba "Spawns Players".
+
         const custom = this.playtest ? this.rooms.playtestSpawn : null;
         if (custom) {
             for (const key of ["p1", "p2"]) {
@@ -426,9 +349,6 @@ export class Game {
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
 
-        // No modo de teste do editor, o spawn pode cair sobre um buraco
-        // (morte instantânea em loop). Reposiciona cada player no tile de piso
-        // seguro mais próximo.
         if (this.playtest) {
             this.tiles.ensureSafeSpawn(this.p1, rect);
             this.tiles.ensureSafeSpawn(this.p2, rect);
@@ -440,19 +360,13 @@ export class Game {
         this.renderer.camY = center.y;
         this.renderer.resetSway();
 
-        // A sala inicial também pode ter inimigos autorais (sempre no teste do
-        // editor). Antes eles só nasciam ao ENTRAR por uma porta, então a sala
-        // de teste ficava vazia — e trancada para sempre na regra "enemies".
         this._activateRoomEnemies();
     }
 
-    // Move para a sala vizinha através de uma porta, reposicionando cada player em um tile logo à frente da porta.
     transitionThroughDoor(door) {
         this.rooms.transitionTo(door);
         this.arenaBounds = this.rooms.currentBounds;
 
-        // A porta de entrada na nova sala é o lado oposto da porta atravessada na sala anterior:
-        // Ex: saiu pela porta Norte -> entra pela porta Sul da nova sala.
         const entryDir = { N: "S", S: "N", E: "W", W: "E" }[door.dir] || "CENTER";
         const rect = this.rooms.cellRect();
         const spawns = getPlayerSpawnPositions(entryDir, rect.x, rect.y, TILE);
@@ -461,26 +375,16 @@ export class Game {
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
         this._rememberEntrySpawns();
 
-        // Saíram DESARMADOS: a lâmina largada ficaria presa na sala anterior
-        // (coordenadas de outra célula) e nunca mais poderia ser recolhida.
-        // Ela acompanha os jogadores e a corrente volta conectada.
         if (!this.chain.isConnected) this.chain.reset();
 
-        // Sala de combate (tem inimigos a instanciar): dispara a SEQUÊNCIA DE
-        // INTRO (jogadores parados na porta -> zoom -> inimigos aparecem
-        // congelados -> zoom volta -> liberados). Caso contrário, entrou numa
-        // sala já aberta: dispara o flash amarelo das portas.
         const combat = this._activateRoomEnemies();
         if (!combat && !this.rooms.isLocked()) {
             this._triggerDoorFlash();
         }
 
-        // Retratos da HUD reagem à sala nova (combate = espanto -> raiva).
         this.hud.onRoomEnter(combat);
     }
 
-    // Guarda onde cada jogador entrou na sala atual (tile à frente da porta,
-    // ou o spawn inicial). É ali que ele renasce se cair num buraco.
     _rememberEntrySpawns() {
         this._entrySpawns = new Map([
             [this.p1, { x: this.p1.x, y: this.p1.y }],
@@ -488,9 +392,6 @@ export class Game {
         ]);
     }
 
-    // Primeiro quadro da queda: se a corrente estava conectada, ela solta e a
-    // serra cai num ponto SEGURO (longe da beirada) alcançável pelo jogador
-    // que ficou de pé e pela entrada onde o caído vai renascer.
     _dropSawOnFall() {
         const { p1, p2 } = this;
         const seeds = [p1, p2].filter(p => !p.falling);
@@ -500,7 +401,7 @@ export class Game {
         const dropped = this.chain.forceDrop(p1, p2,
             (x, y) => this.tiles.safeDropPoint(x, y, seeds));
         if (!dropped) return;
-        // Mesmo feedback da ruptura, sem o shake grande (a queda já tem o seu).
+
         this.audio.play("sawSnap");
         this.sawMotor?.onSnap();
         this._sawLandPending = true;
@@ -510,9 +411,6 @@ export class Game {
         this.renderer.triggerShake(6);
     }
 
-    // Fim da animação de queda: perde HOLE_FALL.livesLost corações e renasce
-    // na entrada por onde entrou na sala. Sem vidas sobrando fica "no fundo"
-    // (lives = 0) e o fim de jogo é tratado no fim do passo.
     _resolveFall(p) {
         if (!p.falling || !p.fallComplete) return;
         p.lives = Math.max(0, p.lives - (HOLE_FALL.livesLost ?? 1));
@@ -522,16 +420,12 @@ export class Game {
         p.respawnAt(spot.x, spot.y, HOLE_FALL.respawnInvulnFrames ?? 0);
         this.tiles.ensureSafeSpawn(p, this.rooms.cellRect());
         p._fallSeen = false;
-        // Feedback do coração perdido (flash) sem o som de golpe: a queda já
-        // teve o seu. Atualiza o "visto" para o detector de dano não repetir.
+
         this.screenGore.triggerFlash();
         p._livesSeen = p.lives;
         this.particleSystem.triggerFlash(p.x, p.y, 10, 0.8);
     }
 
-    // Instancia os inimigos autorais pendentes da sala atual. Com a intro
-    // ligada, dispara a sequência (zoom -> aparição -> liberação); sem ela,
-    // cria os inimigos já ativos. Devolve true se havia inimigos a criar.
     _activateRoomEnemies() {
         const room = this.rooms.current;
         if (!room.hasPendingEnemies) return false;
@@ -540,60 +434,44 @@ export class Game {
         return true;
     }
 
-    // Inicia a sequência de intro da sala atual. Enquanto ativa, o controle dos
-    // jogadores e o combate ficam suspensos (ver _updateRoomIntro).
     _beginRoomIntro() {
         this.roomIntro = { phase: "zoomIn", t: 0 };
-        // Cor da chama de aparição = cor da luz da tocha (âmbar do cenário),
-        // convertida de "r, g, b" para [r,g,b]. Calculada uma vez por intro.
+
         this._introFlameColor = this._parseRgbTriplet(
             TORCHES?.light?.color || "255, 190, 110"
         );
-        // Garante que os jogadores comecem imóveis na porta.
+
         this.p1.vx = this.p1.vy = 0;
         this.p2.vx = this.p2.vy = 0;
     }
 
-    // Converte uma cor "r, g, b" (string) em [r, g, b] (números). Fallback para
-    // o âmbar da tocha se o formato for inesperado.
     _parseRgbTriplet(str) {
         const parts = String(str).split(",").map(s => parseInt(s.trim(), 10));
         if (parts.length === 3 && parts.every(n => Number.isFinite(n))) return parts;
         return [255, 190, 110];
     }
 
-    /**
-     * Distribui atrasos de aparição ALEATÓRIOS entre os inimigos recém-criados,
-     * para que surjam de forma desordenada (um aqui, outro ali, não todos de
-     * uma vez). Cada inimigo recebe um delay base crescente + jitter, embaralhado
-     * para a ordem não seguir a lista. Delays em frames (60 = 1s).
-     */
     _scheduleStaggeredSpawns(enemies) {
         if (!enemies || !enemies.length) return;
-        // Ordem embaralhada (Fisher–Yates) para o escalonamento ser desordenado.
+
         const order = enemies.slice();
         for (let i = order.length - 1; i > 0; i--) {
             const j = (Math.random() * (i + 1)) | 0;
             [order[i], order[j]] = [order[j], order[i]];
         }
-        // Espaçamento entre aparições (frames) com jitter. O primeiro pode sair
-        // quase imediato; os demais escalonam.
+
         let acc = (Math.random() * 6) | 0;
         for (const e of order) {
             e.beginFrozenSpawn(acc);
-            acc += 8 + ((Math.random() * 16) | 0); // ~0.13s..0.4s entre cada
+            acc += 8 + ((Math.random() * 16) | 0);
         }
     }
 
-    // Dispara o flash temporário de "porta aberta" (pulsa e enfraquece) + um
-    // pulso de câmera sutil (zoom-punch) ao abrir a porta.
     _triggerDoorFlash() {
         this._doorFlashT = DOOR_LIGHT.flashDuration;
         this.renderer.triggerZoomPunch(0.045);
     }
 
-    // Motor da serra: roda TODO quadro (também em transição/intro/game over),
-    // então nunca congela no último valor — fora do gameplay ele some suave.
     _updateSawMotor() {
         const w = this.chain?.weapon;
         if (!this.sawMotor || !w) return;
@@ -604,17 +482,12 @@ export class Game {
         });
     }
 
-    // Dispara o slow-motion de abate (dá peso ao golpe sem travar). Delega ao
-    // GameLoop, dono do tempo da simulação.
     triggerHitSlowmo() {
         this.gameLoop.triggerHitSlowmo();
     }
 
-    // Limite físico de afastamento entre os players (teto rígido).
     enforceSeparationLimit() {
-        // O teto rígido só vale enquanto a corrente está CONECTADA. Se ela
-        // arrebentou, os jogadores ficam livres (desarmados) e não devem mais
-        // puxar um ao outro — a reconexão acontece ao se reaproximarem.
+
         if (!this.chain.isConnected) return;
         const dx = this.p2.x - this.p1.x, dy = this.p2.y - this.p1.y;
         const dist = Math.hypot(dx, dy);
@@ -626,9 +499,6 @@ export class Game {
         }
     }
 
-    // Centra a câmera na sala atual com zoom que faz a célula inteira caber.
-    // Além do centro fixo, aplica o sway "drone": a câmera pende na direção do
-    // movimento dos jogadores e balança como um pêndulo ao virar/parar.
     _updateCameraToCurrentRoom(dt = SIM_STEP) {
         const rect = this.rooms.cellRect();
         const fitZoom = Math.min(
@@ -636,10 +506,6 @@ export class Game {
             this.canvas.height / (rect.h + CAM_MARGIN * 2)
         );
 
-        // Sway drone: alvo de deslocamento = velocidade média dos jogadores,
-        // normalizada por responseVel (satura em 1) e escalada por maxOffset.
-        // Enquanto correm, a câmera pende à frente; ao parar/virar, a mola
-        // amortecida devolve o sway ao centro oscilando (pêndulo).
         if (CAMERA_DRONE.enabled) {
             const avgVX = (this.p1.vx + this.p2.vx) / 2;
             const avgVY = (this.p1.vy + this.p2.vy) / 2;
@@ -656,12 +522,6 @@ export class Game {
         });
     }
 
-    // ---- Simulação ----
-    //
-    // O laço e o tempo (fixed timestep + slow-motion) vivem no GameLoop; aqui
-    // ficam só os passos de simulação e o render, chamados pelos callbacks.
-
-    // Um passo lógico de tamanho fixo (SIM_STEP segundos).
     _step(deltaSeconds) {
         if (this.gameOver) return;
         if (this.transition) {
@@ -683,19 +543,10 @@ export class Game {
         } else if (this.transition.phase === "in" && this.transition.t >= 1) {
             this.transition = null;
         }
-        this.wind.update(this.arenaBounds); // poeira continua viva durante o fade
+        this.wind.update(this.arenaBounds);
         this._updateCameraToCurrentRoom();
     }
 
-    /**
-     * Sequência de ENTRADA na sala de combate. Enquanto ativa, os jogadores
-     * ficam parados na porta (sem controle) e o combate está suspenso. As fases:
-     *   zoomIn  — a câmera aproxima (introZoomFactor sobe até ROOM_INTRO.zoomFactor);
-     *             ao chegar, os inimigos SPAWNAM congelados com partícula.
-     *   hold    — os inimigos ficam visíveis e parados por um instante.
-     *   zoomOut — a câmera volta ao zoom normal (fator -> 1).
-     *   (fim)   — libera os inimigos (unfreeze) e devolve o controle.
-     */
     _updateRoomIntro(deltaSeconds = SIM_STEP) {
         const intro = this.roomIntro;
         const room = this.rooms.current;
@@ -706,13 +557,10 @@ export class Game {
         if (intro.phase === "zoomIn") {
             const dur = ROOM_INTRO.zoomInTime || 0.0001;
             const k = Math.min(1, intro.t / dur);
-            const eased = 1 - Math.pow(1 - k, 3); // easeOutCubic
+            const eased = 1 - Math.pow(1 - k, 3);
             this.renderer.setIntroZoomFactor(1 + (ROOM_INTRO.zoomFactor - 1) * eased);
             if (k >= 1) {
-                // Pico do zoom: cria os inimigos CONGELADOS e os ESCALONA — cada
-                // um ganha um atraso de aparição aleatório, para surgirem de
-                // forma desordenada (não todos de uma vez). Cada um aparece do
-                // fogo (chama de tocha) quando sua vez chega (ver justAppeared).
+
                 const spawned = room.spawnEnemies(true);
                 this._scheduleStaggeredSpawns(spawned);
                 intro.phase = "hold";
@@ -720,8 +568,7 @@ export class Game {
             }
         } else if (intro.phase === "hold") {
             this.renderer.setIntroZoomFactor(ROOM_INTRO.zoomFactor);
-            // Só avança quando TODOS já apareceram (nenhum ainda escondido) E o
-            // tempo mínimo de contemplação passou.
+
             const allAppeared = room.enemies.every(e => !e.isHidden);
             if (allAppeared && intro.t >= (ROOM_INTRO.spawnHold || 0)) {
                 intro.phase = "zoomOut";
@@ -733,38 +580,30 @@ export class Game {
             const eased = 1 - Math.pow(1 - k, 3);
             this.renderer.setIntroZoomFactor(ROOM_INTRO.zoomFactor + (1 - ROOM_INTRO.zoomFactor) * eased);
             if (k >= 1) {
-                // Fim da intro: zoom normal, libera os inimigos e o controle.
+
                 this.renderer.setIntroZoomFactor(1);
                 for (const e of room.enemies) e.unfreeze?.();
                 this.roomIntro = null;
             }
         }
 
-        // Os jogadores permanecem imóveis na porta durante toda a intro.
         this.p1.vx = this.p1.vy = 0;
         this.p2.vx = this.p2.vy = 0;
 
-        // Mantém os inimigos presos aos bounds e avança APENAS seu efeito de
-        // aparição (update congelado não move/ataca). Quando um inimigo chega a
-        // sua vez (justAppeared), uma CHAMA sobe no lugar dele com as cores da
-        // tocha e a câmera dá um soquinho. Partículas e ambiente continuam vivos
-        // para a cena não "congelar" por completo.
         for (const e of room.enemies) {
             e.update([this.p1, this.p2], () => {});
-            // Altura do fogo: um pouco MAIOR que o sprite, para a coluna de
-            // chama cobrir e revelar o inimigo de baixo para cima.
+
             const riseH = e.drawHeight * 1.15;
             if (e.justAppeared) {
-                // Erupção inicial (densa) saindo do CHÃO (os pés).
+
                 this.particleSystem.triggerFlameBurst(e.x, e.footY, this._introFlameColor, {
                     amount: 40, rise: riseH, width: e.drawHeight * 0.6
                 });
                 this.renderer.triggerShake(6);
-                // Som da chama/surgimento no MESMO quadro da erupção de fogo.
+
                 this.audio.play("enemySpawn");
             } else if (e.spawnFx > 0) {
-                // Alimenta a coluna de fogo durante toda a REVELAÇÃO, para o
-                // fogo acompanhar o sprite surgindo (não some antes da hora).
+
                 this.particleSystem.triggerFlameBurst(e.x, e.footY, this._introFlameColor, {
                     amount: 6, rise: riseH, width: e.drawHeight * 0.55
                 });
@@ -788,35 +627,26 @@ export class Game {
         this.arenaBounds = rooms.currentBounds;
         const room = rooms.current;
 
-        // IA opcional do P1: injeta as teclas virtuais ANTES do update do
-        // jogador. Desligada, não faz nada (controle volta ao humano).
         this.playerAI.update();
 
         p1.update(this.input, this.arenaBounds);
         p2.update(this.input, this.arenaBounds);
-        // Quem terminou de cair renasce na entrada (ou fica sem vidas).
+
         this._resolveFall(p1);
         this._resolveFall(p2);
 
         this.effects.processPlayer(p1);
         this.effects.processPlayer(p2);
 
-        // Corrente: tensão elástica, ruptura (arrebenta e desarma) e reconexão.
-        // A própria Chain aplica o constraint elástico e atualiza a animação da
-        // arma. O teto rígido de afastamento continua valendo por cima.
         this.chain.update(p1, p2, {
             onSnap: () => {
                 this.renderer.triggerShake(14);
-                // Som no MESMO quadro do shake/faíscas (evento grande): estalo
-                // da corrente + ducking forte do ambiente. O "clang" da lâmina
-                // tocando o chão vem depois, quando o sprite assenta (ver
-                // _updateSawLanding) — a separação no tempo vende a queda.
+
                 this.audio.play("sawSnap");
                 this.sawMotor?.onSnap();
                 this.audio.duck(-9, { attackMs: 10, holdMs: 250, releaseMs: 1100 });
                 this._sawLandPending = true;
-                // Ruptura: explosão exagerada de FAÍSCAS (radiais, com glow) +
-                // flash branco no ponto da serra (meio da curva da corda).
+
                 const sp = this.chain.weapon?.getSawPositions?.(p1, p2)?.[0];
                 const fx = sp ? sp.x : (p1.x + p2.x) / 2;
                 const fy = sp ? sp.y : (p1.y + p2.y) / 2;
@@ -826,33 +656,23 @@ export class Game {
             },
             onReconnect: () => {
                 this.renderer.triggerShake(4);
-                // Recompensa: serra de volta (elos puxando + trava + motor).
+
                 this.audio.play("sawPickup");
                 this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
                 this._sawLandPending = false;
-                // Serra recolhida: pisca em branco e dá um pop de escala que
-                // cresce e retrai suave.
+
                 this.chain.weapon?.playReconnect?.();
             },
-            // A serra nunca cai num ponto inalcançável (buraco, parede, ilha).
+
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });
         this._updateSawLanding();
 
-        // Serra em velocidade ALTA: tremida de câmera SECA e PEQUENA, contínua
-        // enquanto o disco gira a toda (sensação de vibração do motor).
         const weapon = this.chain.weapon;
         if (this.chain.isConnected && weapon?.isHighSpeed) {
             this.renderer.triggerShake(1.6);
         }
 
-        // Faíscas de "raspar o chão": o disco cospe centelhas pelas BORDAS,
-        // arremessadas no sentido do giro. A TAXA de emissão é contínua e
-        // proporcional a (giro × movimento), então as faíscas vão RAREANDO
-        // suavemente conforme a serra ou os jogadores desaceleram — sem corte
-        // seco. Um acumulador fracionário permite emitir menos de 1 por frame.
-        // Corrente desarmada: a serra não está em jogo — garante que não fique
-        // "presa" sobre sangue.
         if (!this.chain.isConnected) weapon?.setOnBlood?.(false);
 
         if (this.chain.isConnected && weapon) {
@@ -860,13 +680,12 @@ export class Game {
             const vx = (p1.vx + p2.vx) / 2;
             const vy = (p1.vy + p2.vy) / 2;
             const speed = Math.min(1, Math.hypot(vx, vy) / (p1.speed || 4.2));
-            // Intensidade 0..1 combinando giro e movimento (ambos precisam
-            // existir para raspar). Elevada ao quadrado para cair suave no fim.
+
             const intensity = spin * speed;
-            // Pico de ~5 faíscas por frame no raspar máximo.
+
             this._sparkAccum = (this._sparkAccum ?? 0) + intensity * 5;
             const emit = Math.floor(this._sparkAccum);
-            // Centro da serra = meio da CURVA da corda (ancoragem real).
+
             const sawPos = weapon.getSawPositions(p1, p2)[0];
             const sawX = sawPos.x;
             const sawY = sawPos.y;
@@ -877,10 +696,6 @@ export class Game {
                 );
             }
 
-            // Serra SOBRE SANGUE: enquanto o disco está sobre uma poça/zona
-            // molhada do chão, mantém o sprite ensanguentado (mesmo parado) e,
-            // se estiver GIRANDO, chapinha lançando gotas EFÊMERAS pelas bordas
-            // — só visual, sem carimbar/criar sangue novo no chão.
             const bc = this.particleSystem.bloodCanvas;
             const overBlood = !!bc && bc.isBloodZone(sawX, sawY);
             weapon.setOnBlood?.(overBlood);
@@ -901,27 +716,23 @@ export class Game {
         }
         this.enforceSeparationLimit();
 
-        // Corredor-desafio: perigos (spikes/flechas) + botões co-op.
         if (room.challenge) {
             room.challenge.update([p1, p2], deltaSeconds);
             this._buttonFeedback(room.challenge);
             this._arrowTrapFeedback(room.challenge);
         }
 
-        // Inimigos: IA + dano no player (feedback via CombatSystem)
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
 
-        // Colisões entre entidades (3 iterações)
         const liveEnemies = enemies.filter(e => e.state !== "dying");
         const allEntities = [p1, p2, ...liveEnemies];
-        // Raio sólido do disco da serra (só quando conectada): impede que os
-        // jogadores (e inimigos vivos) fiquem em cima/atrás do disco.
+
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
         for (let it = 0; it < 3; it++) {
             Physics.resolveEntityCollisions(allEntities);
             if (sawR > 0) {
-                // Centro = meio da CURVA da corda, recalculado a cada iteração.
+
                 const sc = weapon.getSawPositions(p1, p2)[0];
                 for (const e of allEntities) {
                     Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
@@ -929,31 +740,22 @@ export class Game {
             }
         }
 
-        // Colisão com paredes construídas no editor (vindo da branch paredes).
         if (room.wallBoxes?.length) {
             for (const entity of [p1, p2, ...room.enemies]) {
                 Physics.resolveBoxCollisions(entity, room.wallBoxes);
             }
         }
 
-        // Após resolver as colisões, garante que nenhum inimigo tenha sido
-        // empurrado para um tile não-caminhável.
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
-        // Confinamento: inimigos presos; players podem adentrar portas abertas
         enemies.forEach(e => rooms.clampEnemy(e, this.arenaBounds));
         const doors = rooms.doorsOfCurrent();
         const canPass = !rooms.isLocked();
         rooms.clampPlayer(p1, this.arenaBounds, doors, canPass);
         rooms.clampPlayer(p2, this.arenaBounds, doors, canPass);
 
-        // Queda em buracos/abismos COM RESISTÊNCIA (HOLE_FALL): na beirada o
-        // jogador é freado e empurrado de volta ao piso; só cai se insistir além
-        // dela por alguns frames. A posição já está confinada acima.
         this.tiles.checkHoleFalls([p1, p2]);
-        // Som de queda na BORDA de subida de `falling` (uma vez por queda), com
-        // ducking longo: o vento descendo domina o momento. No mesmo quadro a
-        // serra solta e cai num lugar seguro para ser recolhida depois.
+
         for (const p of [p1, p2]) {
             if (p.falling && !p._fallSeen) {
                 this.audio.play("playerFall");
@@ -963,41 +765,31 @@ export class Game {
             p._fallSeen = p.falling;
         }
 
-        // Arma: a animação já é atualizada por chain.update(). O dano só é
-        // aplicado quando a corrente está conectada (desarmada = sem dano).
         this.combat.resolveWeaponHits(
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
             () => {
                 this.triggerHitSlowmo();
-                // Motor "engasga" ao morder o inimigo (oscilação de tom/volume).
+
                 this.sawMotor?.onHit();
             }
         );
         this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger(), [p1, p2]);
 
-        // Corações de cura: atualiza, e qualquer player com vida < 3 que
-        // encoste coleta (cura até o máximo de 3). Toca o som de pickup.
         this._updateHearts(room);
 
-        // Gibs
         for (let i = this.gibs.length - 1; i >= 0; i--) {
             this.gibs[i].update(this.arenaBounds);
             if (this.gibs[i].done) this.gibs.splice(i, 1);
         }
 
-        // Pegadas / poeira
         this.effects.update();
 
-        // Flash vermelho SÓ quando um jogador perde vida (qualquer fonte:
-        // inimigo, flecha, spike). Detecta pela queda de `lives` desde o
-        // último passo; cura e reinício (lives sobe) não disparam.
         for (const p of [p1, p2]) {
             if (p._livesSeen !== undefined && p.lives < p._livesSeen) {
                 this.screenGore.triggerFlash();
-                // Impacto no corpo, junto do flash e do knockback. A queda no
-                // abismo já tem som próprio (playerFall), então não duplica.
+
                 if (!p.falling) {
-                    // O último coração soa mais pesado (tom mais grave).
+
                     this.audio.play("playerHit", { rateMultiplier: p.lives <= 1 ? 0.88 : 1 });
                     this.audio.duck(-6, { attackMs: 10, holdMs: 150, releaseMs: 700 });
                 }
@@ -1005,22 +797,17 @@ export class Game {
             p._livesSeen = p.lives;
         }
 
-        // Feedback de tela: respingos (kill) + flash vermelho (dano).
         this.screenGore.update();
 
-        // Flash de "porta aberta": decai ao longo do tempo até sumir.
         if (this._doorFlashT > 0) {
             this._doorFlashT = Math.max(0, this._doorFlashT - deltaSeconds);
         }
 
-        // Sala limpa quando sem inimigos. No instante em que destrava, dispara
-        // o flash amarelo nas portas (pulsa um momento e enfraquece).
         if (rooms.tryClearCurrent()) {
             this._triggerDoorFlash();
-            // Portas destravando (trinco + pedra arrastando), junto do flash.
+
             this.audio.play("doorOpen");
-            // Pulso de câmera mais forte ao LIMPAR a sala (alívio/recompensa):
-            // afasta de leve e volta.
+
             this.renderer.triggerZoomPunch(-0.07);
             this.hud.onRoomCleared();
         }
@@ -1031,7 +818,7 @@ export class Game {
         if (p1.lives <= 0 || p2.lives <= 0) {
             this.gameOver = true;
             this.deathScreen.show();
-            // Tela de morte: o ambiente recua (-10 dB) e volta no restart.
+
             this.audio.setLoopLevel("ambience", -10, 1500);
         }
 
@@ -1039,9 +826,6 @@ export class Game {
         this._updateCameraToCurrentRoom(deltaSeconds);
     }
 
-    // Atualiza os corações da sala e resolve a coleta pelos jogadores.
-    // Qualquer player pode recolher um coração desde que ainda tenha espaço para
-    // recuperar uma vida (o máximo é três). Coletar cura +1 e toca "pickup".
     _updateHearts(room) {
         const { p1, p2 } = this;
         const hearts = room.hearts;
@@ -1054,15 +838,13 @@ export class Game {
             if (collector) {
                 collector.lives = Math.min(3, collector.lives + 1);
                 this._playHeartPickup();
-                // Brilho curto no ponto da coleta (a camada visual do som).
+
                 this.particleSystem.triggerFlash(heart.x, heart.y, 6, 0.6);
                 hearts.splice(i, 1);
             }
         }
     }
 
-    // Coletas em sequência (dentro de HEART_STREAK_MS) sobem o tom do pickup
-    // em degraus — recompensa crescente, como moedas em sequência.
     _playHeartPickup() {
         const now = globalThis.performance?.now?.() ?? Date.now();
         const HEART_STREAK_MS = 2500;
@@ -1073,9 +855,6 @@ export class Game {
         this.audio.play("pickup", { rateMultiplier: 1 + this._heartStreak * 0.06 });
     }
 
-    // "Clang" da lâmina largada: toca quando o pop de queda termina (dropT
-    // chega a 1, sprite assentado no chão), com tremidinha e poeira — o
-    // impacto sonoro casa com o momento visual do contato.
     _updateSawLanding() {
         const w = this.chain.weapon;
         if (!this._sawLandPending) return;
@@ -1095,9 +874,8 @@ export class Game {
         }
     }
 
-    // Dispara a transição quando ambos os players adentraram o mesmo vão.
     _checkDoorTransition(doors) {
-        // No modo de teste do editor só existe UMA sala: nunca transiciona.
+
         if (this.playtest) return;
         if (this.rooms.isLocked() || this.transition) return;
         const { p1, p2, rooms } = this;
@@ -1113,7 +891,6 @@ export class Game {
         }
     }
 
-    // ---- Render ----
     _render() {
         const { ctx, renderer, rooms } = this;
         renderer.beginFrame();
@@ -1125,7 +902,6 @@ export class Game {
         const tiles = rooms.currentTiles;
         const doorHalf = rooms.doorHalfWidth;
 
-        // Recorta ao retângulo da célula + margem dos stubs de corredor.
         const stubMargin = DOOR_STUB_TILES * TILE;
         ctx.save();
         ctx.beginPath();
@@ -1139,21 +915,15 @@ export class Game {
             renderer.drawDoorGradients(doors, doorHalf, TILE, DOOR_STUB_TILES);
         }
 
-        // Desafio co-op: botões e spikes ficam no CHÃO. São desenhados ANTES do
-        // sangue para que a mancha caia POR CIMA do piso onde eles estão (do
-        // contrário o sprite da spike taparia o sangue do próprio tile).
         const challenge = rooms.current.challenge;
         if (challenge) challenge.drawFloorLayer(ctx);
 
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
-        // Botões: objeto com altura, POR CIMA do sangue e das pegadas (nada
-        // mancha a tampa), mas sob a poeira, as sombras e as entidades.
+
         if (challenge) challenge.drawButtons(ctx);
         this.particleSystem.drawSmoke(ctx);
 
-        // Corações de cura: só a SOMBRA vai no chão; o coração em si é
-        // desenhado depois do pós-processamento (ver _render, abaixo).
         rooms.current.hearts.forEach(h => h.drawShadow(ctx));
 
         const p1Bounce = this.p1.speedMag > 0.15 ? Math.abs(Math.sin(this.p1.animTimer)) : 0;
@@ -1161,70 +931,46 @@ export class Game {
         renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, p1Bounce);
         renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
         const enemies = rooms.current.enemies;
-        // Inimigos ainda escondidos (atraso de spawn da intro) não projetam
-        // sombra — ela denunciaria a posição antes de aparecerem.
+
         enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
 
-        // Corrente (linha) da arma: SEMPRE ao fundo, atrás de todas as
-        // entidades. Só o disco entra na ordenação por profundidade.
         this.chain.drawChain(ctx, this.p1, this.p2);
 
-        // Profundidade pelo DISCO da serra: ele fica no meio da corrente
-        // (sawY). Quem está mais ACIMA (y <= sawY, "ao fundo") é desenhado
-        // ANTES e fica atrás do disco; quem está mais ABAIXO (y > sawY, "à
-        // frente") é desenhado DEPOIS e fica na frente dele. Ordenado por Y.
         const sawY = this.chain.weapon?.getSawPositions
             ? this.chain.weapon.getSawPositions(this.p1, this.p2)[0].y
             : (this.p1.y + this.p2.y) / 2;
         const entities = [this.p1, this.p2, ...enemies];
-        // Botões entram na ordenação como OCLUSORES: redesenham a tampa por
-        // cima dos pés de quem passa por TRÁS deles (dá volume ao botão).
+
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const drawables = [...entities, ...occluders].sort((a, b) => a.y - b.y);
 
         drawables.filter(e => e.y <= sawY).forEach(e => e.draw(ctx));
 
-        // Disco da serra: só aparece quando conectada (a Chain cuida disso).
         this.chain.draw(ctx, this.p1, this.p2);
 
-        // Lâmina DROPADA: quando a corrente arrebenta, a serra fica flutuando
-        // no chão como item coletável (sombra + feixe de luz). Só desenha
-        // quando desconectada (a Chain cuida disso).
         this.chain.drawDropped(ctx);
 
-        // Faíscas da serra: por cima do disco (centelhas saltando).
         this.particleSystem.drawSparks(ctx);
 
         drawables.filter(e => e.y > sawY).forEach(e => e.draw(ctx));
 
-        // Chamas de APARIÇÃO (intro): por cima das entidades, para o fogo subir
-        // na frente do inimigo que materializa.
         this.particleSystem.drawFlames(ctx);
 
-        // Indicadores dos atiradores de flecha: montados nas paredes, por cima
-        // das entidades (ficam na parede, não no chão).
         if (challenge) challenge.drawWallLayer(ctx);
 
         renderer.drawFrontWall(rect, tiles, TILE, open, doors, doorHalf, DOOR_STUB_TILES);
 
         this.gibs.forEach(g => g.draw(ctx));
 
-        // Flechas em voo: por cima de tudo no mundo (camada "aérea").
         if (challenge) challenge.drawAirLayer(ctx);
 
         this.particleSystem.drawAir(ctx);
 
-        // Poeira/vento no MUNDO (dentro do clip). Como a iluminação é aplicada
-        // depois do endFrame, a luz das tochas/jogadores "revela" a poeira.
         if (WIND.layer === "world") this.wind.draw(ctx);
 
-        ctx.restore(); // fim do clip da sala
+        ctx.restore();
         renderer.endFrame();
 
-        // Pós-processamento em espaço de tela (iluminação + vinheta), sobre a
-        // cena mas por baixo dos overlays de UI/transição/game over. Toda a
-        // montagem de luzes do quadro é delegada ao LightingRenderer; a posição
-        // da serra em uso é calculada aqui (depende de p1/p2) e injetada.
         const sawPos = (this.chain.isConnected && this.chain.weapon)
             ? this.chain.weapon.getSawPositions?.(this.p1, this.p2)?.[0] ?? null
             : null;
@@ -1243,18 +989,12 @@ export class Game {
             hearts: this.rooms.current?.hearts ?? []
         });
 
-        // Vinheta "respira" no ritmo da TENSÃO da corrente: quanto mais perto
-        // de arrebentar, mais a tela pulsa (tensão/ansiedade). Sem tensão (ou
-        // desconectada), fica estável.
         const strain = (this.chain.isConnected && this.chain.weapon)
             ? (this.chain.weapon.strain ?? 0) : 0;
         this.postProcessor.setVignetteBreath(strain);
 
         this.postProcessor.draw();
 
-        // Corações de cura POR CIMA de todos os efeitos (luz, vinheta, sangue,
-        // fumaça, partículas): sprite + brilho + feixe diagonal, no transform
-        // do mundo — como um item "pega-me" que nunca some no escuro.
         const hearts = rooms.current.hearts;
         if (hearts.length) {
             renderer.beginOverlayWorld();
@@ -1262,8 +1002,6 @@ export class Game {
             renderer.endOverlayWorld();
         }
 
-        // Poeira/vento em espaço de TELA (visível na cena toda, inclusive no
-        // escuro). Só quando WIND.layer === "screen".
         if (WIND.layer === "screen") this.wind.drawScreen(ctx, (x, y) => renderer.worldToScreen(x, y));
 
         this._renderOverlays();
@@ -1272,8 +1010,6 @@ export class Game {
     _renderOverlays() {
         const { ctx, canvas } = this;
 
-        // Feedback de "kill" (sangue voando + flash vermelho) por cima da cena,
-        // mas por baixo de transição/game over.
         this.screenGore.draw(ctx);
 
         if (this.transition) {
@@ -1283,10 +1019,7 @@ export class Game {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        // HUD "vtuber" por cima do fade de transição (os retratos reagem à
-        // sala nova enquanto a tela escurece); a tela de morte (DOM) fica acima.
         this.hud.draw(ctx, canvas.width, canvas.height);
 
-        // Fim de jogo: a tela de morte (DOM, js/ui/DeathScreen.js) cobre a cena.
     }
 }

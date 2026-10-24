@@ -1,15 +1,3 @@
-/**
- * RoomSocket.js — Definição de conectores (portas/sockets) e templates de salas modulares.
- *
- * Em um sistema modular de salas ("peças de quebra-cabeça"), cada sala possui sockets
- * em suas quatro bordas (N, S, E, W). Um socket especifica o vão exato onde uma porta
- * ou corredor se conecta com a sala vizinha:
- *   - Borda: "N" (Norte), "S" (Sul), "E" (Leste), "W" (Oeste).
- *   - Offset: coordenada na borda (coluna horizontal p/ N e S, linha vertical p/ E e W).
- *   - Span: largura da passagem em tiles (no jogo o padrão é 2 tiles).
- *   - Type: tipo de conexão (ex: "standard", "corridor", "boss_gate", "secret").
- */
-
 export const DIRECTION = Object.freeze({
     NORTH: "N",
     SOUTH: "S",
@@ -33,20 +21,8 @@ export const DIRECTION_DELTA = Object.freeze({
     W: Object.freeze({ dx: -1, dy: 0 })
 });
 
-/**
- * RoomSocket — Conector/porta individual em uma das quatro bordas de uma sala.
- */
 export class RoomSocket {
-    /**
-     * @param {object} opts
-     * @param {string} [opts.id]              Identificador único (ex: "E_row3_span2")
-     * @param {"N"|"S"|"E"|"W"} opts.dir      Borda onde o conector se localiza
-     * @param {number} opts.offset            Coordenada inicial na borda (coluna para N/S, linha para E/W)
-     * @param {number} [opts.span=2]          Largura do vão em tiles (padrão do jogo: 2)
-     * @param {string} [opts.type="standard"] Tipo de passagem (ex: "standard", "boss", "secret")
-     * @param {"open"|"closed"|"locked"} [opts.state="open"] Estado da passagem
-     * @param {string[]} [opts.tags=[]]       Tags adicionais
-     */
+
     constructor({
         id = null,
         dir,
@@ -75,35 +51,14 @@ export class RoomSocket {
         this.id = id || `${this.dir}_${this.offset}_span${this.span}`;
     }
 
-    /**
-     * Retorna o intervalo fechado [start, end] de coordenadas ocupadas por este socket.
-     * Exemplo: offset 3 com span 2 ocupa os tiles [3, 4].
-     * @returns {[number, number]}
-     */
     get range() {
         return [this.offset, this.offset + this.span - 1];
     }
 
-    /**
-     * Verifica se uma coordenada de tile específica ao longo da borda cai no vão do socket.
-     * @param {number} pos
-     * @returns {boolean}
-     */
     containsCoord(pos) {
         return pos >= this.offset && pos < this.offset + this.span;
     }
 
-    /**
-     * Valida se este socket encaixa perfeitamente com um socket vizinho.
-     * Critérios obrigatórios:
-     * 1. Direções opostas (Norte encaixa com Sul, Leste encaixa com Oeste).
-     * 2. Exata mesma coordenada (offset) na borda compartilhada.
-     * 3. Mesma largura de vão (span).
-     * 4. Tipos compatíveis (ex: standard com standard).
-     *
-     * @param {RoomSocket} other
-     * @returns {boolean}
-     */
     matches(other) {
         if (!other || !(other instanceof RoomSocket)) return false;
         if (other.dir !== OPPOSITE_DIRECTION[this.dir]) return false;
@@ -142,22 +97,8 @@ export class RoomSocket {
     }
 }
 
-/**
- * RoomTemplate — Blueprint de uma sala modular ("peça de quebra-cabeça").
- * Contém o tamanho em tiles e o conjunto de sockets definidos nas suas bordas.
- */
 export class RoomTemplate {
-    /**
-     * @param {object} opts
-     * @param {string} opts.id              Identificador único do template (ex: "room_cross_4way")
-     * @param {string} [opts.name]          Nome legível da sala
-     * @param {number} [opts.cols=14]       Largura da sala em tiles
-     * @param {number} [opts.rows=9]        Altura da sala em tiles
-     * @param {RoomSocket[]} [opts.sockets] Lista de sockets nas bordas
-     * @param {string} [opts.kind="room"]   "room" | "corridor"
-     * @param {string} [opts.type="normal"] "start" | "normal" | "boss" | "challenge"
-     * @param {object} [opts.metadata={}]   Metadados adicionais (layout de tiles, perigos, props)
-     */
+
     constructor({
         id,
         name = "",
@@ -197,31 +138,14 @@ export class RoomTemplate {
         }
     }
 
-    /**
-     * Retorna todos os sockets localizados em uma borda específica.
-     * @param {"N"|"S"|"E"|"W"} dir
-     * @returns {RoomSocket[]}
-     */
     getSockets(dir) {
         return this.sockets.filter(s => s.dir === dir);
     }
 
-    /**
-     * Verifica se existe um socket com determinado offset na borda especificada.
-     * @param {"N"|"S"|"E"|"W"} dir
-     * @param {number} offset
-     * @param {number} [span=2]
-     * @returns {RoomSocket|null}
-     */
     findSocket(dir, offset, span = 2) {
         return this.sockets.find(s => s.dir === dir && s.offset === offset && s.span === span) || null;
     }
 
-    /**
-     * Gera o objeto de portas tradicional { N, S, E, W } para compatibilidade
-     * total com RoomTiles.js, Dungeon.js e RoomManager.js.
-     * @returns {{ N: boolean, S: boolean, E: boolean, W: boolean }}
-     */
     getDoorsBoolean() {
         return {
             N: this.sockets.some(s => s.dir === "N"),
@@ -231,11 +155,6 @@ export class RoomTemplate {
         };
     }
 
-    /**
-     * Cria uma cópia deste template rotacionada em sentido horário (90°, 180° ou 270°).
-     * @param {1|2|3} quarterTurns Número de rotações de 90 graus no sentido horário
-     * @returns {RoomTemplate}
-     */
     rotate(quarterTurns = 1) {
         const turns = ((quarterTurns % 4) + 4) % 4;
         if (turns === 0) return this.clone();
@@ -253,11 +172,6 @@ export class RoomTemplate {
                 let nextDir;
                 let nextOffset;
 
-                // Rotação 90° horário:
-                // N (topo, x=offset, y=0) -> E (direita, x'=nextCols-1, y'=offset)
-                // E (dir, x=currentCols-1, y=offset) -> S (base, x'=nextCols - (offset+span), y'=nextRows-1)
-                // S (base, x=offset, y=currentRows-1) -> W (esq, x'=0, y'=nextRows - (offset+span))
-                // W (esq, x=0, y=offset) -> N (topo, x'=offset, y'=0)
                 if (s.dir === "N") {
                     nextDir = "E";
                     nextOffset = s.offset;
@@ -313,24 +227,6 @@ export class RoomTemplate {
         });
     }
 
-    /**
-     * Cria um RoomTemplate padrão baseado nas regras vigentes do jogo:
-     * - Salas de largura `cols` (padrão 14) e altura `rows` (padrão 9).
-     * - Portas de 2 tiles centralizadas:
-     *   * N e S: offset = floor(cols/2) - 1, span = 2.
-     *   * E e W: offset = floor(rows/2) - 1, span = 2.
-     *
-     * @param {object} opts
-     * @param {string} opts.id
-     * @param {string} [opts.name]
-     * @param {number} [opts.cols=14]
-     * @param {number} [opts.rows=9]
-     * @param {{ N?: boolean, S?: boolean, E?: boolean, W?: boolean }} [opts.doors={}]
-     * @param {string} [opts.kind="room"]
-     * @param {string} [opts.type="normal"]
-     * @param {object} [opts.metadata={}]
-     * @returns {RoomTemplate}
-     */
     static createStandard({
         id,
         name = "",
@@ -390,11 +286,6 @@ export class RoomTemplate {
         });
     }
 
-    /**
-     * Converte um objeto JSON ou metadados de arquivo de sala em uma instância de RoomTemplate.
-     * @param {object|string} json
-     * @returns {RoomTemplate}
-     */
     static fromJSON(json) {
         const data = typeof json === "string" ? JSON.parse(json) : json;
 

@@ -12,7 +12,7 @@ export class FloorDebris {
     }
 
     update(players, bounds) {
-        // Sangue não tem física: apenas fica fixo no chão onde assentou.
+
         if (this.isBlood) return;
 
         players.forEach(p => {
@@ -46,7 +46,6 @@ export class FloorDebris {
             this.vy = 0;
         }
 
-        // Limites
         if (this.x < bounds.minX) { this.x = bounds.minX; this.vx = 0; }
         if (this.x > bounds.maxX) { this.x = bounds.maxX; this.vx = 0; }
         if (this.y < bounds.minY) { this.y = bounds.minY; this.vy = 0; }

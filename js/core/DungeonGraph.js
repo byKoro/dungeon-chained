@@ -1,22 +1,3 @@
-/**
- * DungeonGraph — geração PROCEDURAL pura do layout da dungeon.
- *
- * Não desenha nada nem conhece o Canvas: só produz DADOS. Inspirado no
- * gerador (salas na grade + algoritmo de Prim para conectar as mais próximas
- * + corredores em L), portado para JS puro.
- *
- * Saída de generate():
- * {
- *   cols, rows,                     // dimensões da grade
- *   cells: Map<"x,y", cell>,        // células ocupadas (salas e corredores)
- *   rooms: [{ gx, gy, type }],      // salas (type: "start" | "normal" | "boss")
- *   start: { gx, gy },              // sala inicial
- *   // cada cell: { gx, gy, kind: "room"|"corridor", doors: {N,S,E,W:bool} }
- * }
- *
- * "doors" indica em quais lados a célula conecta a um vizinho ocupado.
- */
-
 const DIRS = [
     { dx: 0, dy: -1, key: "N", opp: "S" },
     { dx: 0, dy: 1, key: "S", opp: "N" },
@@ -25,12 +6,7 @@ const DIRS = [
 ];
 
 export class DungeonGraph {
-    /**
-     * @param {object} opts
-     *   cols, rows        tamanho da grade
-     *   roomCount         quantas salas gerar
-     *   rng               função () => [0,1) (opcional, default Math.random)
-     */
+
     constructor(opts = {}) {
         this.cols = opts.cols ?? 9;
         this.rows = opts.rows ?? 7;
@@ -42,24 +18,17 @@ export class DungeonGraph {
     _key(x, y) { return `${x},${y}`; }
     _rand(n) { return Math.floor(this.rng() * n); }
 
-    // Distância de grade (usada pelo Prim). Euclidiana ao quadrado basta.
     _dist2(a, b) {
         const dx = a.gx - b.gx, dy = a.gy - b.gy;
         return dx * dx + dy * dy;
     }
 
-    /**
-     * Espalha salas na grade com um espaçamento mínimo, para não ficarem
-     * grudadas (versão simples de "poisson-like": tenta pontos aleatórios e
-     * rejeita os muito próximos de salas já colocadas).
-     */
     _scatterRooms() {
         const rooms = [];
-        const minSpacing = 2; // células de distância mínima entre centros
+        const minSpacing = 2;
         let attempts = 0;
         const maxAttempts = this.roomCount * 60;
 
-        // Sala inicial no centro
         const start = { gx: (this.cols / 2) | 0, gy: (this.rows / 2) | 0, type: "start" };
         rooms.push(start);
 
@@ -79,7 +48,6 @@ export class DungeonGraph {
             if (ok) rooms.push(candidate);
         }
 
-        // A sala mais distante da inicial vira a "boss"
         if (rooms.length > 1) {
             let far = rooms[1], farD = -1;
             for (let i = 1; i < rooms.length; i++) {
@@ -92,12 +60,6 @@ export class DungeonGraph {
         return { rooms, start };
     }
 
-    /**
-     * Conecta as salas com o algoritmo de Prim: começa por uma sala e vai
-     * ligando sempre o par (visitada, restante) de menor distância, formando
-     * uma árvore geradora mínima (todas alcançáveis, sem excesso de arestas).
-     * Retorna a lista de arestas [{ a, b }] (salas a conectar por corredor).
-     */
     _connectPrim(rooms) {
         const edges = [];
         if (rooms.length <= 1) return edges;
@@ -126,11 +88,6 @@ export class DungeonGraph {
         return edges;
     }
 
-    /**
-     * Cava um corredor em L entre duas salas, marcando as células percorridas.
-     * Move primeiro no eixo de maior distância, depois no outro (igual ao
-     * gerador original).
-     */
     _carveCorridor(a, b, cells) {
         let x = a.gx, y = a.gy;
         const x2 = b.gx, y2 = b.gy;
@@ -145,14 +102,13 @@ export class DungeonGraph {
             }
 
             const key = this._key(x, y);
-            // Não sobrescreve uma sala; só cria corredor em célula vazia.
+
             if (!cells.has(key)) {
                 cells.set(key, { gx: x, gy: y, kind: "corridor", doors: { N: false, S: false, E: false, W: false } });
             }
         }
     }
 
-    /** Calcula as portas de cada célula: abre para todo vizinho ocupado. */
     _computeDoors(cells) {
         for (const cell of cells.values()) {
             for (const d of DIRS) {
@@ -253,7 +209,6 @@ export class DungeonGraph {
         if (this.layout) return this._generateFromLayout(this.layout);
         const { rooms, start } = this._scatterRooms();
 
-        // Registra as salas como células
         const cells = new Map();
         for (const r of rooms) {
             cells.set(this._key(r.gx, r.gy), {
@@ -262,16 +217,10 @@ export class DungeonGraph {
             });
         }
 
-        // Conecta com Prim e cava corredores
         const edges = this._connectPrim(rooms);
         for (const e of edges) this._carveCorridor(e.a, e.b, cells);
 
-        // Calcula portas (conexões entre células vizinhas)
         this._computeDoors(cells);
-
-        // NOTA: não há mais marcação PROCEDURAL de corredores-desafio. Perigos,
-        // botões e traps vêm exclusivamente das peças autorais (/map) que você
-        // desenha — nada é injetado automaticamente.
 
         return {
             cols: this.cols,

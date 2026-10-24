@@ -1,13 +1,4 @@
-/**
- * EntityConfig — descrição (crop/animação) dos sprites de inimigos e jogadores.
- *
- * As configs recebem as imagens já carregadas (do AssetLoader) em vez de
- * criá-las, para manter a configuração separada do carregamento de assets.
- */
-
 import { TINY_RPG_ENEMIES } from './TinyRpgEnemies.js';
-
-// ---- Inimigos melee ----
 
 export function demonConfig(assets) {
     return {
@@ -39,12 +30,8 @@ export function bloodMonsterConfig(assets) {
     };
 }
 
-// Lista de fábricas de config de inimigos melee do SORTEIO (salas sem
-// inimigos autorais). Os tipos do Tiny RPG Pack 02 ficam de fora: só entram
-// quando escolhidos no editor.
 export const MELEE_ENEMY_CONFIGS = [demonConfig, bloodMonsterConfig];
 
-// Fábrica de config para um inimigo gerado (tools/build_tinyrpg_enemies.py).
 function tinyRpgConfig({ key, label, src, ...sprite }) {
     return (assets) => ({
         img: assets.get ? assets.get(key) : assets[key],
@@ -52,11 +39,6 @@ function tinyRpgConfig({ key, label, src, ...sprite }) {
     });
 }
 
-/**
- * Registro ÚNICO dos tipos de inimigo autorais. `key` é o "type" gravado no
- * mapa ({ type, col, row }); `label` aparece no editor. Todos usam a mesma
- * IA padrão (MeleeEnemy), só trocando a folha/animações.
- */
 export const ENEMY_TYPES = [
     { key: "demon", label: "Demônio (Rápido)", config: demonConfig },
     { key: "bloodMonster", label: "Monstro de Sangue (Tanque)", config: bloodMonsterConfig },
@@ -64,9 +46,6 @@ export const ENEMY_TYPES = [
 ];
 
 export const ENEMY_TYPE_BY_KEY = Object.fromEntries(ENEMY_TYPES.map(t => [t.key, t]));
-
-// ---- Jogadores ----
-// Cada player: { color, controls, img, name, sprite }
 
 export function playerConfigs(assets) {
     return [

@@ -4,69 +4,48 @@ export class Player extends Entity {
     constructor(x, y, color, controls, spriteImg, name, spriteConfig = null) {
         super(x, y, 16);
         this.color = color;
-        this.controls = controls; // ['up', 'down', 'left', 'right']
+        this.controls = controls;
         this.img = spriteImg;
         this.name = name;
         this.speed = 4.2;
         this.lives = 3;
         this.invulnerableTimer = 0;
         this.hurtTimer = 0;
-        this.hurtDuration = 30;    // duração do balanço/pose de impacto (frames)
-        this.scaredTimer = 0;      // após o dano, anda "assustado" por um tempo
-        this.scaredDuration = 120; // ~2s a 60fps
-        // Expressão forçada (olhos/sobrancelhas). Nome de uma chave em
-        // sprite.expressions; null = usa o comportamento normal. Usado no trailer.
+        this.hurtDuration = 30;
+        this.scaredTimer = 0;
+        this.scaredDuration = 120;
+
         this.expression = null;
 
-        // Configuração do sprite.
-        // Spritesheet animado (P1): {
-        //   animated:true, frameCount, cellSize, cropX/Y/W/H, drawHeight,
-        //   hurt:   { img, frameCount, hurtFrame, cellSize, cropX/Y/W/H },  // pose de impacto
-        //   scared: { img, frameCount, cellSize, cropX/Y/W/H }             // andar assustado
-        // }
-        // Sprite único legado (P2): { animated:false, drawSize }
         this.sprite = spriteConfig || { animated: false, drawSize: 46 };
-        this.walkFrame = 0;   // acumulador contínuo do ciclo de andar (compartilhado entre walks)
+        this.walkFrame = 0;
 
-        // --- Estado de animação suavizada ---
-        this.bobPhase = 0;    // fase contínua do balanço ao andar
-        this.tilt = 0;        // inclinação lateral suavizada (rad), segue o vx
+        this.bobPhase = 0;
+        this.tilt = 0;
 
-        // Detecção de "arranque" (transição parado -> correndo)
         this.wasRunning = false;
-        this.justStartedRunning = false; // true só no frame em que arranca
+        this.justStartedRunning = false;
 
-        // --- Escorregada ao parar (freada brusca) ---
-        // Quando o jogador solta o input vindo de uma corrida, ele não trava na
-        // hora: desliza um pouquinho e desacelera mais devagar por alguns frames.
-        this.slideTimer = 0;             // frames restantes de deslize
-        this.slideDuration = 10;         // ~0.17s de escorregada
-        this.justStopped = false;        // true só no frame em que a freada começa
-        this.stopDirX = 0; this.stopDirY = 0; // direção do movimento ao frear
-        this.stopSpeed = 0;              // velocidade no instante da freada
+        this.slideTimer = 0;
+        this.slideDuration = 10;
+        this.justStopped = false;
+        this.stopDirX = 0; this.stopDirY = 0;
+        this.stopSpeed = 0;
 
-        // Sistema de passos/pegadas
-        this.stepDist = 0;        // distância acumulada desde o último passo
-        this.stepSide = 1;        // alterna 1/-1 (pé direito/esquerdo)
-        this.justStepped = false; // true só no frame em que dá um passo
+        this.stepDist = 0;
+        this.stepSide = 1;
+        this.justStepped = false;
         this.stepX = 0; this.stepY = 0; this.stepAngle = 0;
-        this.bloodStepsLeft = 0;  // passos ensanguentados restantes (ao pisar em sangue)
+        this.bloodStepsLeft = 0;
 
-        // --- Queda em buraco/abismo ---
-        // Ao pisar num tile de buraco (floor === -1), o jogador cai: encolhe e
-        // afunda por `fallDuration` frames. Ao fim da animação `fallComplete`
-        // liga e o Game decide: renasce na entrada da sala (ver respawnAt) ou,
-        // sem vidas sobrando, fim de jogo.
         this.falling = false;
         this.fallComplete = false;
         this.fallTimer = 0;
-        this.fallDuration = 34;   // ~0.57s de animação de queda
-        this.fallX = 0;           // centro do tile em que caiu (trava a posição)
+        this.fallDuration = 34;
+        this.fallX = 0;
         this.fallY = 0;
     }
 
-    // Dispara a queda no buraco (uma vez). Trava o jogador no centro do tile e
-    // zera a velocidade; o desfecho vem ao fim da animação (ver update).
     startFalling(tileCenterX, tileCenterY) {
         if (this.falling) return;
         this.falling = true;
@@ -77,8 +56,6 @@ export class Player extends Entity {
         this.vx = 0; this.vy = 0;
     }
 
-    // Renasce após cair no buraco: sai do estado de queda, reaparece em (x, y)
-    // parado e fica invulnerável por `invulnFrames` (pisca, como após dano).
     respawnAt(x, y, invulnFrames = 0) {
         this.falling = false;
         this.fallComplete = false;
@@ -89,22 +66,16 @@ export class Player extends Entity {
         this.invulnerableTimer = Math.max(this.invulnerableTimer, invulnFrames);
     }
 
-    // Seleciona a folha e o frame corretos conforme o estado atual do player.
-    // Prioridade: impacto (hurt) > assustado (scared) > caminhada normal (walk).
-    // Todos os ciclos de caminhada compartilham this.walkFrame, então a troca
-    // entre "andar assustado" e "andar normal" fica perfeitamente sincronizada.
     resolveSprite() {
         const s = this.sprite;
 
         const hasSheet = (cfg) => cfg && cfg.img && cfg.img.complete && cfg.img.naturalWidth > 0;
 
-        // Índice do frame de caminhada atual (0 = parado; 1..frameCount-1 = passos)
         const walkFrameIndex = () => {
             if (this.speedMag <= 0.2) return 0;
             return 1 + (Math.floor(this.walkFrame) % (s.frameCount - 1));
         };
 
-        // Monta o descritor de recorte a partir de uma config de folha
         const build = (img, cfg, frame) => ({
             sheet: img,
             cell: cfg.cellSize,
@@ -112,24 +83,20 @@ export class Player extends Entity {
             frame
         });
 
-        // 1) Impacto: pose fixa de dano
         if (this.hurtTimer > 0 && hasSheet(s.hurt)) {
             const frame = Math.min(s.hurt.hurtFrame, s.hurt.frameCount - 1);
             return build(s.hurt.img, s.hurt, frame);
         }
 
-        // 1.5) Expressão forçada: mesmo ciclo de andar, folha da expressão
         if (this.expression && s.expressions) {
             const e = s.expressions[this.expression];
             if (hasSheet(e)) return build(e.img, e, walkFrameIndex());
         }
 
-        // 2) Assustado: mesmo ciclo de andar, porém na folha "scared"
         if (this.scaredTimer > 0 && hasSheet(s.scared)) {
             return build(s.scared.img, s.scared, walkFrameIndex());
         }
 
-        // 3) Caminhada normal (folha principal, this.img)
         return build(this.img, s, walkFrameIndex());
     }
 
@@ -147,20 +114,17 @@ export class Player extends Entity {
         }
 
         const hasInput = moveX !== 0 || moveY !== 0;
-        // Intenção de movimento do frame (usada pela assistência dos botões
-        // para não "grudar" quem está tentando sair).
+
         this.moveX = moveX;
         this.moveY = moveY;
 
         if (hasInput) {
-            // Acelera na direção do input (comportamento normal).
+
             this.vx = this.vx * 0.76 + moveX * this.speed * 0.24;
             this.vy = this.vy * 0.76 + moveY * this.speed * 0.24;
             this.slideTimer = 0;
         } else {
-            // Sem input: em vez de travar (fator 0.76), DESLIZA. Durante a janela
-            // de deslize a desaceleração é mais suave (0.90), dando aquela
-            // escorregadinha; depois volta a frear firme para parar de vez.
+
             const decel = this.slideTimer > 0 ? 0.90 : 0.76;
             this.vx *= decel;
             this.vy *= decel;
@@ -169,9 +133,9 @@ export class Player extends Entity {
     }
 
     takeDamage(sourceX, sourceY) {
-        // Caindo no buraco: a queda já cobra seu preço, golpes não somam.
+
         if (this.falling || this.invulnerableTimer > 0) return false;
-        
+
         this.lives--;
         this.invulnerableTimer = 65;
         this.hurtTimer = this.hurtDuration;
@@ -184,15 +148,14 @@ export class Player extends Entity {
     }
 
     update(input, bounds) {
-        // Caindo no abismo: ignora input/movimento, só avança o timer de queda.
-        // Trava a posição no centro do tile para o sprite afundar no lugar.
+
         if (this.falling) {
             this.x = this.fallX;
             this.y = this.fallY;
             this.vx = 0; this.vy = 0;
             if (this.fallTimer > 0) {
                 this.fallTimer--;
-                if (this.fallTimer === 0) this.fallComplete = true; // Game resolve (renasce/morre)
+                if (this.fallTimer === 0) this.fallComplete = true;
             }
             return;
         }
@@ -204,36 +167,24 @@ export class Player extends Entity {
         this.handleInput(input);
         super.update();
 
-        // Avança o ciclo de caminhada proporcional à velocidade real
         if (this.speedMag > 0.2) {
             this.walkFrame += this.speedMag * 0.18;
         } else {
-            // Volta suavemente para a pose parada (frame 0)
+
             this.walkFrame = 0;
         }
 
-        // Balanço suave que acompanha a velocidade (frequência e amplitude
-        // proporcionais ao quão rápido o personagem se move). Sem tranco:
-        // a fase avança continuamente, sem depender de troca de estado.
         this.bobPhase += 0.12 + this.speedMag * 0.06;
 
-        // Tilt lateral: inclina na direção do movimento horizontal, suavizado.
-        // Alvo proporcional a vx; aproximação exponencial evita solavancos.
         const tiltTarget = Math.max(-1, Math.min(1, this.vx / this.speed)) * 0.16;
         this.tilt += (tiltTarget - this.tilt) * 0.15;
 
-        // Direção instantânea (flip imediato). Usa um limiar para não ficar
-        // trocando de lado por causa de micro-velocidade ao parar.
         if (this.vx < -0.15) this.facingLeft = true;
         else if (this.vx > 0.15) this.facingLeft = false;
 
-        // Detecção de arranque: transição de "parado/lento" para "correndo".
-        // Histerese (limiares diferentes) evita disparos repetidos ao oscilar.
         const running = this.speedMag > this.speed * 0.55;
         this.justStartedRunning = running && !this.wasRunning;
 
-        // Detecção de freada: estava correndo e agora desacelerou abaixo do
-        // limiar. Dispara a escorregada + o evento para as partículas de freada.
         this.justStopped = false;
         if (this.wasRunning && !running && this.speedMag > this.speed * 0.2) {
             this.justStopped = true;
@@ -247,10 +198,8 @@ export class Player extends Entity {
         if (running) this.wasRunning = true;
         else if (this.speedMag < this.speed * 0.35) this.wasRunning = false;
 
-        // --- Passos / pegadas ---
-        // Acumula a distância percorrida; a cada trecho, "pisa" alternando o pé.
         this.justStepped = false;
-        const STEP_LENGTH = 20; // pixels por passo
+        const STEP_LENGTH = 20;
         if (this.speedMag > 0.25) {
             this.stepDist += this.speedMag;
             if (this.stepDist >= STEP_LENGTH) {
@@ -260,12 +209,12 @@ export class Player extends Entity {
                 const mag = this.speedMag || 1;
                 const dirX = this.vx / mag;
                 const dirY = this.vy / mag;
-                // Perpendicular à direção, para deslocar o pé para a lateral
+
                 const perpX = -dirY, perpY = dirX;
                 const sideOffset = 5 * this.stepSide;
 
                 this.stepX = this.x + perpX * sideOffset;
-                this.stepY = this.y + 15 + perpY * sideOffset; // aos pés
+                this.stepY = this.y + 15 + perpY * sideOffset;
                 this.stepAngle = Math.atan2(dirY, dirX);
                 this.justStepped = true;
             }
@@ -273,9 +222,6 @@ export class Player extends Entity {
             this.stepDist = 0;
         }
 
-        // Nota: o clamp aos limites da sala é feito no main.js
-        // (clampPlayerWithDoors), que conhece os vãos das portas e permite o
-        // jogador adentrá-los. Por isso NÃO prendemos aos bounds aqui.
     }
 
     draw(ctx) {
@@ -286,49 +232,41 @@ export class Player extends Entity {
 
         ctx.translate(this.x, this.y);
 
-        // Queda no abismo: encolhe, afunda um pouco e gira — some no buraco.
         if (this.falling) {
-            const t = 1 - (this.fallTimer / this.fallDuration); // 0 -> 1
-            const shrink = Math.max(0, 1 - t);                  // 1 -> 0 (some)
-            ctx.translate(0, t * 10);                            // afunda levemente
-            ctx.rotate(t * 1.6);                                 // tomba girando
+            const t = 1 - (this.fallTimer / this.fallDuration);
+            const shrink = Math.max(0, 1 - t);
+            ctx.translate(0, t * 10);
+            ctx.rotate(t * 1.6);
             ctx.scale(shrink, shrink);
             ctx.globalAlpha = Math.max(0, 1 - t * 0.8);
         }
 
-        // Balanço BRUSCO ao receber dano (mais forte no impacto, decaindo com o tempo)
         if (this.hurtTimer > 0 && !this.falling) {
-            const intensity = this.hurtTimer / this.hurtDuration; // 1 -> 0
+            const intensity = this.hurtTimer / this.hurtDuration;
             const shake = 16 * intensity;
             ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake * 0.5);
             ctx.rotate((Math.random() - 0.5) * 0.55 * intensity);
         }
 
-        // Balanço suave ao andar (amplitude segue a velocidade) + leve bob vertical.
-        // Nada de tremor brusco: tudo interpolado e proporcional ao movimento.
         const moveAmount = Math.min(1, this.speedMag / this.speed);
         const bobAngle = Math.sin(this.bobPhase) * 0.03 * moveAmount;
         const bobY = Math.abs(Math.sin(this.bobPhase)) * 2.2 * moveAmount;
         ctx.translate(0, -bobY);
 
-        // Inclinação lateral (tilt) na direção do movimento
         ctx.rotate(this.tilt + bobAngle);
 
-        // Flip instantâneo (sem animação de giro)
         if (this.facingLeft) ctx.scale(-1, 1);
 
-        // Renderização do sprite
         if (this.img && this.img.complete && this.img.naturalWidth > 0) {
             const s = this.sprite;
 
             if (s.animated) {
-                // Escolhe folha + frame conforme o estado (impacto/assustado/normal)
+
                 const sp = this.resolveSprite();
                 const cw = sp.cropW, ch = sp.cropH;
                 const srcX = sp.frame * sp.cell + sp.cropX;
                 const srcY = sp.cropY;
 
-                // Escala uniforme pela altura desejada, preservando a proporção do boneco
                 const scale = s.drawHeight / ch;
                 const drawW = cw * scale;
                 const drawH = ch * scale;
@@ -339,7 +277,7 @@ export class Player extends Entity {
                     -drawW / 2, -drawH / 2, drawW, drawH
                 );
             } else {
-                // Sprite único legado, fatiado em topo/base com micro-bobbing
+
                 const drawW = 36, drawH = 46;
                 const halfH = this.img.naturalHeight / 2;
                 ctx.drawImage(this.img, 0, halfH, this.img.naturalWidth, halfH, -drawW / 2, 0, drawW, drawH / 2);
