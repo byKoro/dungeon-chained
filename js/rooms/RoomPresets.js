@@ -1,16 +1,8 @@
-/**
- * RoomPresets.js — Catálogo de peças modulares prontas (templates de salas e corredores).
- *
- * Todas as peças seguem as dimensões padrão do jogo (14x9 tiles) com portas
- * centralizadas de 2 tiles de largura, correspondendo fielmente à geometria
- * de RoomTiles.js e GameConfig.js.
- */
-
 import { RoomTemplate } from './RoomSocket.js';
 import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
 
 export const RoomPresets = Object.freeze({
-    // Salas 4-vias (cruzamento)
+
     CROSS_4WAY: RoomTemplate.createStandard({
         id: "room_cross_4way",
         name: "Sala de Quatro Vias",
@@ -21,7 +13,6 @@ export const RoomPresets = Object.freeze({
         type: "normal"
     }),
 
-    // Salas 3-vias (T-Junctions)
     T_JUNCTION_NORTH: RoomTemplate.createStandard({
         id: "room_t_junction_n",
         name: "Junção T (Sem porta Sul)",
@@ -62,7 +53,6 @@ export const RoomPresets = Object.freeze({
         type: "normal"
     }),
 
-    // Corredores retos 2-vias
     CORRIDOR_HORIZONTAL: RoomTemplate.createStandard({
         id: "corridor_horizontal_ew",
         name: "Corredor Leste-Oeste",
@@ -83,7 +73,6 @@ export const RoomPresets = Object.freeze({
         type: "normal"
     }),
 
-    // Cotovelos / Curvas em L (2-vias)
     CORNER_NE: RoomTemplate.createStandard({
         id: "room_corner_ne",
         name: "Curva Norte-Leste",
@@ -124,7 +113,6 @@ export const RoomPresets = Object.freeze({
         type: "normal"
     }),
 
-    // Finais de linha / Dead-ends (1-via)
     DEADEND_WEST: RoomTemplate.createStandard({
         id: "room_deadend_w",
         name: "Câmara sem Saída (Entrada Oeste)",
@@ -165,7 +153,6 @@ export const RoomPresets = Object.freeze({
         type: "normal"
     }),
 
-    // Sala Inicial e Sala do Chefe
     START_ROOM: RoomTemplate.createStandard({
         id: "room_start_hub",
         name: "Câmara Inicial",
@@ -187,10 +174,6 @@ export const RoomPresets = Object.freeze({
     })
 });
 
-/**
- * Retorna todos os presets como um Map de id -> RoomTemplate.
- * @returns {Map<string, RoomTemplate>}
- */
 export function getPresetCatalog() {
     const catalog = new Map();
     for (const template of Object.values(RoomPresets)) {

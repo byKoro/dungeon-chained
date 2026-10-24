@@ -5,63 +5,35 @@ export class Renderer {
         this.canvas = canvas;
         this.ctx = ctx;
         this.assets = null;
-        this.zoom = 1.50;         // zoom atual (animado)
+        this.zoom = 1.50;
         this.screenShake = 0;
 
-        // Tamanho do tile em px de MUNDO. Usado para quantizar o zoom de modo
-        // que a grade de tiles sempre caia em pixels inteiros de tela. Definido
-        // por setTileWorldSize(); default seguro até lá.
         this.tileWorldSize = 64;
 
-        // Câmera: ponto do MUNDO que fica no centro da tela.
         this.camX = canvas.width / 2;
         this.camY = canvas.height / 2;
 
-        // Sway "drone/pêndulo": deslocamento (px de mundo) somado ao alvo da
-        // câmera, resolvido por mola amortecida (ver applyDroneSway). Guarda a
-        // posição e a velocidade do sway em cada eixo.
         this.swayX = 0; this.swayY = 0;
         this._swayVX = 0; this._swayVY = 0;
 
-        // Zoom-punch: um "soco" de zoom (fração somada ao zoom) que decai a cada
-        // frame, dando um pulso rápido de câmera em eventos (limpar sala, abrir
-        // porta). Positivo = aproxima; negativo = afasta.
         this._zoomPunch = 0;
 
-        // Fator de zoom da INTRO de sala: multiplica o zoom-alvo (fit) para
-        // aproximar a câmera durante a sequência de entrada. 1 = normal (fit),
-        // >1 = aproximado. O Game anima este valor; a suavização de updateCamera
-        // faz a transição ser macia.
         this.introZoomFactor = 1;
     }
 
-    // Define o fator de zoom da intro (1 = fit normal, >1 = aproxima).
     setIntroZoomFactor(f) {
         this.introZoomFactor = Math.max(0.1, f || 1);
     }
 
-    // Dispara um pulso de zoom (fração; ex.: 0.08 = +8%). Usa o maior em módulo
-    // para pulsos sobrepostos não se cancelarem.
     triggerZoomPunch(amount = 0.08) {
         if (Math.abs(amount) > Math.abs(this._zoomPunch)) this._zoomPunch = amount;
     }
 
-    // Zera o sway "drone" (posição e velocidade). Usado ao (re)entrar numa
-    // dungeon para a câmera não começar deslocada/balançando.
     resetSway() {
         this.swayX = 0; this.swayY = 0;
         this._swayVX = 0; this._swayVY = 0;
     }
 
-    /**
-     * Avança o sway "drone" por um passo de tempo dt (segundos). O alvo
-     * (targetX, targetY) é o deslocamento DESEJADO da câmera na direção do
-     * movimento dos jogadores. Uma mola amortecida persegue esse alvo:
-     *   a = stiffness*(alvo - pos) - damping*vel
-     * Com damping baixo em relação à rigidez, a câmera ULTRAPASSA e volta,
-     * criando o balanço de pêndulo ao virar/parar. Integração semi-implícita
-     * (atualiza velocidade e depois posição) para estabilidade.
-     */
     applyDroneSway(targetX, targetY, stiffness, damping, dt) {
         const ax = stiffness * (targetX - this.swayX) - damping * this._swayVX;
         const ay = stiffness * (targetY - this.swayY) - damping * this._swayVY;
@@ -71,7 +43,6 @@ export class Renderer {
         this.swayY += this._swayVY * dt;
     }
 
-    // Informa o tamanho do tile no mundo (px) para a quantização do zoom.
     setTileWorldSize(px) {
         if (px > 0) this.tileWorldSize = px;
     }
@@ -80,16 +51,10 @@ export class Renderer {
         this.assets = assets;
     }
 
-    /**
-     * Quantiza o zoom para que um tile (tileWorldSize px de mundo) ocupe um
-     * número INTEIRO de pixels de tela. Isso trava a grade de rasterização:
-     * sem fração acumulando entre tiles, as costuras de 1px desaparecem e o
-     * cenário fica fixo mesmo com a câmera em zoom-fit arbitrário.
-     */
     _quantizeZoom(zoom) {
         const t = this.tileWorldSize;
         if (!t) return zoom;
-        // nº inteiro de px de tela por tile (>= 1), arredondado do zoom desejado.
+
         const tilePxOnScreen = Math.max(1, Math.round(t * zoom));
         return tilePxOnScreen / t;
     }
@@ -98,31 +63,20 @@ export class Renderer {
         this.screenShake = Math.max(this.screenShake, amount);
     }
 
-    /**
-     * Atualiza a câmera para seguir um alvo (px de mundo) com um zoom desejado,
-     * de forma suave. Faz clamp para não mostrar além dos limites da sala.
-     * @param {object} t { x, y, zoom, bounds } — bounds da sala (opcional)
-     */
     updateCamera(t) {
-        // O sway "drone" é somado ao alvo: a câmera persegue o centro da sala
-        // DESLOCADO na direção do movimento (o balanço vive em swayX/swayY).
+
         const targetX = t.x + this.swayX;
         const targetY = t.y + this.swayY;
         this.camX += (targetX - this.camX) * 0.12;
         this.camY += (targetY - this.camY) * 0.12;
         if (t.zoom) {
-            // O zoom-alvo (fit da sala) é multiplicado pelo fator de intro para
-            // aproximar/afastar durante a sequência de entrada.
+
             const targetZoom = t.zoom * this.introZoomFactor;
             this.zoom += (targetZoom - this.zoom) * 0.08;
-            // Snap no alvo quando já está perto: evita a interpolação ficar
-            // eternamente a frações de distância, o que mantinha a escala
-            // mudando de leve a cada frame (tiles "respirando" no início).
+
             if (Math.abs(targetZoom - this.zoom) < 0.001) this.zoom = targetZoom;
         }
 
-        // Clamp: mantém a câmera dentro dos limites da sala (não revela o vazio
-        // fora dela). Só clampa no eixo se a sala for maior que a viewport.
         if (t.bounds) {
             const halfW = (this.canvas.width / 2) / this.zoom;
             const halfH = (this.canvas.height / 2) / this.zoom;
@@ -140,7 +94,6 @@ export class Renderer {
         }
     }
 
-    // Converte um ponto de tela (px) para coordenadas de mundo.
     screenToWorld(sx, sy) {
         return {
             x: this.camX + (sx - this.canvas.width / 2) / this.zoom,
@@ -148,10 +101,6 @@ export class Renderer {
         };
     }
 
-    // Converte um ponto de MUNDO (px) para coordenadas de TELA, usando o mesmo
-    // zoom quantizado e a mesma translação arredondada do beginFrame (sem o
-    // shake). Útil para desenhar overlays em espaço de tela alinhados a
-    // entidades do mundo — p.ex. o mapa de luz do PostProcessor.
     worldToScreen(wx, wy) {
         const z = this._quantizeZoom(this.zoom);
         const tx = Math.round(this.canvas.width / 2 - this.camX * z);
@@ -163,7 +112,6 @@ export class Renderer {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
 
-        // Screen shake (em pixels de tela)
         let shakeX = 0, shakeY = 0;
         if (this.screenShake > 0) {
             shakeX = (Math.random() - 0.5) * this.screenShake;
@@ -172,20 +120,6 @@ export class Renderer {
             if (this.screenShake < 0.3) this.screenShake = 0;
         }
 
-        // Câmera via setTransform: um ponto de mundo (wx,wy) vai para a tela em
-        //   screen = wx*zoom + tx   (idem para y)
-        //
-        // Para pixel art estável precisamos de DUAS coisas:
-        //  1) a ESCALA aplicada precisa manter a grade de tiles alinhada ao
-        //     pixel de tela. Como cada tile tem `tilePx` px de mundo, quantizamos
-        //     o zoom para que `tilePx * zoom` caia num nº inteiro de pixels de
-        //     tela. Sem isso, com zoom fracionário o nearest-neighbor arredonda
-        //     bordas de tiles vizinhos para lados diferentes (costura de 1px que
-        //     não some nunca);
-        //  2) a TRANSLAÇÃO final em tela cai em pixel inteiro (como já fazíamos).
-        // Aplica o zoom-punch (pulso) ao zoom base e decai o pulso. Como a
-        // quantização trava a grade, o pulso só "aparece" ao cruzar limiares de
-        // pixel inteiro por tile — por isso um punch de ~8% já dá o soco visível.
         if (Math.abs(this._zoomPunch) > 0.0005) {
             this._zoomPunch *= 0.82;
             if (Math.abs(this._zoomPunch) < 0.0005) this._zoomPunch = 0;
@@ -201,13 +135,6 @@ export class Renderer {
         this.ctx.restore();
     }
 
-    /**
-     * Reaplica o transform da câmera para desenhar uma camada de MUNDO DEPOIS
-     * do pós-processamento (ex.: a parede frontal por cima da luz). Usa o mesmo
-     * zoom quantizado e translação arredondada do worldToScreen (sem shake/
-     * punch), de modo que a camada fique perfeitamente alinhada à cena.
-     * Encerre com endOverlayWorld().
-     */
     beginOverlayWorld() {
         const z = this._quantizeZoom(this.zoom);
         const tx = Math.round(this.canvas.width / 2 - this.camX * z);
@@ -237,19 +164,13 @@ export class Renderer {
         this.ctx.restore();
     }
 
-    /** Define o tileset usado para desenhar as salas. */
     setTileset(tileset) {
         this.tileset = tileset;
     }
 
-    /**
-     * Preenche toda a área visível (mundo) com um tile de fundo. Usado para o
-     * "vazio" fora da sala não ficar preto. Deve ser chamado dentro do
-     * beginFrame/endFrame (usa o transform da câmera).
-     */
     drawBackground(tileIndex, tile) {
         if (!this.tileset || !this.tileset.ready) return;
-        // Cantos da viewport em coordenadas de mundo (com folga p/ o shake).
+
         const tl = this.screenToWorld(-tile, -tile);
         const br = this.screenToWorld(this.canvas.width + tile, this.canvas.height + tile);
         const x0 = Math.floor(tl.x / tile) * tile;
@@ -261,21 +182,9 @@ export class Renderer {
         }
     }
 
-    /**
-     * Desenha a sala atual (tiles chunky) em coordenadas de MUNDO.
-     * @param {object} rect     { x, y, w, h } retângulo total da célula
-     * @param {object} bounds   { minX,maxX,minY,maxY } área jogável (fallback)
-     * @param {RoomTiles} tiles mapa de tiles da sala (floor[][] + props[])
-     * @param {number} tile     tamanho do tile no mundo (px)
-     * @param {boolean} doorsOpen portas abertas (só para o realce visual)
-     * @param {Array} doors     [{dir,x,y}] para realçar batente aberto/fechado
-     * @param {number} doorHalf meia-largura do vão (para o realce)
-     * @param {Array} boxes     obstáculos
-     */
     drawRoom(rect, bounds, tiles, tile, doorsOpen, doors = [], doorHalf = 48) {
         const c = this.ctx;
 
-        // Fallback simples caso o tileset ainda não tenha carregado
         if (!this.tileset || !this.tileset.ready || !tiles) {
             c.fillStyle = "#15141f";
             c.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
@@ -287,9 +196,6 @@ export class Renderer {
             return;
         }
 
-        // Desenha a grade de tiles (piso + moldura de parede + portas).
-        // idx < 0 marca um buraco/abismo (vindo do editor): desenha o tile de
-        // borda do abismo correspondente (autotiling pelos vizinhos).
         for (let r = 0; r < tiles.rows; r++) {
             for (let col = 0; col < tiles.cols; col++) {
                 let idx = tiles.floor[r][col];
@@ -305,18 +211,15 @@ export class Renderer {
             }
         }
 
-        // Paredes autorais (tile visual + colisão definida pela Room).
         for (const wall of (tiles.walls || [])) {
             this.tileset.draw(c, wall.tile, rect.x + wall.col * tile, rect.y + wall.row * tile, tile, tile);
         }
 
-        // Props decorativos (encostados nas paredes)
         for (const p of tiles.props) {
             const dx = rect.x + p.col * tile;
             const dy = rect.y + p.row * tile;
             if (p.flip) {
-                // Espelha horizontalmente em torno do centro do tile (p.ex. a
-                // tocha lateral da parede direita, que reusa o tile da esquerda).
+
                 c.save();
                 c.translate(dx + tile, dy);
                 c.scale(-1, 1);
@@ -327,12 +230,11 @@ export class Renderer {
             }
         }
 
-        // Tochas e candlesticks animados. O Game acrescenta a luz separadamente.
         if (tiles.torches) {
             const torchSprites = this.assets && this.assets.torchSprites;
             const frame = Math.floor(performance.now() / 160) % 4;
             for (const t of tiles.torches) {
-                // A tocha abaixo da parede baixa continua iluminando, mas seu sprite fica oculto.
+
                 const behindLowWall = t.side === "S" && (tiles.walls || []).some(w =>
                     w.col === t.col && w.row === t.row - 1 &&
                     (w.side === "bottom" || (w.tile >= 41 && w.tile <= 44))
@@ -371,34 +273,25 @@ export class Renderer {
         }
 
         if (!doorsOpen && tiles.doorCells) {
-            // Portas FECHADAS (sala trancada): desenha o tile de porta no vão.
+
             for (const d of tiles.doorCells) {
                 const dx = rect.x + d.col * tile;
                 const dy = rect.y + d.row * tile;
                 this.tileset.draw(c, d.index, dx, dy, tile, tile);
             }
         }
-        // O gradiente das portas abertas é desenhado DEPOIS dos stubs de
-        // corredor (ver drawDoorGradients, chamado pelo main.js).
+
     }
 
-    // Público: gradiente das portas abertas (chamado após os stubs de corredor).
     drawDoorGradients(doors, doorHalf, tile, stubTiles = 0) {
         this._drawDoorGradients(doors, doorHalf, tile, stubTiles);
     }
 
-    /**
-     * Desenha "stubs" de corredor: tiles de piso projetados para FORA de cada
-     * porta aberta, estendendo o chão da passagem alguns tiles para dentro do
-     * corredor. Deve ser chamado logo após a sala (antes do gradiente).
-     * @param stubTiles quantos tiles de piso projetar para fora
-     * @param floorIdx índice do tile de piso a usar
-     */
     drawDoorStubs(rect, doors, tile, doorHalf, stubTiles = 2, floorIdx = 17) {
         if (!this.tileset || !this.tileset.ready) return;
         const ctx = this.ctx;
         for (const d of doors) {
-            // nº de tiles de piso que cabem na largura do vão (2 tiles)
+
             const across = Math.round((doorHalf * 2) / tile);
             for (let s = 1; s <= stubTiles; s++) {
                 for (let k = 0; k < across; k++) {
@@ -412,7 +305,7 @@ export class Renderer {
                     } else if (d.dir === "W") {
                         dx = d.x - s * tile;
                         dy = d.y - doorHalf + k * tile;
-                    } else { // E
+                    } else {
                         dx = d.x + (s - 1) * tile;
                         dy = d.y - doorHalf + k * tile;
                     }
@@ -422,18 +315,10 @@ export class Renderer {
         }
     }
 
-    /**
-     * Redesenha a PAREDE FRONTAL (fileira inferior de tiles) por cima das
-     * entidades, para que quem encosta nela fique "atrás" da parede.
-     * Deve ser chamado depois de desenhar players/inimigos.
-     */
     drawFrontWall(rect, tiles, tile, doorsOpen, doors = [], doorHalf = 64, stubTiles = 0) {
         if (!this.tileset || !this.tileset.ready || !tiles) return;
         const r = tiles.rows - 1;
 
-        // Colunas do vão da porta Sul (fileira inferior). Quando a sala está
-        // ABERTA, essas células são PASSAGEM: não as redesenhamos por cima do
-        // jogador (senão o piso do vão cobriria quem está entrando).
         const southDoorCols = new Set();
         if (doorsOpen && tiles.doorCells) {
             for (const d of tiles.doorCells) {
@@ -442,44 +327,34 @@ export class Renderer {
         }
 
         for (let col = 0; col < tiles.cols; col++) {
-            if (southDoorCols.has(col)) continue; // pula o vão aberto
+            if (southDoorCols.has(col)) continue;
             let idx = tiles.floor[r][col];
-            if (idx < 0) idx = holeTileFor(tiles.floor, col, r); // buraco/abismo
+            if (idx < 0) idx = holeTileFor(tiles.floor, col, r);
             const dx = rect.x + col * tile;
             const dy = rect.y + r * tile;
             this.tileset.draw(this.ctx, idx, dx, dy, tile, tile);
         }
 
         if (!doorsOpen && tiles.doorCells) {
-            // Porta FECHADA da base por cima.
+
             for (const d of tiles.doorCells) {
                 if (d.row === r) {
                     this.tileset.draw(this.ctx, d.index, rect.x + d.col * tile, rect.y + d.row * tile, tile, tile);
                 }
             }
         } else if (doorsOpen) {
-            // Porta S ABERTA: a parede frontal taparia o gradiente do corredor
-            // Sul. Redesenhamos SÓ o gradiente (escuro) por cima — o stub de
-            // piso NÃO é redesenhado, para não cobrir os jogadores que estão
-            // no corredor (o piso fica atrás deles, como deve ser).
+
             const south = doors.find(d => d.dir === "S");
             if (south) this._drawDoorGradients([south], doorHalf, tile, stubTiles);
         }
     }
 
-    // Gradiente de entrada em cada porta aberta: da borda interna (transparente)
-    // para fora da sala (cor escura), sugerindo a passagem escura adiante.
     _drawDoorGradients(doors, doorHalf, wallDepth, stubTiles = 0) {
         const c = this.ctx;
-        // Cor do fundo (tile 78 ≈ rgb(37,19,26)). O gradiente representa um
-        // CORREDOR escuro atrás da parede: começa transparente na borda interna
-        // (o chão aparece) e escurece atravessando a parede para fora. Não
-        // invade o piso jogável; apenas a faixa da parede/vão.
+
         const dark = "rgba(37, 19, 26, 1)";
         const clear = "rgba(37, 19, 26, 0)";
-        // O caminho escuro vai da borda interna PARA FORA (afundando no
-        // corredor), cobrindo também os stubs de piso projetados. Não invade o
-        // piso jogável da sala.
+
         const depth = wallDepth * 2.5 + stubTiles * wallDepth;
         for (const d of doors) {
             c.save();

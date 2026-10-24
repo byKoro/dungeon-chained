@@ -1,5 +1,5 @@
 export class Physics {
-    // Tensão elástica entre os jogadores
+
     static applyChainConstraint(p1, p2, maxRestDistance = 145, stiffness = 0.045) {
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
@@ -18,7 +18,6 @@ export class Physics {
         }
     }
 
-    // Distância perpendicular entre um ponto e um segmento de linha (usado para as armas na corrente)
     static distToSegment(px, py, x1, y1, x2, y2) {
         const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
         if (l2 === 0) return Math.hypot(px - x1, py - y1);
@@ -27,17 +26,12 @@ export class Physics {
         return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
     }
 
-    // Colisão entre entidades (players e inimigos) com empurrão mútuo.
-    // A colisão é ANISOTRÓPICA (elíptica): mais rígida no eixo vertical
-    // (não dá pra subir em cima do outro) e mais permissiva no horizontal
-    // (dá pra chegar perto lado a lado, com um empurrão elástico).
     static resolveEntityCollisions(entities, opts = {}) {
-        // Multiplicadores do raio de colisão por eixo.
-        // radiusY maior => bloqueio vertical forte. radiusX menor => folga lateral.
-        const radiusXMul = opts.radiusXMul ?? 0.72; // sobreposição horizontal permitida
-        const radiusYMul = opts.radiusYMul ?? 1.15; // vertical mais rígido
-        const push = opts.push ?? 0.5;              // 0.5 = cada um cede metade
-        const impulse = opts.impulse ?? 0.35;       // quanto do empurrão vira velocidade
+
+        const radiusXMul = opts.radiusXMul ?? 0.72;
+        const radiusYMul = opts.radiusYMul ?? 1.15;
+        const push = opts.push ?? 0.5;
+        const impulse = opts.impulse ?? 0.35;
 
         for (let i = 0; i < entities.length; i++) {
             for (let j = i + 1; j < entities.length; j++) {
@@ -50,23 +44,20 @@ export class Physics {
                 let dx = b.x - a.x;
                 let dy = b.y - a.y;
 
-                // Distância no espaço "normalizado" pelos raios elípticos
                 const nx = dx / rx;
                 const ny = dy / ry;
                 const distNorm = Math.hypot(nx, ny);
 
                 if (distNorm > 0 && distNorm < 1) {
-                    // Estão se sobrepondo. Calcula quanto e para qual direção separar.
+
                     const overlap = (1 - distNorm);
 
-                    // Direção de separação de volta para o espaço real (respeita a elipse)
                     let sx = (nx / distNorm) * rx;
                     let sy = (ny / distNorm) * ry;
                     const sLen = Math.hypot(sx, sy) || 1;
                     sx /= sLen;
                     sy /= sLen;
 
-                    // Deslocamento total necessário (aprox.), dividido entre os dois
                     const sep = overlap * ((rx + ry) / 2);
                     const moveA = sep * push;
                     const moveB = sep * (1 - push);
@@ -76,9 +67,6 @@ export class Physics {
                     b.x += sx * moveB;
                     b.y += sy * moveB;
 
-                    // Empurrão que vira velocidade (sensação de se empurrar).
-                    // Entidades com pushVx/pushVy (inimigos) recebem nesse campo
-                    // dedicado, para o empurrão não ser engolido pela IA de ataque.
                     const imp = sep * impulse;
                     Physics._addImpulse(a, -sx * imp, -sy * imp);
                     Physics._addImpulse(b,  sx * imp,  sy * imp);
@@ -87,9 +75,6 @@ export class Physics {
         }
     }
 
-    // Colisão com um CÍRCULO sólido (ex.: o disco da serra). Empurra a entidade
-    // para fora do círculo e converte parte da sobreposição em empurrão de
-    // velocidade. (cx,cy) é o centro; `radius` o raio sólido.
     static resolveCircleCollision(entity, cx, cy, radius, impulse = 0.35) {
         const r = radius + (entity.hitRadius ?? 0);
         let dx = entity.x - cx;
@@ -97,23 +82,18 @@ export class Physics {
         let dist = Math.hypot(dx, dy);
         if (dist >= r) return;
 
-        // Se cair exatamente no centro, escolhe uma direção qualquer.
         if (dist === 0) { dx = 1; dy = 0; dist = 1; }
 
         const nx = dx / dist;
         const ny = dy / dist;
         const overlap = r - dist;
 
-        // Reposiciona na borda do círculo.
         entity.x = cx + nx * r;
         entity.y = cy + ny * r;
 
-        // Empurrão como velocidade (sensação de ser repelido).
         Physics._addImpulse(entity, nx * overlap * impulse, ny * overlap * impulse);
     }
 
-    // Aplica um impulso de empurrão. Se a entidade tiver um canal de empurrão
-    // dedicado (pushVx/pushVy), usa-o; senão soma direto em vx/vy.
     static _addImpulse(e, ix, iy) {
         if (e.pushVx !== undefined) {
             e.pushVx += ix;
@@ -124,7 +104,6 @@ export class Physics {
         }
     }
 
-    // Colisão com caixas/obstáculos
     static resolveBoxCollisions(entity, boxes) {
         boxes.forEach(b => {
             const nearestX = Math.max(b.x, Math.min(entity.x, b.x + b.w));

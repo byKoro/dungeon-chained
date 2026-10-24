@@ -1,22 +1,8 @@
-/**
- * BloodCanvas — sangue procedural desenhado num buffer offscreen.
- *
- * Em vez de manter centenas de objetos de sangue e redesenhá-los todo frame,
- * "carimbamos" o sangue uma única vez neste buffer do tamanho do mundo e
- * copiamos o buffer inteiro para a tela por frame. O sangue vira parte
- * permanente do chão (até o buffer ser limpo na troca de fase).
- *
- * O visual é montado com geometrias pixeladas: elipses imperfeitas (bordas
- * irregulares) preenchidas em blocos + "quadriculados" (blocos soltos) ao
- * redor, todos com cores amostradas de assets/particles/blood.png.
- */
 export class BloodCanvas {
     constructor(width, height, palette = null, pixel = 4) {
         this.width = width;
         this.height = height;
 
-        // Tamanho de 1 "pixel" de sangue no mundo. Deve bater com 1 pixel de
-        // tile do cenário (tile 16px desenhado a 64px => 4px por pixel de arte).
         this.px = pixel;
 
         this.canvas = document.createElement("canvas");
@@ -25,25 +11,14 @@ export class BloodCanvas {
         this.ctx = this.canvas.getContext("2d");
         this.ctx.imageSmoothingEnabled = false;
 
-        // Paleta de cores do sangue (controlada externamente). Fallback padrão.
-        // Tons de vinho/bordô profundos e dessaturados: ao serem compostos em
-        // "multiply" sobre o piso escuro, tingem o chão sem "flutuar" por cima.
         this.palette = (palette && palette.length)
             ? palette
             : ["#4a0612", "#5c0a18", "#6e0f1c", "#480810", "#3a0510"];
 
-        // Como o buffer de sangue é composto sobre a cena. "multiply" faz o
-        // sangue MULTIPLICAR a cor do piso embaixo (escurece/tinge) em vez de
-        // cobri-lo opaco, integrando a mancha ao cenário. "source-over" (normal)
-        // volta ao comportamento antigo.
         this.blendMode = "multiply";
-        // Opacidade global do buffer na composição (reforça o assentamento).
+
         this.drawAlpha = 0.9;
 
-        // Zonas de sangue "molhado" (círculos) registradas em código, para
-        // detectar passos sem ler pixels (getImageData é custoso). As PEGADAS
-        // de sangue NÃO registram zonas — assim o jogador não re-detecta as
-        // próprias pegadas (evita o efeito de "espalhar infinito").
         this.zones = [];
     }
 
@@ -52,10 +27,9 @@ export class BloodCanvas {
         this.zones = [];
     }
 
-    // Registra uma zona de sangue "molhado" (círculo) para detecção de passos.
     addZone(x, y, radius) {
         this.zones.push({ x, y, r: radius });
-        // Teto simples para não crescer indefinidamente
+
         if (this.zones.length > 200) this.zones.shift();
     }
 
@@ -63,8 +37,6 @@ export class BloodCanvas {
         return this.palette[(Math.random() * this.palette.length) | 0];
     }
 
-    // Verifica (por geometria, sem ler pixels) se (x,y) está sobre uma zona de
-    // sangue molhado. Rápido: só distância a círculos registrados.
     isBloodZone(x, y) {
         for (let i = 0; i < this.zones.length; i++) {
             const z = this.zones[i];
@@ -74,27 +46,16 @@ export class BloodCanvas {
         return false;
     }
 
-    // Carimba uma pegada de sangue pixelada (fixa) no buffer, orientada por
-    // 'angle' (direção do passo). 'intensity' 0..1 controla o tamanho/opacidade
-    // (vai diminuindo a cada passo até "secar").
-    // Alinha um valor à grade de pixels de sangue.
     _snap(v) { return Math.round(v / this.px) * this.px; }
 
     stampFootprint(x, y, angle, intensity = 1) {
         const ctx = this.ctx;
         const px = this.px;
-        const len = px * (2 + Math.round(2 * intensity)); // semi-eixo maior (px de arte)
-        const wid = px * (1 + Math.round(1 * intensity)); // semi-eixo menor
+        const len = px * (2 + Math.round(2 * intensity));
+        const wid = px * (1 + Math.round(1 * intensity));
 
-        // IMPORTANTE: não rotacionamos o canvas. Se rotacionássemos, cada bloco
-        // de 1px sairia inclinado e o nearest-neighbor espalharia os pixels na
-        // diagonal (visual serrilhado). Em vez disso, varremos a grade de
-        // pixels de sangue SEMPRE alinhada aos eixos (blocos retos) e aplicamos
-        // a orientação da pegada só no TESTE da elipse, girando os offsets por
-        // -angle no cálculo. Resultado: pixels retos, pegada orientada.
         const cos = Math.cos(angle), sin = Math.sin(angle);
 
-        // Caixa de varredura: o maior semi-eixo cobre qualquer orientação.
         const reach = Math.max(len, wid);
         const cx = this._snap(x), cy = this._snap(y);
 
@@ -102,13 +63,13 @@ export class BloodCanvas {
         ctx.globalAlpha = 0.5 + 0.5 * intensity;
         for (let gy = -reach; gy <= reach; gy += px) {
             for (let gx = -reach; gx <= reach; gx += px) {
-                // Projeta o offset (eixo-alinhado) no referencial da pegada.
-                const lx = gx * cos + gy * sin;   // eixo longo (direção do passo)
-                const ly = -gx * sin + gy * cos;  // eixo curto (lateral)
+
+                const lx = gx * cos + gy * sin;
+                const ly = -gx * sin + gy * cos;
                 const nx = lx / len, ny = ly / wid;
                 if (nx * nx + ny * ny <= 1 && Math.random() < 0.85) {
                     ctx.fillStyle = this._color();
-                    // Blocos sempre alinhados à grade do buffer -> pixels retos.
+
                     ctx.fillRect(cx + this._snap(gx), cy + this._snap(gy), px, px);
                 }
             }
@@ -117,18 +78,9 @@ export class BloodCanvas {
         ctx.restore();
     }
 
-    /**
-     * Carimba uma elipse pixelada imperfeita.
-     * @param {number} cx centro X
-     * @param {number} cy centro Y
-     * @param {number} rx raio horizontal
-     * @param {number} ry raio vertical
-     * @param {number} px tamanho do "pixel"/bloco
-     * @param {number} density 0..1 chance de preencher cada bloco (buracos)
-     */
     stampBlob(cx, cy, rx, ry, px = this.px, density = 0.92) {
         const ctx = this.ctx;
-        // Alinha a varredura à grade de pixels de sangue.
+
         const x0 = Math.floor((cx - rx) / px) * px;
         const y0 = Math.floor((cy - ry) / px) * px;
         const x1 = Math.ceil((cx + rx) / px) * px;
@@ -136,15 +88,13 @@ export class BloodCanvas {
 
         for (let y = y0; y <= y1; y += px) {
             for (let x = x0; x <= x1; x += px) {
-                // Centro do bloco
+
                 const bx = x + px / 2;
                 const by = y + px / 2;
                 const nx = (bx - cx) / rx;
                 const ny = (by - cy) / ry;
                 const d = nx * nx + ny * ny;
 
-                // Ruído na borda: quanto mais perto de 1, mais chance de "falhar",
-                // deixando a borda irregular/pixelada.
                 const edgeNoise = (Math.random() - 0.5) * 0.35;
                 if (d + edgeNoise <= 1) {
                     if (Math.random() <= density) {
@@ -156,10 +106,6 @@ export class BloodCanvas {
         }
     }
 
-    /**
-     * Espalha "quadriculados" (blocos soltos) em volta de um ponto, para dar
-     * o aspecto de respingo sujo.
-     */
     stampSpecks(cx, cy, spread, count, px = this.px) {
         const ctx = this.ctx;
         for (let i = 0; i < count; i++) {
@@ -167,28 +113,21 @@ export class BloodCanvas {
             const r = Math.random() * spread;
             const bx = Math.round((cx + Math.cos(a) * r) / px) * px;
             const by = Math.round((cy + Math.sin(a) * r) / px) * px;
-            // Sempre 1 pixel de arte (coerente com os tiles)
+
             ctx.fillStyle = this._color();
             ctx.fillRect(bx, by, px, px);
         }
     }
 
-    /**
-     * Respingo (ao ferir/receber dano): uma mancha central pequena + specks.
-     */
     stampSplat(x, y, scale = 1) {
         const rx = (6 + Math.random() * 6) * scale;
         const ry = (4 + Math.random() * 5) * scale;
         this.stampBlob(x, y, rx, ry, this.px, 0.9);
         this.stampSpecks(x, y, (18 + Math.random() * 14) * scale, 8 + ((Math.random() * 8) | 0), this.px);
-        // Zona molhada (para pegadas): raio aproximado da mancha central
+
         this.addZone(x, y, Math.max(rx, ry) + 3);
     }
 
-    /**
-     * Poça (no local da morte): várias elipses sobrepostas + bastante specks,
-     * formando uma geometria maior e mais complexa.
-     */
     stampPool(x, y, scale = 1) {
         const blobs = 4 + ((Math.random() * 4) | 0);
         for (let i = 0; i < blobs; i++) {
@@ -198,17 +137,12 @@ export class BloodCanvas {
             const ry = (7 + Math.random() * 8) * scale;
             this.stampBlob(x + ox, y + oy, rx, ry, this.px, 0.94);
         }
-        // Respingos ao redor da poça
+
         this.stampSpecks(x, y, 40 * scale, 20 + ((Math.random() * 16) | 0), this.px);
-        // Zona molhada da poça (maior)
+
         this.addZone(x, y, 26 * scale);
     }
 
-    /**
-     * Carimba um GibPiece assentado no buffer, uma única vez, para que ele
-     * saia do loop de update/draw (grande ganho de performance). Desenha o
-     * recorte do sprite com rotação, um overlay de escurecimento e as manchas.
-     */
     stampGib(gib) {
         const ctx = this.ctx;
         ctx.save();
@@ -227,9 +161,7 @@ export class BloodCanvas {
     }
 
     draw(ctx) {
-        // Compor em "multiply" faz o sangue tingir o piso (parte do chão), em
-        // vez de ser um decalque opaco por cima. Salvamos/restauramos para não
-        // vazar o blend mode para o resto da renderização.
+
         const prevOp = ctx.globalCompositeOperation;
         const prevAlpha = ctx.globalAlpha;
         ctx.globalCompositeOperation = this.blendMode;

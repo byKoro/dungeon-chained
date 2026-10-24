@@ -1,27 +1,4 @@
-/**
- * ModularGrid.js — Gerenciador do Grid Global e Validador de Encaixe de Salas.
- *
- * Controla o posicionamento de salas modulares em uma grade 2D [gx, gy],
- * funcionando como peças de quebra-cabeça com sockets (portas) nas bordas.
- *
- * Responsabilidades:
- * 1. Validação de Encaixe / Adjacência:
- *    - Verifica sobreposição (célula já ocupada).
- *    - Verifica compatibilidade exata de sockets em todas as bordas adjacentes:
- *      * Se a Sala A possui porta no Leste, a Sala B vizinha no Oeste DEVE possuir
- *        porta correspondente na EXATA mesma coordenada vertical e mesma largura.
- *      * Se um dos lados tem porta e o outro tem parede sólida -> REJEITADO.
- *      * Se ambos têm parede sólida -> VÁLIDO.
- * 2. Gestão do Grid Global:
- *    - Armazena instâncias de PlacedRoom por coordenadas [gx, gy].
- *    - Mantém conexões bidirecionais entre portas conectadas.
- *    - Rastreia sockets abertos (fronteiras de expansão) para o gerador ou editor.
- *    - Trata ou bloqueia beiradas sem saída (dead-ends).
- *    - Exporta para a estrutura esperada por Dungeon.js / RoomManager.js.
- */
-
 import {
-    DIRECTION,
     ALL_DIRECTIONS,
     OPPOSITE_DIRECTION,
     DIRECTION_DELTA,
@@ -30,17 +7,8 @@ import {
 } from './RoomSocket.js';
 import { ROOM_COLS, ROOM_ROWS, GRID_COLS, GRID_ROWS, TILE } from '../config/GameConfig.js';
 
-/**
- * PlacedRoom — Instância concreta de uma sala posicionada no grid global.
- */
 export class PlacedRoom {
-    /**
-     * @param {object} opts
-     * @param {RoomTemplate} opts.template  Template da sala
-     * @param {number} opts.gx             Coordenada X no grid
-     * @param {number} opts.gy             Coordenada Y no grid
-     * @param {string} [opts.id]           ID único da instância
-     */
+
     constructor({ template, gx, gy, id = null }) {
         this.template = template;
         this.gx = gx;
@@ -48,10 +16,8 @@ export class PlacedRoom {
         this.id = id || `room_${gx}_${gy}_${template.id}`;
         this.key = `${gx},${gy}`;
 
-        // Sockets ativos nesta instância (cópia dos sockets do template)
         this.sockets = template.sockets.map(s => s.clone());
 
-        // Mapa de conexões: socketId -> { neighborKey, neighborGx, neighborGy, neighborSocketId }
         this.connections = new Map();
     }
 
@@ -60,30 +26,14 @@ export class PlacedRoom {
     get cols() { return this.template.cols; }
     get rows() { return this.template.rows; }
 
-    /**
-     * Retorna o socket pelo ID.
-     * @param {string} socketId
-     * @returns {RoomSocket|null}
-     */
     getSocket(socketId) {
         return this.sockets.find(s => s.id === socketId) || null;
     }
 
-    /**
-     * Retorna todos os sockets de uma borda (N, S, E, W).
-     * @param {"N"|"S"|"E"|"W"} dir
-     * @returns {RoomSocket[]}
-     */
     getSockets(dir) {
         return this.sockets.filter(s => s.dir === dir);
     }
 
-    /**
-     * Conecta um socket a uma sala vizinha.
-     * @param {string} socketId
-     * @param {PlacedRoom} neighborRoom
-     * @param {string} neighborSocketId
-     */
     connectSocket(socketId, neighborRoom, neighborSocketId) {
         const socket = this.getSocket(socketId);
         if (!socket) return false;
@@ -98,37 +48,20 @@ export class PlacedRoom {
         return true;
     }
 
-    /**
-     * Desconecta um socket.
-     * @param {string} socketId
-     */
     disconnectSocket(socketId) {
         const socket = this.getSocket(socketId);
         if (socket) socket.state = "open";
         this.connections.delete(socketId);
     }
 
-    /**
-     * Verifica se um socket específico está conectado.
-     * @param {string} socketId
-     * @returns {boolean}
-     */
     isSocketConnected(socketId) {
         return this.connections.has(socketId);
     }
 
-    /**
-     * Retorna a lista de sockets que ainda estão abertos (sem conexão com vizinho).
-     * @returns {RoomSocket[]}
-     */
     getOpenSockets() {
         return this.sockets.filter(s => !this.isSocketConnected(s.id));
     }
 
-    /**
-     * Retorna a lista de sockets conectados.
-     * @returns {Array<{ socket: RoomSocket, connection: object }>}
-     */
     getConnectedSockets() {
         const list = [];
         for (const s of this.sockets) {
@@ -138,11 +71,6 @@ export class PlacedRoom {
         return list;
     }
 
-    /**
-     * Gera o objeto clássico { N, S, E, W } de portas abertas/conectadas.
-     * Permite integração direta e retrocompatibilidade com RoomTiles.js e Dungeon.js.
-     * @returns {{ N: boolean, S: boolean, E: boolean, W: boolean }}
-     */
     getDoorsBoolean() {
         return {
             N: this.sockets.some(s => s.dir === "N" && this.isSocketConnected(s.id)),
@@ -152,9 +80,6 @@ export class PlacedRoom {
         };
     }
 
-    /**
-     * Serializa a sala posicionada.
-     */
     toJSON() {
         const connectionsObj = {};
         for (const [k, v] of this.connections.entries()) {
@@ -172,18 +97,8 @@ export class PlacedRoom {
     }
 }
 
-/**
- * ModularGrid — Gerenciador do Grid 2D de salas e Validador Central.
- */
 export class ModularGrid {
-    /**
-     * @param {object} [opts={}]
-     * @param {number} [opts.cols=GRID_COLS]         Limite de colunas (ou null para infinito/esparso)
-     * @param {number} [opts.rows=GRID_ROWS]         Limite de linhas (ou null para infinito/esparso)
-     * @param {number} [opts.cellTileCols=ROOM_COLS] Largura de cada célula em tiles (padrão 14)
-     * @param {number} [opts.cellTileRows=ROOM_ROWS] Altura de cada célula em tiles (padrão 9)
-     * @param {number} [opts.tile=TILE]              Tamanho de 1 tile no mundo em px (padrão 64)
-     */
+
     constructor(opts = {}) {
         this.cols = opts.cols ?? GRID_COLS;
         this.rows = opts.rows ?? GRID_ROWS;
@@ -191,7 +106,6 @@ export class ModularGrid {
         this.cellTileRows = opts.cellTileRows ?? ROOM_ROWS;
         this.tile = opts.tile ?? TILE;
 
-        // Mapa de células ocupadas: "gx,gy" -> PlacedRoom
         this.cells = new Map();
     }
 
@@ -199,45 +113,22 @@ export class ModularGrid {
         return `${gx},${gy}`;
     }
 
-    /**
-     * Retorna a sala posicionada em (gx, gy) ou null se vazia.
-     * @param {number} gx
-     * @param {number} gy
-     * @returns {PlacedRoom|null}
-     */
     getRoom(gx, gy) {
         return this.cells.get(this._key(gx, gy)) || null;
     }
 
-    /**
-     * Verifica se existe uma sala em (gx, gy).
-     * @param {number} gx
-     * @param {number} gy
-     * @returns {boolean}
-     */
     hasRoom(gx, gy) {
         return this.cells.has(this._key(gx, gy));
     }
 
-    /**
-     * Quantidade total de salas posicionadas no grid.
-     */
     get roomCount() {
         return this.cells.size;
     }
 
-    /**
-     * Retorna a lista de todas as salas posicionadas.
-     * @returns {PlacedRoom[]}
-     */
     getAllRooms() {
         return Array.from(this.cells.values());
     }
 
-    /**
-     * Retorna os limites ocupados no grid (bounding box).
-     * @returns {{ minGx: number, maxGx: number, minGy: number, maxGy: number, count: number }}
-     */
     getOccupiedBounds() {
         if (this.cells.size === 0) {
             return { minGx: 0, maxGx: 0, minGy: 0, maxGy: 0, count: 0 };
@@ -252,48 +143,10 @@ export class ModularGrid {
         return { minGx, maxGx, minGy, maxGy, count: this.cells.size };
     }
 
-    /**
-     * Valida se uma sala candidata pode ser posicionada nas coordenadas (gx, gy).
-     *
-     * Regras Rígidas de Validação:
-     * 1. Sobreposição: A célula (gx, gy) NÃO pode estar previamente ocupada.
-     * 2. Limites do Grid: Se cols/rows forem definidos, (gx, gy) deve estar dentro da grade.
-     * 3. Validação de Adjacência (Mandatório):
-     *    Para cada vizinho ortogonal nas 4 direções (N, S, E, W):
-     *    - Se a célula vizinha possui uma sala:
-     *      * A borda em comum DEVE apresentar correspondência 1-para-1 exata:
-     *        - Porta do candidato deve encontrar porta da sala vizinha na mesma coordenada
-     *          (mesmo offset horizontal p/ N/S ou vertical p/ E/W) e com a mesma largura (span).
-     *        - Se o candidato tem porta e o vizinho tem parede sólida -> REJEITADO (retorna inválido).
-     *        - Se o vizinho tem porta e o candidato tem parede sólida -> REJEITADO (retorna inválido).
-     *        - Se o offset ou span divergir entre as portas vizinhas -> REJEITADO (retorna inválido).
-     *        - Se ambos têm parede sólida -> VÁLIDO (parede encosta em parede sem conflito).
-     * 4. Conectividade:
-     *    Se requireConnection for true e o grid já tiver salas, a nova sala deve se conectar
-     *    a pelo menos uma porta de sala vizinha existente (evita ilhas isoladas).
-     * 5. Sockets Abertos no Vazio:
-     *    Se allowDanglingSockets for false, rejeita salas que possuam portas abrindo para células vazias.
-     *
-     * @param {RoomTemplate} template
-     * @param {number} gx
-     * @param {number} gy
-     * @param {object} [options={}]
-     * @param {boolean} [options.requireConnection=true]   Exige que conecte a ao menos um socket existente
-     * @param {boolean} [options.allowDanglingSockets=true] Permite portas voltadas para o vazio (fronteira)
-     * @returns {{
-     *   valid: boolean,
-     *   reason?: string,
-     *   message?: string,
-     *   connections?: Array<{ socket: RoomSocket, neighborSocket: RoomSocket, dir: string, neighborGx: number, neighborGy: number }>,
-     *   danglingSockets?: Array<{ socket: RoomSocket, dir: string, targetGx: number, targetGy: number }>,
-     *   neighborDetails?: object
-     * }}
-     */
     canPlace(template, gx, gy, options = {}) {
         const requireConnection = options.requireConnection ?? (this.cells.size > 0);
         const allowDanglingSockets = options.allowDanglingSockets ?? true;
 
-        // 1. Verificação de Sobreposição
         if (this.hasRoom(gx, gy)) {
             return {
                 valid: false,
@@ -303,7 +156,6 @@ export class ModularGrid {
             };
         }
 
-        // 2. Verificação de Limites do Grid (se configurados)
         if (this.cols !== null && (gx < 0 || gx >= this.cols)) {
             return {
                 valid: false,
@@ -325,7 +177,6 @@ export class ModularGrid {
         const danglingSockets = [];
         const neighborDetails = {};
 
-        // 3. Validação de Adjacência nas 4 Direções (N, S, E, W)
         for (const dir of ALL_DIRECTIONS) {
             const delta = DIRECTION_DELTA[dir];
             const oppDir = OPPOSITE_DIRECTION[dir];
@@ -336,7 +187,7 @@ export class ModularGrid {
             const candSockets = template.getSockets(dir);
 
             if (!neighbor) {
-                // Vizinho vazio: portas do candidato para esta direção são portas de fronteira
+
                 for (const s of candSockets) {
                     danglingSockets.push({
                         socket: s,
@@ -359,7 +210,6 @@ export class ModularGrid {
                 continue;
             }
 
-            // Vizinho existente: validação rígida de encaixe
             const neighSockets = neighbor.getSockets(oppDir);
 
             neighborDetails[dir] = {
@@ -371,7 +221,6 @@ export class ModularGrid {
                 neighSocketsCount: neighSockets.length
             };
 
-            // Caso A: Candidato tem porta, mas o vizinho tem parede sólida
             if (candSockets.length > 0 && neighSockets.length === 0) {
                 return {
                     valid: false,
@@ -388,7 +237,6 @@ export class ModularGrid {
                 };
             }
 
-            // Caso B: Vizinho tem porta aberta, mas o candidato tem parede sólida
             if (candSockets.length === 0 && neighSockets.length > 0) {
                 return {
                     valid: false,
@@ -405,7 +253,6 @@ export class ModularGrid {
                 };
             }
 
-            // Caso C: Ambos têm portas — verificar quantidade e alinhamento exato de coordenadas
             if (candSockets.length !== neighSockets.length) {
                 return {
                     valid: false,
@@ -422,17 +269,16 @@ export class ModularGrid {
                 };
             }
 
-            // Verifica se cada porta do candidato se alinha perfeitamente com uma porta do vizinho
             const matchedNeighSockets = new Set();
 
             for (const candSocket of candSockets) {
-                // Procura um socket correspondente exato
+
                 const matchingNeighSocket = neighSockets.find(ns =>
                     !matchedNeighSockets.has(ns.id) && candSocket.matches(ns)
                 );
 
                 if (!matchingNeighSocket) {
-                    // Descobre o motivo específico para uma mensagem de erro precisa
+
                     const coordName = (dir === "E" || dir === "W") ? "vertical (linha)" : "horizontal (coluna)";
                     const nearbySocket = neighSockets.find(ns => !matchedNeighSockets.has(ns.id));
 
@@ -469,7 +315,6 @@ export class ModularGrid {
             }
         }
 
-        // 4. Verificação de Conectividade com a Rede de Salas
         if (requireConnection && this.cells.size > 0 && connections.length === 0) {
             return {
                 valid: false,
@@ -487,17 +332,6 @@ export class ModularGrid {
         };
     }
 
-    /**
-     * Posiciona uma sala no grid caso a validação seja bem-sucedida.
-     * Atualiza as conexões bidirecionais de sockets entre as salas.
-     *
-     * @param {RoomTemplate} template
-     * @param {number} gx
-     * @param {number} gy
-     * @param {object} [options={}]
-     * @param {boolean} [options.throwOnError=false]
-     * @returns {{ success: boolean, room?: PlacedRoom, error?: string, validation?: object }}
-     */
     placeRoom(template, gx, gy, options = {}) {
         const validation = this.canPlace(template, gx, gy, options);
 
@@ -515,7 +349,6 @@ export class ModularGrid {
         const room = new PlacedRoom({ template, gx, gy });
         this.cells.set(this._key(gx, gy), room);
 
-        // Estabelece as conexões mútuas entre os sockets
         for (const conn of validation.connections) {
             const neighbor = this.getRoom(conn.neighborGx, conn.neighborGy);
             if (neighbor) {
@@ -531,18 +364,11 @@ export class ModularGrid {
         };
     }
 
-    /**
-     * Remove uma sala do grid e desconecta os sockets das salas vizinhas.
-     * @param {number} gx
-     * @param {number} gy
-     * @returns {PlacedRoom|null} A sala removida ou null se não existia
-     */
     removeRoom(gx, gy) {
         const key = this._key(gx, gy);
         const room = this.cells.get(key);
         if (!room) return null;
 
-        // Desconecta vizinhos
         for (const [socketId, conn] of room.connections.entries()) {
             const neighbor = this.getRoom(conn.neighborGx, conn.neighborGy);
             if (neighbor) {
@@ -554,11 +380,6 @@ export class ModularGrid {
         return room;
     }
 
-    /**
-     * Retorna todos os sockets abertos do grid (fronteiras de expansão).
-     * Útil para o gerador procedural ou cursor do editor saber para onde a dungeon pode crescer.
-     * @returns {Array<{ gx: number, gy: number, dir: string, socket: RoomSocket, targetGx: number, targetGy: number }>}
-     */
     getOpenSockets() {
         const openList = [];
         for (const room of this.cells.values()) {
@@ -580,17 +401,12 @@ export class ModularGrid {
         return openList;
     }
 
-    /**
-     * Retorna a lista de coordenadas [gx, gy] vazias que possuem ao menos
-     * um conector aberto apontando para elas (a "fronteira" do mapa).
-     * @returns {Array<{ gx: number, gy: number, incomingSocketsCount: number }>}
-     */
     getFrontierCells() {
         const counts = new Map();
 
         for (const open of this.getOpenSockets()) {
             const key = this._key(open.targetGx, open.targetGy);
-            // Ignora se estiver fora dos limites globais
+
             if (this.cols !== null && (open.targetGx < 0 || open.targetGx >= this.cols)) continue;
             if (this.rows !== null && (open.targetGy < 0 || open.targetGy >= this.rows)) continue;
 
@@ -605,17 +421,10 @@ export class ModularGrid {
         return Array.from(counts.values());
     }
 
-    /**
-     * Encontra todas as posições válidas no grid onde um template específico pode ser encaixado.
-     * @param {RoomTemplate} template
-     * @param {object} [options={}]
-     * @returns {Array<{ gx: number, gy: number, validation: object }>}
-     */
     findValidPlacements(template, options = {}) {
         const validSpots = [];
         const frontier = this.getFrontierCells();
 
-        // Se o grid estiver vazio, testa o centro ou posição inicial (0, 0)
         if (this.cells.size === 0) {
             const initialGx = this.cols !== null ? ((this.cols / 2) | 0) : 0;
             const initialGy = this.rows !== null ? ((this.rows / 2) | 0) : 0;
@@ -626,7 +435,6 @@ export class ModularGrid {
             return validSpots;
         }
 
-        // Testa cada célula de fronteira
         for (const cell of frontier) {
             const res = this.canPlace(template, cell.gx, cell.gy, options);
             if (res.valid) {
@@ -637,11 +445,6 @@ export class ModularGrid {
         return validSpots;
     }
 
-    /**
-     * Identifica beiradas sem saída (dead-ends): sockets que apontam para fora do grid
-     * ou para células que não podem ser ocupadas.
-     * @returns {Array<{ gx: number, gy: number, dir: string, socket: RoomSocket }>}
-     */
     getDeadEnds() {
         const deadEnds = [];
         for (const open of this.getOpenSockets()) {
@@ -659,12 +462,6 @@ export class ModularGrid {
         return deadEnds;
     }
 
-    /**
-     * Trata/bloqueia beiradas sem saída, fechando o estado dos sockets desconectados
-     * ou convertendo-os em paredes sólidas para que não fiquem buracos abertos para o vazio.
-     * @param {"blocked"|"locked"|"sealed"} [action="sealed"]
-     * @returns {number} Quantidade de sockets tratados
-     */
     sealDeadEnds(action = "sealed") {
         let count = 0;
         for (const open of this.getOpenSockets()) {
@@ -675,23 +472,6 @@ export class ModularGrid {
         return count;
     }
 
-    /**
-     * Valida a integridade completa do grid construído:
-     * - Verifica se todas as conexões são recíprocas e válidas.
-     * - Rastreia se existem salas desconectadas da sala inicial (usando flood fill BFS).
-     * - Lista sockets pendentes/dangling.
-     *
-     * @param {object} [opts={}]
-     * @param {string} [opts.startKey] Chave da sala inicial (ex: "gx,gy")
-     * @returns {{
-     *   isValid: boolean,
-     *   totalRooms: number,
-     *   connectedRoomsCount: number,
-     *   unreachableRooms: PlacedRoom[],
-     *   danglingSocketsCount: number,
-     *   errors: string[]
-     * }}
-     */
     validateIntegrity(opts = {}) {
         const errors = [];
         if (this.cells.size === 0) {
@@ -705,7 +485,6 @@ export class ModularGrid {
             };
         }
 
-        // 1. Verificação de reciprocidade das conexões
         for (const room of this.cells.values()) {
             for (const [socketId, conn] of room.connections.entries()) {
                 const neighbor = this.getRoom(conn.neighborGx, conn.neighborGy);
@@ -720,7 +499,6 @@ export class ModularGrid {
             }
         }
 
-        // 2. Verificação de acessibilidade (Flood fill BFS)
         const allRooms = Array.from(this.cells.values());
         const startRoom = opts.startKey ? this.cells.get(opts.startKey) : (allRooms.find(r => r.type === "start") || allRooms[0]);
 
@@ -756,21 +534,6 @@ export class ModularGrid {
         };
     }
 
-    /**
-     * Exporta o grid modular diretamente para o formato consumido pela engine
-     * (Dungeon.js, RoomTiles.js e RoomManager.js).
-     *
-     * Estrutura compatível com DungeonGraph:
-     * {
-     *   cols: number,
-     *   rows: number,
-     *   cells: Map<"x,y", { gx, gy, kind, type, doors: { N, S, E, W } }>,
-     *   rooms: [{ gx, gy, type }],
-     *   start: { gx, gy }
-     * }
-     *
-     * @returns {object}
-     */
     toDungeonGraphData() {
         const bounds = this.getOccupiedBounds();
         const cols = this.cols ?? (bounds.maxGx + 1);
@@ -813,10 +576,6 @@ export class ModularGrid {
         };
     }
 
-    /**
-     * Serializa todo o grid para JSON.
-     * @returns {object}
-     */
     toJSON() {
         const roomsData = [];
         for (const r of this.cells.values()) {
@@ -832,12 +591,6 @@ export class ModularGrid {
         };
     }
 
-    /**
-     * Restaura um grid modular a partir de dados JSON.
-     * @param {object|string} json
-     * @param {Map<string, RoomTemplate>} [templateCatalog] Catálogo de templates (opcional)
-     * @returns {ModularGrid}
-     */
     static fromJSON(json, templateCatalog = new Map()) {
         const data = typeof json === "string" ? JSON.parse(json) : json;
         const grid = new ModularGrid({
@@ -848,7 +601,6 @@ export class ModularGrid {
             tile: data.tile
         });
 
-        // 1. Instancia as salas
         for (const rData of data.rooms) {
             let template = templateCatalog.get(rData.templateId);
             if (!template && rData.template) {
@@ -866,7 +618,6 @@ export class ModularGrid {
             grid.cells.set(room.key, room);
         }
 
-        // 2. Reconstrói as conexões de sockets
         for (const rData of data.rooms) {
             const room = grid.getRoom(rData.gx, rData.gy);
             if (room && rData.connections) {

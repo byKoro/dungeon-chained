@@ -1,6 +1,3 @@
-// GERADO por tools/build_tinyrpg_enemies.py — não editar à mão.
-// Inimigos do Tiny RPG Character Asset Pack 02 (folhas em grade 100x100,
-// linha 0 = flash, 1 = walk, depois ataques e por último death).
 export const TINY_RPG_ENEMIES = [
     {
         "key": "blackKnightA",

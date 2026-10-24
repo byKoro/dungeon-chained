@@ -18,7 +18,6 @@ export class Entity {
         this.x += this.vx;
         this.y += this.vy;
 
-        // Atualização da animação proporcional à velocidade real de caminhada
         if (this.speedMag > 0.15) {
             this.animTimer += this.speedMag * 0.085;
         } else {
@@ -30,6 +29,6 @@ export class Entity {
     }
 
     draw(ctx) {
-        // Implementado pelas subclasses
+
     }
 }

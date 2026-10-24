@@ -1,17 +1,3 @@
-/**
- * PixelButton — botão em pixel art compartilhado pelas telas de menu (morte,
- * pausa): moldura de pedra chanfrada com juntas de tijolo, rebites de ferro,
- * um poço escuro onde a FACE assenta e o texto na fonte do balão de fala do
- * trailer (PixelFont).
- *
- * O botão é um <button> de verdade (foco, Enter/Espaço, leitor de tela) cujo
- * conteúdo é um canvas pequeno em resolução de ARTE (1 px = 1 pixel de arte),
- * ampliado sem suavização por uma escala inteira. Três quadros: normal,
- * destaque (hover/foco) e apertado (a face afunda no poço).
- *
- * Faces: 'red' (ação principal, sangue, com gotas escorrendo), 'stone'
- * (ação secundária, pedra cinza) e 'gold' (SKIP do trailer, amarelo).
- */
 import { drawText, measureText } from './PixelFont.js';
 import { playUi } from './UiSound.js';
 
@@ -27,7 +13,6 @@ export const FRAME = {
     ironDark: '#454b57',
 };
 
-// Paletas da face (normal / destaque) + texto.
 export const FACES = {
     red: {
         base: '#8a1424', baseHover: '#a3192b',
@@ -36,7 +21,7 @@ export const FACES = {
         text: '#efe3c2', textHover: '#fff6dc', textShadow: '#3a0610',
         drips: true,
     },
-    // Ouro velho (botão SKIP do trailer): texto escuro gravado na face clara.
+
     gold: {
         base: '#c99a2e', baseHover: '#e2b63f',
         light: '#f2cf5b', lightHover: '#ffe27a',
@@ -53,20 +38,15 @@ export const FACES = {
     },
 };
 
-export const PAD_X = 7;   // respiro lateral do texto dentro da face
-export const FACE_H = 11; // altura da face (texto de 5 px + respiro)
-export const LIP = 2;     // "espessura" da face (some quando apertada)
-export const DRIPS = 4;   // linhas extras abaixo para as gotas de sangue
+export const PAD_X = 7;
+export const FACE_H = 11;
+export const LIP = 2;
+export const DRIPS = 4;
 
-/** Largura/altura (px de arte) do corpo de um controle com texto de largura T. */
 export function controlSize(T) {
     return { W: T + PAD_X * 2 + 6, H: 1 + 2 + FACE_H + LIP + 2 + 1 };
 }
 
-/**
- * Sombra + moldura de pedra chanfrada (bisel, juntas de tijolo, rebites) +
- * poço escuro — a base comum dos botões e do slider.
- */
 export function drawStoneFrame(ctx, W, H) {
     const px = (x, y, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); };
     const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
@@ -93,26 +73,16 @@ export function drawStoneFrame(ctx, W, H) {
     rivet(1, 1); rivet(W - 3, 1); rivet(1, H - 3); rivet(W - 3, H - 3);
 }
 
-/** Escala inteira (px de tela por px de arte) a partir da altura da janela. */
 export function pixelScale() {
     return Math.max(3, Math.min(9, Math.round(window.innerHeight / 140)));
 }
 
-/**
- * Desenha o botão em resolução de arte.
- * @param {string} text
- * @param {'idle'|'hover'|'pressed'} state
- * @param {HTMLCanvasElement} [canvas]
- * @param {{face?: 'red'|'stone', minTextW?: number}} [opts]
- *   minTextW: largura mínima do texto (px de arte) — iguala botões empilhados.
- * @returns {HTMLCanvasElement}
- */
 export function renderPixelButton(text, state = 'idle', canvas = document.createElement('canvas'), opts = {}) {
     const F = FACES[opts.face] || FACES.red;
     const textW = measureText(text);
     const T = Math.max(textW, opts.minTextW || 0);
-    const { W, H } = controlSize(T);           // contorno(1) + pedra(2) por lado
-    canvas.width = W + 1;                       // +1 da sombra projetada
+    const { W, H } = controlSize(T);
+    canvas.width = W + 1;
     canvas.height = H + DRIPS + 1;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -122,31 +92,27 @@ export function renderPixelButton(text, state = 'idle', canvas = document.create
     const hover = state === 'hover';
     const pressed = state === 'pressed';
 
-    // --- Sombra, moldura de pedra, rebites e poço (comum ao slider) ---
     drawStoneFrame(ctx, W, H);
     const x0 = 3, y0 = 3, w = W - 6;
 
-    // --- Face (afunda LIP px quando apertada) ---
     const fy = pressed ? y0 + LIP : y0;
     const base = hover ? F.baseHover : F.base;
     const light = hover ? F.lightHover : F.light;
     rect(x0, fy, w, FACE_H, base);
-    rect(x0, fy, w, 1, light);                 // luz em cima
-    rect(x0, fy + 1, 1, FACE_H - 2, light);    // luz à esquerda
+    rect(x0, fy, w, 1, light);
+    rect(x0, fy + 1, 1, FACE_H - 2, light);
     rect(x0, fy + FACE_H - 1, w, 1, F.dark);
     rect(x0 + w - 1, fy + 1, 1, FACE_H - 1, F.dark);
-    px(x0 + 1, fy + 1, F.spec);                 // brilho de canto
+    px(x0 + 1, fy + 1, F.spec);
     px(x0 + 2, fy + 1, F.spec);
     px(x0 + 1, fy + 2, F.spec);
-    if (!pressed) rect(x0, fy + FACE_H, w, LIP, F.lip); // espessura da face
+    if (!pressed) rect(x0, fy + FACE_H, w, LIP, F.lip);
 
-    // --- Texto (PixelFont) com sombra de 1 px, centrado na face ---
     const tx = x0 + Math.floor((w - textW) / 2);
     const ty = fy + 3;
     drawText(ctx, text, tx, ty + 1, F.textShadow);
     drawText(ctx, text, tx, ty, hover ? F.textHover : F.text);
 
-    // --- Gotas de sangue escorrendo da base (só na face vermelha) ---
     if (F.drips) {
         const drips = [[Math.floor(W * 0.22), 3], [Math.floor(W * 0.27), 1], [Math.floor(W * 0.71), 2]];
         for (const [dx, len] of drips) {
@@ -158,22 +124,8 @@ export function renderPixelButton(text, state = 'idle', canvas = document.create
     return canvas;
 }
 
-/**
- * Liga um <button> (com um <canvas> dentro) ao desenho pixel art e aos
- * estados de interação. Mouse em cima = FOCO (um único destaque para mouse,
- * teclado e controle).
- */
 export class PixelButton {
-    /**
-     * @param {HTMLButtonElement} el
-     * @param {object} o
-     * @param {string} o.label             texto desenhado
-     * @param {string} [o.ariaLabel]       nome acessível
-     * @param {'red'|'stone'} [o.face]
-     * @param {number} [o.minTextW]
-     * @param {() => boolean} [o.enabled]  se false, ignora cliques
-     * @param {() => void} [o.onPress]
-     */
+
     constructor(el, { label, ariaLabel, face = 'red', minTextW = 0, enabled = () => true, onPress = null }) {
         this.el = el;
         this.label = label;
@@ -188,10 +140,6 @@ export class PixelButton {
         this._state = null;
         this._pressed = false;
 
-        // Som de UI. "uiMove" só quando o FOCO muda por ação do jogador (mouse
-        // entrando, ou foco vindo de outro botão via teclado/controle) — o
-        // foco automático ao abrir uma tela não toca nada (quem abre a tela
-        // já tem som próprio). "uiConfirm" ao acionar.
         this._pointerFocus = false;
         el.addEventListener('pointerenter', () => {
             if (!this.enabled()) return;
@@ -200,7 +148,7 @@ export class PixelButton {
             this._pointerFocus = false;
         });
         el.addEventListener('focus', (e) => {
-            // closest: o foco pode vir de dentro de um controle aninhado.
+
             const fromButton = !!e.relatedTarget?.closest?.('.pixel-btn');
             if (this.enabled() && (this._pointerFocus || fromButton)) playUi('uiMove');
         });
@@ -216,15 +164,13 @@ export class PixelButton {
         el.addEventListener('click', () => {
             if (!this.enabled()) return;
             this.showPressed();
-            // Som no MESMO instante do quadro "apertado" (antes da ação, que
-            // pode trocar de tela/pausar e cortar efeitos em curso).
+
             playUi('uiConfirm');
             this.onPress?.();
         });
         this.refresh();
     }
 
-    // Mostra o quadro apertado (ex.: durante o fade de saída da tela).
     showPressed() {
         this._pressed = true;
         this.refresh();
@@ -244,7 +190,6 @@ export class PixelButton {
         this.applyScale(this._scale);
     }
 
-    // Escala inteira do botão; a última escolhida é mantida nos redesenhos.
     applyScale(s = pixelScale()) {
         this._scale = s;
         this.canvas.style.width = `${this.canvas.width * s}px`;

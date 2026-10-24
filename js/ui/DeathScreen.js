@@ -1,18 +1,7 @@
-/**
- * DeathScreen — tela de morte: escurece a cena com um véu vermelho-sangue e
- * mostra SÓ o botão RESTART no centro, em pixel art (ver PixelButton.js).
- *
- * Game feel: o véu entra com atraso (deixa o golpe final ler), o botão nasce
- * com um pop elástico e depois "respira" em degraus de 1 pixel de arte.
- */
 import { PixelButton, pixelScale } from './PixelButton.js';
 
 export class DeathScreen {
-    /**
-     * @param {object} o
-     * @param {() => void} o.onRestart  chamado ao clicar/apertar RESTART
-     * @param {string} [o.label]
-     */
+
     constructor({ onRestart, label = 'RESTART' }) {
         this.onRestart = onRestart;
         this.root = document.getElementById('death-screen') || this._createRoot();
@@ -46,7 +35,7 @@ export class DeathScreen {
         this.pixel.reset();
         this.root.classList.add('visible');
         this.root.setAttribute('aria-hidden', 'false');
-        // Foco no botão: Enter/Espaço (e controle via START) já reiniciam.
+
         setTimeout(() => { if (this.visible) this.button.focus({ preventScroll: true }); }, 400);
     }
 
