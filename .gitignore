@@ -23,7 +23,9 @@ __pycache__/
 # Configs residuais de ferramentas antigas
 /.aider-desk/
 /.claude/
-/.kiro/
+/.kiro/*
+# Versiona as skills de game dev instaladas em .kiro/skills
+!/.kiro/skills/
 
 # Arquivos compactados e temporários de teste
 *.zip
