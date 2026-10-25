@@ -7,7 +7,16 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win --x64",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --dir",
+    "serve": "python serve.py",
+    "test": "node scripts/run-tests.mjs",
+    "validate:map": "node scripts/validate-map.mjs",
+    "check": "node scripts/check.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "graph": "node scripts/graph.mjs",
+    "new-task": "node scripts/new-task.mjs",
+    "agents:sync": "node scripts/agents-sync.mjs",
+    "assets:report": "node scripts/asset-report.mjs"
   },
   "devDependencies": {
     "electron": "^33.2.1",

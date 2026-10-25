@@ -1,0 +1,5 @@
+# Python dev tools (the game itself has no Python dependency; serve.py uses stdlib only).
+# Install: python -m pip install -r requirements-dev.txt
+graphifyy==0.9.38
+# Optional, for npm run assets:report (create-game-assets skill):
+Pillow>=10,<14

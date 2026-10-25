@@ -1,0 +1,17 @@
+# Keep the graph focused on game code. Agent docs/skills live in .agents/ and
+# are navigated directly (see AGENTS.md), so they are excluded here.
+.agents/
+.kiro/
+.claude/
+node_modules/
+dist/
+build/
+assets/
+graphify-out/
+*.png
+*.wav
+*.ogg
+*.flac
+package-lock.json
+# Room pieces are data (no AST nodes); documented in .agents/context/systems/rooms-and-maps.md
+map/*.json
