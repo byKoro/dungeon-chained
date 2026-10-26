@@ -119,6 +119,29 @@ export const HOLE_FALL = Object.freeze({
     respawnInvulnFrames: 90
 });
 
+// Só com a corrente arrebentada. 9 × 12 px ≈ 108 px: cruza vão de 1 tile, nunca 2.
+export const PLAYER_DASH = Object.freeze({
+    speed: 12,
+    durationSteps: 9,
+    exitSpeed: 4.2,
+    cooldownSteps: 60,
+    afterimages: 4,
+    afterimageEvery: 2,
+    afterimageAlpha: 0.7,
+    afterimageLife: 10,
+    afterimageTint: 0.92,
+    dustCount: 6,
+    ringDust: 8,
+    landDust: 5,
+    // Visual apenas: estica na direção do dash, achata ao parar e volta com overshoot.
+    stretch: 0.32,
+    landSquash: 0.28,
+    landSteps: 9,
+    flashSteps: 4,
+    shake: 2.5,
+    landStepRate: 0.85
+});
+
 export const HOLE_FX = Object.freeze({
     pixel: 4,
     color: "132, 100, 96",
@@ -449,6 +472,9 @@ export const HAZARDS = {
         barrierGlow: "#e53170"
     }
 };
+
+// Espaço/Enter/A também são dash: quem aperta no instante da morte não reinicia sem ver a tela.
+export const GAME_OVER_INPUT_DELAY_MS = 400;
 
 export const MENU_PAD = {
     buttons: { a: 0, b: 1, start: 9, up: 12, down: 13, left: 14, right: 15 },

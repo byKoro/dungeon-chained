@@ -29,6 +29,19 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
 - `resolveSprite()` priority: hurt sheet → `expression` sheet → scared sheet → walk sheet. Walk frame 0 = idle, 1..frameCount-1 = walk cycle.
 - `draw(ctx)`: invuln blink (alpha 0.4), fall spin/shrink, hurt jitter, bob + tilt, horizontal flip, sprite scaled to `sprite.drawHeight` (73).
 - Bookkeeping fields set by `Game`: `_livesSeen`, `_fallSeen`, `bloodPalette` (PlayerFactory).
+- `update(input, bounds, { canDash })`: `canDash` comes from `Game` (`!chain.isConnected`). See Dash below.
+
+## Dash (individual, only while the chain is snapped)
+
+- Key = `controls[4]` (P1 `" "`, P2 `"enter"`); gamepad A (0) / RB (5) mapped to it (`InputHandler.dashButtons`). Edge-triggered inside `Player` (`_dashHeld`), no buffer. A key already held when the chain snaps does not fire.
+- Starts only if `canDash && !feetInHole && dashCooldown === 0 && hurtTimer === 0` and not `falling`. `feetInHole` (`tiles.feetInHole(p)`, feet over a hole tile) blocks starting from inside the edge, which would add up to `edgeMargin` of reach and cross a 2-tile gap.
+- `Game.setPaused(false)` calls `latchDashKey()` on both players, so the Enter / pad A that closed the menu does not fire a dash. Game-over restart via Space/Enter/pad A/Start waits `GAME_OVER_INPUT_DELAY_MS` (400 ms, same as the death-button focus delay) because those are dash keys too. Direction = current 8-dir input, else `lastMoveX/Y`. No steering while `dashing`.
+- `PLAYER_DASH` (GameConfig): `speed` 12 × `durationSteps` 9 (~108 px), then velocity = `exitSpeed` 4.2 along `dashDir*`. `cooldownSteps` 60, counted from the end of the dash (`dashCharge` 0..1 getter, 0 while dashing).
+- While `dashing`: `takeDamage` returns false (separate from `invulnerableTimer`, no blink); `Game` leaves the player out of `resolveEntityCollisions` (walls still apply); `checkHoleFalls` skips the player (no pushback, no grace); no footsteps.
+- End of dash (`justEndedDash`): if the feet are beyond `HOLE_FALL.edgeMargin` inside a hole, the player falls that step (no grace). A 1-tile gap is crossable, 2 tiles never.
+- Flags: `justDashed` (Game plays `playerDash` + `triggerDust`), `justEndedDash`, `dashEnabled` (last `canDash`, read by the HUD bar). `afterimages` (tinted ghosts, drawn in `Player.draw`).
+- Resets: `respawnAt` (death-respawn) and `restart` (new Player) refill the charge. `cancelDash()` (door transition, `newDungeon`) cuts a dash in progress but keeps the cooldown running. Reconnecting mid-dash lets the dash finish.
+- `PlayerAI` never dashes (legacy bot).
 
 **PlayerFactory** `{ assets, bloodCanvas }` → `create()` returns `[p1, p2]` at (0,0); Game positions them.
 
@@ -68,8 +81,8 @@ Kill rule (`CombatSystem.resolveWeaponHits`, only while connected): an enemy die
 ## Input (`InputHandler`)
 
 - Keys stored lowercase from `KeyboardEvent.key`. Arrow keys and Space get `preventDefault`. Window `blur` clears keys.
-- P1: `w s a d`. P2: `arrowup arrowdown arrowleft arrowright` (from `playerConfigs`).
-- Gamepad index 0 → P1 keys, index 1 → P2 keys (`gamepadControls`). Left stick with `deadZone` 0.35, D-pad buttons 12/13/14/15. Converted into the same key names, so `Player` is device-agnostic.
+- P1: `w s a d` + dash `Space`. P2: `arrowup arrowdown arrowleft arrowright` + dash `Enter` (from `playerConfigs`, `controls[4]`). `Enter`/`Space` also restart on game over (`Game._bindButtons`).
+- Gamepad index 0 → P1 keys, index 1 → P2 keys (`gamepadControls`). Left stick with `deadZone` 0.35, D-pad buttons 12/13/14/15, dash buttons 0/5. Converted into the same key names, so `Player` is device-agnostic.
 - Menu pad handling is separate (`MenuPad` in `Game._pollMenuPad`, any pad: 9 Start, 0 A, 1 B, D-pad/stick ±0.6; see `ui.md`).
 
 ## PlayerAI (debug)
@@ -79,7 +92,7 @@ Disabled by default; toggled with `I` (own keydown listener) or `window.playerAI
 ## Config knobs
 
 - `js/Game.js` constructor (hardcoded Chain config): `rest 130`, `stiffness 0.02`, `breakDistance 240`, `strainDistance 165`, `strainLimit 30`, `reconnectDistance 110`, `pickupRadius 60`, `snapImpulse 12`, `playerSafeZone: PLAYER_SAFE_ZONE`. `reconnectDelay` default 20 (Chain.js).
-- `js/config/GameConfig.js`: `MAX_PLAYER_SEPARATION`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `graceFrames`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
+- `js/config/GameConfig.js`: `PLAYER_DASH`, `MAX_PLAYER_SEPARATION`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `graceFrames`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
 - `js/config/EntityConfig.js`: `playerConfigs` (color, controls, name, sprite crops, `drawHeight`, hurt/scared sheets).
 - `Player.js` (hardcoded): `speed`, `lives`, invuln 65, knockback 16, `hurtDuration`, `scaredDuration`, `fallDuration`, `slideDuration`.
 

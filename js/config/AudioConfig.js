@@ -171,6 +171,18 @@ export const AUDIO_CONFIG = {
             enabled: true
         },
 
+        playerDash: {
+            description: "Dash do jogador (PLACEHOLDER: reaproveita arrow-fire mais agudo até existir um whoosh próprio)",
+            files: [1, 2, 3].map(i => `assets/audio/arrow-fire-0${i}.wav`),
+            volume: 0.4,
+            rate: 1.45,
+            rateVariance: 0.06,
+            pitchShift: true,
+            cooldownMs: 60,
+            maxVoices: 2,
+            enabled: true
+        },
+
         sawMotor: {
             description: "Motor da serra em loop (regime do circular-saw.mp3); nível/tom/brilho seguem o giro — ver SawMotorAudio",
             files: ["assets/audio/saw-motor-loop.wav"],

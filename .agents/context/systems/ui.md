@@ -32,6 +32,11 @@ Pixel-art UI in two layers:
   - `Portrait` reactions: `hurt()`, `partnerHurt()`, `healed()`, `roomEnter(combat, delay)`, `roomCleared(delay)`, `setPaused(p, delay)`. It plays expression sequences `[{ expr | look, dur, lean? }]` and uses `Spring`s (`squash`, `hop`, `push`, `lean`, `sink`), blinking, and idle glances.
   - Expressions (pt-BR file names): `PLAYER_EXPRESSIONS` in `js/core/AssetLoader.js`, loaded as `player_0N_expr_<name>` from `assets/player_0N/expressions/<name>.png`. A missing image falls back to the walk sheet.
   - `HeartRow`: hearts break into halves (debris) on loss, pop in on gain, heartbeat when at 1 life. Sprite `assets/heart/heart.png` frames FULL/EMPTY/HALF_L/HALF_R (16 px).
+  - `DashBar`: a mini loading bar (same art language as `LoadingScreen`: chamfered stone frame from `FRAME`, dark well, cells with a spec row on top and a dark row at the bottom), 40×7 art px. It sits on the label line, right after `P1` / mirrored before `P2`, and is drawn at 1 art px into its own buffer, scaled by `hs`. The drop shadow is drawn outside the buffer, so it stays bottom-right when mirrored.
+    - Content: a `-▸` glyph (iron while charging; player color when ready) and `DASH_SEGMENTS` 5 cells, one per 12 steps of cooldown. The cell being charged shows a partial dark fill.
+    - Palettes: `DASH_RAMPS` (P1 = the `FACES.gold` ramp, P2 = a matching blue ramp).
+    - Motion: pop-in spring when it appears (chain snaps). Each cell flashes as it lights. When all cells are full the bar pops and a glint sweeps every `DASH_GLINT_PERIOD` (off under reduced motion). Spending the dash shakes the bar.
+    - Drawn only while `player.dashEnabled`, otherwise `hide()`.
 
 ## Data flow (driven from `js/Game.js`)
 - Boot (`js/main.js`): `LoadingScreen.run('Loading the dungeon…', [assets.whenReady, roomCatalog.load])` → opening trailer (below) until START/SKIP → `run('Preparing the dungeon…', [new Game, game.audio.whenReady])` → `game.start()`. `#loading-screen` starts visible (no `ls-hidden` in HTML).
@@ -41,10 +46,10 @@ Pixel-art UI in two layers:
 - HUD: `hud.draw` runs every render. It detects life changes by polling `player.lives` against `entry.seen`, and new player objects (restart) by identity, which resets the HUD. `transitionThroughDoor` → `hud.onRoomEnter(combat)`; room cleared → `hud.onRoomCleared()`.
 
 ## Input & focus
-- Keyboard (`Game._bindButtons`, window `keydown`, ignores repeats): `Escape` toggles pause, `T` cycles tileset, `R` restarts (any time, even when paused), `Enter`/`Space` on game over restarts unless the death button is focused. When it is focused, the native click handles it, which avoids a double restart.
+- Keyboard (`Game._bindButtons`, window `keydown`, ignores repeats): `Escape` toggles pause, `T` cycles tileset, `R` restarts (any time, even when paused), `Enter`/`Space` on game over restarts (only after `GAME_OVER_INPUT_DELAY_MS`, since they are also dash keys) unless the death button is focused. When it is focused, the native click handles it, which avoids a double restart.
 - `PauseScreen` root `keydown`: ↑/W, ↓/S → `move`. Native `<button>` Enter/Space → click.
 - Gamepad: all menu pad input goes through `MenuPad` (`js/core/MenuPad.js`, tuning `MENU_PAD` in `GameConfig`). Any pad counts. `poll()` returns edge hits `{start, a, b, up, down, left, right, any}`. Directions (D-pad 12–15 or left stick |axis| > 0.6) repeat while held (350 ms delay, then every 110 ms). Buttons held at the first poll do not fire, so the Start that pressed the trailer's START does not pause the new game. `Game` and `TrailerPlayer` each own one.
-  - Game (`Game._pollMenuPad`, each frame via `GameLoop.onFrameStart`): Start toggles pause. In the pause: ↑/↓ `move`, ←/→ `adjust` (volume ±10 %), A `confirm`, B resume. Game over: Start or A restart (death button shows pressed), B does nothing.
+  - Game (`Game._pollMenuPad`, each frame via `GameLoop.onFrameStart`): Start toggles pause. In the pause: ↑/↓ `move`, ←/→ `adjust` (volume ±10 %), A `confirm`, B resume. Game over: Start or A restart after `GAME_OVER_INPUT_DELAY_MS` (death button shows pressed), B does nothing.
 - Hover equals focus. `pointerenter` focuses the control. `uiMove` plays only when focus arrives from another `.pixel-btn` or from the pointer, so `show()` auto-focus is silent.
 - Controls are gated by `enabled: () => screen.visible`. Hidden screens ignore clicks.
 

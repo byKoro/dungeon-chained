@@ -40,7 +40,7 @@ import {
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
-    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL
+    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
 } from './config/GameConfig.js';
 
 export class Game {
@@ -212,6 +212,32 @@ export class Game {
         }
     }
 
+    _dashFeedback(p) {
+        if (!p.justDashed) return;
+        this.audio?.play("playerDash");
+        this.renderer.triggerShake(PLAYER_DASH.shake);
+        const fx = p.x - p.dashDirX * 10, fy = p.y + 15 - p.dashDirY * 4;
+        this.particleSystem.triggerDust(fx, fy, p.dashDirX, p.dashDirY, PLAYER_DASH.dustCount);
+        this._dustRing(fx, fy, PLAYER_DASH.ringDust);
+        this.particleSystem.triggerFlash(fx, fy - 6, 4, 0.7);
+    }
+
+    _dashLandFeedback(p) {
+        if (!p.justEndedDash || p.falling) return;
+        this.audio?.play("playerStep", { rateMultiplier: PLAYER_DASH.landStepRate });
+        const fx = p.x + p.dashDirX * 8, fy = p.y + 15;
+        this.particleSystem.triggerDust(fx, fy, -p.dashDirX, -p.dashDirY, PLAYER_DASH.landDust);
+        this._dustRing(p.x, fy, Math.ceil(PLAYER_DASH.landDust / 2));
+    }
+
+    _dustRing(x, y, n) {
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
+            const cx = Math.cos(a), cy = Math.sin(a);
+            this.particleSystem.triggerDust(x + cx * 14, y + cy * 6, -cx, -cy, 1);
+        }
+    }
+
     _arrowTrapFeedback(challenge) {
         for (const t of challenge.arrowTraps) {
             if (!t.justFired) continue;
@@ -234,12 +260,17 @@ export class Game {
             else if (k === "t") this.cycleTileset();
             else if (k === "r") this.restart();
 
-            else if (this.gameOver && (k === "enter" || k === " ") &&
+            else if (this._gameOverAcceptsInput() && (k === "enter" || k === " ") &&
                 document.activeElement !== this.deathScreen.button) {
                 playUi("uiConfirm");
                 this.restart();
             }
         });
+    }
+
+    _gameOverAcceptsInput() {
+        if (!this.gameOver) return false;
+        return performance.now() - (this._gameOverAt ?? 0) >= GAME_OVER_INPUT_DELAY_MS;
     }
 
     restart() {
@@ -262,6 +293,8 @@ export class Game {
             playUi("uiOpen");
         } else {
             this.pauseScreen.hide();
+            // A tecla/botão que fechou a pausa (Enter, A) também é dash: não pode disparar ao voltar.
+            for (const p of this.players) p.latchDashKey();
             this.audio.setLoopLevel("ambience", 0, 400);
             if (!silent) playUi("uiClose");
         }
@@ -275,7 +308,7 @@ export class Game {
         const hit = this.menuPad.poll();
 
         if (this.gameOver) {
-            if (hit.start || hit.a) {
+            if ((hit.start || hit.a) && this._gameOverAcceptsInput()) {
                 this.deathScreen.pixel.showPressed();
                 playUi("uiConfirm");
                 this.restart();
@@ -333,6 +366,8 @@ export class Game {
         }
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
+        this.p1.cancelDash();
+        this.p2.cancelDash();
 
         if (this.playtest) {
             this.tiles.ensureSafeSpawn(this.p1, rect);
@@ -358,6 +393,8 @@ export class Game {
 
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
+        this.p1.cancelDash();
+        this.p2.cancelDash();
         this._rememberEntrySpawns();
 
         if (!this.chain.isConnected) this.chain.reset();
@@ -599,6 +636,7 @@ export class Game {
         this.particleSystem.update([this.p1, this.p2], this.arenaBounds);
         this.wind.update(this.arenaBounds);
         this.effects.update();
+        this.holes.update();
 
         if (this._doorFlashT > 0) {
             this._doorFlashT = Math.max(0, this._doorFlashT - deltaSeconds);
@@ -614,8 +652,11 @@ export class Game {
 
         this.playerAI.update();
 
-        p1.update(this.input, this.arenaBounds);
-        p2.update(this.input, this.arenaBounds);
+        const canDash = !this.chain.isConnected;
+        p1.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p1) });
+        p2.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p2) });
+        this._dashFeedback(p1);
+        this._dashFeedback(p2);
 
         this._resolveFall(p1);
         this._resolveFall(p2);
@@ -636,7 +677,6 @@ export class Game {
                 const fx = sp ? sp.x : (p1.x + p2.x) / 2;
                 const fy = sp ? sp.y : (p1.y + p2.y) / 2;
                 const r = this.chain.weapon?.discRadius ?? 24;
-        this.holes.update();
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
@@ -712,7 +752,7 @@ export class Game {
         this.combat.updateEnemies(enemies, [p1, p2]);
 
         const liveEnemies = enemies.filter(e => e.state !== "dying");
-        const allEntities = [p1, p2, ...liveEnemies];
+        const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies);
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
         for (let it = 0; it < 3; it++) {
@@ -749,7 +789,9 @@ export class Game {
                 this._dropSawOnFall();
             }
             p._fallSeen = p.falling;
+            this._dashLandFeedback(p);
         }
+        this.holes.update([p1, p2]);
 
         this.combat.resolveWeaponHits(
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
@@ -791,7 +833,6 @@ export class Game {
 
         if (rooms.tryClearCurrent()) {
             this._triggerDoorFlash();
-        this.holes.update([p1, p2]);
 
             this.audio.play("doorOpen");
 
@@ -804,6 +845,7 @@ export class Game {
 
         if (p1.lives <= 0 || p2.lives <= 0) {
             this.gameOver = true;
+            this._gameOverAt = performance.now();
             this.deathScreen.show();
 
             this.audio.setLoopLevel("ambience", -10, 1500);
@@ -902,6 +944,8 @@ export class Game {
             renderer.drawDoorGradients(doors, doorHalf, TILE, DOOR_STUB_TILES);
         }
 
+        this.holes.draw(ctx);
+
         const challenge = rooms.current.challenge;
         if (challenge) challenge.drawFloorLayer(ctx);
 
@@ -945,8 +989,6 @@ export class Game {
         this.particleSystem.drawFlames(ctx);
 
         if (challenge) challenge.drawWallLayer(ctx);
-        this.holes.draw(ctx);
-
 
         renderer.drawFrontWall(rect, tiles, TILE, open, doors, doorHalf, DOOR_STUB_TILES);
 

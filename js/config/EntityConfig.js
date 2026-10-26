@@ -51,7 +51,7 @@ export function playerConfigs(assets) {
     return [
         {
             color: "#ffd166",
-            controls: ["w", "s", "a", "d"],
+            controls: ["w", "s", "a", "d", " "],
             img: assets.p1,
             name: "Amarelo",
             sprite: {
@@ -63,7 +63,7 @@ export function playerConfigs(assets) {
         },
         {
             color: "#6bb4db",
-            controls: ["arrowup", "arrowdown", "arrowleft", "arrowright"],
+            controls: ["arrowup", "arrowdown", "arrowleft", "arrowright", "enter"],
             img: assets.p2,
             name: "Azul",
             sprite: {

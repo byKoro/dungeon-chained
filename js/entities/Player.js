@@ -1,4 +1,5 @@
 import { Entity } from './Entity.js';
+import { PLAYER_DASH } from '../config/GameConfig.js';
 
 export class Player extends Entity {
     constructor(x, y, color, controls, spriteImg, name, spriteConfig = null) {
@@ -44,6 +45,107 @@ export class Player extends Entity {
         this.fallDuration = 34;
         this.fallX = 0;
         this.fallY = 0;
+
+        this.lastMoveX = 1; this.lastMoveY = 0;
+        this.dashEnabled = false;
+        this.dashing = false;
+        this.dashTimer = 0;
+        this.dashCooldown = 0;
+        this.dashDirX = 1; this.dashDirY = 0;
+        this.justDashed = false;
+        this.justEndedDash = false;
+        this._dashHeld = false;
+        this.afterimages = [];
+        this._tintBuf = null;
+        this._dashFlashT = 0;
+        this._landT = 0;
+    }
+
+    get dashScale() {
+        if (this.dashing) return 1 + PLAYER_DASH.stretch;
+        if (this._landT <= 0) return 1;
+        const k = 1 - this._landT / PLAYER_DASH.landSteps;
+        const c1 = 1.70158, c3 = c1 + 1, m = k - 1;
+        const easeOutBack = 1 + c3 * m * m * m + c1 * m * m;
+        const from = 1 - PLAYER_DASH.landSquash;
+        return from + (1 - from) * easeOutBack;
+    }
+
+    latchDashKey() {
+        this._dashHeld = true;
+    }
+
+    get dashCharge() {
+        if (this.dashing) return 0;
+        return 1 - this.dashCooldown / PLAYER_DASH.cooldownSteps;
+    }
+
+    cancelDash() {
+        this.afterimages.length = 0;
+        this._dashFlashT = 0;
+        this._landT = 0;
+        if (!this.dashing) return;
+        this.dashing = false;
+        this.dashTimer = 0;
+        this.dashCooldown = PLAYER_DASH.cooldownSteps;
+    }
+
+    _resetDash() {
+        this.dashing = false;
+        this.dashTimer = 0;
+        this.dashCooldown = 0;
+        this.justDashed = false;
+        this.justEndedDash = false;
+        this.afterimages.length = 0;
+        this._dashFlashT = 0;
+        this._landT = 0;
+    }
+
+    _startDash() {
+        const hasInput = this.moveX !== 0 || this.moveY !== 0;
+        const dx = hasInput ? this.moveX : this.lastMoveX;
+        const dy = hasInput ? this.moveY : this.lastMoveY;
+        const mag = Math.hypot(dx, dy) || 1;
+        this.dashDirX = dx / mag;
+        this.dashDirY = dy / mag;
+        this.dashing = true;
+        this.dashTimer = PLAYER_DASH.durationSteps;
+        this.justDashed = true;
+        this.slideTimer = 0;
+        this._dashFlashT = PLAYER_DASH.flashSteps;
+        this._landT = 0;
+        this.vx = this.dashDirX * PLAYER_DASH.speed;
+        this.vy = this.dashDirY * PLAYER_DASH.speed;
+    }
+
+    _updateDash() {
+        this.dashTimer--;
+        if (this.dashTimer <= 0) {
+            this.dashing = false;
+            this.justEndedDash = true;
+            this.dashCooldown = PLAYER_DASH.cooldownSteps;
+            this._landT = PLAYER_DASH.landSteps;
+            this.vx = this.dashDirX * PLAYER_DASH.exitSpeed;
+            this.vy = this.dashDirY * PLAYER_DASH.exitSpeed;
+            return;
+        }
+        this.vx = this.dashDirX * PLAYER_DASH.speed;
+        this.vy = this.dashDirY * PLAYER_DASH.speed;
+    }
+
+    _updateAfterimages() {
+        if (this._dashFlashT > 0) this._dashFlashT--;
+        if (this._landT > 0 && !this.dashing) this._landT--;
+        for (let i = this.afterimages.length - 1; i >= 0; i--) {
+            if (--this.afterimages[i].life <= 0) this.afterimages.splice(i, 1);
+        }
+        if (!this.dashing || !this.sprite.animated) return;
+        if ((PLAYER_DASH.durationSteps - this.dashTimer) % PLAYER_DASH.afterimageEvery !== 0) return;
+        this.afterimages.push({
+            x: this.x, y: this.y, tilt: this.tilt, facingLeft: this.facingLeft,
+            scale: this.dashScale, sp: this.resolveSprite(), life: PLAYER_DASH.afterimageLife
+        });
+        if (this.afterimages.length > PLAYER_DASH.afterimages) this.afterimages.shift();
     }
 
     startFalling(tileCenterX, tileCenterY) {
@@ -54,6 +156,8 @@ export class Player extends Entity {
         this.fallX = tileCenterX;
         this.fallY = tileCenterY;
         this.vx = 0; this.vy = 0;
+        this.afterimages.length = 0;
+        this._landT = 0;
     }
 
     respawnAt(x, y, invulnFrames = 0) {
@@ -64,6 +168,7 @@ export class Player extends Entity {
         this.x = x; this.y = y;
         this.vx = 0; this.vy = 0;
         this.invulnerableTimer = Math.max(this.invulnerableTimer, invulnFrames);
+        this._resetDash();
     }
 
     resolveSprite() {
@@ -119,7 +224,8 @@ export class Player extends Entity {
         this.moveY = moveY;
 
         if (hasInput) {
-
+            this.lastMoveX = moveX;
+            this.lastMoveY = moveY;
             this.vx = this.vx * 0.76 + moveX * this.speed * 0.24;
             this.vy = this.vy * 0.76 + moveY * this.speed * 0.24;
             this.slideTimer = 0;
@@ -134,7 +240,7 @@ export class Player extends Entity {
 
     takeDamage(sourceX, sourceY) {
 
-        if (this.falling || this.invulnerableTimer > 0) return false;
+        if (this.falling || this.dashing || this.invulnerableTimer > 0) return false;
 
         this.lives--;
         this.invulnerableTimer = 65;
@@ -147,7 +253,15 @@ export class Player extends Entity {
         return true;
     }
 
-    update(input, bounds) {
+    update(input, bounds, { canDash = false, feetInHole = false } = {}) {
+        this.justDashed = false;
+        this.justEndedDash = false;
+        this.dashEnabled = canDash;
+
+        const dashKey = this.controls[4];
+        const dashDown = !!dashKey && input.isDown(dashKey);
+        const dashPressed = dashDown && !this._dashHeld;
+        this._dashHeld = dashDown;
 
         if (this.falling) {
             this.x = this.fallX;
@@ -164,8 +278,17 @@ export class Player extends Entity {
         if (this.hurtTimer > 0) this.hurtTimer--;
         if (this.scaredTimer > 0) this.scaredTimer--;
 
-        this.handleInput(input);
+        if (this.dashing) {
+            this._updateDash();
+        } else {
+            if (this.dashCooldown > 0) this.dashCooldown--;
+            this.handleInput(input);
+            // Sair de dentro da beirada somaria até edgeMargin ao alcance e cruzaria vão de 2 tiles.
+            const ready = canDash && !feetInHole && this.dashCooldown === 0 && this.hurtTimer === 0;
+            if (dashPressed && ready) this._startDash();
+        }
         super.update();
+        this._updateAfterimages();
 
         if (this.speedMag > 0.2) {
             this.walkFrame += this.speedMag * 0.18;
@@ -200,7 +323,7 @@ export class Player extends Entity {
 
         this.justStepped = false;
         const STEP_LENGTH = 20;
-        if (this.speedMag > 0.25) {
+        if (this.speedMag > 0.25 && !this.dashing) {
             this.stepDist += this.speedMag;
             if (this.stepDist >= STEP_LENGTH) {
                 this.stepDist = 0;
@@ -224,7 +347,53 @@ export class Player extends Entity {
 
     }
 
+    _tintedFrame(sp, color, amount) {
+        const cw = sp.cropW, ch = sp.cropH;
+        if (!this._tintBuf) this._tintBuf = document.createElement('canvas');
+        const buf = this._tintBuf;
+        if (buf.width !== cw || buf.height !== ch) { buf.width = cw; buf.height = ch; }
+        const b = buf.getContext('2d');
+        b.globalCompositeOperation = 'source-over';
+        b.globalAlpha = 1;
+        b.clearRect(0, 0, cw, ch);
+        b.drawImage(sp.sheet, sp.frame * sp.cell + sp.cropX, sp.cropY, cw, ch, 0, 0, cw, ch);
+        b.globalCompositeOperation = 'source-atop';
+        b.globalAlpha = amount;
+        b.fillStyle = color;
+        b.fillRect(0, 0, cw, ch);
+        return buf;
+    }
+
+    // Estica ao longo do dash (rotate → scale → unrotate), independente do flip do sprite.
+    _applyDashScale(ctx, scale) {
+        if (scale === 1) return;
+        const a = Math.atan2(this.dashDirY, this.dashDirX);
+        ctx.rotate(a);
+        ctx.scale(scale, 1 / scale);
+        ctx.rotate(-a);
+    }
+
+    _drawAfterimages(ctx) {
+        const s = this.sprite;
+        for (const g of this.afterimages) {
+            const sp = g.sp;
+            if (!sp.sheet || !sp.sheet.complete || !sp.sheet.naturalWidth) continue;
+            const buf = this._tintedFrame(sp, this.color, PLAYER_DASH.afterimageTint);
+            const scale = s.drawHeight / sp.cropH;
+            const drawW = sp.cropW * scale, drawH = sp.cropH * scale;
+            ctx.save();
+            ctx.globalAlpha = PLAYER_DASH.afterimageAlpha * (g.life / PLAYER_DASH.afterimageLife);
+            ctx.translate(g.x, g.y);
+            this._applyDashScale(ctx, g.scale);
+            ctx.rotate(g.tilt);
+            if (g.facingLeft) ctx.scale(-1, 1);
+            ctx.drawImage(buf, -drawW / 2, -drawH / 2, drawW, drawH);
+            ctx.restore();
+        }
+    }
+
     draw(ctx) {
+        if (this.afterimages.length) this._drawAfterimages(ctx);
         ctx.save();
         if (this.invulnerableTimer % 6 >= 3 && this.hurtTimer === 0) {
             ctx.globalAlpha = 0.4;
@@ -253,6 +422,7 @@ export class Player extends Entity {
         const bobY = Math.abs(Math.sin(this.bobPhase)) * 2.2 * moveAmount;
         ctx.translate(0, -bobY);
 
+        this._applyDashScale(ctx, this.dashScale);
         ctx.rotate(this.tilt + bobAngle);
 
         if (this.facingLeft) ctx.scale(-1, 1);
@@ -276,6 +446,10 @@ export class Player extends Entity {
                     srcX, srcY, cw, ch,
                     -drawW / 2, -drawH / 2, drawW, drawH
                 );
+                if (this._dashFlashT > 0) {
+                    ctx.globalAlpha *= this._dashFlashT / PLAYER_DASH.flashSteps;
+                    ctx.drawImage(this._tintedFrame(sp, '#ffffff', 1), -drawW / 2, -drawH / 2, drawW, drawH);
+                }
             } else {
 
                 const drawW = 36, drawH = 46;

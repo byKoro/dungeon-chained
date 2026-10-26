@@ -40,6 +40,12 @@ Everything that makes hits feel heavy: pixel particles (dust, sparks, flashes, f
 
 Typical recipe (e.g. `onSnap` in `Game._updateGameplay`): shake + sound + duck + spark burst + flash.
 
+Player dash (medium tier, no hit-stop: it is movement, not impact). All numbers in `PLAYER_DASH`.
+- Start (`Game._dashFeedback` on `justDashed`): `playerDash` sound, `triggerShake(shake)` (2.5), backward dust cone (`dustCount`) + radial ring (`ringDust`, `Game._dustRing`) + small `triggerFlash` at the feet.
+- Body (visual only, `Player.dashScale`): stretched along the dash direction by `stretch` while dashing (`_applyDashScale`: rotate → scale(s, 1/s) → unrotate, before tilt/flip). White sprite flash for `flashSteps`.
+- Landing (`Game._dashLandFeedback` on `justEndedDash`, after `checkHoleFalls`, skipped if the player fell): `playerStep` at `landStepRate` (heavier), forward skid dust (`landDust`) + small ring. The sprite squashes by `landSquash` and returns with ease-out-back over `landSteps`.
+- Afterimages are not particles: `Player.afterimages` (≤ `afterimages`, one every `afterimageEvery` steps, `afterimageLife` steps, keep their stretch) are drawn first in `Player.draw` as player-colored silhouettes (`afterimageTint`, `source-atop` on the per-player `_tintBuf`) at `afterimageAlpha`. At 1 ghost per step they overlap into a smear. 2 steps apart they read as distinct silhouettes.
+
 ## Key types & APIs
 Particle contract (used by `updateAndCompact` in `ParticleSystem.js`): `update(a?, b?)`, `draw(ctx)`, `get done()`. Units are world px; motion is **per simulation step** (60 Hz, `SIM_STEP`), not dt-scaled. Lifetimes are in steps.
 Pools: `airParticles`, `floorDebris`, `smoke`, `sparks`, `flashes`, `flames`. `update(players, bounds)` updates all of them. `clear()` empties them and also `bloodCanvas.clear()`.
@@ -58,17 +64,17 @@ Render (`Game._render`, inside `renderer.beginFrame()` world transform + room cl
 5. `renderer.endFrame()` → `lighting.render(...)` → `postProcessor.setVignetteBreath(strain)` → `postProcessor.draw()` (ambient `41,35,53` + additive lights, multiplied over the frame; then vignette)
 6. heart overlays (`beginOverlayWorld`, unlit), wind if `"screen"`, `_renderOverlays`: `screenGore.draw`, door-transition fade, `hud.draw`.
 
-## Lighting specifics
-- Player light: `PLAYER_LIGHT_RADIUS` (260 world px) × zoom, default falloff/flicker. Pixel size `_lightPixel(zoom, scale)` = `max(2, round(TILE/16 * zoom * LIGHT_PIXEL_SCALE))`.
-- Torches: positions come from room data `tiles.torches` (`{col,row,side,type}`; set from map piece `torches` via `Room` `cell.customTorches`). Each torch adds a `glow` light plus an `area` light pushed `area.pushIn` into the room. `TORCHES.minPerWall/maxPerWall/marginTiles/minGap/onlyCombatRooms/sides` are not referenced by any code (probably leftovers from procedural placement). Sprites animate at 160 ms/frame in `Renderer.drawRoom` (`assets/torch/*`).
-- Active saw light radius grows with `spinSpeed` (60 + 18·spin). Dropped saw breathes with `chain.getDroppedLight().hover`.
-- Wall wash is disabled (`TORCHES.light.wash.enabled=false`).
-
 ## Hole effects (`js/systems/HoleEffects.js`, config `HOLE_FX`)
 - Sources rebuilt when `rooms.currentTiles` changes (clears motes): north lips and E/W rims of every hole tile.
 - `dust`: ambient 1-art-px motes falling from lips (`lipRate`) and side rims (`sideRate`) per step. `crumbs`: pebbles (`bigChance` = 2 px) when a player's foot probe (`HOLE_FALL.edgeMargin + 4` px) touches a hole (`edgeRate`), plus a `fallBurst` once per fall. Both fade over `fadeDepth`, die on leaving a hole tile, capped by `maxMotes`, snapped to `pixel` (4 world px) and clipped to the hole rects.
 - `drawFalling(ctx, player)`: clip = each column of the fall row's hole run, open upward and closed at the bottom of that column's hole run (only floor south of the pit hides the body); sinks `fall.sink` px (ease-out) and darkens with `ctx.filter = brightness(1 - fall.darken·t)`. `Player.draw` still does its own shrink/spin/alpha.
 - `LightingRenderer._fallLightScale`: player light radius shrinks to `fall.lightMin` over the fall.
+
+## Lighting specifics
+- Player light: `PLAYER_LIGHT_RADIUS` (260 world px) × zoom, default falloff/flicker. Pixel size `_lightPixel(zoom, scale)` = `max(2, round(TILE/16 * zoom * LIGHT_PIXEL_SCALE))`.
+- Torches: positions come from room data `tiles.torches` (`{col,row,side,type}`; set from map piece `torches` via `Room` `cell.customTorches`). Each torch adds a `glow` light plus an `area` light pushed `area.pushIn` into the room. `TORCHES.minPerWall/maxPerWall/marginTiles/minGap/onlyCombatRooms/sides` are not referenced by any code (probably leftovers from procedural placement). Sprites animate at 160 ms/frame in `Renderer.drawRoom` (`assets/torch/*`).
+- Active saw light radius grows with `spinSpeed` (60 + 18·spin). Dropped saw breathes with `chain.getDroppedLight().hover`.
+- Wall wash is disabled (`TORCHES.light.wash.enabled=false`).
 
 ## Config knobs
 `POST_PROCESSING.{enabled, vignette.*, lighting.ambient/falloff/flicker*}`, `TORCHES.light.*`, `DOOR_LIGHT.*`, `WIND.*` (`count`, `layer`, `speed`, gusts, `streak`, colors), `HIT_SLOWMO`, `ROOM_INTRO.zoomFactor/times`, `CAMERA_DRONE.*`, `BLOOD_STEPS` (bloody footprints after a blood zone), `MAX_FOOTPRINTS`, `MAX_ACTIVE_GIBS`. Profile constants (`*_PROFILE`, `BLADE_COLOR`) live in `LightingRenderer.js`.

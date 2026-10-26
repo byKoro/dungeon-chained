@@ -57,6 +57,8 @@ Web Audio graph: `loop gain → _duckNode → _preNode → _masterNode → desti
 - `sawSnap` `Game._updateGameplay` onSnap + `Game._dropSawOnFall`; `sawPickup` onReconnect; `sawLand` `Game._updateSawLanding`
 - `playerFall`, `playerHit` (rate 0.88 at 1 life), `doorOpen`, `enemySpawn` (`_updateRoomIntro`), `pickup` (`_playHeartPickup`, streak +6%/pickup up to 4)
 - `buttonPress` (×1.12 when all pressed), `buttonRelease` `Game._buttonFeedback`; `arrowFire` `Game._arrowTrapFeedback` (distance attenuation 160..640 px → ×1..×0.35)
+- `playerStep` also at dash landing (`Game._dashLandFeedback`, rate × `PLAYER_DASH.landStepRate`).
+- `playerDash` `Game._dashFeedback` on `player.justDashed`. PLACEHOLDER: reuses the `arrow-fire-0N.wav` files at `rate` 1.45 until a real whoosh exists.
 - `uiMove`, `uiConfirm` `PixelButton`/`PixelSlider`; `uiOpen`/`uiClose`/`uiConfirm` `Game.setPaused`, `_pollMenuPad`, `_bindButtons`
 - Loops: `ambience` (`setLoopLevel` −12 dB paused, −10 dB game over, 0 on resume/new dungeon), `sawMotor` (LoopVoice)
 - Ducks: sawHit −7, sawSnap −9, playerFall −8, playerHit −6, sawPickup −4 dB.

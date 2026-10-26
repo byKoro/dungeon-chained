@@ -6,9 +6,10 @@ export class InputHandler {
         this.keyboardKeys = new Set();
 
         this.gamepadControls = [
-            { up: "w", down: "s", left: "a", right: "d" },
-            { up: "arrowup", down: "arrowdown", left: "arrowleft", right: "arrowright" }
+            { up: "w", down: "s", left: "a", right: "d", dash: " " },
+            { up: "arrowup", down: "arrowdown", left: "arrowleft", right: "arrowright", dash: "enter" }
         ];
+        this.dashButtons = [0, 5];
 
         this.deadZone = 0.35;
 
@@ -63,6 +64,7 @@ export class InputHandler {
             if (this.isButtonPressed(pad, 13)) this.keys.add(map.down);
             if (this.isButtonPressed(pad, 14)) this.keys.add(map.left);
             if (this.isButtonPressed(pad, 15)) this.keys.add(map.right);
+            if (this.dashButtons.some(b => this.isButtonPressed(pad, b))) this.keys.add(map.dash);
         }
     }
 

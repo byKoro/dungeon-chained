@@ -1,4 +1,5 @@
 import { drawText, measureText } from './PixelFont.js';
+import { FRAME } from './PixelButton.js';
 
 const MAX_LIVES = 3;
 const HEART_FRAME = { FULL: 0, EMPTY: 1, HALF_L: 2, HALF_R: 3 };
@@ -411,6 +412,156 @@ class HeartRow {
     }
 }
 
+// Barra de dash: mesma linguagem da barra de loading (moldura de pedra chanfrada,
+// poço escuro, células com brilho em cima e sombra embaixo), em miniatura ao lado do rótulo.
+const DASH_SEGMENTS = 5;
+const DASH_SEG_W = 5;
+const DASH_SEG_H = 3;
+const DASH_GLYPH_W = 4;
+const DASH_INNER_W = 1 + DASH_GLYPH_W + 1 + 1 + DASH_SEGMENTS * DASH_SEG_W + (DASH_SEGMENTS - 1);
+const DASH_W = DASH_INNER_W + 4;
+const DASH_H = DASH_SEG_H + 4;
+const DASH_SEG_FLASH = 0.16;
+const DASH_GLINT_PERIOD = 1.8;
+
+const DASH_RAMPS = [
+    { base: '#c99a2e', light: '#f2cf5b', dark: '#8a6414', spec: '#fff2b0', flash: '#fff6dc' },
+    { base: '#3d7fb0', light: '#6bb4db', dark: '#22506f', spec: '#cdeeff', flash: '#f2fbff' }
+];
+
+class DashBar {
+    constructor(dir, ramp) {
+        this.dir = dir;
+        this.ramp = ramp;
+        this._buf = document.createElement('canvas');
+        this._buf.width = DASH_W;
+        this._buf.height = DASH_H;
+        this._bctx = this._buf.getContext('2d');
+        this.reset();
+    }
+
+    reset() {
+        this.visible = false;
+        this.t = 0;
+        this.lit = DASH_SEGMENTS;
+        this.litAt = new Array(DASH_SEGMENTS).fill(-1e9);
+        this.readyT = 0;
+        this.shake = 0;
+        this.pop = new Spring(1, 380, 14);
+    }
+
+    hide() {
+        this.visible = false;
+    }
+
+    update(dt, charge) {
+        this.t += dt;
+        const lit = Math.floor(clamp(charge, 0, 1) * DASH_SEGMENTS + 1e-6);
+        if (!this.visible) {
+            this.visible = true;
+            this.lit = lit;
+            this.readyT = this.t - DASH_SEG_FLASH;
+            this.pop.set(0.35);
+            this.pop.kick(10);
+        }
+        if (lit < this.lit) {
+            this.shake = 0.25;
+            this.pop.set(0.9);
+        } else if (lit > this.lit) {
+            for (let i = this.lit; i < lit; i++) this.litAt[i] = this.t + (i - this.lit) * 0.04;
+            if (lit === DASH_SEGMENTS) {
+                this.readyT = this.t;
+                this.pop.set(1.25);
+                this.pop.kick(-4);
+            }
+        }
+        this.lit = lit;
+        this.charge = clamp(charge, 0, 1);
+        this.pop.update(dt);
+        if (this.shake > 0) this.shake = Math.max(0, this.shake - dt);
+    }
+
+    _render() {
+        const g = this._bctx, R = this.ramp, F = FRAME;
+        const px = (x, y, c) => { g.fillStyle = c; g.fillRect(x, y, 1, 1); };
+        const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+        const chamfer = (x, y, w, h, c) => { rect(x + 1, y, w - 2, h, c); rect(x, y + 1, w, h - 2, c); };
+        const W = DASH_W, H = DASH_H;
+        g.clearRect(0, 0, W, H);
+        chamfer(0, 0, W, H, F.outline);
+        chamfer(1, 1, W - 2, H - 2, F.stone);
+        rect(2, 1, W - 4, 1, F.stoneLight);
+        rect(1, 2, 1, H - 4, F.stoneLight);
+        rect(2, H - 2, W - 4, 1, F.stoneDark);
+        rect(W - 2, 2, 1, H - 4, F.stoneDark);
+        for (let x = 9; x < W - 4; x += 11) px(x, 1, F.seam);
+        rect(2, 2, DASH_INNER_W, DASH_SEG_H, F.well);
+
+        const ready = this.lit === DASH_SEGMENTS;
+        const sinceReady = this.t - this.readyT;
+        const gx = 3, gy = 2;
+        const glyphLit = ready && (sinceReady < DASH_SEG_FLASH ? 'flash' : 'on');
+        const gc = glyphLit === 'flash' ? R.flash : glyphLit ? R.light : F.ironDark;
+        px(gx, gy + 1, gc);
+        rect(gx + 2, gy, 1, 3, gc);
+        px(gx + 3, gy + 1, gc);
+
+        const sepX = gx + DASH_GLYPH_W + 1;
+        rect(sepX, 2, 1, DASH_SEG_H, F.stoneDark);
+
+        const sx0 = sepX + 1;
+        const glintX = ready && MOTION === 1
+            ? Math.floor(((sinceReady % DASH_GLINT_PERIOD) / DASH_GLINT_PERIOD) * (DASH_SEGMENTS * (DASH_SEG_W + 1)) * 2)
+            : -1;
+        for (let i = 0; i < DASH_SEGMENTS; i++) {
+            const x = sx0 + i * (DASH_SEG_W + 1);
+            if (i < this.lit) {
+                const age = this.t - this.litAt[i];
+                if (age >= 0 && age < DASH_SEG_FLASH * 0.5) {
+                    rect(x, 2, DASH_SEG_W, DASH_SEG_H, R.flash);
+                    continue;
+                }
+                const fresh = age >= 0 && age < DASH_SEG_FLASH;
+                rect(x, 2, DASH_SEG_W, DASH_SEG_H, fresh ? R.light : R.base);
+                rect(x, 2, DASH_SEG_W, 1, fresh ? R.spec : R.light);
+                rect(x, 2 + DASH_SEG_H - 1, DASH_SEG_W, 1, R.dark);
+                px(x, 2, R.spec);
+            } else if (i === this.lit) {
+                const part = Math.round((this.charge * DASH_SEGMENTS - i) * DASH_SEG_W);
+                if (part > 0) rect(x, 3, part, DASH_SEG_H - 1, R.dark);
+            }
+        }
+        if (glintX >= 0) {
+            const gxp = sx0 + glintX;
+            if (gxp < sx0 + DASH_SEGMENTS * (DASH_SEG_W + 1) - 1 && (gxp - sx0) % (DASH_SEG_W + 1) !== DASH_SEG_W) {
+                rect(gxp, 2, 1, DASH_SEG_H - 1, R.flash);
+            }
+        }
+        return this._buf;
+    }
+
+    // x = ponta do lado do rótulo; a barra cresce na direção de `dir`.
+    // A sombra fica fora do buffer para continuar caindo à direita/abaixo quando espelhada.
+    draw(ctx, x, y, hs) {
+        const buf = this._render();
+        const w = DASH_W * hs, h = DASH_H * hs;
+        const k = this.shake > 0 ? (this.shake / 0.25) * MOTION : 0;
+        const sx = Math.sin(this.t * 70) * hs * k;
+        ctx.save();
+        ctx.translate(Math.round(x + sx), Math.round(y + h / 2));
+        ctx.scale(this.pop.x, this.pop.x);
+        const left = this.dir > 0 ? 0 : -w;
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(left + 2 * hs, -h / 2 + hs, w - 2 * hs, h);
+        ctx.fillRect(left + hs, -h / 2 + 2 * hs, w, h - 2 * hs);
+        ctx.globalAlpha = 1;
+        if (this.dir < 0) ctx.scale(-1, 1);
+        ctx.drawImage(buf, 0, -h / 2, w, h);
+        ctx.restore();
+    }
+}
+
 export class VtuberHud {
 
     constructor({ assets, getPlayers, spriteConfigs, colors }) {
@@ -433,6 +584,7 @@ export class VtuberHud {
                 label: this._makeLabel(`P${i + 1}`, colors[i]),
                 portrait: new Portrait({ side, sprite, walk: assets.get(i === 0 ? 'p1' : 'p2'), expressions }),
                 hearts: new HeartRow(side === 'left' ? 1 : -1),
+                dash: new DashBar(side === 'left' ? 1 : -1, DASH_RAMPS[i] ?? DASH_RAMPS[0]),
                 player: null,
                 seen: MAX_LIVES,
                 layout: null
@@ -459,6 +611,7 @@ export class VtuberHud {
             e.seen = p ? p.lives : MAX_LIVES;
             e.portrait.reset();
             e.hearts.reset(e.seen);
+            e.dash.reset();
         });
     }
 
@@ -497,6 +650,7 @@ export class VtuberHud {
                 e.seen = p ? p.lives : MAX_LIVES;
                 e.portrait.reset();
                 e.hearts.reset(e.seen);
+                e.dash.reset();
             }
         });
         this.entries.forEach((e, i) => {
@@ -555,6 +709,14 @@ export class VtuberHud {
             const lx = left ? x0 : x0 - lw;
             const ly = y0 - (HEART_ART * hs) / 2 - lh - hs;
             ctx.drawImage(e.label, Math.round(lx), Math.round(ly), lw, lh);
+
+            if (e.player?.dashEnabled) {
+                e.dash.update(dt, e.player.dashCharge);
+                const bx = left ? lx + lw + 2 * hs : lx - 2 * hs;
+                e.dash.draw(ctx, bx, ly, hs);
+            } else {
+                e.dash.hide();
+            }
         }
         ctx.restore();
     }

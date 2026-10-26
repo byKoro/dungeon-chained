@@ -42,6 +42,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Coverage | Cobertura | Editor report of pieces per shape |
 | VTuber HUD | HUD vtuber | Animated player portraits with expressions + heart rows |
 | Juice | game feel | Shake, slow-mo, particles, flashes, ducking |
+| Dash | dash, investida | Individual burst (Space / Enter / pad A·RB), only while the chain is snapped: i-frames, passes enemies, jumps 1-tile holes, 1 s cooldown shown under the hearts |
 
 ## Enemies (editor labels)
 

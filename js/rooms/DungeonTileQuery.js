@@ -31,6 +31,10 @@ export class DungeonTileQuery {
         return value === HOLE_TILE;
     }
 
+    feetInHole(player) {
+        return this.isHoleAtWorld(player.x, player.y + (HOLE_FALL.footOffset ?? 0));
+    }
+
     darkHoleRects() {
         const tiles = this._floor();
         if (!tiles) return null;
@@ -54,6 +58,7 @@ export class DungeonTileQuery {
 
         for (const player of players) {
             if (player.falling) continue;
+            if (player.dashing) { player.holeGrace = 0; continue; }
             const hole = this._holeDepth(tiles, rect, wallSet, player.x, player.y + footOffset);
             if (!hole) { player.holeGrace = 0; continue; }
 
@@ -61,7 +66,8 @@ export class DungeonTileQuery {
             const beyondEdge = depth > edgeMargin;
             player.holeGrace = beyondEdge ? (player.holeGrace ?? 0) + 1 : 0;
 
-            if (beyondEdge && player.holeGrace >= graceFrames) {
+            // Dash que termina dentro do buraco não ganha a tolerância da beirada.
+            if (beyondEdge && (player.holeGrace >= graceFrames || player.justEndedDash)) {
                 player.holeGrace = 0;
 
                 player.startFalling(rect.x + (col + 0.5) * TILE, rect.y + (row + 0.5) * TILE);
