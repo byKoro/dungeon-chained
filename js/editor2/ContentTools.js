@@ -44,7 +44,8 @@ export class ContentTools {
             <button class="btn btn-danger" data-content="eraseContent">Remover conteúdo no tile</button>
             <p class="hint" id="content-hint">Selecione uma ferramenta e clique na sala. Ctrl+Z desfaz.</p>
         </div></div>`;
-        $('sidebar-left').querySelector('.tab-panel-container').prepend(panel);
+        // Depois dos cards existentes: no mapa, "Mapa" continua no topo.
+        $('sidebar-left').querySelector('.tab-panel-container').append(panel);
         for (const enemy of ENEMY_TYPES) $('content-enemy').add(new Option(enemy.label, enemy.key));
         for (const [key, def] of Object.entries(INTERACTIVES)) $('content-interactive').add(new Option(def.label, key));
         for (const [type, label, img] of [

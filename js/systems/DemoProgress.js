@@ -41,7 +41,8 @@ export class DemoProgress {
                 const p = players[i];
                 if (p.falling || p.lives <= 0 || Math.hypot(p.x - x, p.y - y) > DEMO.interactionRadius) continue;
                 const pickup = o.type === 'key' || o.type === 'ropeKey';
-                this.prompt = pickup ? 'Pegue a chave' : `Interagir: ${i === 0 ? 'E' : 'Shift direito'} / controle X`;
+                // O primeiro jogador em alcance define a dica, senão P2 sobrescreve a de P1.
+                if (!this.prompt) this.prompt = pickup ? 'Pegue a chave' : `Interagir: ${i === 0 ? 'P1 E' : 'P2 Shift direito'} / controle X`;
                 if (!pickup && !tapped[i]) continue;
                 this.activated.add(id);
                 if (o.type === 'altarDash') this.state.dash = true;
