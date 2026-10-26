@@ -1,3 +1,4 @@
+import { AuthoredDungeon } from './AuthoredDungeon.js';
 import { Dungeon } from '../core/Dungeon.js';
 import { Room } from './Room.js';
 import {
@@ -7,16 +8,23 @@ import {
 
 export class RoomManager {
 
-    constructor({ spawnSystem, getFloor, roomCatalog = null }) {
+    constructor({ spawnSystem, getFloor, roomCatalog = null, mapData = null }) {
         this.spawnSystem = spawnSystem;
         this.getFloor = getFloor;
         this.roomCatalog = roomCatalog;
+        this.mapData = mapData;
         this.rooms = new Map();
         this.dungeon = null;
         this.reset();
     }
 
     reset() {
+        if (this.mapData) {
+            this.dungeon = new AuthoredDungeon(this.mapData.map);
+            this.playtestSpawn = null;
+            this.rooms.clear();
+            return this.dungeon;
+        }
         let customGraph = null;
 
         this.playtestSpawn = null;
@@ -219,12 +227,14 @@ export class RoomManager {
     }
 
     clampPlayer(player, bounds, doors, canPass) {
-        const doorHalf = this.doorHalfWidth;
+        let doorHalf = this.doorHalfWidth;
         const r = player.hitRadius;
 
         const has = { N: null, S: null, E: null, W: null };
         if (canPass) {
             for (const d of doors) {
+                if (d.blocked) continue;
+                doorHalf = d.halfWidth ?? this.doorHalfWidth;
                 if (d.dir === "N" || d.dir === "S") {
                     if (Math.abs(player.x - d.x) < doorHalf) has[d.dir] = d;
                 } else {
@@ -233,6 +243,7 @@ export class RoomManager {
             }
         }
 
+        doorHalf = (Object.values(has).find(Boolean)?.halfWidth) ?? this.doorHalfWidth;
         const minX = has.W ? bounds.minX - DOOR_ENTER_DEPTH : bounds.minX + r;
         const maxX = has.E ? bounds.maxX + DOOR_ENTER_DEPTH : bounds.maxX - r;
         player.x = Math.max(minX, Math.min(maxX, player.x));
@@ -257,7 +268,7 @@ export class RoomManager {
     }
 
     playerAlignedToDoor(player, door) {
-        const doorHalf = this.doorHalfWidth;
+        const doorHalf = (door.halfWidth ?? this.doorHalfWidth) - player.hitRadius;
         if (door.dir === "N" || door.dir === "S") return Math.abs(player.x - door.x) < doorHalf;
         return Math.abs(player.y - door.y) < doorHalf;
     }

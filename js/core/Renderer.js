@@ -78,8 +78,8 @@ export class Renderer {
         }
 
         if (t.bounds) {
-            const halfW = (this.canvas.width / 2) / this.zoom;
-            const halfH = (this.canvas.height / 2) / this.zoom;
+            const halfW = ((this.viewport ? this.viewport.x + this.viewport.w / 2 : this.canvas.width / 2)) / this.zoom;
+            const halfH = ((this.viewport ? this.viewport.y + this.viewport.h / 2 : this.canvas.height / 2)) / this.zoom;
             const b = t.bounds;
             if (b.maxX - b.minX > halfW * 2) {
                 this.camX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, this.camX));
@@ -96,15 +96,15 @@ export class Renderer {
 
     screenToWorld(sx, sy) {
         return {
-            x: this.camX + (sx - this.canvas.width / 2) / this.zoom,
-            y: this.camY + (sy - this.canvas.height / 2) / this.zoom
+            x: this.camX + (sx - (this.viewport ? this.viewport.x + this.viewport.w / 2 : this.canvas.width / 2)) / this.zoom,
+            y: this.camY + (sy - (this.viewport ? this.viewport.y + this.viewport.h / 2 : this.canvas.height / 2)) / this.zoom
         };
     }
 
     worldToScreen(wx, wy) {
         const z = this._quantizeZoom(this.zoom);
-        const tx = Math.round(this.canvas.width / 2 - this.camX * z);
-        const ty = Math.round(this.canvas.height / 2 - this.camY * z);
+        const tx = Math.round((this.viewport ? this.viewport.x + this.viewport.w / 2 : this.canvas.width / 2) - this.camX * z);
+        const ty = Math.round((this.viewport ? this.viewport.y + this.viewport.h / 2 : this.canvas.height / 2) - this.camY * z);
         return { x: wx * z + tx, y: wy * z + ty, zoom: z };
     }
 
@@ -126,8 +126,8 @@ export class Renderer {
         }
         const punchedZoom = this.zoom * (1 + this._zoomPunch);
         const renderZoom = this._quantizeZoom(punchedZoom);
-        const tx = Math.round(this.canvas.width / 2 - this.camX * renderZoom + shakeX);
-        const ty = Math.round(this.canvas.height / 2 - this.camY * renderZoom + shakeY);
+        const tx = Math.round((this.viewport ? this.viewport.x + this.viewport.w / 2 : this.canvas.width / 2) - this.camX * renderZoom + shakeX);
+        const ty = Math.round((this.viewport ? this.viewport.y + this.viewport.h / 2 : this.canvas.height / 2) - this.camY * renderZoom + shakeY);
         this.ctx.setTransform(renderZoom, 0, 0, renderZoom, tx, ty);
     }
 
@@ -137,8 +137,8 @@ export class Renderer {
 
     beginOverlayWorld() {
         const z = this._quantizeZoom(this.zoom);
-        const tx = Math.round(this.canvas.width / 2 - this.camX * z);
-        const ty = Math.round(this.canvas.height / 2 - this.camY * z);
+        const tx = Math.round((this.viewport ? this.viewport.x + this.viewport.w / 2 : this.canvas.width / 2) - this.camX * z);
+        const ty = Math.round((this.viewport ? this.viewport.y + this.viewport.h / 2 : this.canvas.height / 2) - this.camY * z);
         this.ctx.save();
         this.ctx.setTransform(z, 0, 0, z, tx, ty);
     }
@@ -216,6 +216,7 @@ export class Renderer {
         }
 
         for (const p of tiles.props) {
+            if (p.type) continue;
             const dx = rect.x + p.col * tile;
             const dy = rect.y + p.row * tile;
             if (p.flip) {
@@ -291,7 +292,8 @@ export class Renderer {
         if (!this.tileset || !this.tileset.ready) return;
         const ctx = this.ctx;
         for (const d of doors) {
-
+            if (d.blocked) continue;
+            doorHalf = d.halfWidth ?? doorHalf;
             const across = Math.round((doorHalf * 2) / tile);
             for (let s = 1; s <= stubTiles; s++) {
                 for (let k = 0; k < across; k++) {
@@ -357,6 +359,8 @@ export class Renderer {
 
         const depth = wallDepth * 2.5 + stubTiles * wallDepth;
         for (const d of doors) {
+            if (d.blocked) continue;
+            doorHalf = d.halfWidth ?? doorHalf;
             c.save();
             let grad;
             if (d.dir === "N") {

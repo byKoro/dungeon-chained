@@ -1,3 +1,8 @@
+import { DemoProgress } from './systems/DemoProgress.js';
+import { DemoCamera } from './systems/DemoCamera.js';
+import { DemoDoors } from './systems/DemoDoors.js';
+import { ThrownSaw } from './systems/ThrownSaw.js';
+import { PropSprites } from './editor2/PropSprites.js';
 import { InputHandler } from './core/InputHandler.js';
 import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
@@ -50,6 +55,7 @@ export class Game {
         this.ctx.imageSmoothingEnabled = false;
 
         this.roomCatalog = opts.roomCatalog || null;
+        this.mapData = opts.mapData || null;
 
         this.assets = opts.assets || new AssetLoader();
         this._bindResize();
@@ -135,10 +141,15 @@ export class Game {
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
 
         this.effects.stepBlocker = (x, y) => !!this.rooms?.current?.challenge?.coversButton(x, y);
-        this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
+        this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog, mapData: this.mapData });
 
         this.tiles = new DungeonTileQuery({ rooms: this.rooms });
         this.holes = new HoleEffects({ rooms: this.rooms });
+        this.demoProgress = new DemoProgress({ rooms: this.rooms, input: this.input, getPlayers: () => [this.p1, this.p2], getSaw: () => this.chain.weapon });
+        this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current, safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]) });
+        this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(), mode: this.mapData?.test?.camera });
+        this.demoDoors = new DemoDoors({ assets: this.assets, renderer: this.renderer, rooms: this.rooms });
+        this.animatedProps = this.mapData ? new PropSprites() : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -163,6 +174,15 @@ export class Game {
         this._doorFlashT = 0;
 
         this._bindButtons();
+        if (this.mapData?.test) {
+            const back = document.createElement('a'); back.href = 'editor2.html'; back.textContent = '← Voltar ao Editor 2.0';
+            back.style.cssText = 'position:fixed;right:12px;top:12px;z-index:100;color:white;background:#252035;padding:10px;border-radius:6px'; document.body.append(back);
+            window.addEventListener('keydown', e => {
+                if (e.code !== 'F6') return;
+                e.preventDefault(); const modes = ['zoom', 'fixed', 'split'];
+                this.demoCamera.mode = modes[(modes.indexOf(this.demoCamera.mode) + 1) % modes.length];
+            });
+        }
     }
 
     get currentWeapon() {
@@ -334,6 +354,9 @@ export class Game {
 
     newDungeon() {
         this.rooms.reset();
+        this.demoProgress.reset(this.mapData?.test?.progress);
+        this.demoDoors.opened.clear();
+        this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
         this.transition = null;
@@ -355,7 +378,7 @@ export class Game {
         this.arenaBounds = this.rooms.currentBounds;
 
         const rect = this.rooms.cellRect();
-        const spawns = getPlayerSpawnPositions("CENTER", rect.x, rect.y, TILE);
+        const spawns = this.mapData ? this.rooms.dungeon.spawnPositions() : getPlayerSpawnPositions("CENTER", rect.x, rect.y, TILE);
 
         const custom = this.playtest ? this.rooms.playtestSpawn : null;
         if (custom) {
@@ -389,7 +412,8 @@ export class Game {
 
         const entryDir = { N: "S", S: "N", E: "W", W: "E" }[door.dir] || "CENTER";
         const rect = this.rooms.cellRect();
-        const spawns = getPlayerSpawnPositions(entryDir, rect.x, rect.y, TILE);
+        const spawns = this.mapData ? this.rooms.dungeon.spawnPositions(door.targetDoor) : getPlayerSpawnPositions(entryDir, rect.x, rect.y, TILE);
+        if (this.mapData) { this.bloodCanvas.clear(); this.gibs = []; this.particleSystem.clear(); }
 
         this.p1.x = spawns.p1.x; this.p1.y = spawns.p1.y; this.p1.vx = 0; this.p1.vy = 0;
         this.p2.x = spawns.p2.x; this.p2.y = spawns.p2.y; this.p2.vx = 0; this.p2.vy = 0;
@@ -522,6 +546,7 @@ export class Game {
     }
 
     _updateCameraToCurrentRoom(dt = SIM_STEP) {
+        if (this.mapData) { this.demoCamera.update(); return; }
         const rect = this.rooms.cellRect();
         const fitZoom = Math.min(
             this.canvas.width / (rect.w + CAM_MARGIN * 2),
@@ -652,7 +677,7 @@ export class Game {
 
         this.playerAI.update();
 
-        const canDash = !this.chain.isConnected;
+        const canDash = !this.chain.isConnected && (!this.mapData || this.demoProgress.state.dash);
         p1.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p1) });
         p2.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p2) });
         this._dashFeedback(p1);
@@ -664,8 +689,10 @@ export class Game {
         this.effects.processPlayer(p1);
         this.effects.processPlayer(p2);
 
+        this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {
+                if (this.mapData && this.demoProgress.state.sawThrow) this.thrownSaw.launch();
                 this.renderer.triggerShake(14);
 
                 this.audio.play("sawSnap");
@@ -851,6 +878,8 @@ export class Game {
             this.audio.setLoopLevel("ambience", -10, 1500);
         }
 
+        this.thrownSaw.update();
+        this.demoProgress.update(deltaSeconds);
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
     }
@@ -905,10 +934,11 @@ export class Game {
 
     _checkDoorTransition(doors) {
 
-        if (this.playtest) return;
+        if (this.mapData ? this.mapData.test?.isolated : this.playtest) return;
         if (this.rooms.isLocked() || this.transition) return;
         const { p1, p2, rooms } = this;
         for (const door of doors) {
+            if (door.blocked) continue;
             const a1 = rooms.playerAlignedToDoor(p1, door);
             const a2 = rooms.playerAlignedToDoor(p2, door);
             const d1 = rooms.doorEntryDepth(p1, door, this.arenaBounds);
@@ -921,6 +951,20 @@ export class Game {
     }
 
     _render() {
+        if (this.mapData && this.demoCamera.mode === 'split') this.demoCamera.renderSplit(() => this._renderView());
+        else this._renderView();
+        this._renderOverlays();
+        if (this.mapData) {
+            this.demoCamera.drawIndicators(this.ctx);
+            const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
+            const message = this.demoProgress.messageTime ? this.demoProgress.message : this.demoProgress.prompt;
+            if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
+            if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, this.canvas.width / 2, 24); }
+            ctx.restore();
+        }
+    }
+
+    _renderView() {
         const { ctx, renderer, rooms } = this;
         renderer.beginFrame();
         renderer.drawBackground(BACKGROUND_TILE, TILE);
@@ -939,6 +983,10 @@ export class Game {
 
         renderer.drawRoom(rect, this.arenaBounds, tiles, TILE, open, doors, doorHalf);
 
+        if (this.animatedProps) for (const p of tiles.props) {
+            if (p.type) this.animatedProps.draw(ctx, p.type, rect.x + p.col * TILE, rect.y + p.row * TILE, TILE, performance.now(), !!p.flip);
+        }
+        this.demoProgress.draw(ctx);
         if (open) {
             renderer.drawDoorStubs(rect, doors, TILE, doorHalf, DOOR_STUB_TILES);
             renderer.drawDoorGradients(doors, doorHalf, TILE, DOOR_STUB_TILES);
@@ -992,6 +1040,7 @@ export class Game {
 
         renderer.drawFrontWall(rect, tiles, TILE, open, doors, doorHalf, DOOR_STUB_TILES);
 
+        this.demoDoors.draw(ctx);
         this.gibs.forEach(g => g.draw(ctx));
 
         if (challenge) challenge.drawAirLayer(ctx);
@@ -1036,7 +1085,6 @@ export class Game {
 
         if (WIND.layer === "screen") this.wind.drawScreen(ctx, (x, y) => renderer.worldToScreen(x, y));
 
-        this._renderOverlays();
     }
 
     _renderOverlays() {

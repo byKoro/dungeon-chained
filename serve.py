@@ -242,6 +242,25 @@ class RoomServerHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         route = self.path.split("?", 1)[0].rstrip("/")
+        if route == "/api/set-main-map":
+            try:
+                body = self._read_json_body()
+                filename = body.get("file", "")
+                if not re.fullmatch(r"[A-Za-z0-9_-]+\.json", filename) or filename == "active.json":
+                    raise ValueError("Nome de mapa inválido")
+                folder = os.path.join(MAP_DIR, "demo")
+                with open(os.path.join(folder, filename), encoding="utf-8") as f:
+                    document = json.load(f)
+                if document.get("format") != "dungeon-chained-map":
+                    raise ValueError("Formato de mapa inválido")
+                target = os.path.join(folder, "active.json")
+                with open(target + ".tmp", "w", encoding="utf-8") as f:
+                    json.dump({"file": filename}, f)
+                os.replace(target + ".tmp", target)
+                self._send_json(200, {"ok": True})
+            except (ValueError, OSError) as e:
+                self._send_json(400, {"ok": False, "error": str(e)})
+            return
         if route == "/api/delete-room":
             self._handle_delete()
             return
@@ -293,9 +312,9 @@ class DualStackServer(http.server.ThreadingHTTPServer):
 
 if __name__ == "__main__":
     try:
-        httpd = DualStackServer(("::", PORT), RoomServerHandler)
+        httpd = DualStackServer(("::1", PORT), RoomServerHandler)
     except OSError:
-        httpd = http.server.ThreadingHTTPServer(("", PORT), RoomServerHandler)
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), RoomServerHandler)
 
     with httpd:
         print(f"Servindo em http://localhost:{PORT}/ (multithread, IPv4/IPv6, sem cache, com /api/save-room)")

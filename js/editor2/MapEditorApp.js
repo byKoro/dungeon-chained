@@ -1,3 +1,5 @@
+import { ContentTools } from './ContentTools.js';
+import { identifyDoors, validatePlayable, doorCells } from '../rooms/MapConnections.js';
 import { Tileset } from '../core/Tileset.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, EMPTY_FLOOR_COLOR, holeTileFor } from '../config/GameConfig.js';
 import { TILE_KINDS, DOOR_TYPES, DEFAULT_DOOR_TYPE, MAP_LIMITS } from '../config/MapEditorConfig.js';
@@ -74,6 +76,7 @@ export class MapEditorApp {
         this._loadFromStorage();
         this._buildDoorTypes();
         this._buildPropGrid();
+        this.contentTools = new ContentTools(this);
         this._bindUI();
         this._bindCanvas();
         this._resizeCanvas();
@@ -100,6 +103,7 @@ export class MapEditorApp {
     _commit(fn) {
         const before = this._snapshot();
         const result = fn();
+        identifyDoors(this.map);
         if (this._snapshot() !== before) this._pushUndo(before);
         this._afterChange();
         return result;
@@ -372,7 +376,7 @@ export class MapEditorApp {
     }
 
     _onDoubleClick(e) {
-        if (this.view !== "map") return;
+        if (this.view !== "map" || this.contentTools.connecting) return;
         const key = this._slotAt(e.clientX, e.clientY);
         if (!key) return;
         if (!this.map.rooms[key]) this._createRoomAt(key);
@@ -380,6 +384,7 @@ export class MapEditorApp {
     }
 
     _mapMouseDown(e) {
+        if (this.contentTools.mapClick(e)) return;
         const key = this._slotAt(e.clientX, e.clientY);
         this.selectedKey = key;
         if (key && this.map.rooms[key]) this.mapDrag = { key, x: e.clientX, y: e.clientY, moved: false };
@@ -442,6 +447,7 @@ export class MapEditorApp {
         stroke.visited.add(key);
         if (this.tool !== "paint" && !M.inBounds(room, col, row)) return;
 
+        if (this.contentTools.apply(col, row)) return;
         switch (this.tool) {
             case "paint": {
                 const stamp = this.palette.stamp;
@@ -674,24 +680,7 @@ export class MapEditorApp {
     }
 
     _playtest() {
-        const room = this.room;
-        if (!room) return;
-        if (room.cols !== ROOM_COLS || room.rows !== ROOM_ROWS) {
-            alert(`O jogo ainda só carrega salas ${ROOM_COLS}×${ROOM_ROWS}. Ajuste o tamanho desta sala para testar.`);
-            return;
-        }
-        const issues = M.legacyIssues(room);
-        if (issues.length && !confirm(`Avisos:\n- ${issues.join("\n- ")}\n\nTestar mesmo assim?`)) return;
-        const spawn = M.findPlaytestSpawn(room);
-        if (!spawn) {
-            alert("Não há 2 tiles de piso livres lado a lado para os jogadores nascerem.");
-            return;
-        }
-        const piece = M.toLegacyPiece(room, { type: "start" });
-        piece.testSpawn = spawn;
-        this._persistNow();
-        sessionStorage.setItem("editor_custom_room", JSON.stringify(piece));
-        window.location.href = "index.html?playtest=true";
+        this.contentTools.playtest(true);
     }
 
     // ---------- UI ----------
@@ -827,6 +816,7 @@ export class MapEditorApp {
 
         if (isRoom) this._syncRoomUI();
         else this._syncMapUI();
+        this.contentTools?.sync();
     }
 
     _syncMapUI() {
@@ -879,11 +869,11 @@ export class MapEditorApp {
         this._setVal("room-cols", room.cols);
         this._setVal("room-rows", room.rows);
 
-        const issues = M.legacyIssues(room);
+        const issues = validatePlayable(this.map, { roomKey: this.editingKey });
         const info = $("legacy-info");
         info.className = issues.length ? "hint warn" : "hint ok";
         info.textContent = issues.length ? `Testar no jogo: ${issues.join(" ")}` : "Esta sala pode ser testada no jogo.";
-        $("btn-playtest").disabled = room.cols !== ROOM_COLS || room.rows !== ROOM_ROWS;
+        $("btn-playtest").disabled = false;
 
         for (const btn of document.querySelectorAll("#tool-grid [data-tool]")) btn.classList.toggle("active", btn.dataset.tool === this.tool);
         $("paint-kind-field").hidden = this.tool !== "paint";
@@ -965,7 +955,7 @@ export class MapEditorApp {
     }
 
     _drawDoors(ctx, room, ox, oy, T, detailed) {
-        for (const d of room.doors) {
+        for (const door of room.doors) for (const d of doorCells(room, door).map(p => ({ ...door, ...p }))) {
             const def = DOOR_TYPES[d.type] || DOOR_TYPES[DEFAULT_DOOR_TYPE];
             const x = ox + d.col * T, y = oy + d.row * T;
             ctx.save();
@@ -995,7 +985,9 @@ export class MapEditorApp {
     _drawProps(ctx, room, ox, oy, T) {
         for (const p of room.props) {
             const x = ox + p.col * T, y = oy + p.row * T;
-            if (!this.props.draw(ctx, p.type, x, y, T, this.now, !!p.flip)) {
+            if (Number.isInteger(p.index)) {
+                this.tileset.draw(ctx, p.index, x, y, T, T);
+            } else if (!this.props.draw(ctx, p.type, x, y, T, this.now, !!p.flip)) {
                 const { w, h } = M.propFootprint(p);
                 ctx.fillStyle = "rgba(255, 137, 6, 0.5)";
                 ctx.fillRect(x, y, w * T, h * T);
@@ -1036,6 +1028,7 @@ export class MapEditorApp {
                 this._drawTiles(ctx, room, o.x, o.y, MAP_TILE_PX);
                 this._drawProps(ctx, room, o.x, o.y, MAP_TILE_PX);
                 this._drawDoors(ctx, room, o.x, o.y, MAP_TILE_PX, false);
+                this.contentTools.drawRoom(ctx, room, o.x, o.y, MAP_TILE_PX);
 
                 const label = `${order.has(key) ? `#${order.get(key) + 1} ` : ""}${room.name}${map.start === key ? "  ★ início" : ""}`;
                 ctx.font = `700 ${12 * px}px "Segoe UI", sans-serif`;
@@ -1049,7 +1042,7 @@ export class MapEditorApp {
             }
         }
 
-        for (const link of M.roomLinks(map)) {
+        for (const link of map.connections ? [] : M.roomLinks(map)) {
             const { gx, gy } = M.parseKey(link.from);
             const room = map.rooms[link.from];
             const o = this._roomOrigin(room, gx, gy, L);
@@ -1072,6 +1065,7 @@ export class MapEditorApp {
             ctx.restore();
         }
 
+        this.contentTools.drawConnections(ctx);
         const highlight = (key, color, width) => {
             if (!key) return;
             const { gx, gy } = M.parseKey(key);
@@ -1095,6 +1089,7 @@ export class MapEditorApp {
         if (this.showKinds) this._drawKinds(ctx, room, T);
         this._drawProps(ctx, room, 0, 0, T);
         this._drawDoors(ctx, room, 0, 0, T, true);
+        this.contentTools.drawRoom(ctx, room, 0, 0, T);
 
         if (this.showGrid) {
             ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";

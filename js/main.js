@@ -1,3 +1,4 @@
+import { DemoMapLoader } from './rooms/DemoMapLoader.js';
 import { Game } from './Game.js';
 import { RoomCatalog } from './rooms/RoomCatalog.js';
 import { AssetLoader } from './core/AssetLoader.js';
@@ -40,7 +41,9 @@ async function bootstrap() {
             {
                 weight: 1,
                 task: async (p) => {
-                    game = new Game(canvas, { roomCatalog, assets });
+                    const mapData = await DemoMapLoader.load();
+                    game = new Game(canvas, { roomCatalog, assets, mapData });
+                    window.game = game;
                     await game.audio.whenReady(4000, (d, t) => p(t ? d / t : 1));
                 }
             }

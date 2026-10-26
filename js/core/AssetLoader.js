@@ -40,6 +40,7 @@ export class AssetLoader {
             this._tilesetVariantKeys.push(key);
         }
 
+        this.load("bossGate", "assets/doors/boss-gate-opening-sheet-v1.png");
         this.load("saw", "assets/saw/saw.png");
 
         this.load("cable", "assets/saw/rope.png");

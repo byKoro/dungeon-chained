@@ -15,6 +15,7 @@ export class InputHandler {
 
         window.addEventListener("keydown", (e) => {
             this.keyboardKeys.add(e.key.toLowerCase());
+            this.keyboardKeys.add(e.code.toLowerCase());
 
             const k = e.key.toLowerCase();
             if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) {
@@ -24,6 +25,7 @@ export class InputHandler {
 
         window.addEventListener("keyup", (e) => {
             this.keyboardKeys.delete(e.key.toLowerCase());
+            this.keyboardKeys.delete(e.code.toLowerCase());
         });
 
         window.addEventListener("blur", () => this.keyboardKeys.clear());
@@ -52,6 +54,7 @@ export class InputHandler {
             if (!pad) continue;
 
             const map = this.gamepadControls[i];
+            if (this.isButtonPressed(pad, 2)) this.keys.add(i === 0 ? "e" : "shiftright");
 
             const ax = pad.axes[0] || 0;
             const ay = pad.axes[1] || 0;

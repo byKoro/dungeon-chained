@@ -115,6 +115,7 @@ export class Chain {
 
     _canReconnect(p1, p2, dist) {
         const w = this.weapon;
+        if (w.thrown) return false;
         if (!w.dropped) return dist < this.reconnectDistance;
 
         const r = this.pickupRadius;

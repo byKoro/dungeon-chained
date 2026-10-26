@@ -1,3 +1,5 @@
+import { identifyDoors, outgoingConnections, sideOf, doorCells } from '../rooms/MapConnections.js';
+import { randomizeFloor } from './MapContent.js';
 // Modelo puro do mapa do editor 2.0 (sem DOM): salas num grid, tiles com atributo, portas por tile e props.
 import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
@@ -85,7 +87,7 @@ export function createRoom(cols = MAP_DEFAULTS.roomCols, rows = MAP_DEFAULTS.roo
         for (let c = 0; c < cols; c++) line += isBorder(cols, rows, c, r) ? WALL : FLOOR;
         kinds.push(line);
     }
-    return {
+    const room = {
         id: opts.id || "sala",
         name: opts.name || "Sala",
         notes: opts.notes || "",
@@ -94,8 +96,10 @@ export function createRoom(cols = MAP_DEFAULTS.roomCols, rows = MAP_DEFAULTS.roo
         tiles,
         kinds,
         doors: [],
-        props: []
+        props: [], enemies: [], hazards: [], torches: [], interactives: [], lock: 'none'
     };
+    randomizeFloor(room);
+    return room;
 }
 
 // Retorna true se algo mudou.
@@ -139,7 +143,7 @@ export function doorSide(room, c, r) {
 }
 
 export function doorAt(room, c, r) {
-    return room.doors.find(d => d.col === c && d.row === r) || null;
+    return room.doors.find(d => doorCells(room, d).some(p => p.col === c && p.row === r)) || null;
 }
 
 export function setDoor(room, c, r, type = DEFAULT_DOOR_TYPE) {
@@ -158,7 +162,8 @@ export function setDoor(room, c, r, type = DEFAULT_DOOR_TYPE) {
 
 export function removeDoorAt(room, c, r) {
     const before = room.doors.length;
-    room.doors = room.doors.filter(d => d.col !== c || d.row !== r);
+    const hit = doorAt(room, c, r);
+    room.doors = room.doors.filter(d => d !== hit);
     return room.doors.length !== before;
 }
 
@@ -238,7 +243,14 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
         }
     }
 
-    for (const p of room.props) placeProp(next, p.type, p.col, p.row, !!p.flip);
+    next.props = room.props.filter(p => p.col < next.cols - 1 && p.row < next.rows - 1).map(p => ({ ...p }));
+    for (const field of ['enemies', 'hazards', 'torches', 'interactives']) next[field] = structuredClone(room[field] || []);
+    next.spawns = structuredClone(room.spawns || null);
+    next.lock = room.lock || 'none';
+    next.floorPool = room.floorPool;
+    next.propDensity = room.propDensity;
+    next.type = room.type;
+    next.doors.forEach((d, i) => Object.assign(d, { id: room.doors[i]?.id, width: room.doors[i]?.width || 1 }));
     return next;
 }
 
@@ -280,6 +292,7 @@ export function addRoom(map, gx, gy, opts = {}) {
 export function removeRoom(map, key) {
     if (!map.rooms[key]) return false;
     delete map.rooms[key];
+    if (map.connections) map.connections = map.connections.filter(c => c.from.room !== key && c.to.room !== key);
     if (map.start === key) map.start = null;
     return true;
 }
@@ -288,6 +301,10 @@ export function removeRoom(map, key) {
 export function moveRoom(map, fromKey, toKey) {
     const { gx, gy } = parseKey(toKey);
     if (fromKey === toKey || !map.rooms[fromKey] || !inGrid(map, gx, gy)) return false;
+    for (const c of map.connections || []) for (const e of [c.from, c.to]) {
+        if (e.room === fromKey) e.room = toKey;
+        else if (e.room === toKey) e.room = fromKey;
+    }
     const moving = map.rooms[fromKey];
     const other = map.rooms[toKey] || null;
     map.rooms[toKey] = moving;
@@ -328,6 +345,10 @@ export function roomsOutsideGrid(map, cols, rows) {
 
 // status: "ok" (as duas salas têm porta no lado que se encontra), "one-way" (o vizinho não tem porta de volta), "no-room".
 export function roomLinks(map) {
+    if (map.connections) return Object.keys(map.rooms).flatMap(key => outgoingConnections(map, key).map(c => {
+        const door = map.rooms[key].doors.find(d => d.id === c.source.door);
+        return { from: key, to: c.target.room, side: door ? sideOf(map.rooms[key], door) : 'N', status: map.rooms[c.target.room] && door ? 'ok' : 'no-room', doors: door ? [door] : [], connection: c };
+    }));
     const links = [];
     for (const [key, room] of Object.entries(map.rooms)) {
         const { gx, gy } = parseKey(key);
@@ -426,7 +447,7 @@ export function validateMap(map) {
 
         const occupied = new Set();
         for (const p of room.props) {
-            const def = ANIMATED_PROPS[p.type];
+            const def = Number.isInteger(p.index) ? { w: 1, h: 1, label: 'Decoração' } : ANIMATED_PROPS[p.type];
             if (!def) { errors.push(`${label}: prop desconhecido "${p.type}".`); continue; }
             for (let dy = 0; dy < def.h; dy++) {
                 for (let dx = 0; dx < def.w; dx++) {
@@ -482,10 +503,14 @@ function normalizeRoom(raw, key) {
         kinds,
         doors: (Array.isArray(raw.doors) ? raw.doors : [])
             .filter(d => d && Number.isInteger(d.col) && Number.isInteger(d.row))
-            .map(d => ({ col: d.col, row: d.row, type: DOOR_TYPES[d.type] ? d.type : DEFAULT_DOOR_TYPE })),
+            .map(d => ({ ...d, col: d.col, row: d.row, type: DOOR_TYPES[d.type] ? d.type : DEFAULT_DOOR_TYPE })),
         props: (Array.isArray(raw.props) ? raw.props : [])
-            .filter(p => p && typeof p.type === "string" && Number.isInteger(p.col) && Number.isInteger(p.row))
-            .map(p => (p.flip ? { type: p.type, col: p.col, row: p.row, flip: true } : { type: p.type, col: p.col, row: p.row }))
+            .filter(p => p && (typeof p.type === "string" || Number.isInteger(p.index)) && Number.isInteger(p.col) && Number.isInteger(p.row))
+            .map(p => ({ ...p })),
+        enemies: structuredClone(raw.enemies || []), hazards: structuredClone(raw.hazards || []),
+        torches: structuredClone(raw.torches || []), interactives: structuredClone(raw.interactives || []),
+        spawns: structuredClone(raw.spawns || null), lock: raw.lock || 'none', type: raw.type || 'normal',
+        floorPool: raw.floorPool, propDensity: raw.propDensity
     };
 }
 
@@ -505,6 +530,8 @@ export function normalizeMap(raw) {
         if (!/^\d+,\d+$/.test(key)) throw new Error(`chave de sala inválida "${key}"`);
         map.rooms[key] = normalizeRoom(room, key);
     }
+    if (raw.connections) map.connections = structuredClone(raw.connections);
+    identifyDoors(map);
     map.start = raw.start && map.rooms[raw.start] ? raw.start : null;
     return map;
 }

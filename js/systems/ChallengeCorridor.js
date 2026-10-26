@@ -123,12 +123,12 @@ export class ChallengeCorridor {
                 case "arrow": {
                     const p = this._elemWorld(el);
                     const inferredSide = el.side || (el.row === 0 ? "top"
-                        : el.row === ROOM_ROWS - 1 ? "bottom"
+                        : el.row === Math.round((this.bounds.maxY - this.bounds.minY) / TILE) + 1 ? "bottom"
                             : el.col === 0 ? "left"
-                                : el.col === ROOM_COLS - 1 ? "right" : null);
+                                : el.col === Math.round((this.bounds.maxX - this.bounds.minX) / TILE) + 1 ? "right" : null);
 
-                    const isCustomLateralWall = byTile && el.col > 0 && el.col < ROOM_COLS - 1 &&
-                        el.row > 0 && el.row < ROOM_ROWS - 1 &&
+                    const isCustomLateralWall = byTile && el.col > 0 && el.col < Math.round((this.bounds.maxX - this.bounds.minX) / TILE) + 1 &&
+                        el.row > 0 && el.row < Math.round((this.bounds.maxY - this.bounds.minY) / TILE) + 1 &&
                         (inferredSide === "left" || inferredSide === "right");
                     const dir = this._fireDirFromWall(inferredSide) || this._fireDir(el.dir || "across+");
                     if (isCustomLateralWall) dir.x *= -1;
