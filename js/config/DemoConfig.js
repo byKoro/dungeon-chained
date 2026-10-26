@@ -1,7 +1,8 @@
 export const DEMO = {
     manifest: 'map/demo/active.json',
     sessionKey: 'editor2_playtest',
-    floorTiles: [16, 17, 18, 19],
+    // Variações de chão do tileset (linhas 0–2, colunas 6–9).
+    floorTiles: [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29],
     propTiles: [59, 77, 68, 64],
     interactionRadius: 88,
     cameraMargin: 120,

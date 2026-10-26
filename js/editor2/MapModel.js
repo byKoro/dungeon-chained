@@ -1,5 +1,5 @@
 import { identifyDoors, outgoingConnections, sideOf, doorCells } from '../rooms/MapConnections.js';
-import { randomizeFloor } from './MapContent.js';
+import { randomizeFloor, placeDoor } from './MapContent.js';
 // Modelo puro do mapa do editor 2.0 (sem DOM): salas num grid, tiles com atributo, portas por tile e props.
 import { RoomTiles } from '../core/RoomTiles.js';
 import { ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
@@ -96,7 +96,8 @@ export function createRoom(cols = MAP_DEFAULTS.roomCols, rows = MAP_DEFAULTS.roo
         tiles,
         kinds,
         doors: [],
-        props: [], enemies: [], hazards: [], torches: [], interactives: [], lock: 'none'
+        props: [], enemies: [], hazards: [], torches: [], interactives: [],
+        spawns: null, lock: 'none', type: 'normal'
     };
     randomizeFloor(room);
     return room;
@@ -156,7 +157,9 @@ export function setDoor(room, c, r, type = DEFAULT_DOOR_TYPE) {
         return true;
     }
     if (room.kinds[r][c] !== FLOOR) setCell(room, c, r, FLOOR_INDEX, FLOOR);
-    room.doors.push({ col: c, row: r, type });
+    let i = 0;
+    while (room.doors.some(d => d.id === `door_${i}`)) i++;
+    room.doors.push({ col: c, row: r, type, width: 1, id: `door_${i}` });
     return true;
 }
 
@@ -227,6 +230,7 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
         }
     }
 
+    // Portas seguem para a borda nova mantendo id (as conexões apontam para ele) e largura.
     for (const d of room.doors) {
         const side = doorSide(room, d.col, d.row);
         let c = d.col, r = d.row;
@@ -235,22 +239,21 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
         else if (side === "W") c = 0;
         else if (side === "E") c = next.cols - 1;
         if (!side || doorSide(next, c, r) !== side) continue;
-        setDoor(next, c, r, d.type);
-        if (rebuildFrame) {
-            const [ic, ir] = side === "N" ? [c, 1] : side === "S" ? [c, next.rows - 2]
-                : side === "W" ? [1, r] : [next.cols - 2, r];
-            if (next.kinds[ir][ic] === FLOOR) next.tiles[ir][ic] = FLOOR_INDEX;
-        }
+        placeDoor(next, c, r, d.type, d.width || 1, d.id);
     }
 
+    const inside = (o) => o && o.col >= 0 && o.row >= 0 && o.col < next.cols && o.row < next.rows;
+    const interior = (o) => o && o.col > 0 && o.row > 0 && o.col < next.cols - 1 && o.row < next.rows - 1;
     next.props = room.props.filter(p => p.col < next.cols - 1 && p.row < next.rows - 1).map(p => ({ ...p }));
-    for (const field of ['enemies', 'hazards', 'torches', 'interactives']) next[field] = structuredClone(room[field] || []);
-    next.spawns = structuredClone(room.spawns || null);
+    for (const field of ['enemies', 'hazards', 'torches', 'interactives']) {
+        next[field] = structuredClone((room[field] || []).filter(inside));
+    }
+    for (const o of next.interactives) if (o.tiles) o.tiles = o.tiles.filter(interior);
+    next.spawns = room.spawns && interior(room.spawns.p1) && interior(room.spawns.p2) ? structuredClone(room.spawns) : null;
     next.lock = room.lock || 'none';
-    next.floorPool = room.floorPool;
-    next.propDensity = room.propDensity;
-    next.type = room.type;
-    next.doors.forEach((d, i) => Object.assign(d, { id: room.doors[i]?.id, width: room.doors[i]?.width || 1 }));
+    if (room.floorPool) next.floorPool = room.floorPool;
+    if (room.propDensity !== undefined) next.propDensity = room.propDensity;
+    next.type = room.type || 'normal';
     return next;
 }
 
@@ -510,7 +513,8 @@ function normalizeRoom(raw, key) {
         enemies: structuredClone(raw.enemies || []), hazards: structuredClone(raw.hazards || []),
         torches: structuredClone(raw.torches || []), interactives: structuredClone(raw.interactives || []),
         spawns: structuredClone(raw.spawns || null), lock: raw.lock || 'none', type: raw.type || 'normal',
-        floorPool: raw.floorPool, propDensity: raw.propDensity
+        ...(Array.isArray(raw.floorPool) ? { floorPool: raw.floorPool.filter(Number.isInteger) } : {}),
+        ...(Number.isFinite(raw.propDensity) ? { propDensity: raw.propDensity } : {})
     };
 }
 

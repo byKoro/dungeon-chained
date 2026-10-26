@@ -24,7 +24,7 @@ export function scatterProps(room, density, rng = Math.random) {
     }
 }
 
-export function placeDoor(room, col, row, type, width = 2) {
+export function placeDoor(room, col, row, type, width = 2, id = null) {
     const door = { col, row, type, width: type === 'boss' ? 2 : Math.max(1, Math.min(6, Math.round(width))) };
     const side = sideOf(room, door);
     if (!side || (type === 'boss' && side !== 'N')) return false;
@@ -32,9 +32,12 @@ export function placeDoor(room, col, row, type, width = 2) {
     if (cells.some(p => p.col < 0 || p.row < 0 || p.col >= room.cols || p.row >= room.rows
         || ((p.col === 0 || p.col === room.cols - 1) && (p.row === 0 || p.row === room.rows - 1)))) return false;
     if (room.doors.some(d => doorCells(room, d).some(p => cells.some(q => p.col === q.col && p.row === q.row)))) return false;
-    let i = 0;
-    while (room.doors.some(d => d.id === `door_${i}`)) i++;
-    door.id = `door_${i}`;
+    if (id && !room.doors.some(d => d.id === id)) door.id = id;
+    else {
+        let i = 0;
+        while (room.doors.some(d => d.id === `door_${i}`)) i++;
+        door.id = `door_${i}`;
+    }
     room.doors.push(door);
     for (const p of cells) {
         for (let inset = 0; inset < 2; inset++) {
