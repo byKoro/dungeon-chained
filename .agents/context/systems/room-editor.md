@@ -1,6 +1,8 @@
 # Room editor & dev server
 
 ## Purpose
+Two editors. This page documents the old piece editor first; the map editor for the demo is in "Editor 2.0" at the end.
+
 Browser tool (`editor.html`) for authoring room pieces (`map/*.json`) on the real 14×9 tile grid, playtesting one piece in the game, and saving/deleting pieces through the dev server `serve.py`. UI text is pt-BR.
 
 ## Files
@@ -73,6 +75,30 @@ New tool: add a `<section class="tool-group collapsed" data-group="tab-x">` card
 
 ## Tests
 No automated editor tests. Manual: run `serve.py`, edit, Testar, Salvar, Cobertura, Deletar; check `map/index.json` diff. Map data checks: `node tests/test_safe_spawn.js`, `npm run validate:map`.
+
+## Editor 2.0 (`editor2.html`) — mapa fixo da demo
+
+Separate tool; the old editor above is untouched. Authors a whole map: a grid of rooms (grid size editable), each room with its own size, every tile editable, tiles picked visually from `assets/tileset/tileset.png`, animated props. Open `http://localhost:8000/editor2.html` (save/list need `serve.py`).
+
+| File | Role |
+|---|---|
+| `editor2.html` + `css/editor2.css` | Layout; reuses `css/editor.css` (header, sidebar cards, buttons). Sidebar cards carry `data-view="map"` or `"room"`. |
+| `js/editor2/MapEditorApp.js` | Class `MapEditorApp` (`window.mapEditor`): two views (map grid / room), tools, undo/redo, autosave, server save/load, import/export, playtest. Keeps the `e.target !== this.canvas` guard in `_onMouseDown`. |
+| `js/editor2/MapModel.js` | Pure functions (no DOM), tested by `tests/test_map_model.js`: create/resize rooms and grid, `setCell`/`setKind`/`eraseCell`, doors, props, `roomLinks`, `sequenceOrder`, `validateMap`, `normalizeMap`, `formatMapJson`, `toLegacyPiece`/`legacyIssues`/`findPlaytestSpawn`. |
+| `js/editor2/TilePalette.js` | Clickable tileset; drag selects a rectangular stamp. |
+| `js/editor2/PropSprites.js` | Loads and animates the prop frames. |
+| `js/config/MapEditorConfig.js` | Format id/version, limits, tile kinds, `WALL_TILE_INDICES` (auto kind), `DOOR_TYPES` (`normal`, `boss`; `sprite: null` until the boss gate art exists). |
+| `js/config/PropConfig.js` | `ANIMATED_PROPS` (box, mini box, chest, chest opening, coin, flag, flasks 1–4, keys 1–2, flamethrower 1×2 and 2×1), 4 frames each, `PROP_FRAME_MS`. |
+
+Map file `map/demo/<name>.json` (`format: "dungeon-chained-map"`, `version: 1`): `name`, `grid {cols, rows}`, `roomSize` (default for new rooms), `start` (`"gx,gy"`), `rooms {"gx,gy": room}`. Room: `id, name, notes, cols, rows, tiles[r][c]` (tileset index; `-1` hole; `-2` void), `kinds[r]` (one char per column: `f` floor, `w` wall/collision, `h` hole, `v` void), `doors [{col,row,type}]` (border tiles, not corners; a door on side N of `gx,gy` leads to `gx,gy-1`), `props [{type,col,row,flip?}]`. Saved pretty-printed (`_pretty` in `serve.py` = `formatMapJson`): one tile row per line, `kinds` reads as a drawing of the room.
+
+Tools (keys 1–7): Tile (palette stamp; attribute auto/floor/wall), Buraco, Vazio, Colisão (toggles f↔w, keeps the visual), Porta (type normal/boss; click again removes), Prop, Borracha (frame default, removes door/prop). Right click = eyedropper. Map view: click selects, double click opens/creates, drag moves (drop on a room swaps), links drawn green (ok), orange dashed (no door back), red dashed (no room). Resize room keeps the interior; "Refazer a moldura" rebuilds border + shadow ring and moves doors to the new border.
+
+Persistence: `localStorage["editor2_map_state"]` (autosave, 250 ms debounce); `POST /api/save-map {file, map}` overwrites `map/demo/<file>` (name regex, 5 MB cap, atomic replace); `GET /api/list-maps`. Files in `map/demo/` are not in `map/index.json` and are ignored by `validate:map` and by the game.
+
+Playtest ("Testar sala") only for 14×9 rooms: `toLegacyPiece` → `sessionStorage["editor_custom_room"]` (same contract as the old editor). Interior walls become `walls[]` with floor 16 under them; doors become N/E/S/W booleans, so the game still opens them at the 2 middle tiles; props and door types are not shown in game (warned before testing).
+
+Not done yet (runtime, cronograma #12): the game does not load `map/demo/*.json`; variable room size, per-tile doors, door types and animated props need `Dungeon`, `Room`, `RoomTiles`, `Renderer` and the spawn table to become size-aware.
 
 ## Related docs
 `.agents/context/systems/rooms-and-maps.md` · `.agents/playbooks/add-room-piece.md` · `.agents/playbooks/add-trap.md` · ADR `.agents/decisions/0004-authored-room-pieces.md`

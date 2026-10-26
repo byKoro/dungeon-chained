@@ -1,0 +1,11 @@
+# Boss gate — generated source v1
+
+Created: 2026-10-26. Source: OpenAI built-in image generation tool.
+File: `boss-gate-closed-source-v1.png`.
+Status: visual draft; not integrated or validated at game scale. Generated pixels do not yet conform to the requested strict 48x48 logical grid. Preserve this source; normalize a separate runtime asset before integration.
+
+Intended placement: north wall of the demo hub. Closed locked state only. Intended passage width: two 16px art tiles (128 world pixels); frame target: approximately 48 art pixels wide. Inspect fit before use. Keep nearest-neighbor filtering and integer scales.
+
+## Generation prompt
+
+Create a single isolated CLOSED BOSS GATE sprite for Dungeon Chained, a low-resolution pixel-art top-down dungeon videogame. Transparent background. Front-facing north-wall doorway seen in a classic orthographic top-down RPG, no isometric angle. Match this existing visual language: chunky simple 16x16 tiles, muted dark plum-purple stone (#382937, #4b3448, #684454), very dark purple outlines, rusty brown iron and tiny warm amber highlights. Design at a strict implied 48x48 pixel logical grid, enlarged using crisp uniform square pixels, no smooth gradients, no antialiasing, no fine high-resolution texture. A compact heavy rectangular stone frame with a slightly stepped arch, inner passage 32 logical pixels wide (two 16px tiles), total frame 48 logical pixels wide. Closed heavy vertical iron portcullis, readable bars, and a single central bone skull-shaped lock with an obvious dark keyhole and two tiny ember-orange eye sockets, hinting at a fire skull boss. The gate must look distinct and dangerous but very simple and readable at tiny game scale. Subtle rust-orange metal bands; plum masonry harmonizes with dungeon walls. Symmetric silhouette, centered complete object with small transparent margin, solid closed-door dark interior behind the bars, flat threshold. NO surroundings, floor scene, flames outside frame, floating decorations, text, labels, numbers, watermarks, perspective vanishing point, multiple variants, UI or checkerboard. Deliver only one clean sprite on true alpha transparency. This is the closed locked gate state.

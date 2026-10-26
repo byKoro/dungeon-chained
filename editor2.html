@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor 2.0 — Mapa da Demo — Dungeon Chained</title>
+    <link rel="stylesheet" href="css/editor.css">
+    <link rel="stylesheet" href="css/editor2.css">
+</head>
+<body>
+
+    <header id="editor-header">
+        <div class="brand">
+            <span class="editor-title">Editor 2.0</span>
+        </div>
+
+        <div class="header-center">
+            <div class="shape-info">
+                <div class="shape-name" id="title-main">Mapa</div>
+                <div class="shape-status" id="title-sub"></div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn" id="btn-back-map" title="Voltar para o grid do mapa (Esc)" hidden>← Mapa</button>
+            <button class="btn btn-primary" id="btn-save" title="Salvar o mapa em map/demo/ (Ctrl+S)">Salvar</button>
+            <button class="btn btn-primary" id="btn-playtest" title="Jogar esta sala no jogo" hidden>Testar sala</button>
+            <a href="editor.html" class="btn">Editor antigo</a>
+            <a href="index.html" class="btn btn-accent">Jogo</a>
+        </div>
+    </header>
+
+    <main id="editor-workspace">
+        <aside id="sidebar-left">
+            <div class="tab-panel-container">
+
+                <!-- ===== VISÃO DO MAPA ===== -->
+                <section class="tool-group expanded" data-view="map">
+                    <h2 class="group-title">Mapa</h2>
+                    <div class="group-body">
+                        <div class="tab-panel">
+                            <label class="field">
+                                <span>Nome do mapa</span>
+                                <input type="text" id="map-name" maxlength="60">
+                            </label>
+
+                            <div class="panel-section">
+                                <div class="panel-title">Tamanho do grid (salas)</div>
+                                <div class="field-row">
+                                    <label class="field"><span>Colunas</span><input type="number" id="grid-cols" min="1" max="12"></label>
+                                    <label class="field"><span>Linhas</span><input type="number" id="grid-rows" min="1" max="12"></label>
+                                    <button class="btn btn-sm" id="btn-apply-grid">Aplicar</button>
+                                </div>
+                            </div>
+
+                            <div class="panel-section">
+                                <div class="panel-title">Tamanho padrão das salas novas (tiles)</div>
+                                <div class="field-row">
+                                    <label class="field"><span>Colunas</span><input type="number" id="default-room-cols" min="5" max="40"></label>
+                                    <label class="field"><span>Linhas</span><input type="number" id="default-room-rows" min="5" max="30"></label>
+                                </div>
+                            </div>
+
+                            <div class="panel-section">
+                                <div class="panel-title">Arquivo (map/demo/)</div>
+                                <label class="field">
+                                    <span>Salvar como</span>
+                                    <input type="text" id="map-file" maxlength="60" placeholder="demo_map.json">
+                                </label>
+                                <div class="field-row">
+                                    <select class="styled-select" id="map-list" title="Mapas salvos em map/demo/"></select>
+                                    <button class="btn btn-sm" id="btn-refresh-maps" title="Atualizar a lista">↻</button>
+                                    <button class="btn btn-sm" id="btn-load-map">Abrir</button>
+                                </div>
+                                <div class="field-row">
+                                    <button class="btn btn-sm" id="btn-export">Exportar JSON</button>
+                                    <button class="btn btn-sm" id="btn-import">Importar JSON</button>
+                                    <button class="btn btn-sm btn-danger" id="btn-new-map">Novo</button>
+                                    <input type="file" id="import-file" accept=".json,application/json" hidden>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tool-group expanded" data-view="map">
+                    <h2 class="group-title">Célula selecionada</h2>
+                    <div class="group-body">
+                        <div class="tab-panel">
+                            <div class="hint" id="cell-info">Clique numa célula do grid.</div>
+                            <div class="field-row" id="cell-empty" hidden>
+                                <button class="btn btn-primary btn-sm" id="btn-create-room">Criar sala aqui</button>
+                            </div>
+                            <div class="panel-section" id="cell-room" hidden>
+                                <div class="field-row">
+                                    <button class="btn btn-primary btn-sm" id="btn-edit-room" title="Duplo clique na sala também abre">Editar sala</button>
+                                    <button class="btn btn-sm" id="btn-set-start">Definir como início</button>
+                                    <button class="btn btn-sm btn-danger" id="btn-delete-room">Excluir</button>
+                                </div>
+                            </div>
+                            <p class="hint">Duplo clique abre a sala (ou cria uma na célula vazia). Arraste uma sala para movê-la; soltar sobre outra troca as duas.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tool-group expanded" data-view="map">
+                    <h2 class="group-title">Validação</h2>
+                    <div class="group-body">
+                        <ul class="validation-list" id="validation-list"></ul>
+                    </div>
+                </section>
+
+                <!-- ===== VISÃO DA SALA ===== -->
+                <section class="tool-group expanded" data-view="room" hidden>
+                    <h2 class="group-title">Sala</h2>
+                    <div class="group-body">
+                        <div class="tab-panel">
+                            <label class="field">
+                                <span>Nome</span>
+                                <input type="text" id="room-name" maxlength="60">
+                            </label>
+                            <label class="field">
+                                <span>Anotações (só no editor)</span>
+                                <textarea id="room-notes" rows="2" maxlength="400"></textarea>
+                            </label>
+                            <div class="panel-section">
+                                <div class="panel-title">Tamanho (tiles)</div>
+                                <div class="field-row">
+                                    <label class="field"><span>Colunas</span><input type="number" id="room-cols" min="5" max="40"></label>
+                                    <label class="field"><span>Linhas</span><input type="number" id="room-rows" min="5" max="30"></label>
+                                    <button class="btn btn-sm" id="btn-apply-size">Aplicar</button>
+                                </div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="room-rebuild-frame" checked>
+                                    Refazer a moldura (bordas) no tamanho novo
+                                </label>
+                            </div>
+                            <div class="hint" id="legacy-info"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tool-group expanded" data-view="room" hidden>
+                    <h2 class="group-title">Ferramentas</h2>
+                    <div class="group-body">
+                        <div class="tab-panel">
+                            <div class="tool-grid" id="tool-grid">
+                                <button class="tool-btn" data-tool="paint" title="Pintar com o tile escolhido no tileset (1)">Tile</button>
+                                <button class="tool-btn" data-tool="hole" title="Buraco: o jogador cai (2)">Buraco</button>
+                                <button class="tool-btn" data-tool="void" title="Vazio: não anda, não cai (3)">Vazio</button>
+                                <button class="tool-btn" data-tool="collision" title="Liga/desliga colisão sem trocar o visual (4)">Colisão</button>
+                                <button class="tool-btn" data-tool="door" title="Porta na borda da sala (5)">Porta</button>
+                                <button class="tool-btn" data-tool="prop" title="Prop animado (6)">Prop</button>
+                                <button class="tool-btn" data-tool="erase" title="Volta o tile ao padrão e remove porta/prop (7)">Borracha</button>
+                            </div>
+
+                            <label class="field" id="paint-kind-field">
+                                <span>Atributo ao pintar</span>
+                                <select class="styled-select" id="paint-kind">
+                                    <option value="auto">Automático (parede para tiles de parede)</option>
+                                    <option value="f">Piso (anda)</option>
+                                    <option value="w">Parede (colisão)</option>
+                                </select>
+                            </label>
+
+                            <div class="panel-section" id="door-type-field" hidden>
+                                <div class="panel-title">Tipo de porta</div>
+                                <div class="choice-list" id="door-types"></div>
+                            </div>
+
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="show-kinds" checked>
+                                Mostrar atributos (colisão, buraco, vazio)
+                            </label>
+                            <p class="hint">Botão direito: conta-gotas. Shift/Alt/botão do meio: mover a vista. Ctrl+Z / Ctrl+Y: desfazer / refazer.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tool-group expanded" data-view="room" hidden>
+                    <h2 class="group-title">Tileset</h2>
+                    <div class="group-body">
+                        <div class="tab-panel">
+                            <canvas id="tileset-canvas"></canvas>
+                            <div class="hint" id="tile-info"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="tool-group expanded" data-view="room" hidden>
+                    <h2 class="group-title">Props animados</h2>
+                    <div class="group-body">
+                        <div class="tab-panel">
+                            <div class="prop-grid" id="prop-grid"></div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="prop-flip">
+                                Espelhar na horizontal
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </aside>
+
+        <section id="editor-viewport">
+            <div class="viewport-toolbar">
+                <div class="viewport-tools-left">
+                    <button class="btn btn-sm" id="btn-zoom-out" title="Diminuir zoom">−</button>
+                    <button class="btn btn-sm" id="btn-zoom-fit" title="Enquadrar">Enquadrar</button>
+                    <button class="btn btn-sm" id="btn-zoom-in" title="Aumentar zoom">+</button>
+                    <label class="toggle-switch"><input type="checkbox" id="toggle-grid" checked> Grade</label>
+                </div>
+                <div class="viewport-tools-right">
+                    <button class="btn btn-sm" id="btn-undo" title="Desfazer (Ctrl+Z)">Desfazer</button>
+                    <button class="btn btn-sm" id="btn-redo" title="Refazer (Ctrl+Y)">Refazer</button>
+                </div>
+            </div>
+            <div class="canvas-container" id="canvas-container">
+                <canvas id="editorCanvas"></canvas>
+            </div>
+            <div class="viewport-statusbar">
+                <span id="status-coords">—</span>
+                <span id="status-save">—</span>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="js/editor2/MapEditorApp.js"></script>
+</body>
+</html>

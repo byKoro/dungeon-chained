@@ -46,6 +46,7 @@ Audio, UI, editor
 14. `R` restarts instantly at any time (even paused); `T` cycles tileset (debug). Debug globals `window.audio`, `window.audioConfig`, `window.sawMotor`, `window.playerAI`.
 15. `AssetLoader` requests `tileset_1..6` but only `tileset_1.png` exists (404s).
 16. Editor hazard-on-spawn warning never shows (`#spawn-warning-box` missing); Save never overwrites (duplicates); import rebuilds `floor` (hand-edited tile values lost).
-17. `serve.py` has no auth and binds all interfaces: anyone on the LAN can write/delete `map/` while it runs. Dev-only; never expose it.
+17. `serve.py` has no auth and binds all interfaces: anyone on the LAN can write/delete `map/` while it runs (now also `map/demo/` via `/api/save-map`). Dev-only; never expose it.
 18. ~~Opening trailer missing~~ Fixed on `fix/restore-trailer` (2026-10-26): `9b13c52` had deleted `js/trailer/` as dead code although `main.js` played it at boot. Restored only the boot trailer (no `trailer.html`/`b3`/`matchcut`); see `systems/ui.md` → Opening trailer.
 19. ~~Trailer gamepad gaps~~ Fixed on `feat/gamepad-ui` (2026-10-26): gate, SKIP, START, both pauses and the death screen work with a pad (`MenuPad`). Remaining limit: in a browser, a pad-only player gets the trailer muted (pad buttons don't unlock audio). The game's `AudioManager` also stays suspended until a key/click. Electron is not affected.
+20. Editor 2.0 (`editor2.html`, branch `novo_editor`) saves `map/demo/*.json`, but the game does not load that format yet (variable room size, per-tile doors, door types, animated props). Playtest works only for 14×9 rooms through the old single-room path.
