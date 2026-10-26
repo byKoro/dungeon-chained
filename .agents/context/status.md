@@ -16,7 +16,7 @@ Fully merged (0 ahead, safe to delete): `arrebentar`, `branch-rodrigo`, `charact
 
 Old-base branches predate the subsystem refactor (ADR 0002): port features into the current architecture instead of merging the old files.
 
-Branch `feat/player-dash` (2026-10-26, pushed, not merged), two commits:
+Merged into `main` (fast-forward, 2026-10-26) from `feat/player-dash`, two commits:
 - Hole depth: hole art with a lip and wall, plus `HoleEffects`. See `systems/rendering.md` and `visual-effects.md`.
 - Individual dash while the chain is snapped. See `systems/players-and-chain.md` → Dash. The `playerDash` sound is a placeholder (pitched `arrow-fire`).
 
