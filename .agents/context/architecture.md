@@ -10,8 +10,9 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 
 ## Boot sequence (`js/main.js` → `bootstrap()`)
 
-1. `new LoadingScreen()` (DOM overlay `#loading-screen`), `new AssetLoader()` (constructor immediately starts every `Image` load), `new RoomCatalog()`.
+1. `new LoadingScreen()` (DOM overlay `#loading-screen`), `new AssetLoader()` (constructor immediately starts every `Image` load), `new RoomCatalog()`. Unless `?skipTrailer` or `?playtest=true`: `new TrailerPlayer(canvas, assets, …)` *before* waiting, because its stage registers extra images (logo, expressions, explosion) in the loader.
 2. `loading.run('Loading the dungeon…', …)`: `assets.whenReady(progress)` (weight 4) + `roomCatalog.load()` (weight 1; fetches `map/index.json` then each listed room JSON; failures only `console.warn`).
+   - Trailer path: `new TrailerOverlay({ onStart: startGame, … })`, `trailer.play()`. START (end of trailer) or SKIP calls `startGame` once: `overlay.hide()`, `trailer.stop()`, then step 3. See `systems/ui.md` → Opening trailer.
 3. `loading.run('Preparing the dungeon…', …)`: `game = new Game(canvas, { roomCatalog, assets })`, then `await game.audio.whenReady(4000, progress)` (4 s timeout).
 4. `game.start()`: `PlayerFactory.create()` → `[p1, p2]`, `newDungeon()`, ambience loop, creates `SawMotorAudio`, `gameLoop.start()`.
 
@@ -45,7 +46,7 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 
 Also global singletons: `MasterVolume` (js/core/MasterVolume.js, localStorage key `dungeonChained.masterVolume`, `gain = v²`), `UiSound` (`setUiAudio`/`playUi`). `HeartPickup.sheet` is a static set in the Game constructor.
 
-Debug globals: `window.audio`, `window.audioConfig`, `window.sawMotor`, `window.playerAI`.
+Debug globals: `window.audio`, `window.audioConfig`, `window.sawMotor`, `window.playerAI`, `window.trailer` (main.js, only when the trailer runs).
 
 ## Game loop (`GameLoop._tick`, rAF)
 
@@ -100,9 +101,9 @@ DOM overlays above canvas: `#death-screen` (z 40), `#pause-screen` (z 45), `#loa
 
 ## Screens / states
 
-`loading` (DOM, main.js) → `playing` (`_started = true`) ⇄ `paused` (`setPaused`; ignored before start or when gameOver; stops SFX, ambience −12 dB) → `gameOver` (any player at 0 lives; death screen) → `restart()` (floor=1, new players, `newDungeon()`). Within playing: `roomIntro` and `transition` sub-states.
+`loading` (DOM, main.js) → `trailer` (main.js: `TrailerPlayer` + `TrailerOverlay`; skipped with `?skipTrailer` / `?playtest=true`) → `loading` (game audio) → `playing` (`_started = true`) ⇄ `paused` (`setPaused`; ignored before start or when gameOver; stops SFX, ambience −12 dB) → `gameOver` (any player at 0 lives; death screen) → `restart()` (floor=1, new players, `newDungeon()`). Within playing: `roomIntro` and `transition` sub-states.
 
-Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant, `R` restart (any time, no confirm), `Enter`/`Space` restart on game over. Gamepad menu (`_pollMenuPad`, any pad): Start = pause/restart, A confirm, B resume, D-pad/left stick navigate pause menu. `I` toggles PlayerAI (PlayerAI.js). Electron: F11 fullscreen, F12 DevTools. URL `?playtest=true`: uses `rooms.playtestSpawn`, disables door transitions.
+Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant, `R` restart (any time, no confirm), `Enter`/`Space` restart on game over. Gamepad menu (`_pollMenuPad`, any pad): Start = pause/restart, A confirm, B resume, D-pad/left stick navigate pause menu. `I` toggles PlayerAI (PlayerAI.js). Electron: F11 fullscreen, F12 DevTools. URL `?playtest=true`: uses `rooms.playtestSpawn`, disables door transitions, skips the trailer. Trailer URL flags: `?skipTrailer`, `?mute` (no audio, no gate), `?timer` (scene clock in the bottom bar).
 
 ## Where tuning lives (`js/config/`)
 

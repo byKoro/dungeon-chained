@@ -16,6 +16,9 @@ Pixel-art UI in two layers:
 | `js/ui/PauseScreen.js` | RESUME / RESTART / volume slider; focus navigation |
 | `js/ui/DeathScreen.js` | single RESTART button |
 | `js/ui/LoadingScreen.js` | segmented progress bar; `run(text, tasks)` |
+| `js/ui/TrailerOverlay.js` | SKIP (gold, after 3 s) / START (red, at trailer end) over the opening trailer |
+| `js/ui/SpeechBubble.js` | `renderSpeechBubble` (trailer dialogue bubbles) |
+| `js/trailer/` | opening trailer: `TrailerPlayer` (scene list, gate, pause, pad), `TrailerStage`, `scenes/`, `kit/`, `fx/`, `audio/TrailerAudio.js` |
 | `js/ui/VtuberHud.js` | `VtuberHud`, internal `Portrait`, `HeartRow`, `Spring` |
 | `js/ui/UiSound.js` | `playUi(cue)` (see audio.md) |
 
@@ -31,7 +34,7 @@ Pixel-art UI in two layers:
   - `HeartRow`: hearts break into halves (debris) on loss, pop in on gain, heartbeat when at 1 life. Sprite `assets/heart/heart.png` frames FULL/EMPTY/HALF_L/HALF_R (16 px).
 
 ## Data flow (driven from `js/Game.js`)
-- Boot (`js/main.js`): `LoadingScreen.run('Loading the dungeon…', [assets.whenReady, roomCatalog.load])` → `run('Preparing the dungeon…', [new Game, game.audio.whenReady])` → `game.start()`. `#loading-screen` starts visible (no `ls-hidden` in HTML).
+- Boot (`js/main.js`): `LoadingScreen.run('Loading the dungeon…', [assets.whenReady, roomCatalog.load])` → opening trailer (below) until START/SKIP → `run('Preparing the dungeon…', [new Game, game.audio.whenReady])` → `game.start()`. `#loading-screen` starts visible (no `ls-hidden` in HTML).
 - `Game` constructor builds `hud`, `deathScreen` (`onRestart: restart`), and `pauseScreen` (`onResume: setPaused(false,{silent:true})`, `onRestart: restart`).
 - Pause: `Game.setPaused(p)` → `gameLoop.setPaused`, `hud.setPaused`, `pauseScreen.show/hide`, `audio.stopAll` + ambience −12 dB, `playUi('uiOpen'|'uiClose')`. It is refused before `start()` or during game over.
 - Game over: in `_updateGameplay` when any player has `lives <= 0` → `gameOver = true`, `deathScreen.show()`. `newDungeon()` hides it.
@@ -44,6 +47,14 @@ Pixel-art UI in two layers:
 - Hover equals focus. `pointerenter` focuses the control. `uiMove` plays only when focus arrives from another `.pixel-btn` or from the pointer, so `show()` auto-focus is silent.
 - Controls are gated by `enabled: () => screen.visible`. Hidden screens ignore clicks.
 
+## Opening trailer
+Restored on 2026-10-26 after `9b13c52` deleted it (see `status.md` #18). Only the boot trailer is in the repo; the old review pages (`trailer.html`, `b3.html`, `matchcut.html`) and `js/trailer/b3|matchcut` stay in history at `9b13c52~1`.
+- Flow (`js/main.js`): `TrailerPlayer` is created before `assets.whenReady` → loading → `trailer.play()`. If the AudioContext is still suspended, a gate screen (logo + "CLICK OR PRESS ANY KEY (sound on)") waits for a pointer or key (not Esc); Electron allows autoplay, so it usually skips the gate. Then 12 scenes (~126 s); the last one loops under START.
+- `TrailerPlayer(canvas, assets, { onBegin, onEnd, showTimer, audio })`: `play(from)`, `stop()`, `setPaused/togglePause`, `paused`. `onBegin` → `overlay.showSkip()`, `onEnd` → `overlay.showStart()`. It pauses itself on `visibilitychange`.
+- Input: Enter/Space press START when it is visible; Esc toggles the trailer pause. Pad (`TrailerPlayer._pollPad`): Start toggles pause; in the pause, D-pad/left stick navigate and change volume, A confirms, B resumes. No pad button presses START/SKIP (`status.md` #19).
+- Audio: `TrailerAudio` (own WebAudio graph, follows `MasterVolume`) uses `assets/audio/trailer/*.wav`, `assets/audio/music/megasong.mp3`, and some game wavs. Images: `assets/keyart/logo.png`, `assets/fx/explosion.png`, player expressions.
+- Trailer scenes import game classes (`Player`, `SawWeapon`, `Renderer`, `PostProcessor`, traps, particles). Changing those APIs can break the trailer: check `/` without `?skipTrailer` after such changes.
+
 ## Config knobs
 `pixelScale()` = clamp(round(innerHeight/140), 3, 9), applied on resize and exposed as CSS `--px`. Palettes `FRAME`/`FACES`. HUD layout `_layout(W,H)` (S = bust scale, hs = heart scale), `BELOW_EDGE_ROWS`, `MOTION` (0.35 under `prefers-reduced-motion`). Loading bar `SEGMENTS`, `FLASH_MS`.
 
@@ -51,7 +62,7 @@ Pixel-art UI in two layers:
 - All UI art is drawn at 1 art-px into a small canvas, then CSS-scaled by an integer `pixelScale`. Keep `imageSmoothingEnabled = false` and integer coordinates.
 - `PauseScreen` constructor clears `.pause-menu` (`innerHTML = ''`) and rebuilds its controls. Constructing it twice on the same root duplicates listeners on the root.
 - `PauseScreen.confirm()` only clicks buttons. With the slider focused it does nothing.
-- `onMove` is supported but `Game` does not pass it. `rootId`/`volume`/`restartLabel` exist for reuse (index.html mentions a `#trailer-pause`, which is not in this repo).
+- `onMove` is supported but `Game` does not pass it. `rootId`/`volume`/`restartLabel` exist for reuse: the trailer builds its own `#trailer-pause` (RESUME + volume, no RESTART) on first pause.
 - HUD timing uses `performance.now()` (render time, capped 50 ms). It keeps animating while paused, by design: `Portrait.paused` shows `olhando_cima`.
 - `VtuberHud.draw` resets the transform to identity. It must run after `renderer.endFrame()` (it does, in `_renderOverlays`).
 - Death and pause screens are DOM, so they are not affected by lighting or vignette. The HUD is drawn after post-processing and is also unlit.

@@ -33,7 +33,7 @@ Generation & rooms
 Combat & entities
 8. `MeleeEnemy.setNavigationFloor` ignores its `walls` argument → BFS paths through wall blocks; `findSafeFloorCell` ignores custom walls (enemies may spawn inside walls).
 9. Enemy hit plays both `playerHurt` (CombatSystem) and `playerHit` (Game) — same wav set, doubled.
-10. Dead code: `MeleeEnemy` "dead" state, `Chain.applyToEnemies`, `Chain.cycleWeapon`, `Weapon.hitsTarget`, `HAZARDS.spike.*Frames`, `ParticleSystem.triggerExplosion`, `BloodCanvas.stampGib`, `PostProcessor.addAreaLight`, `preloadUi`, `TORCHES.minPerWall/...`.
+10. Dead code: `MeleeEnemy` "dead" state, `Chain.applyToEnemies`, `Chain.cycleWeapon`, `Weapon.hitsTarget`, `HAZARDS.spike.*Frames`, `ParticleSystem.triggerExplosion`, `BloodCanvas.stampGib`, `PostProcessor.addAreaLight`, `TORCHES.minPerWall/...`. (`preloadUi` is used again by the trailer.)
 11. Lives cap 3 hard-coded in `Game._updateHearts` / `Player` (ignores `HEART_DROP.maxLives`). Chain tuning hard-coded in `Game` constructor.
 12. Cable hit uses the straight p1→p2 segment, not the drawn sagging cable; a still saw also kills.
 
@@ -43,4 +43,5 @@ Audio, UI, editor
 15. `AssetLoader` requests `tileset_1..6` but only `tileset_1.png` exists (404s).
 16. Editor hazard-on-spawn warning never shows (`#spawn-warning-box` missing); Save never overwrites (duplicates); import rebuilds `floor` (hand-edited tile values lost).
 17. `serve.py` has no auth and binds all interfaces: anyone on the LAN can write/delete `map/` while it runs. Dev-only; never expose it.
-18. `index.html` / `electron/main.cjs` comments mention a removed `#trailer-pause`.
+18. ~~Opening trailer missing~~ Fixed on `fix/restore-trailer` (2026-10-26): `9b13c52` had deleted `js/trailer/` as dead code although `main.js` played it at boot. Restored only the boot trailer (no `trailer.html`/`b3`/`matchcut`); see `systems/ui.md` → Opening trailer.
+19. Trailer gamepad: Start pauses/resumes the trailer, but no pad button presses START or SKIP, and the "press any key" gate ignores the pad (keyboard/mouse only). Same as before the removal.

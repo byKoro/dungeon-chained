@@ -131,6 +131,8 @@ html, body {
 .pause-screen.visible .pixel-btn:nth-child(3) { animation-delay: 0.19s; }
 /* Slider de volume (js/ui/PixelSlider.js): arrastar sem rolar a página. */
 .pixel-slider { touch-action: none; cursor: ew-resize; display: block; }
+/* O trailer pausa por cima do botão SKIP. */
+#trailer-pause { z-index: 60; }
 /* Só o botão em foco respira. */
 .pause-screen.visible .pixel-btn:focus canvas {
     animation: pixel-idle 1.4s steps(1, end) 0.5s infinite;
@@ -177,4 +179,73 @@ html, body {
     display: block;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+}
+
+/* ---------------------------------------------------------------------------
+   Trailer na abertura (js/ui/TrailerOverlay.js): botões SKIP / START
+   --------------------------------------------------------------------------- */
+#trailer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+}
+#trailer-overlay.hidden { display: none; }
+.tr-skip {
+    --px: 3px;
+    position: fixed;
+    right: 22px;
+    bottom: calc(10vh + 14px);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.6);
+    transform-origin: 100% 100%;
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+}
+.tr-skip.visible {
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    animation: pixel-pop 0.4s cubic-bezier(0.34, 1.7, 0.64, 1) both;
+    transition: opacity 0.15s ease, visibility 0s linear 0s;
+}
+.tr-skip.visible canvas {
+    animation: skip-nudge 2.6s steps(1, end) 1.2s infinite;
+}
+.tr-skip.visible:focus canvas { animation: none; }
+@keyframes skip-nudge {
+    0%, 78% { transform: translateX(0); }
+    82% { transform: translateX(var(--px)); }
+    86% { transform: translateX(0); }
+    90% { transform: translateX(var(--px)); }
+    94%, 100% { transform: translateX(0); }
+}
+/* `translate` centraliza sem brigar com o `transform` do pop. */
+.tr-start {
+    --px: 5px;
+    position: fixed;
+    left: 50%;
+    bottom: calc(10vh + 22px);
+    translate: -50% 0;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0);
+}
+.tr-start.visible {
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    animation: pixel-pop 0.45s cubic-bezier(0.34, 1.7, 0.64, 1) 0.15s both;
+}
+.tr-start.visible canvas {
+    animation: pixel-idle 1.4s steps(1, end) 0.8s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    .tr-skip.visible,
+    .tr-skip.visible canvas,
+    .tr-start.visible canvas { animation: none; }
+    .tr-start.visible { animation: none; transform: none; }
 }
