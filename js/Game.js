@@ -25,6 +25,7 @@ import { ScreenGore } from './systems/ScreenGore.js';
 import { WindSystem } from './systems/WindSystem.js';
 import { PlayerAI } from './systems/PlayerAI.js';
 import { LightingRenderer } from './systems/LightingRenderer.js';
+import { HoleEffects } from './systems/HoleEffects.js';
 import { VtuberHud } from './ui/VtuberHud.js';
 import { DeathScreen } from './ui/DeathScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
@@ -137,6 +138,7 @@ export class Game {
         this.rooms = new RoomManager({ spawnSystem: this.spawnSystem, getFloor: () => this.floor, roomCatalog: this.roomCatalog });
 
         this.tiles = new DungeonTileQuery({ rooms: this.rooms });
+        this.holes = new HoleEffects({ rooms: this.rooms });
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -634,6 +636,7 @@ export class Game {
                 const fx = sp ? sp.x : (p1.x + p2.x) / 2;
                 const fy = sp ? sp.y : (p1.y + p2.y) / 2;
                 const r = this.chain.weapon?.discRadius ?? 24;
+        this.holes.update();
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
@@ -788,6 +791,7 @@ export class Game {
 
         if (rooms.tryClearCurrent()) {
             this._triggerDoorFlash();
+        this.holes.update([p1, p2]);
 
             this.audio.play("doorOpen");
 
@@ -911,8 +915,8 @@ export class Game {
 
         const p1Bounce = this.p1.speedMag > 0.15 ? Math.abs(Math.sin(this.p1.animTimer)) : 0;
         const p2Bounce = this.p2.speedMag > 0.15 ? Math.abs(Math.sin(this.p2.animTimer)) : 0;
-        renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, p1Bounce);
-        renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
+        if (!this.p1.falling) renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, p1Bounce);
+        if (!this.p2.falling) renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
         const enemies = rooms.current.enemies;
 
         enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
@@ -927,7 +931,8 @@ export class Game {
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const drawables = [...entities, ...occluders].sort((a, b) => a.y - b.y);
 
-        drawables.filter(e => e.y <= sawY).forEach(e => e.draw(ctx));
+        const drawEntity = e => (e.falling ? this.holes.drawFalling(ctx, e) : e.draw(ctx));
+        drawables.filter(e => e.y <= sawY).forEach(drawEntity);
 
         this.chain.draw(ctx, this.p1, this.p2);
 
@@ -935,11 +940,13 @@ export class Game {
 
         this.particleSystem.drawSparks(ctx);
 
-        drawables.filter(e => e.y > sawY).forEach(e => e.draw(ctx));
+        drawables.filter(e => e.y > sawY).forEach(drawEntity);
 
         this.particleSystem.drawFlames(ctx);
 
         if (challenge) challenge.drawWallLayer(ctx);
+        this.holes.draw(ctx);
+
 
         renderer.drawFrontWall(rect, tiles, TILE, open, doors, doorHalf, DOOR_STUB_TILES);
 

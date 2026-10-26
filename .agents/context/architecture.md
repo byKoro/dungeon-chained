@@ -41,6 +41,7 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `effects` | ParticleEffects | js/systems/ParticleEffects.js | footprints/dust per player |
 | `rooms` | RoomManager | js/rooms/RoomManager.js | dungeon graph, current room, doors, clamping |
 | `tiles` | DungeonTileQuery | js/rooms/DungeonTileQuery.js | hole queries, falls, safe drop/spawn points |
+| `holes` | HoleEffects | js/systems/HoleEffects.js | dust/crumbs inside holes, falling-player clip + darken |
 | `lighting` | LightingRenderer | js/systems/LightingRenderer.js | pushes lights into postProcessor |
 | `gameLoop` | GameLoop | js/core/GameLoop.js | fixed-step loop, pause, hit slow-mo |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
@@ -70,7 +71,7 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 7. `combat.updateEnemies`.
 8. 3 iterations: `Physics.resolveEntityCollisions` + saw disc as circle obstacle; then `Physics.resolveBoxCollisions` vs `room.wallBoxes`; `enemy.ensureOnWalkableTile`.
 9. `rooms.clampEnemy` / `rooms.clampPlayer` (door openings passable only when unlocked).
-10. `tiles.checkHoleFalls`; first frame of fall → audio + `_dropSawOnFall` (forced chain drop).
+10. `tiles.checkHoleFalls`; first frame of fall → audio + `_dropSawOnFall` (forced chain drop); then `holes.update([p1, p2])` (also called with no players during the room intro).
 11. `combat.resolveWeaponHits` (hit → slow-mo), `combat.resolveDeaths` (gibs, screen gore).
 12. `_updateHearts` (pickup if `lives < 3`), gibs update, `effects.update`, damage detection via `p._livesSeen`, `screenGore.update`.
 13. `rooms.tryClearCurrent()` → door flash, zoom punch, `hud.onRoomCleared`.
@@ -84,10 +85,10 @@ World pass (inside `renderer.beginFrame()` camera transform, clipped to room rec
 1. `drawBackground(BACKGROUND_TILE)` (before clip, fills view).
 2. `drawRoom` (floor incl. auto-tiled holes, walls, props, torches, closed door tiles).
 3. If open: `drawDoorStubs`, `drawDoorGradients`.
-4. `challenge.drawFloorLayer` → `particleSystem.drawFloor` (blood canvas; masked by `tiles.darkHoleRects()`) → `effects.draw` (footprints) → `challenge.drawButtons` → `particleSystem.drawSmoke`.
-5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce) and visible enemies (r 13).
+4. `holes.draw` (motes clipped to hole tiles) → `challenge.drawFloorLayer` → `particleSystem.drawFloor` (blood canvas; masked by `tiles.darkHoleRects()`) → `effects.draw` (footprints) → `challenge.drawButtons` → `particleSystem.drawSmoke`.
+5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce; skipped while falling) and visible enemies (r 13).
 6. `chain.drawChain` (cable).
-7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders]` sorted by `y`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.
+7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders]` sorted by `y`; a falling player goes through `holes.drawFalling`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.
 8. `particleSystem.drawFlames` → `challenge.drawWallLayer` → `renderer.drawFrontWall` (bottom row redrawn over entities) → gibs → `challenge.drawAirLayer` → `particleSystem.drawAir` → wind if `WIND.layer === "world"`.
 9. `ctx.restore()`, `renderer.endFrame()`.
 
@@ -108,7 +109,7 @@ Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant
 
 ## Where tuning lives (`js/config/`)
 
-- `GameConfig.js`: world/grid (`TILE`, `ROOM_COLS/ROWS`, `GRID_COLS/ROWS`, `ROOM_COUNT`), sim (`SIM_HZ`, `SIM_STEP`, `MAX_SIM_STEPS_PER_FRAME`, `HIT_SLOWMO`), camera (`CAM_MARGIN`, `CAMERA_DRONE`, `ROOM_INTRO`, `TRANSITION_SPEED`), doors/spawns (`DOOR_STUB_TILES`, `DOOR_ENTER_DEPTH`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`), holes (`HOLE_TILE`, `HOLE_TILES`, `holeTileFor`, `HOLE_FALL`), lighting (`PLAYER_LIGHT_RADIUS`, `LIGHT_PIXEL_SCALE`, `TORCHES`, `DOOR_LIGHT`, `POST_PROCESSING`), `WIND`, `HAZARDS`, blood/gibs, `PROP_SCATTER`. Re-exports `AUDIO_CONFIG`, `AUDIO_CLIPS` from `AudioConfig.js`.
+- `GameConfig.js`: world/grid (`TILE`, `ROOM_COLS/ROWS`, `GRID_COLS/ROWS`, `ROOM_COUNT`), sim (`SIM_HZ`, `SIM_STEP`, `MAX_SIM_STEPS_PER_FRAME`, `HIT_SLOWMO`), camera (`CAM_MARGIN`, `CAMERA_DRONE`, `ROOM_INTRO`, `TRANSITION_SPEED`), doors/spawns (`DOOR_STUB_TILES`, `DOOR_ENTER_DEPTH`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`), holes (`HOLE_TILE`, `HOLE_TILES`, `holeTileFor`, `HOLE_FALL`, `HOLE_FX`), lighting (`PLAYER_LIGHT_RADIUS`, `LIGHT_PIXEL_SCALE`, `TORCHES`, `DOOR_LIGHT`, `POST_PROCESSING`), `WIND`, `HAZARDS`, blood/gibs, `PROP_SCATTER`. Re-exports `AUDIO_CONFIG`, `AUDIO_CLIPS` from `AudioConfig.js`.
 - `EntityConfig.js`: `playerConfigs(assets)`, enemy sprite configs, `ENEMY_TYPES`, `ENEMY_TYPE_BY_KEY`.
 - `TinyRpgEnemies.js`: data for extra enemy sprite sheets (used by AssetLoader + EntityConfig).
 - `AudioConfig.js`: clips, loops, mix.

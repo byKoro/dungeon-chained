@@ -119,36 +119,76 @@ export const HOLE_FALL = Object.freeze({
     respawnInvulnFrames: 90
 });
 
-export const HOLE_TILES = Object.freeze({
-    0:  116,
-    1:  103,
-    2:  105,
-    3:  102,
-    4:  104,
-    5:  115,
-    6:  109,
-    7:  112,
-    8:  106,
-    9:  101,
-    10: 114,
-    11: 110,
-    12: 107,
-    13: 113,
-    14: 111,
-    15: 100
+export const HOLE_FX = Object.freeze({
+    pixel: 4,
+    color: "132, 100, 96",
+    maxMotes: 140,
+
+    dust: {
+        lipRate: 0.012,
+        sideRate: 0.004,
+        alpha: 0.7,
+        gravity: 0.025,
+        maxSpeed: 1.6,
+        drift: 0.12,
+        life: [50, 90],
+        fadeDepth: 52
+    },
+
+    crumbs: {
+        edgeRate: 0.18,
+        fallBurst: 9,
+        alpha: 0.9,
+        gravity: 0.09,
+        maxSpeed: 3.2,
+        spread: 1.1,
+        bigChance: 0.3,
+        life: [24, 40],
+        fadeDepth: 60
+    },
+
+    fall: {
+        sink: 34,
+        darken: 0.85,
+        lightMin: 0.3
+    }
 });
+
+// Blob autotile, art from scripts/gen-hole-tiles.py (--js prints this table).
+// Bit set = that neighbour is not a hole. Edges 1 N, 2 E, 4 S, 8 W; inner corners
+// 16 NW, 32 NE, 64 SE, 128 SW only count when both orthogonals beside them are holes.
+export const HOLE_TILES = Object.freeze({
+    0: 116, 1: 103, 2: 105, 3: 102, 4: 104, 5: 115, 6: 109, 7: 112,
+    8: 106, 9: 101, 10: 114, 11: 110, 12: 107, 13: 113, 14: 111, 15: 100,
+    16: 120, 18: 121, 20: 122, 22: 123, 32: 124, 36: 125, 40: 126, 44: 127,
+    48: 128, 52: 129, 64: 130, 65: 131, 72: 132, 73: 133, 80: 134, 96: 135,
+    104: 136, 112: 137, 128: 138, 129: 139, 130: 140, 131: 141, 144: 142, 146: 143,
+    160: 144, 176: 145, 192: 146, 193: 147, 208: 148, 224: 149, 240: 150
+});
+
+export function holeMask(isHole, col, row) {
+    let mask = 0;
+    if (!isHole(col, row - 1)) mask |= 1;
+    if (!isHole(col + 1, row)) mask |= 2;
+    if (!isHole(col, row + 1)) mask |= 4;
+    if (!isHole(col - 1, row)) mask |= 8;
+    if (!(mask & 9) && !isHole(col - 1, row - 1)) mask |= 16;
+    if (!(mask & 3) && !isHole(col + 1, row - 1)) mask |= 32;
+    if (!(mask & 6) && !isHole(col + 1, row + 1)) mask |= 64;
+    if (!(mask & 12) && !isHole(col - 1, row + 1)) mask |= 128;
+    return mask;
+}
+
+export function holeTileForMask(mask) {
+    return HOLE_TILES[mask] ?? HOLE_TILES[mask & 15];
+}
 
 export function holeTileFor(floor, col, row) {
     const isHole = (c, r) => {
         const line = floor[r];
         return !!line && line[c] === HOLE_TILE;
     };
-    let mask = 0;
-    if (!isHole(col, row - 1)) mask |= 1;
-    if (!isHole(col + 1, row)) mask |= 2;
-    if (!isHole(col, row + 1)) mask |= 4;
-    if (!isHole(col - 1, row)) mask |= 8;
-    return HOLE_TILES[mask];
+    return holeTileForMask(holeMask(isHole, col, row));
 }
 
 export const PROP_SCATTER = {

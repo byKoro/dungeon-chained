@@ -51,7 +51,7 @@ Light profile: `{ color: "r, g, b", flickerBase, flickerSine, flickerNoise, fall
 ## Data flow
 Sim step (`Game._updateGameplay`/`_updateRoomIntro`): systems call `trigger*`. Then `particleSystem.update`, `effects.update`, `wind.update`, `screenGore.update` (gameplay only).
 Render (`Game._render`, inside `renderer.beginFrame()` world transform + room clip):
-1. background, room, door stubs/gradients, challenge floor
+1. background, room, door stubs/gradients, `holes.draw`, challenge floor
 2. `particleSystem.drawFloor` (BloodCanvas + debris, clipped with hole rects via even-odd) → `effects.draw` (footprints) → buttons → `drawSmoke`
 3. shadows, chain, y-sorted entities split by saw y, saw, `drawSparks` (sparks + additive flashes), entities in front, `drawFlames` (additive)
 4. wall layer, front wall, gibs, air layer, `drawAir` (blood arcs), wind (if `WIND.layer==="world"`)
@@ -63,6 +63,12 @@ Render (`Game._render`, inside `renderer.beginFrame()` world transform + room cl
 - Torches: positions come from room data `tiles.torches` (`{col,row,side,type}`; set from map piece `torches` via `Room` `cell.customTorches`). Each torch adds a `glow` light plus an `area` light pushed `area.pushIn` into the room. `TORCHES.minPerWall/maxPerWall/marginTiles/minGap/onlyCombatRooms/sides` are not referenced by any code (probably leftovers from procedural placement). Sprites animate at 160 ms/frame in `Renderer.drawRoom` (`assets/torch/*`).
 - Active saw light radius grows with `spinSpeed` (60 + 18·spin). Dropped saw breathes with `chain.getDroppedLight().hover`.
 - Wall wash is disabled (`TORCHES.light.wash.enabled=false`).
+
+## Hole effects (`js/systems/HoleEffects.js`, config `HOLE_FX`)
+- Sources rebuilt when `rooms.currentTiles` changes (clears motes): north lips and E/W rims of every hole tile.
+- `dust`: ambient 1-art-px motes falling from lips (`lipRate`) and side rims (`sideRate`) per step. `crumbs`: pebbles (`bigChance` = 2 px) when a player's foot probe (`HOLE_FALL.edgeMargin + 4` px) touches a hole (`edgeRate`), plus a `fallBurst` once per fall. Both fade over `fadeDepth`, die on leaving a hole tile, capped by `maxMotes`, snapped to `pixel` (4 world px) and clipped to the hole rects.
+- `drawFalling(ctx, player)`: clip = each column of the fall row's hole run, open upward and closed at the bottom of that column's hole run (only floor south of the pit hides the body); sinks `fall.sink` px (ease-out) and darkens with `ctx.filter = brightness(1 - fall.darken·t)`. `Player.draw` still does its own shrink/spin/alpha.
+- `LightingRenderer._fallLightScale`: player light radius shrinks to `fall.lightMin` over the fall.
 
 ## Config knobs
 `POST_PROCESSING.{enabled, vignette.*, lighting.ambient/falloff/flicker*}`, `TORCHES.light.*`, `DOOR_LIGHT.*`, `WIND.*` (`count`, `layer`, `speed`, gusts, `streak`, colors), `HIT_SLOWMO`, `ROOM_INTRO.zoomFactor/times`, `CAMERA_DRONE.*`, `BLOOD_STEPS` (bloody footprints after a blood zone), `MAX_FOOTPRINTS`, `MAX_ACTIVE_GIBS`. Profile constants (`*_PROFILE`, `BLADE_COLOR`) live in `LightingRenderer.js`.

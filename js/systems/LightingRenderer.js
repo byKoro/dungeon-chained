@@ -1,5 +1,5 @@
 import {
-    TILE, LIGHT_PIXEL_SCALE, PLAYER_LIGHT_RADIUS, TORCHES, DOOR_LIGHT
+    TILE, LIGHT_PIXEL_SCALE, PLAYER_LIGHT_RADIUS, TORCHES, DOOR_LIGHT, HOLE_FX
 } from '../config/GameConfig.js';
 
 const BLADE_COLOR = "150, 196, 255";
@@ -113,8 +113,14 @@ export class LightingRenderer {
         for (const p of players) {
             const s = this.renderer.worldToScreen(p.x, p.y);
             const pixel = this._lightPixel(s.zoom);
-            this.postProcessor.addLight(s.x, s.y, PLAYER_LIGHT_RADIUS * s.zoom, pixel);
+            this.postProcessor.addLight(s.x, s.y, PLAYER_LIGHT_RADIUS * s.zoom * this._fallLightScale(p), pixel);
         }
+    }
+
+    _fallLightScale(p) {
+        if (!p.falling || !p.fallDuration) return 1;
+        const min = HOLE_FX.fall.lightMin;
+        return min + (1 - min) * (p.fallTimer / p.fallDuration);
     }
 
     _renderDroppedBladeLight(chain) {

@@ -1,4 +1,4 @@
-import { HOLE_TILES } from '../../../config/GameConfig.js';
+import { holeMask, holeTileForMask } from '../../../config/GameConfig.js';
 
 export const CELL_W = 18;
 export const CELL_H = 13;
@@ -109,14 +109,7 @@ export function wallTile(m, x, y) {
 const FLOOR_VARIANTS = [6, 7, 8, 17, 18, 26, 27];
 
 export function floorTile(isF, isHole, x, y) {
-    if (isHole(x, y)) {
-        let mask = 0;
-        if (!isHole(x, y - 1)) mask |= 1;
-        if (!isHole(x + 1, y)) mask |= 2;
-        if (!isHole(x, y + 1)) mask |= 4;
-        if (!isHole(x - 1, y)) mask |= 8;
-        return HOLE_TILES[mask];
-    }
+    if (isHole(x, y)) return holeTileForMask(holeMask(isHole, x, y));
     const wN = !isF(x, y - 1), wE = !isF(x + 1, y), wS = !isF(x, y + 1), wW = !isF(x - 1, y);
     if ((wN && wS) || (wE && wW)) return 16;
     if (wN && wW) return 11;
