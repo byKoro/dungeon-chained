@@ -18,11 +18,15 @@ Mapa montado por script no Editor 2.0: Hub 14×9, Grande 22×14, Pequena 9×7, 3
 - Porta sul do Hub → sala Pequena 9×7, centralizada.
 - "Testar sala" isolado (sala 18×11 com conteúdo): 1 inimigo, 2 tochas (parede + castiçal animados), prop estático por cima do piso + baú animado, espinhos, 2 botões co-op com trava "botões". Altar de Dash: P1 apertando E concede Dash para a dupla. Os dois em cima dos botões destravam a sala.
 - Jogo normal sem `map/demo/active.json`: abre o modo clássico (procedural) como antes.
+- Mecânicas (sala 20×11, teste com Dash e Lançar Serra liberados):
+  - Alavanca: E perto dela troca só os 2 tiles marcados de buraco (-1) para chão (16); o resto do buraco continua.
+  - Serra lançável: ao arrebentar o cabo a serra sai voando (`thrown`), anda até x≈1179 e para em chão seguro.
+  - Corda + chave: a serra em voo corta a corda; a chave cai e é coletada por contato (`bossKey: true`).
 
 ## Não verificado
 - Controles reais (teclado/controle físico): os testes moveram os jogadores e dispararam teclas por script.
 - Comparação das 3 câmeras jogando (zoom-out / fixa + indicadores / tela dividida): o código existe (F6 alterna no teste), a escolha precisa ser feita jogando.
-- Serra lançável, alavanca/ponte e corda/chave: código existe (ThrownSaw, DemoProgress), mas não foi exercitado em jogo.
+- Ricochete da serra nas paredes e dano nos inimigos pelo caminho (o teste não tinha inimigo na linha nem parede no alcance).
 - Interface de clicar portas no modo "Conectar portas" com mouse real (as conexões do teste foram criadas por script).
 - Build Electron empacotado (`npm run dist`) com mapa principal definido.
 - Boss e tela de agradecimento: não existem ainda.
