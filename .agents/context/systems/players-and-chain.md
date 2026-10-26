@@ -70,7 +70,7 @@ Kill rule (`CombatSystem.resolveWeaponHits`, only while connected): an enemy die
 - Keys stored lowercase from `KeyboardEvent.key`. Arrow keys and Space get `preventDefault`. Window `blur` clears keys.
 - P1: `w s a d`. P2: `arrowup arrowdown arrowleft arrowright` (from `playerConfigs`).
 - Gamepad index 0 → P1 keys, index 1 → P2 keys (`gamepadControls`). Left stick with `deadZone` 0.35, D-pad buttons 12/13/14/15. Converted into the same key names, so `Player` is device-agnostic.
-- Menu pad handling is separate (`Game._pollMenuPad`, any pad: 9 Start, 0 A, 1 B, D-pad/stick ±0.6).
+- Menu pad handling is separate (`MenuPad` in `Game._pollMenuPad`, any pad: 9 Start, 0 A, 1 B, D-pad/stick ±0.6; see `ui.md`).
 
 ## PlayerAI (debug)
 

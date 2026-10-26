@@ -43,15 +43,16 @@ Pixel-art UI in two layers:
 ## Input & focus
 - Keyboard (`Game._bindButtons`, window `keydown`, ignores repeats): `Escape` toggles pause, `T` cycles tileset, `R` restarts (any time, even when paused), `Enter`/`Space` on game over restarts unless the death button is focused. When it is focused, the native click handles it, which avoids a double restart.
 - `PauseScreen` root `keydown`: ↑/W, ↓/S → `move`. Native `<button>` Enter/Space → click.
-- Gamepad (`Game._pollMenuPad`, each frame via `GameLoop.onFrameStart`, edge-detected with `_padPrev`): Start(9) pause/restart, A(0) confirm/restart, B(1) resume, D-pad 12–15 or stick |axis|>0.6 → `move`/`adjust`.
+- Gamepad: all menu pad input goes through `MenuPad` (`js/core/MenuPad.js`, tuning `MENU_PAD` in `GameConfig`). Any pad counts. `poll()` returns edge hits `{start, a, b, up, down, left, right, any}`. Directions (D-pad 12–15 or left stick |axis| > 0.6) repeat while held (350 ms delay, then every 110 ms). Buttons held at the first poll do not fire, so the Start that pressed the trailer's START does not pause the new game. `Game` and `TrailerPlayer` each own one.
+  - Game (`Game._pollMenuPad`, each frame via `GameLoop.onFrameStart`): Start toggles pause. In the pause: ↑/↓ `move`, ←/→ `adjust` (volume ±10 %), A `confirm`, B resume. Game over: Start or A restart (death button shows pressed), B does nothing.
 - Hover equals focus. `pointerenter` focuses the control. `uiMove` plays only when focus arrives from another `.pixel-btn` or from the pointer, so `show()` auto-focus is silent.
 - Controls are gated by `enabled: () => screen.visible`. Hidden screens ignore clicks.
 
 ## Opening trailer
 Restored on 2026-10-26 after `9b13c52` deleted it (see `status.md` #18). Only the boot trailer is in the repo; the old review pages (`trailer.html`, `b3.html`, `matchcut.html`) and `js/trailer/b3|matchcut` stay in history at `9b13c52~1`.
-- Flow (`js/main.js`): `TrailerPlayer` is created before `assets.whenReady` → loading → `trailer.play()`. If the AudioContext is still suspended, a gate screen (logo + "CLICK OR PRESS ANY KEY (sound on)") waits for a pointer or key (not Esc); Electron allows autoplay, so it usually skips the gate. Then 12 scenes (~126 s); the last one loops under START.
-- `TrailerPlayer(canvas, assets, { onBegin, onEnd, showTimer, audio })`: `play(from)`, `stop()`, `setPaused/togglePause`, `paused`. `onBegin` → `overlay.showSkip()`, `onEnd` → `overlay.showStart()`. It pauses itself on `visibilitychange`.
-- Input: Enter/Space press START when it is visible; Esc toggles the trailer pause. Pad (`TrailerPlayer._pollPad`): Start toggles pause; in the pause, D-pad/left stick navigate and change volume, A confirms, B resumes. No pad button presses START/SKIP (`status.md` #19).
+- Flow (`js/main.js`): `TrailerPlayer` is created before `assets.whenReady` → loading → `trailer.play()`. If the AudioContext is still suspended, a gate screen (logo + "CLICK OR PRESS ANY BUTTON (sound on)") waits for a pointer, a key (not Esc) or any pad button. Browsers do not count a pad button as a user gesture (Chromium issue 463233716), so after a pad press the trailer waits `PAD_UNLOCK_WAIT_MS` (300 ms) and, if the audio is still locked, plays muted (`stage.audio = null`). Electron sets `autoplayPolicy: 'no-user-gesture-required'`, so the gate does not appear there. Then 12 scenes (~126 s); the last one loops under START.
+- `TrailerPlayer(canvas, assets, { onBegin, onEnd, onPadAction, showTimer, audio })`: `play(from)`, `stop()`, `setPaused/togglePause`, `paused`. `onBegin` → `overlay.showSkip()`, `onEnd` → `overlay.showStart()`. It pauses itself on `visibilitychange`.
+- Input: Enter/Space press START when it is visible; Esc toggles the trailer pause. Pad (`TrailerPlayer._pollPad`, polled from the gate on): during the trailer, A presses SKIP (once visible) and Start toggles the pause. When START is visible, A or Start press it. Routing goes through `onPadAction(button)` → `TrailerOverlay.padAction`, which returns `true` when it consumed the button. In the pause: ↑/↓ navigate, ←/→ volume (with repeat), A confirms, B or Start resume.
 - Audio: `TrailerAudio` (own WebAudio graph, follows `MasterVolume`) uses `assets/audio/trailer/*.wav`, `assets/audio/music/megasong.mp3`, and some game wavs. Images: `assets/keyart/logo.png`, `assets/fx/explosion.png`, player expressions.
 - Trailer scenes import game classes (`Player`, `SawWeapon`, `Renderer`, `PostProcessor`, traps, particles). Changing those APIs can break the trailer: check `/` without `?skipTrailer` after such changes.
 
@@ -72,7 +73,7 @@ Restored on 2026-10-26 after `9b13c52` deleted it (see `status.md` #18). Only th
 New screen: follow the `DeathScreen` pattern (root in `index.html` + CSS `.visible`, `PixelButton`s gated by `visible`, `show/hide` with `aria-hidden` and focus). Wire it from `Game` and route gamepad input in `_pollMenuPad`. See `.agents/playbooks/add-ui-screen.md`. New HUD element: draw it in `VtuberHud.draw` or after it in `Game._renderOverlays`, using `drawText` and integer scales.
 
 ## Tests
-None automated. Verify in browser: `python serve.py` → http://localhost:8000, Escape/Start to pause, lose all lives for the death screen, test keyboard, mouse, and gamepad, and check the devtools console.
+`tests/test_menu_pad.js` covers `MenuPad` (edges, first-poll latch, repeat, stick threshold, several pads). Screens have no automated tests. Verify in browser: `python serve.py` → http://localhost:8000, Escape/Start to pause, lose all lives for the death screen, test keyboard, mouse, and gamepad, and check the devtools console.
 
 ## Related docs
 `audio.md` (UI cues, `MasterVolume`), `visual-effects.md` (render order), `.agents/playbooks/add-ui-screen.md`.

@@ -44,4 +44,4 @@ Audio, UI, editor
 16. Editor hazard-on-spawn warning never shows (`#spawn-warning-box` missing); Save never overwrites (duplicates); import rebuilds `floor` (hand-edited tile values lost).
 17. `serve.py` has no auth and binds all interfaces: anyone on the LAN can write/delete `map/` while it runs. Dev-only; never expose it.
 18. ~~Opening trailer missing~~ Fixed on `fix/restore-trailer` (2026-10-26): `9b13c52` had deleted `js/trailer/` as dead code although `main.js` played it at boot. Restored only the boot trailer (no `trailer.html`/`b3`/`matchcut`); see `systems/ui.md` → Opening trailer.
-19. Trailer gamepad: Start pauses/resumes the trailer, but no pad button presses START or SKIP, and the "press any key" gate ignores the pad (keyboard/mouse only). Same as before the removal.
+19. ~~Trailer gamepad gaps~~ Fixed on `feat/gamepad-ui` (2026-10-26): gate, SKIP, START, both pauses and the death screen work with a pad (`MenuPad`). Remaining limit: in a browser, a pad-only player gets the trailer muted (pad buttons don't unlock audio). The game's `AudioManager` also stays suspended until a key/click. Electron is not affected.

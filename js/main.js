@@ -19,6 +19,7 @@ async function bootstrap() {
     const trailer = skipTrailer ? null : new TrailerPlayer(canvas, assets, {
         onEnd: () => { if (!started) overlay?.showStart(); },
         onBegin: () => overlay?.showSkip(),
+        onPadAction: (button) => overlay?.padAction(button) ?? false,
         showTimer: params.has('timer'),
         audio: !params.has('mute')
     });

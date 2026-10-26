@@ -32,6 +32,7 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `particleSystem` | ParticleSystem | js/particles/ParticleSystem.js | sparks, dust, flames, flashes, gore |
 | `audio` | AudioManager | js/core/AudioManager.js | WebAudio clips/loops/ducking (`AUDIO_CONFIG`) |
 | `input` | InputHandler | js/core/InputHandler.js | keyboard + gamepad → key set |
+| `menuPad` | MenuPad | js/core/MenuPad.js | gamepad menu edges + hold-to-repeat (`MENU_PAD`) |
 | `playerAI` | PlayerAI | js/systems/PlayerAI.js | debug bot driving P1 (toggle `I`) |
 | `chain` | Chain (wraps `[SawWeapon]`) | js/core/Chain.js, js/weapons/SawWeapon.js | cable between players + saw |
 | `playerFactory` | PlayerFactory | js/entities/PlayerFactory.js | builds the 2 Players |
@@ -103,7 +104,7 @@ DOM overlays above canvas: `#death-screen` (z 40), `#pause-screen` (z 45), `#loa
 
 `loading` (DOM, main.js) → `trailer` (main.js: `TrailerPlayer` + `TrailerOverlay`; skipped with `?skipTrailer` / `?playtest=true`) → `loading` (game audio) → `playing` (`_started = true`) ⇄ `paused` (`setPaused`; ignored before start or when gameOver; stops SFX, ambience −12 dB) → `gameOver` (any player at 0 lives; death screen) → `restart()` (floor=1, new players, `newDungeon()`). Within playing: `roomIntro` and `transition` sub-states.
 
-Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant, `R` restart (any time, no confirm), `Enter`/`Space` restart on game over. Gamepad menu (`_pollMenuPad`, any pad): Start = pause/restart, A confirm, B resume, D-pad/left stick navigate pause menu. `I` toggles PlayerAI (PlayerAI.js). Electron: F11 fullscreen, F12 DevTools. URL `?playtest=true`: uses `rooms.playtestSpawn`, disables door transitions, skips the trailer. Trailer URL flags: `?skipTrailer`, `?mute` (no audio, no gate), `?timer` (scene clock in the bottom bar).
+Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant, `R` restart (any time, no confirm), `Enter`/`Space` restart on game over. Gamepad menu (`_pollMenuPad` via `MenuPad`, any pad): Start = pause/restart, A confirm/restart, B resume, D-pad/left stick navigate the pause menu with hold-to-repeat. The trailer has its own `MenuPad` (A = SKIP/START, Start = pause or START). `I` toggles PlayerAI (PlayerAI.js). Electron: F11 fullscreen, F12 DevTools. URL `?playtest=true`: uses `rooms.playtestSpawn`, disables door transitions, skips the trailer. Trailer URL flags: `?skipTrailer`, `?mute` (no audio, no gate), `?timer` (scene clock in the bottom bar).
 
 ## Where tuning lives (`js/config/`)
 

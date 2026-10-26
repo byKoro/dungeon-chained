@@ -70,8 +70,9 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
-            // Permite o áudio tocar sem gesto do usuário (o trailer já tem a
-            // sua própria tela de "clique para começar" quando há som).
+            // Permite o áudio tocar sem gesto do usuário: botão de controle não
+            // conta como gesto, e sem isso quem joga só no controle fica mudo.
+            autoplayPolicy: 'no-user-gesture-required',
             backgroundThrottling: false,
         },
     });

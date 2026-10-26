@@ -409,3 +409,10 @@ export const HAZARDS = {
         barrierGlow: "#e53170"
     }
 };
+
+export const MENU_PAD = {
+    buttons: { a: 0, b: 1, start: 9, up: 12, down: 13, left: 14, right: 15 },
+    axisThreshold: 0.6,
+    repeatDelayMs: 350,
+    repeatMs: 110
+};

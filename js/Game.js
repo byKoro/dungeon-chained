@@ -1,4 +1,5 @@
 import { InputHandler } from './core/InputHandler.js';
+import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
 import { Chain } from './core/Chain.js';
 import { Renderer } from './core/Renderer.js';
@@ -68,7 +69,7 @@ export class Game {
             onRestart: () => this.restart()
         });
         this._started = false;
-        this._padPrev = {};
+        this.menuPad = new MenuPad();
 
         HeartPickup.sheet = this.assets.get("heartPickup");
 
@@ -269,42 +270,24 @@ export class Game {
     }
 
     _pollMenuPad() {
-        if (typeof navigator === "undefined" || !navigator.getGamepads) return;
-        const pads = navigator.getGamepads() || [];
-        const now = { start: false, a: false, b: false, up: false, down: false, left: false, right: false };
-        for (const pad of pads) {
-            if (!pad) continue;
-            const btn = (i) => this.input.isButtonPressed(pad, i);
-            const ax = pad.axes?.[0] || 0;
-            const ay = pad.axes?.[1] || 0;
-            now.start ||= btn(9);
-            now.a ||= btn(0);
-            now.b ||= btn(1);
-            now.up ||= btn(12) || ay < -0.6;
-            now.down ||= btn(13) || ay > 0.6;
-            now.left ||= btn(14) || ax < -0.6;
-            now.right ||= btn(15) || ax > 0.6;
-        }
-        const prev = this._padPrev;
-        const hit = (k) => now[k] && !prev[k];
-        this._padPrev = now;
+        const hit = this.menuPad.poll();
 
-        if (hit("start")) {
-            if (this.gameOver) { playUi("uiConfirm"); this.restart(); }
-            else this.togglePause();
-            return;
-        }
         if (this.gameOver) {
-            if (hit("a")) { playUi("uiConfirm"); this.restart(); }
+            if (hit.start || hit.a) {
+                this.deathScreen.pixel.showPressed();
+                playUi("uiConfirm");
+                this.restart();
+            }
             return;
         }
+        if (hit.start) { this.togglePause(); return; }
         if (!this.gameLoop.paused) return;
-        if (hit("up")) this.pauseScreen.move(-1);
-        else if (hit("down")) this.pauseScreen.move(1);
-        else if (hit("left")) this.pauseScreen.adjust(-1);
-        else if (hit("right")) this.pauseScreen.adjust(1);
-        else if (hit("a")) this.pauseScreen.confirm();
-        else if (hit("b")) this.setPaused(false);
+        if (hit.up) this.pauseScreen.move(-1);
+        else if (hit.down) this.pauseScreen.move(1);
+        else if (hit.left) this.pauseScreen.adjust(-1);
+        else if (hit.right) this.pauseScreen.adjust(1);
+        else if (hit.a) this.pauseScreen.confirm();
+        else if (hit.b) this.setPaused(false);
     }
 
     cycleTileset() {

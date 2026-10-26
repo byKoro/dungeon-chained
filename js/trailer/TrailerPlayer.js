@@ -15,6 +15,7 @@ import { TrailerAudio } from './audio/TrailerAudio.js';
 import { PauseScreen } from '../ui/PauseScreen.js';
 import { playUi, preloadUi } from '../ui/UiSound.js';
 import { drawText, measureText } from '../ui/PixelFont.js';
+import { MenuPad } from '../core/MenuPad.js';
 
 const SCENE_MOOD = {
     IntroScene: [-26, 420, 1.5],
@@ -38,6 +39,7 @@ const SCENES = [
 
 const IMPACT_INVERT = 0.06;
 const IMPACT_FLASH = 0.22;
+const PAD_UNLOCK_WAIT_MS = 300;
 
 export class TrailerPlayer {
     constructor(canvas, assets, opts = {}) {
@@ -52,7 +54,8 @@ export class TrailerPlayer {
         this._gate = null;
         this._paused = false;
         this.pauseScreen = null;
-        this._padPrev = {};
+        this.menuPad = new MenuPad();
+        this.onPadAction = opts.onPadAction || null;
         if (typeof document !== 'undefined') {
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden && this.running && !this._gate) this.setPaused(true);
@@ -89,17 +92,29 @@ export class TrailerPlayer {
         const gate = this._gate = { from, t: 0, loaded: false };
         preloadUi();
         this.stage.audio.ready.then(() => { gate.loaded = true; });
-        const go = (e) => {
-            if (e?.key === 'Escape') return;
+        const go = (e, { fromPad = false } = {}) => {
+            if (e?.key === 'Escape' || gate.going) return;
+            gate.going = true;
             window.removeEventListener('pointerdown', go, true);
             window.removeEventListener('keydown', go, true);
             if (!e?.target?.closest?.('.pixel-btn, button')) playUi('uiConfirm');
-            this.stage.audio.unlock().then(() => this.stage.audio.ready).then(() => {
+            const au = this.stage.audio;
+            const begin = () => {
                 if (this._gate !== gate) return;
                 this._gate = null;
                 this._begin(gate.from);
-            });
+            };
+            au.unlock().then(() => au.ready).then(begin);
+            // No navegador, botão de controle não conta como gesto e o áudio não destrava: segue mudo, sem travar no gate.
+            if (fromPad) {
+                setTimeout(() => {
+                    if (this._gate !== gate || au.running) return;
+                    this.stage.audio = null;
+                    begin();
+                }, PAD_UNLOCK_WAIT_MS);
+            }
         };
+        gate.go = go;
         gate.cancel = () => {
             window.removeEventListener('pointerdown', go, true);
             window.removeEventListener('keydown', go, true);
@@ -140,28 +155,24 @@ export class TrailerPlayer {
     togglePause() { this.setPaused(!this._paused); }
 
     _pollPad() {
-        if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
-        const now = { start: false, a: false, b: false, up: false, down: false, left: false, right: false };
-        for (const pad of navigator.getGamepads() || []) {
-            if (!pad) continue;
-            const btn = (i) => !!pad.buttons?.[i]?.pressed;
-            const ax = pad.axes?.[0] || 0, ay = pad.axes?.[1] || 0;
-            now.start ||= btn(9); now.a ||= btn(0); now.b ||= btn(1);
-            now.up ||= btn(12) || ay < -0.6; now.down ||= btn(13) || ay > 0.6;
-            now.left ||= btn(14) || ax < -0.6; now.right ||= btn(15) || ax > 0.6;
+        const hit = this.menuPad.poll();
+        if (this._gate) {
+            if (hit.any) this._gate.go?.(null, { fromPad: true });
+            return;
         }
-        const prev = this._padPrev;
-        const hit = (k) => now[k] && !prev[k];
-        this._padPrev = now;
-        if (hit('start')) { this.togglePause(); return; }
-        if (!this._paused || !this.pauseScreen) return;
-        const ps = this.pauseScreen;
-        if (hit('up')) ps.move(-1);
-        else if (hit('down')) ps.move(1);
-        else if (hit('left')) ps.adjust(-1);
-        else if (hit('right')) ps.adjust(1);
-        else if (hit('a')) ps.confirm();
-        else if (hit('b')) this.setPaused(false);
+        if (this._paused && this.pauseScreen) {
+            const ps = this.pauseScreen;
+            if (hit.start) this.togglePause();
+            else if (hit.up) ps.move(-1);
+            else if (hit.down) ps.move(1);
+            else if (hit.left) ps.adjust(-1);
+            else if (hit.right) ps.adjust(1);
+            else if (hit.a) ps.confirm();
+            else if (hit.b) this.setPaused(false);
+            return;
+        }
+        if (hit.start) { if (!this.onPadAction?.('start')) this.togglePause(); }
+        else if (hit.a) this.onPadAction?.('a');
     }
 
     _begin(from = 0) {
@@ -203,7 +214,7 @@ export class TrailerPlayer {
         if (!this.running) return;
         const dt = Math.min(0.05, (now - this._last) / 1000);
         this._last = now;
-        if (!this._gate) this._pollPad();
+        this._pollPad();
         if (this._gate) { this._gate.t += dt; this._drawGate(); }
         else if (this._paused) {   }
         else { this.update(dt); this.render(); }
@@ -220,7 +231,7 @@ export class TrailerPlayer {
         ctx.restore();
         const logo = this.stage.drawTitleLogo(0, Math.min(1, g.t / 0.6), H / 2 - 16);
         const promptY = logo ? logo.y + logo.h + 36 : H / 2 + 64;
-        const text = g.loaded ? '▶ CLICK OR PRESS ANY KEY  (sound on)' : 'loading sound…';
+        const text = g.loaded ? '▶ CLICK OR PRESS ANY BUTTON  (sound on)' : 'loading sound…';
         const art = this._pixelText(text);
         const s = Math.max(2, (this.stage.logoScale() || 3) - 1);
         const blink = 0.55 + 0.45 * Math.sin(g.t * 4);

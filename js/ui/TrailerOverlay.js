@@ -23,6 +23,11 @@ export class TrailerOverlay {
             enabled: () => this.start.classList.contains('visible') && !this._confirmed,
             onPress: () => { this._confirmed = true; onStart(); }
         });
+        this._pressSkip = () => {
+            this.skipBtn.showPressed();
+            playUi('uiConfirm');
+            onStart();
+        };
         this._confirmStart = () => {
             // Enter/Espaço não passam pelo clique do botão: mostra o quadro apertado e toca o som uma vez só.
             if (!this._confirmed) { this.startBtn.showPressed(); playUi('uiConfirm'); }
@@ -44,6 +49,17 @@ export class TrailerOverlay {
             }
         };
         window.addEventListener('keydown', this._onKey);
+    }
+
+    // A ou Start no fim apertam START; A durante o trailer aperta SKIP. Start sem START na tela fica com a pausa.
+    padAction(button) {
+        if (!this.root || this.root.classList.contains('hidden')) return false;
+        if (this.start.classList.contains('visible')) {
+            if (button === 'a' || button === 'start') { this._confirmStart(); return true; }
+            return false;
+        }
+        if (button === 'a' && this.skip.classList.contains('visible')) { this._pressSkip(); return true; }
+        return false;
     }
 
     _applyScale() {
