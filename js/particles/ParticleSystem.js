@@ -3,6 +3,8 @@ import { DustPuff } from './DustPuff.js';
 import { SparkParticle } from './SparkParticle.js';
 import { FlashParticle } from './FlashParticle.js';
 import { FlameParticle } from './FlameParticle.js';
+import { DamageNumber } from './DamageNumber.js';
+import { DAMAGE_NUMBER } from '../config/CombatFeelConfig.js';
 
 const BLOOD_PX = 4;
 
@@ -19,7 +21,7 @@ function updateAndCompact(list, a, b) {
 }
 
 class AirParticle {
-    constructor(x, y, color, isBlood = false, spread = 1, ephemeral = false) {
+    constructor(x, y, color, isBlood = false, spread = 1, ephemeral = false, dir = null) {
         this.x = x;
         this.y = y;
         this.color = color;
@@ -29,7 +31,10 @@ class AirParticle {
 
         this.size = BLOOD_PX * (1 + (Math.random() < 0.35 ? 1 : 0));
 
-        const angle = Math.random() * Math.PI * 2;
+        // Com `dir`, o sangue sai em leque ao redor da direção do golpe em vez de radial.
+        const angle = dir
+            ? Math.atan2(dir.y, dir.x) + (Math.random() - 0.5) * 1.6
+            : Math.random() * Math.PI * 2;
         const speed = ((isBlood ? 3 : 4) + Math.random() * (isBlood ? 8 : 11)) * spread;
         this.vx = Math.cos(angle) * speed + (Math.random() - 0.5) * 2;
         this.vy = Math.sin(angle) * speed - (1 + Math.random() * 3.5);
@@ -94,6 +99,7 @@ export class ParticleSystem {
         this.sparks = [];
         this.flashes = [];
         this.flames = [];
+        this.damageNumbers = [];
         this.bloodCanvas = bloodCanvas;
     }
 
@@ -104,7 +110,28 @@ export class ParticleSystem {
         this.sparks = [];
         this.flashes = [];
         this.flames = [];
+        this.damageNumbers = [];
         if (this.bloodCanvas) this.bloodCanvas.clear();
+    }
+
+    triggerDamageNumber(x, y, amount, opts = {}) {
+        this.damageNumbers.push(new DamageNumber(x, y, amount, opts));
+        while (this.damageNumbers.length > DAMAGE_NUMBER.max) this.damageNumbers.shift();
+    }
+
+    // Faíscas em cone a partir do ponto de contato, na direção do golpe.
+    triggerHitSparks(x, y, dirX, dirY, amount = 6, power = 1, cone = 0.9) {
+        for (let i = 0; i < amount; i++) {
+            this.sparks.push(new SparkParticle(x, y, 0, 1, { dir: { x: dirX, y: dirY }, power, cone }));
+        }
+    }
+
+    triggerHitBlood(x, y, dirX, dirY, amount = 5, spread = 0.8) {
+        const dir = { x: dirX, y: dirY };
+        for (let i = 0; i < amount; i++) {
+            const c = AIR_BLOOD_COLORS[Math.floor(Math.random() * AIR_BLOOD_COLORS.length)];
+            this.airParticles.push(new AirParticle(x, y, c, true, spread, false, dir));
+        }
     }
 
     triggerDust(x, y, dirX, dirY, amount = 10) {
@@ -200,6 +227,15 @@ export class ParticleSystem {
         updateAndCompact(this.sparks);
         updateAndCompact(this.flashes);
         updateAndCompact(this.flames);
+        updateAndCompact(this.damageNumbers);
+    }
+
+    get hasDamageNumbers() {
+        return this.damageNumbers.length > 0;
+    }
+
+    drawDamageNumbers(ctx) {
+        for (let i = 0; i < this.damageNumbers.length; i++) this.damageNumbers[i].draw(ctx);
     }
 
     drawFloor(ctx, clip, holes = null) {

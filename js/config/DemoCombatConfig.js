@@ -1,6 +1,7 @@
 export const DEMO_ENEMY_STATS = {
     assassin: { hp: 1, speed: 2.8, windupFrames: 26, recoverFrames: 22 },
-    tank: { hp: 4, speed: 1.1, windupFrames: 65, recoverFrames: 40 }
+    // poise > 0 = inimigo forte: acumula poise, tem stagger curto e stun longo ao romper (ver ENEMY_HIT).
+    tank: { hp: 4, poise: 3, speed: 1.1, windupFrames: 65, recoverFrames: 40 }
 };
 
 export const FIRE_SKULL = {

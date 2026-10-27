@@ -23,7 +23,11 @@ Everything that makes hits feel heavy: pixel particles (dust, sparks, flashes, f
 |---|---|
 | `this.renderer.triggerShake(px)` | random offset, keeps `max(current, px)`, decays ×0.88 per render frame. Used values: 1.6 (high-speed saw, every step), 3, 4, 6, 7, 10, 14 |
 | `this.renderer.triggerZoomPunch(k)` | zoom × (1+k), decays ×0.82/frame; largest magnitude wins. Positive = punch in (`0.045` door flash), negative = out (`-0.07` room cleared) |
-| `this.gameLoop.triggerHitSlowmo()` / `game.triggerHitSlowmo()` | timeScale eases from `HIT_SLOWMO.minScale` (0.25) back to 1 over `duration` (0.22 s). Fired per kill |
+| `this.gameLoop.triggerHitSlowmo()` / `game.triggerHitSlowmo()` | timeScale eases from `HIT_SLOWMO.minScale` (0.25) back to 1 over `duration` (0.22 s). Fired per kill (not per non-lethal hit) |
+| `this.gameLoop.triggerHitStop(seconds)` | Freezes the **simulation** for `seconds` of real time, clamped to `HIT_STOP.min..max` (0.02–0.10 s); rendering, input polling, shake and the camera keep running. Max-merges (never adds), refuses new stops for `HIT_STOP.minGap` after one ends and while paused; pausing cancels it. Slow-mo and resume timers do not advance during the stop, so a kill's slow-mo plays right after it. Tier durations in `HIT_FEEL.hitStop` |
+| `.triggerHitSparks(x,y,dirX,dirY,n,power,cone)` | sparks in a cone from the contact point along the hit direction |
+| `.triggerHitBlood(x,y,dirX,dirY,n,spread)` | blood arcs fanned around the hit direction (stamps like `triggerBlood`) |
+| `.triggerDamageNumber(x,y,amount,{color})` | floating number (`DamageNumber`, `PixelFont`, art-pixel scale `DAMAGE_NUMBER.pixel`), max `DAMAGE_NUMBER.max`; step-based like every particle; drawn by `drawDamageNumbers` in the unlit overlay pass (`Game._renderView`, with the hearts); cleared by `clear()` and on door transitions |
 | `this.screenGore.triggerFlash(i=1)` | full-screen `#8a0f1a` pulse, peak capped 0.3, 20 steps |
 | `this.screenGore.trigger()` | 4–7 blood drops fly in from screen edges (on enemy death) |
 | `this.particleSystem.triggerDust(x,y,dirX,dirY,n)` | `DustPuff`s moving opposite to dir |

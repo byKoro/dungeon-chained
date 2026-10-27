@@ -42,6 +42,14 @@ export const HIT_SLOWMO = {
     minScale: 0.25
 };
 
+// Pausa curta da simulação em tempo real a cada acerto; render e câmera seguem ativos.
+export const HIT_STOP = {
+    min: 0.02,
+    max: 0.10,
+    // Folga mínima depois de um hit stop antes de aceitar outro: evita travar o jogo em sequências.
+    minGap: 0.08
+};
+
 export const ROOM_INTRO = {
     enabled: true,
     zoomFactor: 1.35,

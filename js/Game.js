@@ -139,7 +139,7 @@ export class Game {
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
-        this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio });
+        this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, hitFeedback: true });
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
 
         this.effects.stepBlocker = (x, y) => !!this.rooms?.current?.challenge?.coversButton(x, y);
@@ -430,6 +430,8 @@ export class Game {
         this._rememberEntrySpawns();
 
         if (!this.chain.isConnected) this.chain.reset();
+
+        this.particleSystem.damageNumbers = [];
 
         const combat = this._activateRoomEnemies();
         if (!combat && !this.rooms.isLocked()) {
@@ -830,9 +832,9 @@ export class Game {
 
         this.combat.resolveWeaponHits(
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
-            () => {
-                this.triggerHitSlowmo();
-
+            () => this.triggerHitSlowmo(),
+            (enemy, info) => {
+                this.gameLoop.triggerHitStop(info.hitStop);
                 this.sawMotor?.onHit();
             }
         );
@@ -1086,9 +1088,10 @@ export class Game {
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
-        if (hearts.length) {
+        if (hearts.length || this.particleSystem.hasDamageNumbers) {
             renderer.beginOverlayWorld();
             hearts.forEach(h => h.drawOverlay(ctx));
+            this.particleSystem.drawDamageNumbers(ctx);
             renderer.endOverlayWorld();
         }
 

@@ -1,7 +1,26 @@
 import { TILE } from '../config/GameConfig.js';
+import { ENEMY_HIT } from '../config/CombatFeelConfig.js';
 import { Entity } from './Entity.js';
 import { GibPiece } from '../particles/GibPiece.js';
 import { BloodStains } from '../particles/BloodStains.js';
+
+let tintBuf = null;
+
+// Recorte do sprite pintado com `color` só nos pixels opacos (flash de acerto).
+function tintedCrop(sheet, sx, sy, w, h, color, alpha) {
+    if (!tintBuf) tintBuf = document.createElement('canvas');
+    if (tintBuf.width !== w || tintBuf.height !== h) { tintBuf.width = w; tintBuf.height = h; }
+    const b = tintBuf.getContext('2d');
+    b.globalCompositeOperation = 'source-over';
+    b.globalAlpha = 1;
+    b.clearRect(0, 0, w, h);
+    b.drawImage(sheet, sx, sy, w, h, 0, 0, w, h);
+    b.globalCompositeOperation = 'source-atop';
+    b.globalAlpha = alpha;
+    b.fillStyle = color;
+    b.fillRect(0, 0, w, h);
+    return tintBuf;
+}
 
 export class MeleeEnemy extends Entity {
     constructor(x, y, sheet, spriteConfig, floor = 1) {
@@ -13,6 +32,14 @@ export class MeleeEnemy extends Entity {
         this.hp = spriteConfig.combat?.hp ?? 1;
         this.hitTimer = 0;
         this.speed = spriteConfig.combat?.speed ?? 1.7;
+
+        this.poiseMax = spriteConfig.combat?.poise ?? 0;
+        this.poise = this.poiseMax;
+        this.poiseRegenTimer = 0;
+        this.flashTimer = 0;
+        this.flashTotal = 0;
+        this.vulnerableTimer = 0;
+        this._hurtPose = null;
 
         this.attackRange = 44;
         this.hitRange = 58;
@@ -179,12 +206,78 @@ export class MeleeEnemy extends Entity {
         return this.state === "dying" && this.dyingTimer <= 0;
     }
 
-    takeHit(damage = 1) {
-        if (this.hitTimer > 0 || this.frozen || this.state === 'dying') return false;
-        this.hp -= damage;
-        this.hitTimer = 24;
-        if (this.hp <= 0) this.startDying();
-        return true;
+    // `hit` = { dirX, dirY } (da fonte do golpe para o inimigo). Sem `hit` só desconta vida (chamadas legadas).
+    // Retorna false se o golpe foi recusado (cooldown, spawn congelado, morrendo); senão o resultado do golpe.
+    takeHit(damage = 1, hit = null) {
+        if (this.hitTimer > 0 || this.frozen || this.state === 'dying' || this.state === 'dead') return false;
+
+        const vulnerable = this.vulnerableTimer > 0;
+        const dealt = Math.max(1, Math.round(damage * (vulnerable ? ENEMY_HIT.poise.vulnerableDamageMult : 1)));
+        const result = { damage: dealt, killed: false, staggered: false, poiseBroken: false, vulnerable };
+
+        this.hp -= dealt;
+        this.hitTimer = ENEMY_HIT.cooldownSteps;
+
+        if (this.hp <= 0) {
+            this.startDying();
+            result.killed = true;
+            if (hit) this._startFlash(ENEMY_HIT.flash.steps);
+            return result;
+        }
+        if (!hit) return result;
+
+        let broken = false;
+        if (this.state !== 'stunned' && this.poiseMax > 0) {
+            this.poise -= ENEMY_HIT.poise.perHit;
+            this.poiseRegenTimer = ENEMY_HIT.poise.regenDelaySteps;
+            broken = this.poise <= 0;
+        }
+        this._enterStagger(hit, broken);
+        result.staggered = true;
+        result.poiseBroken = broken;
+        return result;
+    }
+
+    _startFlash(steps) {
+        this.flashTimer = steps;
+        this.flashTotal = steps;
+    }
+
+    // Interrompe windup/attack/recover, congela a pose atual e empurra para longe da fonte do golpe.
+    _enterStagger(hit, broken) {
+        const wasStunned = this.state === 'stunned';
+        if (this.state !== 'hurt' && this.state !== 'stunned') {
+            const anim = this._currentAnim();
+            this._hurtPose = { anim, frame: this._currentFrameIndex(anim) };
+        }
+        this.dealtHit = false;
+        this.justAttacked = false;
+        this.stepDistance = 0;
+
+        if (broken) {
+            this.poise = this.poiseMax;
+            this.state = 'stunned';
+            this.stateTimer = ENEMY_HIT.poise.breakSteps;
+            this.vulnerableTimer = ENEMY_HIT.poise.vulnerableSteps;
+            this._startFlash(ENEMY_HIT.flash.breakSteps);
+        } else if (wasStunned) {
+            this.stateTimer = Math.max(this.stateTimer, ENEMY_HIT.stagger.steps);
+            this._startFlash(ENEMY_HIT.flash.steps);
+        } else {
+            this.state = 'hurt';
+            this.stateTimer = ENEMY_HIT.stagger.steps;
+            this._startFlash(ENEMY_HIT.flash.steps);
+        }
+        this.animTime = 0;
+        this.vx = 0;
+        this.vy = 0;
+
+        const kb = broken ? ENEMY_HIT.poise.breakKnockback : ENEMY_HIT.stagger.knockback;
+        const len = Math.hypot(hit.dirX ?? 0, hit.dirY ?? 0);
+        if (len > 0.0001) {
+            this.pushVx = (hit.dirX / len) * kb;
+            this.pushVy = (hit.dirY / len) * kb;
+        }
     }
 
     startDying() {
@@ -265,6 +358,11 @@ export class MeleeEnemy extends Entity {
 
     update(players, onPlayerHit) {
         this.hitTimer = Math.max(0, this.hitTimer - 1);
+        if (this.flashTimer > 0) this.flashTimer--;
+        if (this.vulnerableTimer > 0) this.vulnerableTimer--;
+        if (this.poiseMax > 0 && this.poise < this.poiseMax && this.state !== 'stunned' && --this.poiseRegenTimer <= 0) {
+            this.poise = this.poiseMax;
+        }
         this.justStepped = false;
         this.justAttacked = false;
 
@@ -396,6 +494,17 @@ export class MeleeEnemy extends Entity {
                 }
                 break;
             }
+
+            case "hurt":
+            case "stunned": {
+                this.vx *= 0.6;
+                this.vy *= 0.6;
+                if (--this.stateTimer <= 0) {
+                    this.state = "chase";
+                    this.animTime = 0;
+                }
+                break;
+            }
         }
 
         this._applyPush();
@@ -412,9 +521,15 @@ export class MeleeEnemy extends Entity {
         }
     }
 
+    // Empurrão nunca leva o inimigo para buraco/borda; o Game ainda resolve paredes e limites da sala.
     _applyPush() {
-        this.x += this.pushVx;
-        this.y += this.pushVy;
+        if (this.pushVx !== 0 || this.pushVy !== 0) {
+            const nx = this.x + this.pushVx;
+            const ny = this.y + this.pushVy;
+            const stuck = !this._isWalkable(this.x, this.y);
+            if (stuck || this._isWalkable(nx, this.y)) this.x = nx; else this.pushVx = 0;
+            if (stuck || this._isWalkable(this.x, ny)) this.y = ny; else this.pushVy = 0;
+        }
         this.pushVx *= 0.85;
         this.pushVy *= 0.85;
         if (Math.abs(this.pushVx) < 0.01) this.pushVx = 0;
@@ -425,6 +540,8 @@ export class MeleeEnemy extends Entity {
         const r = this.sprite.rows;
         switch (this.state) {
             case "dying":  return (this._frozen && this._frozen.anim) || r.walk;
+            case "hurt":
+            case "stunned": return (this._hurtPose && this._hurtPose.anim) || r.walk;
             case "dead":   return r.death;
             case "attack": return r[this.currentAttack] || r.attack;
             case "windup":
@@ -438,6 +555,9 @@ export class MeleeEnemy extends Entity {
         if (this.state === "dying") {
 
             return this._frozen ? this._frozen.frame : 0;
+        }
+        if (this.state === "hurt" || this.state === "stunned") {
+            return this._hurtPose ? this._hurtPose.frame : 0;
         }
         if (this.state === "dead") {
 
@@ -494,8 +614,16 @@ export class MeleeEnemy extends Entity {
             revealT = 1 - this.spawnFx / this.spawnFxDuration;
         }
 
+        let img = this.sheet, imgX = srcX, imgY = srcY;
+        const tint = this._tintSpec();
+        if (tint) {
+            img = tintedCrop(this.sheet, srcX, srcY, cw, ch, tint.color, tint.alpha);
+            imgX = 0;
+            imgY = 0;
+        }
+
         ctx.save();
-        ctx.translate(this.x, this.y);
+        ctx.translate(this.x + this._jitterX(), this.y);
         if (this.facingLeft) ctx.scale(-1, 1);
 
         ctx.translate(cropCenterOffset, cropCenterOffsetY);
@@ -512,11 +640,33 @@ export class MeleeEnemy extends Entity {
         }
 
         ctx.drawImage(
-            this.sheet,
-            srcX, srcY, cw, ch,
+            img,
+            imgX, imgY, cw, ch,
             -drawW / 2, -drawH / 2, drawW, drawH
         );
 
         ctx.restore();
+    }
+
+    _tintSpec() {
+        if (this.flashTimer > 0) {
+            const f = ENEMY_HIT.flash;
+            const firstHalf = this.flashTimer > this.flashTotal * 0.5;
+            return { color: firstHalf ? f.first : f.second, alpha: f.alpha };
+        }
+        if (this.vulnerableTimer > 0 && !this.isDying) {
+            const p = ENEMY_HIT.vulnerablePulse;
+            if (Math.floor(this.vulnerableTimer / (p.periodSteps / 2)) % 2 === 0) return { color: p.color, alpha: p.alpha };
+        }
+        return null;
+    }
+
+    _jitterX() {
+        if (this.state === "hurt") {
+            const amp = ENEMY_HIT.jitter.hurt * (this.stateTimer / ENEMY_HIT.stagger.steps);
+            return (this.stateTimer % 2 ? 1 : -1) * amp;
+        }
+        if (this.state === "stunned") return Math.sin(this.animTime * 0.6) * ENEMY_HIT.jitter.stunned;
+        return 0;
     }
 }

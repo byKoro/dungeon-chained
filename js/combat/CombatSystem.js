@@ -1,15 +1,19 @@
 import { Physics } from '../core/Physics.js';
 import { PLAYER_SAFE_ZONE, MAX_ACTIVE_GIBS, HEART_DROP } from '../config/GameConfig.js';
+import { ENEMY_HIT, HIT_FEEL, DAMAGE_NUMBER } from '../config/CombatFeelConfig.js';
 
 const HIT_COMBO_WINDOW_MS = 900;
 const HIT_COMBO_PITCH_STEP = 0.035;
 const HIT_COMBO_MAX_STEPS = 5;
 
 export class CombatSystem {
-    constructor({ renderer, particleSystem, audio = null }) {
+    // `hitFeedback` liga o feedback novo de acerto (impacto, números, stagger). Desligado, o comportamento
+    // é o antigo: os trailers usam o CombatSystem sem ele.
+    constructor({ renderer, particleSystem, audio = null, hitFeedback = false }) {
         this.renderer = renderer;
         this.particleSystem = particleSystem;
         this.audio = audio;
+        this.hitFeedback = hitFeedback;
         this._combo = 0;
         this._lastHitAt = -Infinity;
     }
@@ -18,17 +22,30 @@ export class CombatSystem {
         return globalThis.performance?.now?.() ?? Date.now();
     }
 
-    _playSawHit(count) {
+    _playSawHit(count, heavy = false) {
         if (!this.audio) return;
         const now = this._now();
         this._combo = now - this._lastHitAt < HIT_COMBO_WINDOW_MS ? this._combo + 1 : 0;
         this._lastHitAt = now;
         const step = Math.min(this._combo, HIT_COMBO_MAX_STEPS);
+        const boost = heavy ? HIT_FEEL.poiseBreakAudio : null;
         this.audio.play("sawHit", {
-            rateMultiplier: 1 + step * HIT_COMBO_PITCH_STEP,
-            volumeMultiplier: Math.min(1.35, 1 + (count - 1) * 0.15)
+            rateMultiplier: (1 + step * HIT_COMBO_PITCH_STEP) * (boost?.rateMultiplier ?? 1),
+            volumeMultiplier: Math.min(1.35, 1 + (count - 1) * 0.15) * (boost?.volumeMultiplier ?? 1)
         });
-        this.audio.duck?.(-7, { attackMs: 10, holdMs: 90, releaseMs: 500 });
+        this.audio.duck?.(heavy ? -9 : -7, { attackMs: 10, holdMs: 90, releaseMs: 500 });
+    }
+
+    // Ponto de contato e direção do golpe (da fonte para o inimigo). Disco tem prioridade sobre o cabo.
+    _impact(enemy, source) {
+        let dirX = enemy.x - source.x;
+        let dirY = enemy.y - source.y;
+        const d = Math.hypot(dirX, dirY);
+        if (d > 0.001) { dirX /= d; dirY /= d; }
+        else if (source.fallbackDir) { dirX = source.fallbackDir.x; dirY = source.fallbackDir.y; }
+        else { dirX = 0; dirY = -1; }
+        const reach = source.radius ? Math.min(d, source.radius) : 0;
+        return { x: source.x + dirX * reach, y: source.y + dirY * reach, dirX, dirY, source: source.kind };
     }
 
     updateEnemies(enemies, players) {
@@ -50,12 +67,15 @@ export class CombatSystem {
         }
     }
 
-    resolveWeaponHits(weapon, enemies, p1, p2, connected = true, onKill = null) {
+    // `onKill(enemy)` roda só quando o golpe mata. `onHit(enemy, info)` roda em todo golpe aceito, com
+    // info = { damage, killed, poiseBroken, staggered, x, y, dirX, dirY, hitStop }.
+    resolveWeaponHits(weapon, enemies, p1, p2, connected = true, onKill = null, onHit = null) {
         if (!connected) return;
 
         const sawPos = weapon.getSawPositions ? weapon.getSawPositions(p1, p2)[0] : null;
         const discR = (sawPos && weapon.discRadius) ? weapon.discRadius : 0;
         let hits = 0;
+        let heavy = false;
 
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
@@ -71,18 +91,87 @@ export class CombatSystem {
                 Math.hypot(enemy.x - sawPos.x, enemy.y - sawPos.y) < discR + enemy.hitRadius;
 
             if (hitChain || hitDisc) {
-                if (enemy.takeHit) { if (!enemy.takeHit()) continue; }
-                else enemy.startDying();
+                if (!this.hitFeedback) {
+                    if (enemy.takeHit) { if (!enemy.takeHit()) continue; }
+                    else enemy.startDying();
+                    weapon.onHit?.();
+                    hits++;
+                    if (this.audio) this.audio.play("monsterHurt");
+                    this.renderer.triggerShake(10);
+                    this.particleSystem.triggerBlood(enemy.x, enemy.y, 10, 0.9);
+                    onKill?.(enemy);
+                    continue;
+                }
+
+                const impact = hitDisc
+                    ? this._impact(enemy, { x: sawPos.x, y: sawPos.y, radius: discR, kind: "disc" })
+                    : this._impact(enemy, {
+                        ...Physics.closestPointOnSegment(enemy.x, enemy.y, p1.x, p1.y, p2.x, p2.y),
+                        kind: "chain",
+                        fallbackDir: { x: -(p2.y - p1.y), y: p2.x - p1.x }
+                    });
+
+                let result = true;
+                if (enemy.takeHit) {
+                    result = enemy.takeHit(ENEMY_HIT.sawDamage, impact);
+                    if (!result) continue;
+                } else enemy.startDying();
+
+                const info = this._hitInfo(enemy, result, impact);
                 weapon.onHit?.();
                 hits++;
-                if (this.audio) this.audio.play("monsterHurt");
-                this.renderer.triggerShake(10);
-                this.particleSystem.triggerBlood(enemy.x, enemy.y, 10, 0.9);
-                onKill?.(enemy);
+                heavy = heavy || info.poiseBroken;
+                this._hitFeedback(enemy, info);
+                onHit?.(enemy, info);
+                if (info.killed) onKill?.(enemy);
             }
         }
 
-        if (hits > 0) this._playSawHit(hits);
+        if (hits > 0) this._playSawHit(hits, heavy);
+    }
+
+    _hitInfo(enemy, result, impact) {
+        const r = typeof result === "object" ? result : {};
+        const killed = r.killed ?? (enemy.state === "dying");
+        const poiseBroken = !!r.poiseBroken;
+        const tier = killed ? "kill" : poiseBroken ? "poiseBreak" : "hit";
+        return {
+            damage: r.damage ?? ENEMY_HIT.sawDamage,
+            killed,
+            poiseBroken,
+            staggered: !!r.staggered,
+            tier,
+            hitStop: HIT_FEEL.hitStop[tier],
+            x: impact.x,
+            y: impact.y,
+            dirX: impact.dirX,
+            dirY: impact.dirY
+        };
+    }
+
+    // Efeitos do contato. O som é o sawHit tocado uma vez por chamada em _playSawHit (monsterHurt segue
+    // desativado e sem arquivos: não conta como feedback).
+    _hitFeedback(enemy, info) {
+        const ps = this.particleSystem;
+        const fx = HIT_FEEL;
+        const { tier } = info;
+
+        this.audio?.play("monsterHurt");
+        this.renderer.triggerShake(fx.shake[tier]);
+
+        ps.triggerHitSparks?.(info.x, info.y, info.dirX, info.dirY, fx.sparks[tier], fx.sparks.power, fx.sparks.cone);
+        ps.triggerFlash?.(info.x, info.y, fx.glint.amount, fx.glint.power);
+        if (info.killed) {
+            ps.triggerBlood(enemy.x, enemy.y, 10, 0.9);
+        } else {
+            ps.triggerHitBlood?.(info.x, info.y, info.dirX, info.dirY, fx.blood[tier], fx.blood.spread);
+            ps.triggerDust?.(info.x, info.y, -info.dirX, -info.dirY, fx.dust[tier]);
+        }
+
+        const top = enemy.y - (enemy.drawHeight ?? 40) / 2 - 6;
+        ps.triggerDamageNumber?.(enemy.x, top, info.damage, {
+            color: info.killed ? DAMAGE_NUMBER.killColor : info.poiseBroken ? DAMAGE_NUMBER.breakColor : DAMAGE_NUMBER.color
+        });
     }
 
     resolveDeaths(room, gibs, onKill = null, players = []) {

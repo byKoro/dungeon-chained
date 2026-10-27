@@ -37,7 +37,7 @@ The only weapon is a saw disc riding the midpoint of the cable that chains P1 an
    - **cable hit**: `Physics.distToSegment(enemy, p1→p2) < weapon.hitThreshold + enemy.hitRadius` AND enemy farther than `PLAYER_SAFE_ZONE` (46) from both players (note: straight segment, not the sagging drawn cable);
    - **disc hit**: distance to `getSawPositions()[0]` < `discRadius + enemy.hitRadius` (no safe-zone exemption).
    - Spin speed does **not** gate damage — a still saw kills too.
-   - Any hit ⇒ instant `startDying()` (no enemy HP), `weapon.onHit()`, sawHit combo SFX; Game's onKill ⇒ `triggerHitSlowmo()` (`HIT_SLOWMO`) and `sawMotor.onHit()`.
+   - Any accepted hit ⇒ `enemy.takeHit(1, impact)` (hp/poise/stagger live in `MeleeEnemy`, see combat-and-entities.md; common enemies have hp 1 and die), `weapon.onHit()`, game-feel feedback, one sawHit combo SFX per call. Game's `onHit` ⇒ `gameLoop.triggerHitStop()` + `sawMotor.onHit()`; Game's `onKill` (only when the hit kills) ⇒ `triggerHitSlowmo()` (`HIT_SLOWMO`). The impact point is the disc rim toward the enemy or the closest point on the cable; collision rules above are unchanged. `ThrownSaw` still calls `takeHit()` without impact info (no new feedback).
 5. `GameLoop.onFrameStart` → `Game._updateSawMotor()` (per render frame, not per sim step); motor created lazily on start with `audio.createLoopVoice("sawMotor")`, exposed as `window.sawMotor`.
 6. Render: `chain.drawChain` before entities; `chain.draw` between entities with `y <= sawY` and `y > sawY` (depth sort around the disc); `chain.drawDropped`.
 

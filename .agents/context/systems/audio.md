@@ -78,7 +78,7 @@ Web Audio graph: `loop gain → _duckNode → _preNode → _masterNode → desti
 - `stopAll()` (called on pause) stops one-shots only. Loops continue; ambience is lowered with `setLoopLevel`, and the motor goes silent via `active:false`.
 - `enemyStep` and `playerStep` intentionally share `footstep-stone-0[1-6].ogg`; enemies use `rate 0.72`.
 - `playerHurt` (CombatSystem, on enemy contact) and `playerHit` (Game, on any life loss) both use `player-hit-0N.wav`. An enemy hit can therefore fire both.
-- `monsterHurt` and `enemyAttackVoice` are `enabled:false` with `files: []`. They are placeholders and their calls are no-ops.
+- `monsterHurt` and `enemyAttackVoice` are `enabled:false` with `files: []`. They are placeholders and their calls are no-ops. `CombatSystem` still calls `monsterHurt` on each saw hit so a future wound sound only needs files + `enabled:true`; until then `sawHit` is the only audible confirmation (a poise break plays it with `HIT_FEEL.poiseBreakAudio`: lower rate, higher volume, −9 dB duck). Missing assets: enemy wound/grunt and a heavier stagger/poise-break impact.
 - `AUDIO_CLIPS` (name → files) has no consumer in `js/` besides the re-export. It exists for compatibility; `AudioManager._normalizeConfig` still accepts that legacy flat map.
 - `whenReady` waits only for one-shot clips (not loop buffers) and resolves after `timeoutMs` regardless.
 - Debug globals: `window.audio`, `window.audioConfig`, `window.sawMotor`.

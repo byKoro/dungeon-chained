@@ -24,16 +24,17 @@ How enemies are defined, spawned, navigate, attack and die; how players take dam
 
 **`MeleeEnemy(x, y, sheet, spriteConfig, floor=1)`** (hitRadius 18)
 - Tuning (hard-coded in constructor): `speed 1.7`, `attackRange 44`, `hitRange 58`, `windupFrames = max(16, 55 - (floor-1)*6)`, `recoverFrames 28`, `dyingDuration 9`.
-- States (`state`): `"chase" → "windup" → "attack" → "recover" → "chase"`; `"dying"` after a hit. `"dead"` branch exists (`isDead`, `deathDone`, `corpseTimer`) but nothing sets it — dead code.
+- States (`state`): `"chase" → "windup" → "attack" → "recover" → "chase"`; `"hurt"` / `"stunned"` after a surviving saw hit (back to `"chase"` when `stateTimer` ends); `"dying"` when hp reaches 0. `"dead"` branch exists (`isDead`, `deathDone`, `corpseTimer`) but nothing sets it — dead code.
 - Spawn: `beginFrozenSpawn(delay)`, `unfreeze()`, `isHidden` (spawnDelay>0), `spawnFx`, `justAppeared`.
 - Navigation: `setNavigationFloor(floor, bounds, walls)`, `_isWalkable`, `_chaseWaypoint` (4-dir BFS over the floor grid, returns the next tile center), `_hasClearWalkablePath` (sampled line check, used before windup and before dealing damage), `ensureOnWalkableTile()` (snap back to `lastSafePosition`).
 - Death: `startDying()`, `isDying`, `readyToGib` (dying && `dyingTimer<=0`), `explodeIntoGibs()` → `GibPiece[]` cut from the last `death` frame.
+- Hit reaction (`takeHit(damage = 1, hit = null)`, numbers in `ENEMY_HIT`, `js/config/CombatFeelConfig.js`). Returns `false` when refused (`hitTimer` cooldown 24 steps, `frozen`, `dying`); otherwise `{ damage, killed, staggered, poiseBroken, vulnerable }`. Without `hit` (`{ dirX, dirY }`, source → enemy) it only subtracts hp (legacy callers: trailers, `ThrownSaw`). With `hit`, a surviving enemy interrupts windup/attack/recover (`dealtHit`/`justAttacked` cleared), freezes its current frame (`_hurtPose`), enters `"hurt"` (14 steps), gets a knockback impulse (`pushVx/Vy`, stopped by `_isWalkable`) and a white→red flash (`flashTimer`, tinted in `draw`). Strong enemies (`combat.poise > 0`, e.g. `tank`) lose `perHit` poise per accepted hit; at 0 the poise resets, the enemy is `"stunned"` for 60 steps with a stronger push and `vulnerableTimer` (72 steps) where damage × `vulnerableDamageMult` (2) and the sprite pulses yellow. Poise refills after `regenDelaySteps` without hits. A lethal hit goes straight to `"dying"` (no knockback).
 - Per-frame flags read by `CombatSystem`: `justStepped` (every 48px while chasing), `justAttacked`.
 - `draw(ctx)`: sprite-sheet crop; blinks `deathFlash` frame while dying; bottom-up reveal clip during `spawnFx`.
 
-**`CombatSystem({ renderer, particleSystem, audio })`**
+**`CombatSystem({ renderer, particleSystem, audio, hitFeedback = false })`** (`Game` passes `hitFeedback: true`; trailers keep the old behaviour)
 - `updateEnemies(enemies, players)` — calls `e.update(players, onPlayerHit)`; on hit: shake 14, `playerHurt` SFX, blood. Plays `enemyStep`, `enemyAttack`, `enemyAttackVoice` from flags.
-- `resolveWeaponHits(weapon, enemies, p1, p2, connected, onKill)` — see weapons.md; hit ⇒ `enemy.startDying()`, `weapon.onHit()`, `monsterHurt`, blood, `onKill`; then `_playSawHit(hits)` (combo pitch step 0.035, window 900 ms, + audio duck).
+- `resolveWeaponHits(weapon, enemies, p1, p2, connected, onKill, onHit)` — see weapons.md. Per accepted hit (once; `takeHit` refuses during the enemy cooldown, so contact frames do not repeat anything): impact point (disc ⇒ point on the disc rim toward the enemy; cable ⇒ closest point on the p1→p2 segment, `Physics.closestPointOnSegment`), `takeHit(ENEMY_HIT.sawDamage, impact)`, `weapon.onHit()`, then `_hitFeedback`: shake by tier (`HIT_FEEL.shake`), directional sparks + glint at the impact, directional blood + dust (or the old `triggerBlood` on a kill), floating damage number with the real damage. `onHit(enemy, info)` runs for every accepted hit (`info = { damage, killed, poiseBroken, staggered, tier: hit|kill|poiseBreak, hitStop, x, y, dirX, dirY }`; `Game` uses it for `gameLoop.triggerHitStop(info.hitStop)` + `sawMotor.onHit()`); `onKill(enemy)` only when the hit kills (`Game` ⇒ hit slow-mo). Then `_playSawHit(hits, heavy)` once (combo pitch step 0.035, window 900 ms, + audio duck; a poise break plays it lower/louder and ducks −9 dB). `monsterHurt` is still called but is disabled/empty, so it is not feedback.
 - `resolveDeaths(room, gibs, onKill, players)` — for each `readyToGib`: blood + pool, push gibs (cap `MAX_ACTIVE_GIBS`=90, FIFO), maybe drop heart, `room.removeEnemyAt(i)`.
 - `canDropHeart(room, players)` — true only if total missing lives (vs `HEART_DROP.maxLives`) > hearts already in room.
 
@@ -63,7 +64,7 @@ Hazard element schema (`cell.customHazards[]`, editor `_addHazardAt`): `{ type, 
 - `HeartPickup.sheet` is static, set in `Game` constructor from `assets.get("heartPickup")`; 12×12 art drawn at 4×.
 
 ## Config knobs
-`HAZARDS.{spike.damageRadius,drawSize; arrowTrap.*; arrow.*; button.*; challenge.holdFrames}`, `HEART_DROP.{chance,maxLives}`, `PLAYER_SAFE_ZONE` (46), `MAX_ACTIVE_GIBS`, `BLOOD_STAIN_CONFIG.gib`, `ROOM_INTRO`, audio cues in `js/config/AudioConfig.js` (`AUDIO_CONFIG.cues`). Enemy stats are not in config (constructor constants in `MeleeEnemy`).
+`HAZARDS.{spike.damageRadius,drawSize; arrowTrap.*; arrow.*; button.*; challenge.holdFrames}`, `HEART_DROP.{chance,maxLives}`, `PLAYER_SAFE_ZONE` (46), `MAX_ACTIVE_GIBS`, `BLOOD_STAIN_CONFIG.gib`, `ROOM_INTRO`, audio cues in `js/config/AudioConfig.js` (`AUDIO_CONFIG.cues`). `js/config/CombatFeelConfig.js`: `ENEMY_HIT` (damage, cooldown, stagger, poise, flash, jitter), `HIT_FEEL` (shake, hit stop per tier, sparks, blood, dust, glint), `DAMAGE_NUMBER`; `GameConfig.HIT_STOP` (min/max/gap). Per-enemy `hp`/`poise`/`speed` come from `combat` in `DemoCombatConfig.js`; other enemy stats are constructor constants in `MeleeEnemy`.
 
 ## Invariants & gotchas
 - Enemy spawn tiles: `isSafeFloorCell` rejects `HOLE_TILE` (-1), any negative (incl. `EMPTY_FLOOR_TILE` -2) and the border ring. It does **not** check `cell.customWalls`, so an authored foe can spawn inside a wall block (box collision then pushes it).
@@ -86,7 +87,8 @@ See `.agents/playbooks/add-enemy.md` and `.agents/playbooks/add-trap.md`.
 ## Tests
 - `node tests/test_safe_spawn.js` — `findSafeFloorCell` rules.
 - `node tests/test_player_spawns.js`, `node tests/test_hole_resistance.js` — related spawn/hole behavior.
-- No tests for `MeleeEnemy`, `CombatSystem` or traps; verify in game: `python serve.py` → http://localhost:8000 (or `npm start` for Electron).
+- `node tests/test_combat_feel.js` — `MeleeEnemy` stagger/poise/knockback, `CombatSystem` impact point/dedupe/events (fake renderer, particles, audio), `GameLoop` hit stop vs pause/slow-mo, damage numbers.
+- No tests for traps; verify in game: `python serve.py` → http://localhost:8000 (or `npm start` for Electron).
 
 ## Related docs
 `weapons.md`, `.agents/playbooks/add-enemy.md`, `.agents/playbooks/add-trap.md`, `.agents/playbooks/add-weapon.md`.
