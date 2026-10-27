@@ -1,5 +1,5 @@
 import { DEMO } from '../config/DemoConfig.js';
-import { normalizeMap } from '../editor2/MapModel.js';
+import { normalizeMap } from './MapDocument.js';
 import { identifyDoors, validatePlayable } from './MapConnections.js';
 
 async function fetchJson(url) {

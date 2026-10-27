@@ -1,0 +1,533 @@
+{
+  "format": "dungeon-chained-map",
+  "version": 1,
+  "name": "Dungeon Chained — Demo",
+  "grid": { "cols": 6, "rows": 3 },
+  "roomSize": { "cols": 14, "rows": 9 },
+  "start": "1,1",
+  "rooms": {
+    "1,1": {
+      "id": "sala_1_1",
+      "name": "1 · Hub",
+      "notes": "Comecem juntos. Oeste: santuário. Leste: abismo. Norte: portão da chave. Interagir: P1 E / P2 Shift direito / controle X.",
+      "cols": 14,
+      "rows": 9,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 16, 16, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 16, 16, 12, 12, 12, 12, 14, 25],
+        [20, 21, 16, 17, 19, 19, 19, 16, 16, 16, 16, 18, 24, 25],
+        [16, 16, 17, 19, 16, 16, 19, 16, 19, 16, 17, 17, 16, 16],
+        [16, 16, 19, 17, 18, 17, 17, 18, 19, 19, 17, 16, 16, 16],
+        [20, 21, 16, 18, 16, 19, 19, 16, 16, 17, 18, 17, 24, 25],
+        [20, 21, 19, 17, 17, 19, 16, 16, 16, 19, 17, 19, 24, 25],
+        [20, 31, 32, 32, 32, 32, 16, 16, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 16, 16, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwffwwwwww",
+        "wffffffffffffw",
+        "wffffffffffffw",
+        "ffffffffffffff",
+        "ffffffffffffff",
+        "wffffffffffffw",
+        "wffffffffffffw",
+        "wffffffffffffw",
+        "wwwwwwffwwwwww"
+      ],
+      "doors": [
+        { "col": 0, "row": 3, "type": "normal", "width": 2, "id": "door_0" },
+        { "col": 13, "row": 3, "type": "normal", "width": 2, "id": "door_1" },
+        { "col": 6, "row": 8, "type": "normal", "width": 2, "id": "door_2" },
+        { "col": 6, "row": 0, "type": "boss", "width": 2, "id": "door_3" }
+      ],
+      "props": [
+        { "col": 5, "row": 3, "index": 68, "generated": true },
+        { "col": 9, "row": 3, "index": 77, "generated": true }
+      ],
+      "enemies": [
+        { "type": "demon", "col": 4, "row": 2 },
+        { "type": "demon", "col": 10, "row": 5 }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 10, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 6, "side": "W", "type": "torch" },
+        { "col": 12, "row": 6, "side": "E", "type": "torch" }
+      ],
+      "interactives": [],
+      "spawns": {
+        "p1": { "col": 6, "row": 4 },
+        "p2": { "col": 7, "row": 4 }
+      },
+      "lock": "enemies",
+      "type": "normal",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    },
+    "0,1": {
+      "id": "sala_0_1",
+      "name": "2 · Santuário do Dash",
+      "notes": "Ativem o altar. Arrebentem o cabo afastando-se; depois usem Espaço / Enter / controle A para cruzar o buraco.",
+      "cols": 11,
+      "rows": 9,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 16, 18, 18, 16, -1, 16, 18, 24, 25],
+        [20, 21, 17, 18, 18, 18, -1, 19, 18, 16, 16],
+        [20, 21, 17, 16, 19, 16, -1, 17, 18, 16, 16],
+        [20, 21, 17, 18, 16, 19, -1, 16, 19, 24, 25],
+        [20, 21, 17, 17, 17, 18, 18, 17, 19, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwww",
+        "wfffffffffw",
+        "wfffffhfffw",
+        "wfffffhffff",
+        "wfffffhffff",
+        "wfffffhfffw",
+        "wfffffffffw",
+        "wfffffffffw",
+        "wwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 10, "row": 3, "type": "normal", "width": 2, "id": "door_0" }
+      ],
+      "props": [
+        { "col": 7, "row": 3, "index": 64, "generated": true },
+        { "col": 8, "row": 4, "index": 77, "generated": true },
+        { "col": 3, "row": 5, "index": 64, "generated": true },
+        { "col": 6, "row": 6, "index": 59, "generated": true }
+      ],
+      "enemies": [
+        { "type": "assassin", "col": 7, "row": 5 }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 7, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 6, "side": "W", "type": "torch" },
+        { "col": 9, "row": 6, "side": "E", "type": "torch" }
+      ],
+      "interactives": [
+        { "type": "altarDash", "id": "altar_dash", "col": 4, "row": 4 }
+      ],
+      "spawns": {
+        "p1": { "col": 3, "row": 3 },
+        "p2": { "col": 3, "row": 4 }
+      },
+      "lock": "enemies",
+      "type": "normal",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    },
+    "2,1": {
+      "id": "sala_2_1",
+      "name": "3 · Abismo",
+      "notes": "Sem Dash, procurem o santuário. Atravessem com o cabo rompido e acionem a alavanca para recuperar a serra pela ponte.",
+      "cols": 20,
+      "rows": 11,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 12, 12, -1, 12, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 19, 16, 16, 18, 19, 17, 18, -1, 18, 18, 18, 18, 18, 19, 17, 18, 24, 25],
+        [20, 21, 18, 16, 18, 16, 18, 18, 18, -1, 16, 17, 18, 16, 18, 17, 16, 19, 24, 25],
+        [16, 16, 18, 18, 17, 18, 18, 17, 18, -1, 18, 18, 17, 16, 18, 18, 17, 19, 16, 16],
+        [16, 16, 18, 16, 17, 17, 17, 17, 19, -1, 16, 18, 19, 16, 19, 18, 18, 16, 16, 16],
+        [20, 21, 17, 17, 18, 19, 16, 18, 18, -1, 17, 17, 16, 18, 16, 19, 18, 17, 24, 25],
+        [20, 21, 18, 16, 16, 18, 19, 19, 17, -1, 19, 18, 19, 17, 19, 18, 19, 19, 24, 25],
+        [20, 21, 19, 16, 17, 18, 16, 19, 18, -1, 19, 16, 17, 19, 17, 16, 17, 16, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 32, 32, -1, 32, 32, 32, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwwwwwwwww",
+        "wffffffffhfffffffffw",
+        "wffffffffhfffffffffw",
+        "wffffffffhfffffffffw",
+        "fffffffffhffffffffff",
+        "fffffffffhffffffffff",
+        "wffffffffhfffffffffw",
+        "wffffffffhfffffffffw",
+        "wffffffffhfffffffffw",
+        "wffffffffhfffffffffw",
+        "wwwwwwwwwwwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 0, "row": 4, "type": "normal", "width": 2, "id": "door_0" },
+        { "col": 19, "row": 4, "type": "normal", "width": 2, "id": "door_1" }
+      ],
+      "props": [
+        { "col": 4, "row": 2, "index": 77, "generated": true },
+        { "col": 7, "row": 2, "index": 77, "generated": true },
+        { "col": 11, "row": 2, "index": 68, "generated": true },
+        { "col": 17, "row": 2, "index": 68, "generated": true },
+        { "col": 2, "row": 5, "index": 64, "generated": true },
+        { "col": 17, "row": 5, "index": 77, "generated": true },
+        { "col": 2, "row": 7, "index": 68, "generated": true },
+        { "col": 8, "row": 7, "index": 68, "generated": true },
+        { "col": 2, "row": 8, "index": 64, "generated": true },
+        { "col": 6, "row": 8, "index": 64, "generated": true }
+      ],
+      "enemies": [],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 16, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 8, "side": "W", "type": "torch" },
+        { "col": 18, "row": 8, "side": "E", "type": "torch" }
+      ],
+      "interactives": [
+        {
+          "type": "lever",
+          "id": "bridge_abyss",
+          "col": 12,
+          "row": 5,
+          "tiles": [
+            { "col": 9, "row": 5 },
+            { "col": 9, "row": 6 }
+          ]
+        }
+      ],
+      "spawns": {
+        "p1": { "col": 4, "row": 5 },
+        "p2": { "col": 4, "row": 6 }
+      },
+      "lock": "none",
+      "type": "normal",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    },
+    "3,1": {
+      "id": "sala_3_1",
+      "name": "4 · Arena",
+      "notes": "Usem o Dash com o cabo rompido para escapar do tanque e das flechas de fogo.",
+      "cols": 18,
+      "rows": 13,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 18, 16, 16, 16, 17, 19, 19, 19, 18, 19, 19, 18, 17, 16, 24, 25],
+        [20, 21, 18, 17, 19, 19, 19, 18, 16, 16, 19, 19, 17, 18, 18, 18, 24, 25],
+        [20, 21, 18, 18, 18, 52, 19, 17, 18, 18, 16, 16, 18, 16, 19, 19, 24, 25],
+        [16, 16, 18, 18, 19, 52, 18, 18, 17, 19, 16, 16, 19, 18, 19, 17, 16, 16],
+        [16, 16, 19, 18, 16, 16, 17, 17, 19, 16, 19, 18, 18, 18, 16, 17, 16, 16],
+        [20, 21, 19, 16, 16, 17, 19, 17, 19, 17, 19, 18, 16, 17, 16, 16, 24, 25],
+        [20, 21, 18, 17, 17, 16, 18, 18, 17, 16, 19, 52, 19, 16, 17, 17, 24, 25],
+        [20, 21, 19, 18, 18, 17, 16, 18, 17, 17, 17, 52, 18, 17, 16, 18, 24, 25],
+        [20, 21, 16, 19, 17, 16, 19, 16, 18, 16, 18, 17, 18, 18, 19, 17, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwwwwwww",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffwfffffffffffw",
+        "fffffwffffffffffff",
+        "ffffffffffffffffff",
+        "wffffffffffffffffw",
+        "wffffffffffwfffffw",
+        "wffffffffffwfffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wwwwwwwwwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 0, "row": 5, "type": "normal", "width": 2, "id": "door_0" },
+        { "col": 17, "row": 5, "type": "normal", "width": 2, "id": "door_1" }
+      ],
+      "props": [
+        { "col": 8, "row": 4, "index": 68, "generated": true },
+        { "col": 15, "row": 4, "index": 68, "generated": true },
+        { "col": 2, "row": 5, "index": 68, "generated": true },
+        { "col": 13, "row": 5, "index": 64, "generated": true },
+        { "col": 5, "row": 6, "index": 77, "generated": true },
+        { "col": 13, "row": 6, "index": 64, "generated": true },
+        { "col": 3, "row": 8, "index": 77, "generated": true },
+        { "col": 4, "row": 8, "index": 77, "generated": true },
+        { "col": 6, "row": 8, "index": 64, "generated": true },
+        { "col": 6, "row": 9, "index": 77, "generated": true },
+        { "col": 4, "row": 10, "index": 77, "generated": true },
+        { "col": 8, "row": 10, "index": 68, "generated": true },
+        { "col": 12, "row": 10, "index": 68, "generated": true },
+        { "col": 13, "row": 10, "index": 64, "generated": true }
+      ],
+      "enemies": [
+        { "type": "tank", "col": 9, "row": 6 },
+        { "type": "assassin", "col": 12, "row": 8 },
+        { "type": "fireSkull", "col": 13, "row": 3 }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 14, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 10, "side": "W", "type": "torch" },
+        { "col": 16, "row": 10, "side": "E", "type": "torch" }
+      ],
+      "interactives": [],
+      "spawns": {
+        "p1": { "col": 3, "row": 3 },
+        "p2": { "col": 3, "row": 4 }
+      },
+      "lock": "enemies",
+      "type": "normal",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    },
+    "4,1": {
+      "id": "sala_4_1",
+      "name": "5 · Lançar Serra",
+      "notes": "Ativem o altar. Movam-se na direção do alvo e rompam o cabo para lançar a serra. Ela ricocheteia nas paredes.",
+      "cols": 16,
+      "rows": 11,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 19, 16, 18, 16, 19, 17, 18, 16, 17, 17, 17, 18, 24, 25],
+        [20, 21, 16, 17, 19, 17, 17, 17, 19, 18, 18, 16, 18, 17, 24, 25],
+        [16, 16, 17, 19, 18, 18, 19, 16, 19, 52, 18, 19, 19, 18, 24, 25],
+        [16, 16, 18, 19, 19, 17, 18, 17, 16, 52, 18, 17, 17, 18, 24, 25],
+        [20, 21, 19, 16, 18, 16, 18, 16, 17, 52, 19, 19, 18, 17, 24, 25],
+        [20, 21, 18, 17, 17, 16, 18, 19, 17, 16, 16, 16, 16, 19, 24, 25],
+        [20, 21, 19, 17, 16, 19, 19, 19, 18, 16, 19, 18, 19, 17, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 16, 16, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 16, 16, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwwwww",
+        "wffffffffffffffw",
+        "wffffffffffffffw",
+        "wffffffffffffffw",
+        "fffffffffwfffffw",
+        "fffffffffwfffffw",
+        "wffffffffwfffffw",
+        "wffffffffffffffw",
+        "wffffffffffffffw",
+        "wffffffffffffffw",
+        "wwwwwwwffwwwwwww"
+      ],
+      "doors": [
+        { "col": 0, "row": 4, "type": "normal", "width": 2, "id": "door_0" },
+        { "col": 7, "row": 10, "type": "normal", "width": 2, "id": "door_1" }
+      ],
+      "props": [
+        { "col": 13, "row": 2, "index": 68, "generated": true },
+        { "col": 2, "row": 6, "index": 77, "generated": true },
+        { "col": 6, "row": 8, "index": 59, "generated": true }
+      ],
+      "enemies": [
+        { "type": "tank", "col": 11, "row": 7 },
+        { "type": "fireSkull", "col": 12, "row": 3 }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 12, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 8, "side": "W", "type": "torch" },
+        { "col": 14, "row": 8, "side": "E", "type": "torch" }
+      ],
+      "interactives": [
+        { "type": "altarSaw", "id": "altar_saw", "col": 6, "row": 5 }
+      ],
+      "spawns": {
+        "p1": { "col": 3, "row": 3 },
+        "p2": { "col": 3, "row": 4 }
+      },
+      "lock": "enemies",
+      "type": "normal",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    },
+    "4,2": {
+      "id": "sala_4_2",
+      "name": "6 · Sala da Chave",
+      "notes": "A chave só cai quando a serra lançada corta a corda. Coletem-na e usem a saída sul: atalho de mão única para o Hub.",
+      "cols": 18,
+      "rows": 11,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 16, 16, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 16, 16, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 18, 18, 19, 16, 16, 19, 19, 18, 19, 19, 16, 17, 18, 16, 24, 25],
+        [20, 21, 19, 19, 17, 19, 17, 18, 17, 19, 19, 17, 19, 16, 17, 17, 24, 25],
+        [20, 21, 18, 19, 17, 19, 18, 18, 19, 19, 17, 17, 18, 16, 19, 19, 24, 25],
+        [20, 21, 17, 19, 17, 19, 16, 18, 18, 16, 19, 17, 16, 17, 17, 19, 24, 25],
+        [20, 21, 19, 19, 18, 16, 19, 18, 16, 18, 18, 17, 16, 17, 19, 18, 24, 25],
+        [20, 21, 17, 18, 16, 19, 17, 19, 17, 19, 18, 17, 19, 18, 17, 16, 24, 25],
+        [20, 21, 18, 19, 16, 18, 19, 17, 16, 19, 19, 16, 16, 17, 18, 19, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 16, 16, 32, 32, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 16, 16, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwffwwwwwwwww",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wffffffffffffffffw",
+        "wwwwwwwffwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 7, "row": 0, "type": "normal", "width": 2, "id": "door_0" },
+        { "col": 7, "row": 10, "type": "normal", "width": 2, "id": "door_1" }
+      ],
+      "props": [
+        { "type": "flag", "col": 10, "row": 3 },
+        { "type": "key_2", "col": 15, "row": 8 },
+        { "col": 7, "row": 2, "index": 77, "generated": true },
+        { "col": 11, "row": 5, "index": 77, "generated": true },
+        { "col": 12, "row": 6, "index": 59, "generated": true }
+      ],
+      "enemies": [
+        { "type": "demon", "col": 5, "row": 8 }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 14, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 8, "side": "W", "type": "torch" },
+        { "col": 16, "row": 8, "side": "E", "type": "torch" }
+      ],
+      "interactives": [
+        { "type": "ropeKey", "id": "boss_key", "col": 12, "row": 5 }
+      ],
+      "spawns": {
+        "p1": { "col": 3, "row": 3 },
+        "p2": { "col": 3, "row": 4 }
+      },
+      "lock": "none",
+      "type": "normal",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    },
+    "1,0": {
+      "id": "sala_1_0",
+      "name": "7 · Caveira de Fogo",
+      "notes": "O boss se teleporta, invoca inimigos e avisa antes do laser. Derrotem todos para concluir a demo.",
+      "cols": 22,
+      "rows": 14,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 16, 19, 19, 17, 19, 16, 17, 19, 18, 17, 17, 17, 19, 19, 19, 18, 17, 18, 24, 25],
+        [20, 21, 19, 17, 18, 16, 18, 18, 16, 19, 17, 16, 18, 17, 17, 17, 18, 17, 16, 16, 24, 25],
+        [20, 21, 19, 19, 19, 18, 16, 18, 17, 17, 16, 16, 16, 19, 19, 19, 16, 19, 19, 16, 24, 25],
+        [16, 16, 18, 19, 19, 17, 19, 16, 16, 18, 19, 19, 16, 16, 19, 19, 16, 18, 16, 18, 24, 25],
+        [16, 16, 18, 16, 16, 19, 16, 17, 16, 16, 18, 16, 19, 18, 16, 18, 19, 16, 19, 17, 24, 25],
+        [20, 21, 18, 16, 18, 17, 16, 19, 16, 16, 17, 17, 17, 19, 18, 17, 19, 16, 18, 18, 24, 25],
+        [20, 21, 19, 19, 19, 16, 17, 19, 18, 16, 16, 18, 16, 19, 16, 17, 19, 17, 17, 17, 24, 25],
+        [20, 21, 17, 16, 17, 16, 19, 17, 17, 17, 17, 18, 19, 18, 17, 18, 17, 19, 16, 19, 24, 25],
+        [20, 21, 17, 17, 17, 18, 19, 19, 17, 18, 18, 18, 19, 18, 16, 17, 18, 19, 18, 19, 24, 25],
+        [20, 21, 18, 16, 18, 18, 19, 19, 19, 16, 18, 16, 19, 18, 19, 17, 18, 17, 19, 16, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwwwwwwwwwww",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "fffffffffffffffffffffw",
+        "fffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wffffffffffffffffffffw",
+        "wwwwwwwwwwwwwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 0, "row": 5, "type": "normal", "width": 2, "id": "door_0" }
+      ],
+      "props": [
+        { "col": 13, "row": 2, "index": 59, "generated": true },
+        { "col": 4, "row": 3, "index": 64, "generated": true },
+        { "col": 14, "row": 3, "index": 68, "generated": true },
+        { "col": 15, "row": 3, "index": 68, "generated": true },
+        { "col": 5, "row": 4, "index": 68, "generated": true },
+        { "col": 3, "row": 5, "index": 59, "generated": true },
+        { "col": 13, "row": 5, "index": 59, "generated": true },
+        { "col": 16, "row": 5, "index": 64, "generated": true },
+        { "col": 4, "row": 6, "index": 64, "generated": true },
+        { "col": 8, "row": 6, "index": 68, "generated": true },
+        { "col": 19, "row": 8, "index": 77, "generated": true },
+        { "col": 15, "row": 9, "index": 59, "generated": true },
+        { "col": 3, "row": 10, "index": 59, "generated": true },
+        { "col": 9, "row": 11, "index": 77, "generated": true }
+      ],
+      "enemies": [
+        { "type": "fireSkullBoss", "col": 14, "row": 6 }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 3, "row": 0, "side": "N", "type": "torch" },
+        { "col": 18, "row": 0, "side": "N", "type": "torch" },
+        { "col": 1, "row": 11, "side": "W", "type": "torch" },
+        { "col": 20, "row": 11, "side": "E", "type": "torch" }
+      ],
+      "interactives": [],
+      "spawns": {
+        "p1": { "col": 3, "row": 3 },
+        "p2": { "col": 3, "row": 4 }
+      },
+      "lock": "enemies",
+      "type": "boss",
+      "floorPool": [16, 17, 18, 19],
+      "propDensity": 0.06
+    }
+  },
+  "connections": [
+    {
+      "from": { "room": "1,1", "door": "door_0" },
+      "to": { "room": "0,1", "door": "door_0" },
+      "oneWay": false,
+      "requires": ""
+    },
+    {
+      "from": { "room": "1,1", "door": "door_1" },
+      "to": { "room": "2,1", "door": "door_0" },
+      "oneWay": false,
+      "requires": ""
+    },
+    {
+      "from": { "room": "2,1", "door": "door_1" },
+      "to": { "room": "3,1", "door": "door_0" },
+      "oneWay": false,
+      "requires": ""
+    },
+    {
+      "from": { "room": "3,1", "door": "door_1" },
+      "to": { "room": "4,1", "door": "door_0" },
+      "oneWay": false,
+      "requires": ""
+    },
+    {
+      "from": { "room": "4,1", "door": "door_1" },
+      "to": { "room": "4,2", "door": "door_0" },
+      "oneWay": false,
+      "requires": ""
+    },
+    {
+      "from": { "room": "4,2", "door": "door_1" },
+      "to": { "room": "1,1", "door": "door_2" },
+      "oneWay": true,
+      "requires": "bossKey"
+    },
+    {
+      "from": { "room": "1,1", "door": "door_3" },
+      "to": { "room": "1,0", "door": "door_0" },
+      "oneWay": false,
+      "requires": "bossKey"
+    }
+  ]
+}

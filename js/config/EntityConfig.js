@@ -1,3 +1,4 @@
+import { DEMO_ENEMY_STATS } from './DemoCombatConfig.js';
 import { TINY_RPG_ENEMIES } from './TinyRpgEnemies.js';
 
 export function demonConfig(assets) {
@@ -42,6 +43,10 @@ function tinyRpgConfig({ key, label, src, ...sprite }) {
 export const ENEMY_TYPES = [
     { key: "demon", label: "Demônio (Rápido)", config: demonConfig },
     { key: "bloodMonster", label: "Monstro de Sangue (Tanque)", config: bloodMonsterConfig },
+    { key: 'assassin', label: 'Assassino', config: assets => ({ ...demonConfig(assets), combat: DEMO_ENEMY_STATS.assassin }) },
+    { key: 'tank', label: 'Tanque', config: assets => ({ ...bloodMonsterConfig(assets), combat: DEMO_ENEMY_STATS.tank }) },
+    ...['fireSkull', 'fireSkullBoss'].map(key => ({ key, label: key === 'fireSkullBoss' ? 'Boss Caveira de Fogo' : 'Caveira à distância',
+        config: assets => ({ img: assets.get('fireSkull'), cellSize: 16, cropX: 0, cropY: 0, cropW: 16, cropH: 20, rows: { walk: { row: 0 } } }) })),
     ...TINY_RPG_ENEMIES.map(e => ({ key: e.key, label: e.label, src: e.src, config: tinyRpgConfig(e) }))
 ];
 

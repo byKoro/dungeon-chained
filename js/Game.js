@@ -1,8 +1,10 @@
+import { DemoEncounter } from './systems/DemoEncounter.js';
+import { DemoVictory } from './ui/DemoVictory.js';
 import { DemoProgress } from './systems/DemoProgress.js';
 import { DemoCamera } from './systems/DemoCamera.js';
 import { DemoDoors } from './systems/DemoDoors.js';
 import { ThrownSaw } from './systems/ThrownSaw.js';
-import { PropSprites } from './editor2/PropSprites.js';
+import { PropSprites } from './core/PropSprites.js';
 import { InputHandler } from './core/InputHandler.js';
 import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
@@ -145,10 +147,14 @@ export class Game {
 
         this.tiles = new DungeonTileQuery({ rooms: this.rooms });
         this.holes = new HoleEffects({ rooms: this.rooms });
-        this.demoProgress = new DemoProgress({ rooms: this.rooms, input: this.input, getPlayers: () => [this.p1, this.p2], getSaw: () => this.chain.weapon });
+        this.demoProgress = new DemoProgress({ rooms: this.rooms, input: this.input, assets: this.assets, getPlayers: () => [this.p1, this.p2], getSaw: () => this.chain.weapon });
         this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current, safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]) });
         this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(), mode: this.mapData?.test?.camera });
         this.demoDoors = new DemoDoors({ assets: this.assets, renderer: this.renderer, rooms: this.rooms });
+        this.demoVictory = new DemoVictory({ onRestart: () => this.restart() });
+        this.demoEncounter = new DemoEncounter({ rooms: this.rooms, spawnSystem: this.spawnSystem, onVictory: () => {
+            this.gameOver = true; this._gameOverAt = performance.now(); this.demoVictory.show();
+        } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
@@ -356,6 +362,8 @@ export class Game {
         this.rooms.reset();
         this.demoProgress.reset(this.mapData?.test?.progress);
         this.demoDoors.opened.clear();
+        this.demoVictory.hide();
+        this.demoEncounter.reset();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -880,6 +888,7 @@ export class Game {
 
         this.thrownSaw.update();
         this.demoProgress.update(deltaSeconds);
+        this.demoEncounter.update();
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
     }

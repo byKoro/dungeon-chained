@@ -182,7 +182,9 @@ export class ContentTools {
         const a = this.app, r = a.map.rooms[e.room], d = r?.doors.find(p => p.id === e.door);
         if (!d) return null;
         const [gx, gy] = e.room.split(',').map(Number), o = a._roomOrigin(r, gx, gy, a._slotLayout());
-        return { x: o.x + (d.col + 0.5) * 16, y: o.y + (d.row + 0.5) * 16 };
+        const horizontal = ['N', 'S'].includes(sideOf(r, d));
+        const w = (horizontal ? d.width || 1 : 1) * 16, h = (horizontal ? 1 : d.width || 1) * 16;
+        return { x: o.x + d.col * 16 + w / 2, y: o.y + d.row * 16 + h / 2, w, h };
     }
 
     mapClick(e) {
@@ -191,7 +193,8 @@ export class ContentTools {
         identifyDoors(a.map);
         for (const [key, room] of Object.entries(a.map.rooms)) for (const door of room.doors) {
             const end = { room: key, door: door.id }, at = this.endpointPosition(end);
-            if (Math.hypot(p.x - at.x, p.y - at.y) > 15 / a.cam.zoom) continue;
+            const margin = 4 / a.cam.zoom;
+            if (Math.abs(p.x - at.x) > at.w / 2 + margin || Math.abs(p.y - at.y) > at.h / 2 + margin) continue;
             if (!this.source) this.source = end;
             else {
                 const ok = a._commit(() => connectDoors(a.map, this.source, end, { oneWay: $('content-one-way').checked, requires: $('content-requires').value }));

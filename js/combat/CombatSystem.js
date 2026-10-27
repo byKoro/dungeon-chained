@@ -71,7 +71,8 @@ export class CombatSystem {
                 Math.hypot(enemy.x - sawPos.x, enemy.y - sawPos.y) < discR + enemy.hitRadius;
 
             if (hitChain || hitDisc) {
-                enemy.startDying();
+                if (enemy.takeHit) { if (!enemy.takeHit()) continue; }
+                else enemy.startDying();
                 weapon.onHit?.();
                 hits++;
                 if (this.audio) this.audio.play("monsterHurt");

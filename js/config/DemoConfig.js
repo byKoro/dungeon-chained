@@ -12,7 +12,12 @@ export const DEMO = {
     throwFriction: 0.985,
     throwMinSpeed: 1,
     throwBounce: 0.85,
-    ropeRadius: 34
+    ropeRadius: 34,
+    keyDropSeconds: 0.4,
+    keyHeight: 48,
+    messageSeconds: 3,
+    aimThreshold: 0.5,
+    sweepStep: 8
 };
 
 export const INTERACTIVES = {

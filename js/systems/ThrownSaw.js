@@ -10,7 +10,7 @@ export class ThrownSaw {
     aimFrom(players) {
         const x = players.reduce((n, p) => n + p.vx, 0), y = players.reduce((n, p) => n + p.vy, 0);
         const length = Math.hypot(x, y);
-        if (length > 0.5) this.aim = { x: x / length, y: y / length };
+        if (length > DEMO.aimThreshold) this.aim = { x: x / length, y: y / length };
     }
 
     launch() {
@@ -30,7 +30,7 @@ export class ThrownSaw {
         w.prevX = w.dropX; w.prevY = w.dropY;
         const collides = (x, y) => x < b.minX + radius || x > b.maxX - radius || y < b.minY + radius || y > b.maxY - radius
             || room.wallBoxes.some(box => x + radius > box.x && x - radius < box.x + box.w && y + radius > box.y && y - radius < box.y + box.h);
-        const steps = Math.max(1, Math.ceil(Math.hypot(w.throwVX, w.throwVY) / 8));
+        const steps = Math.max(1, Math.ceil(Math.hypot(w.throwVX, w.throwVY) / DEMO.sweepStep));
         for (let i = 0; i < steps; i++) {
             if (collides(w.dropX + w.throwVX / steps, w.dropY)) w.throwVX *= -DEMO.throwBounce;
             else w.dropX += w.throwVX / steps;
@@ -42,7 +42,8 @@ export class ThrownSaw {
         for (const enemy of room.enemies) {
             if (enemy.state === 'dying' || this.hit?.has(enemy)) continue;
             if (Physics.distToSegment(enemy.x, enemy.y, w.prevX, w.prevY, w.dropX, w.dropY) < radius + enemy.hitRadius) {
-                enemy.startDying(); this.hit?.add(enemy);
+                if (enemy.takeHit) enemy.takeHit(); else enemy.startDying();
+                this.hit?.add(enemy);
             }
         }
         if (Math.hypot(w.throwVX, w.throwVY) < DEMO.throwMinSpeed) {

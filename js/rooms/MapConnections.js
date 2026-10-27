@@ -1,3 +1,5 @@
+import { dangerousCells } from './MapOccupancy.js';
+
 export function sideOf(room, door) {
     if (door.row === 0) return 'N';
     if (door.row === room.rows - 1) return 'S';
@@ -50,23 +52,35 @@ export function outgoingConnections(map, key) {
 }
 
 export function safeSpawnPair(room, door = null) {
+    const hazards = dangerousCells(room);
     const valid = (p) => p && Number.isInteger(p.col) && Number.isInteger(p.row)
         && p.col > 0 && p.row > 0 && p.col < room.cols - 1 && p.row < room.rows - 1
         && room.kinds[p.row]?.[p.col] === 'f'
-        && !(room.hazards || []).some(h => h.col === p.col && h.row === p.row && h.type !== 'button');
+        && !hazards.has(`${p.col},${p.row}`);
     if (!door && room.spawns) {
         const { p1, p2 } = room.spawns;
         if (valid(p1) && valid(p2) && (p1.col !== p2.col || p1.row !== p2.row)) return structuredClone(room.spawns);
         return null;
     }
     const side = door && sideOf(room, door);
+    let reachable = null;
+    if (door) {
+        const inward = { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] }[side];
+        if (!inward) return null;
+        const queue = doorCells(room, door).map(p => ({ col: p.col + inward[0], row: p.row + inward[1] })).filter(valid);
+        reachable = new Set(queue.map(p => `${p.col},${p.row}`));
+        for (let i = 0; i < queue.length; i++) for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const p = { col: queue[i].col + dc, row: queue[i].row + dr }, key = `${p.col},${p.row}`;
+            if (valid(p) && !reachable.has(key)) { reachable.add(key); queue.push(p); }
+        }
+    }
     const candidates = [];
     const cx = door ? door.col + (['N', 'S'].includes(side) ? ((door.width || 1) - 1) / 2 : 0) : room.cols / 2;
     const cy = door ? door.row + (['E', 'W'].includes(side) ? ((door.width || 1) - 1) / 2 : 0) : room.rows / 2;
     for (let row = 1; row < room.rows - 1; row++) {
         for (let col = 1; col < room.cols - 1; col++) {
             const p = { col, row };
-            if (valid(p) && (!door || Math.abs(col - cx) + Math.abs(row - cy) <= 3)) candidates.push(p);
+            if (valid(p) && (!door || (reachable.has(`${col},${row}`) && Math.abs(col - cx) + Math.abs(row - cy) <= 3))) candidates.push(p);
         }
     }
     candidates.sort((a, b) => Math.hypot(a.col - cx, a.row - cy) - Math.hypot(b.col - cx, b.row - cy));

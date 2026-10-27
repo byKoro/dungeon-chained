@@ -10,14 +10,17 @@ export class MeleeEnemy extends Entity {
         this.sprite = spriteConfig;
         this.isSkeleton = false;
 
-        this.speed = 1.7;
+        this.hp = spriteConfig.combat?.hp ?? 1;
+        this.hitTimer = 0;
+        this.speed = spriteConfig.combat?.speed ?? 1.7;
 
         this.attackRange = 44;
         this.hitRange = 58;
 
         this.baseWindup = 55;
         this.windupFrames = Math.max(16, this.baseWindup - (floor - 1) * 6);
-        this.recoverFrames = 28;
+        this.windupFrames = spriteConfig.combat?.windupFrames ?? this.windupFrames;
+        this.recoverFrames = spriteConfig.combat?.recoverFrames ?? 28;
 
         this.state = "chase";
         this.stateTimer = 0;
@@ -93,6 +96,7 @@ export class MeleeEnemy extends Entity {
     setNavigationFloor(floor, bounds, walls = []) {
         this.navigationFloor = floor;
         this.navigationBounds = bounds;
+        this.navigationWalls = new Set(walls.map(w => `${w.col},${w.row}`));
         this.lastSafePosition = { x: this.x, y: this.y };
     }
 
@@ -175,6 +179,14 @@ export class MeleeEnemy extends Entity {
         return this.state === "dying" && this.dyingTimer <= 0;
     }
 
+    takeHit(damage = 1) {
+        if (this.hitTimer > 0 || this.frozen || this.state === 'dying') return false;
+        this.hp -= damage;
+        this.hitTimer = 24;
+        if (this.hp <= 0) this.startDying();
+        return true;
+    }
+
     startDying() {
         if (this.state === "dying" || this.state === "dead") return;
 
@@ -252,6 +264,7 @@ export class MeleeEnemy extends Entity {
     }
 
     update(players, onPlayerHit) {
+        this.hitTimer = Math.max(0, this.hitTimer - 1);
         this.justStepped = false;
         this.justAttacked = false;
 

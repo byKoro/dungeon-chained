@@ -1,0 +1,6 @@
+.demo-victory { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: #0d091beF; color: #fff; text-align: center; font-family: sans-serif; }
+.demo-victory[hidden] { display: none; }
+.demo-victory h1 { color: #ffd166; font-size: clamp(30px, 5vw, 64px); }
+.demo-victory p { font-size: 22px; }
+.demo-victory button { font: inherit; padding: 16px 32px; border: 2px solid #ffd166; background: #51365e; color: #fff; border-radius: 8px; cursor: pointer; }
+.demo-victory button:focus-visible { outline: 4px solid #fff; outline-offset: 5px; }

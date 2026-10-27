@@ -3,8 +3,8 @@ import { TILE } from '../config/GameConfig.js';
 import { Physics } from '../core/Physics.js';
 
 export class DemoProgress {
-    constructor({ rooms, input, getPlayers, getSaw }) {
-        Object.assign(this, { rooms, input, getPlayers, getSaw });
+    constructor({ rooms, input, getPlayers, getSaw, assets = null }) {
+        Object.assign(this, { rooms, input, getPlayers, getSaw, assets });
         this.reset();
     }
 
@@ -35,7 +35,7 @@ export class DemoProgress {
                 if (!this.cut.has(id) && saw?.thrown && Physics.distToSegment(x, y, saw.prevX, saw.prevY, saw.dropX, saw.dropY) < DEMO.ropeRadius) this.cut.set(id, 0);
                 if (!this.cut.has(id)) continue;
                 this.cut.set(id, this.cut.get(id) + dt);
-                if (this.cut.get(id) < 0.4) continue;
+                if (this.cut.get(id) < DEMO.keyDropSeconds) continue;
             }
             for (let i = 0; i < players.length; i++) {
                 const p = players[i];
@@ -57,7 +57,7 @@ export class DemoProgress {
                     }
                 }
                 this.message = o.type === 'lever' ? 'Ponte ativada' : pickup ? 'Chave do boss adquirida' : `${INTERACTIVES[o.type]?.label} adquirido pela dupla`;
-                this.messageTime = 3;
+                this.messageTime = DEMO.messageSeconds;
                 break;
             }
         }
@@ -73,11 +73,26 @@ export class DemoProgress {
             const active = this.activated.has(id);
             if (active && ['key', 'ropeKey'].includes(o.type)) continue;
             const x = rect.x + (o.col + 0.5) * TILE, y = rect.y + (o.row + 0.5) * TILE;
-            if (o.type === 'ropeKey' && !this.cut.has(id)) {
-                ctx.strokeStyle = '#ccb787'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y - 65); ctx.lineTo(x, y); ctx.stroke();
+            if (o.type === 'key' || o.type === 'ropeKey') {
+                const drop = o.type === 'key' ? 1 : Math.min(1, (this.cut.get(id) || 0) / DEMO.keyDropSeconds);
+                const keyY = y - DEMO.keyHeight * (1 - drop * drop);
+                if (o.type === 'ropeKey' && !this.cut.has(id)) {
+                    ctx.strokeStyle = '#ccb787'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, y - DEMO.keyHeight - 36); ctx.lineTo(x, keyY); ctx.stroke();
+                }
+                const image = this.assets?.get(`demoKey${Math.floor(performance.now() / 150) % 4 + 1}`);
+                ctx.fillStyle = '#0008'; ctx.fillRect(x - 12, y + 10, 24, 5);
+                if (image?.complete && image.naturalWidth) ctx.drawImage(image, x - 20, keyY - 20, 40, 40);
+                else { ctx.fillStyle = def.color; ctx.fillText('⚿', x, keyY); }
+                continue;
             }
+            ctx.fillStyle = '#322b42'; ctx.fillRect(x - 28, y + 10, 56, 16);
+            ctx.fillStyle = '#655669'; ctx.fillRect(x - 24, y - 2, 48, 18);
             ctx.fillStyle = active ? '#53635a' : def.color;
-            ctx.fillRect(x - 20, y - 20, 40, 40); ctx.fillStyle = '#17131e'; ctx.fillText(active ? '✓' : def.symbol, x, y);
+            if (o.type === 'lever') {
+                ctx.fillRect(x - 6, y - 24, 12, 28); ctx.fillRect(x + (active ? 0 : -18), y - 28, 18, 8);
+            } else {
+                ctx.fillRect(x - 18, y - 30, 36, 28); ctx.fillStyle = '#17131e'; ctx.fillText(active ? '✓' : def.symbol, x, y - 15);
+            }
             if (o.type === 'lever' && active) for (const cell of o.tiles || []) {
                 ctx.fillStyle = '#987247'; ctx.fillRect(rect.x + cell.col * TILE, rect.y + cell.row * TILE, TILE, TILE);
                 ctx.strokeStyle = '#473326'; ctx.lineWidth = 3;
