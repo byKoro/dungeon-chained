@@ -62,7 +62,15 @@ export const TINY_RPG_ENEMIES = [
     },
     {
         "key": "blackKnightB",
-        "label": "Cavaleiro Negro B",
+        "label": "Cavaleiro Negro B (Tanque)",
+        "combat": {
+            "hp": 4,
+            "speed": 0.8,
+            "windupFrames": 65,
+            "recoverFrames": 45,
+            "cycleAttacks": true,
+            "playDeathAnimation": true
+        },
         "src": "assets/enemies/black_knight_b.png",
         "cellSize": 100,
         "cropX": 31,

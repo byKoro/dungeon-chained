@@ -27,10 +27,13 @@ export class MeleeEnemy extends Entity {
         this.dealtHit = false;
 
         this.dyingTimer = 0;
-        this.dyingDuration = 9;
+        this.dyingDuration = spriteConfig.combat?.playDeathAnimation
+            ? spriteConfig.rows.death.frames * spriteConfig.rows.death.fps
+            : 9;
 
         this.attackKeys = ["attack", "attack2", "attack3"].filter(k => this.sprite.rows[k]);
         this.currentAttack = this.attackKeys[0] || "attack";
+        this.attackIndex = 0;
 
         this.bloodPalette = null;
         this.gibStainConfig = null;
@@ -194,6 +197,7 @@ export class MeleeEnemy extends Entity {
         this._frozen = { anim, frame: this._currentFrameIndex(anim) };
         this.state = "dying";
         this.dyingTimer = this.dyingDuration;
+        this.animTime = 0;
         this.vx = 0;
         this.vy = 0;
         this.pushVx = 0;
@@ -348,7 +352,9 @@ export class MeleeEnemy extends Entity {
                 if (this.stateTimer <= 0) {
 
                     this.currentAttack = this.attackKeys[
-                        Math.floor(Math.random() * this.attackKeys.length)
+                        this.sprite.combat?.cycleAttacks
+                            ? this.attackIndex++ % this.attackKeys.length
+                            : Math.floor(Math.random() * this.attackKeys.length)
                     ];
                     const atk = this.sprite.rows[this.currentAttack];
                     this.state = "attack";
@@ -424,7 +430,8 @@ export class MeleeEnemy extends Entity {
     _currentAnim() {
         const r = this.sprite.rows;
         switch (this.state) {
-            case "dying":  return (this._frozen && this._frozen.anim) || r.walk;
+            case "dying":  return this.sprite.combat?.playDeathAnimation
+                ? r.death : (this._frozen && this._frozen.anim) || r.walk;
             case "dead":   return r.death;
             case "attack": return r[this.currentAttack] || r.attack;
             case "windup":
@@ -437,6 +444,9 @@ export class MeleeEnemy extends Entity {
     _currentFrameIndex(anim) {
         if (this.state === "dying") {
 
+            if (this.sprite.combat?.playDeathAnimation) {
+                return Math.min(Math.floor(this.animTime / anim.fps), anim.frames - 1);
+            }
             return this._frozen ? this._frozen.frame : 0;
         }
         if (this.state === "dead") {
@@ -470,7 +480,7 @@ export class MeleeEnemy extends Entity {
         let srcRow = anim.row;
         let srcCol = frame;
 
-        if (this.state === "dying" && s.deathFlash) {
+        if (this.state === "dying" && s.deathFlash && !s.combat?.playDeathAnimation) {
             const blink = Math.floor(this.dyingTimer / 2) % 2 === 0;
             if (blink) {
                 srcRow = s.deathFlash.row;
