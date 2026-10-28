@@ -1,4 +1,4 @@
-import { TILE } from '../config/GameConfig.js';
+import { TILE, SIM_HZ } from '../config/GameConfig.js';
 import { ENEMY_HIT } from '../config/CombatFeelConfig.js';
 import { Entity } from './Entity.js';
 import { GibPiece } from '../particles/GibPiece.js';
@@ -31,6 +31,7 @@ export class MeleeEnemy extends Entity {
 
         this.hp = spriteConfig.combat?.hp ?? 1;
         this.hitTimer = 0;
+        this.hitFreezeTimer = 0;
         this.speed = spriteConfig.combat?.speed ?? 1.7;
 
         this.poiseMax = spriteConfig.combat?.poise ?? 0;
@@ -360,7 +361,19 @@ export class MeleeEnemy extends Entity {
         return pieces;
     }
 
+    // Congela só este inimigo (hit stop local); jogadores, serra e resto da sala seguem normais.
+    freezeOnHit(seconds) {
+        const steps = Math.round(seconds * SIM_HZ);
+        if (steps > this.hitFreezeTimer) this.hitFreezeTimer = steps;
+    }
+
     update(players, onPlayerHit) {
+        if (this.hitFreezeTimer > 0) {
+            this.hitFreezeTimer--;
+            this.justStepped = false;
+            this.justAttacked = false;
+            return;
+        }
         this.hitTimer = Math.max(0, this.hitTimer - 1);
         if (this.flashTimer > 0) this.flashTimer--;
         if (this.vulnerableTimer > 0) this.vulnerableTimer--;

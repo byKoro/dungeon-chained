@@ -43,7 +43,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | VTuber HUD | HUD vtuber | Animated player portraits with expressions + heart rows |
 | Juice | game feel | Shake, slow-mo, particles, flashes, ducking |
 | Dash | dash, investida | Individual burst (Space / Enter / pad A·RB), only while the chain is snapped: i-frames, passes enemies, jumps 1-tile holes, 1 s cooldown shown under the hearts |
-| Hit stop | congelamento de impacto | Real-time pause of the simulation (0.02–0.10 s, `HIT_STOP`) on each saw hit; rendering and camera keep running |
+| Hit stop | congelamento de impacto | Per-enemy freeze (`MeleeEnemy.freezeOnHit`, durations in `HIT_FEEL.hitStop`) on each saw hit; players, saw and the rest of the room keep simulating. `GameLoop.triggerHitStop` (global freeze) still exists but `Game` no longer calls it |
 | Stagger / hurt | atordoamento curto | Short interruption + knockback of a surviving enemy after a saw hit (`"hurt"` state) |
 | Poise | poise, postura | Invisible per-enemy buffer for strong enemies (`combat.poise`); breaking it causes a long stun (`"stunned"`) and a vulnerability window |
 

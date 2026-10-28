@@ -6,7 +6,7 @@
 export const ENEMY_HIT = Object.freeze({
     sawDamage: 1,
     // Invulnerabilidade após um golpe aceito: evita dano/feedback repetido a cada frame de contato.
-    cooldownSteps: 24,
+    cooldownSteps: 0,
 
     stagger: { steps: 14, knockback: 6.5 },
 

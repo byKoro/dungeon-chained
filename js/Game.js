@@ -834,7 +834,7 @@ export class Game {
             this.chain.weapon, enemies, p1, p2, this.chain.isConnected,
             () => this.triggerHitSlowmo(),
             (enemy, info) => {
-                this.gameLoop.triggerHitStop(info.hitStop);
+                enemy.freezeOnHit?.(info.hitStop);
                 this.sawMotor?.onHit();
             }
         );

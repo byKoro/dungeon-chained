@@ -69,6 +69,21 @@ const tick = (e, n) => { for (let i = 0; i < n; i++) e.update(FAR_PLAYERS, () =>
     assert(lr && lr.damage === 1 && legacy.hp === 2 && legacy.state === "chase", "takeHit() sem info de impacto só desconta vida (compatível)");
 }
 
+// --- MeleeEnemy: hit stop local ---
+{
+    const e = makeEnemy({ hp: 4, poise: 0 });
+    e.takeHit(1, { dirX: 1, dirY: 0 });
+    e.freezeOnHit(HIT_FEEL.hitStop.hit);
+    const n = Math.round(HIT_FEEL.hitStop.hit * 60);
+    const timer = e.stateTimer, flash = e.flashTimer, x = e.x;
+    tick(e, n);
+    assert(e.stateTimer === timer && e.flashTimer === flash && e.x === x, "inimigo congelado não avança timers nem posição");
+    tick(e, 1);
+    assert(e.stateTimer < timer, "inimigo volta a simular depois do freeze");
+    e.freezeOnHit(0.09); e.freezeOnHit(0.02);
+    assert(e.hitFreezeTimer === Math.round(0.09 * 60), "pedidos menores não encurtam o freeze");
+}
+
 // --- MeleeEnemy: stagger, cooldown, interrupção ---
 {
     const e = makeEnemy({ hp: 4, poise: 0 });
