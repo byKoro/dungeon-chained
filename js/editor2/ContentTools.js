@@ -130,10 +130,7 @@ export class ContentTools {
             <div class="panel-title">Interativos</div><div id="content-interactives" class="choice-grid" role="group" aria-label="Interativo"></div>
             <button class="btn" data-content="bridge">Marcar ponte da alavanca selecionada</button>
             <p class="hint">Clique novamente na alavanca para selecioná-la. Com “Marcar ponte”, clique nos buracos que formarão sua ponte.</p>
-            <div class="panel-title">Decoração sobre o piso</div>
-            <button class="btn" data-content="staticProp">Colocar tile selecionado como prop</button>
-            <label class="field">Densidade (%)<input id="content-density" type="range" min="0" max="40" value="12"></label>
-            <button class="btn" id="content-scatter">Sortear props novamente</button>
+            <div class="panel-title">Chão</div>
             <label class="field">Tiles de chão (índices separados por vírgula)<input id="content-floor-pool" value="${DEMO.floorTiles.join(',')}"></label>
             <button class="btn" id="content-floor">Sortear chão novamente</button>
             <button class="btn btn-danger" data-content="eraseContent">Remover conteúdo no tile</button>
@@ -156,7 +153,8 @@ export class ContentTools {
             button.onclick = () => { this.choice = type; this.select('hazard'); };
             $('content-traps').append(button);
         }
-        panel.querySelectorAll('[data-content]').forEach(b => b.onclick = () => this.select(b.dataset.content));
+        // Inclui o botão de decoração, que fica no card "Props" (fora deste painel).
+        document.querySelectorAll('[data-content]').forEach(b => b.onclick = () => this.select(b.dataset.content));
         $('content-lock').onchange = () => this.app._commit(() => { this.app.room.lock = $('content-lock').value; });
         $('content-room-type').onchange = () => this.app._commit(() => { this.app.room.type = $('content-room-type').value; });
         $('content-scatter').onclick = () => this.app._commit(() => scatterProps(this.app.room, Number($('content-density').value) / 100));
@@ -220,7 +218,7 @@ export class ContentTools {
     _syncSelection() {
         const tool = this.app.tool;
         $('content-active').textContent = `Ferramenta ativa: ${this._activeDescription()}`;
-        for (const b of this.panel.querySelectorAll('[data-content]')) this._markActive(b, b.dataset.content === tool);
+        for (const b of document.querySelectorAll('[data-content]')) this._markActive(b, b.dataset.content === tool);
         for (const b of this.panel.querySelectorAll('[data-trap]')) this._markActive(b, tool === 'hazard' && b.dataset.trap === this.choice);
         const current = { enemy: this.enemyType, torch: this.torchType, interactive: this.interactiveType };
         for (const b of this.panel.querySelectorAll('.choice-btn')) this._markActive(b, tool === b.dataset.tool && b.dataset.value === current[b.dataset.tool]);

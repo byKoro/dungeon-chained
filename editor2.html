@@ -188,14 +188,19 @@
                 </section>
 
                 <section class="tool-group expanded" data-view="room" hidden>
-                    <h2 class="group-title">Props animados</h2>
+                    <h2 class="group-title">Props</h2>
                     <div class="group-body">
                         <div class="tab-panel">
+                            <div class="panel-title">Props animados</div>
                             <div class="prop-grid" id="prop-grid"></div>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="prop-flip">
                                 Espelhar na horizontal
                             </label>
+                            <div class="panel-title">Decoração sobre o piso</div>
+                            <button class="btn" data-content="staticProp">Colocar tile selecionado como prop</button>
+                            <label class="field">Densidade (%)<input id="content-density" type="range" min="0" max="40" value="12"></label>
+                            <button class="btn" id="content-scatter">Sortear props novamente</button>
                         </div>
                     </div>
                 </section>
