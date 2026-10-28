@@ -5,7 +5,8 @@ How enemies are defined, spawned, navigate, attack and die; how players take dam
 
 ## Files
 - `js/entities/Entity.js` — `Entity` base (players + enemies only).
-- `js/entities/MeleeEnemy.js` — the only enemy class; every enemy type is a `MeleeEnemy` with a different sprite config.
+- `js/entities/MeleeEnemy.js` — default melee behavior. `GhostfireBoss.js` specializes the trailer boss.
+- `js/config/GhostfireConfig.js`, `js/systems/GhostfireSystem.js`, `js/systems/GhostfireRenderer.js` — boss timings/stats, minion/FX orchestration, sprite and beam rendering.
 - `js/entities/Player.js` — `takeDamage`, `lives`, `invulnerableTimer` (damage interface only).
 - `js/combat/CombatSystem.js` — `CombatSystem`: enemy updates, saw hits, deaths/gibs, heart drops, combat SFX.
 - `js/systems/SpawnSystem.js` — `SpawnSystem.createEnemy(x, y, floor, type)`.
@@ -40,6 +41,18 @@ How enemies are defined, spawned, navigate, attack and die; how players take dam
 **Player damage interface** (`Player.takeDamage(srcX, srcY)`): returns `false` if `falling` or `invulnerableTimer>0`; else `lives--`, `invulnerableTimer=65`, hurt/scared timers, knockback impulse 16 away from source; returns `true`. `lives` starts 3. Holes subtract lives directly in `Game._resolveFall` (`HOLE_FALL.livesLost`, respawn invuln 90).
 
 ## Data flow
+
+### Ghostfire (boss from the opening trailer)
+
+`type: "ghostfire"` in authored enemies creates `GhostfireBoss` through `SpawnSystem`. In the editor it is listed as **Ghostfire (Boss do trailer)**. The existing `assets/enemies/ghostfire.png` is shared with `BossWallShot`; no generated assets or new runtime dependencies are needed.
+
+The boss starts on the right side, finds a non-negative floor cell without an authored wall, and runs `appear → roar → summon → wait → charge → indicator → beam → fade → recover → teleport`. Teleport switches sides and repeats the arrival. During charge it tracks the live players' mean Y along walkable floor; the horizontal beam locks before the warning and stays fixed through firing/fade. Beam origin is the sprite's mouth, endpoint is the opposite arena edge, and damage is active only during `beam` (players use `takeDamage`; enemies intersecting the beam die).
+
+Summons release one at a time during the spit pose (ticks 18, 23, 28, 33, 38), cycling `hellbat`, `demonessA`, `demonessB`. Preferred positions are in front of the boss; forward safe grid cells and then the rest of the room are fallbacks. Holes, negative floor, walls, proximity to players/enemies and the six-minion cap are respected. Room size and obstacles can reduce the wave.
+
+`CombatSystem.resolveWeaponHits` uses `receiveWeaponHit()` when available and emits hit feedback only for accepted hits. Ghostfire has eight health, a 45-tick hit cooldown, and immunity while frozen, arriving or teleporting. Ordinary enemies retain `startDying()` behavior. The death animation lasts 48 ticks before gibs; `GhostfireSystem` plays a single final burst and kills remaining non-boss minions, as in the trailer.
+
+`Game` calls `ghostfire.update` after enemy updates, warning drawing on the floor, the firing/fading beam in the air, and `renderLights` before post-processing. Generic melee attack audio is suppressed for bosses; `ghostfireRoar`, `ghostfireSummon`, `ghostfireCharge`, `ghostfireBeam`, `ghostfireDeath` reuse the trailer clips through `AudioConfig`.
 1. **Authoring**: room pieces (`map/*.json`, made in `editor.html`) carry `enemies: [{type, col, row}]` and `hazards: [...]`. `RoomManager` copies them to `cell.customEnemies` / `cell.customHazards`.
 2. **Enter room**: `RoomManager.enter()` → `Room.populate(spawnSystem, floor, assets)`: builds `ChallengeCorridor` if hazards exist, seeds `cell.heartCount` hearts, sets `cleared` from `lockRule` (`"buttons"` needs ≥2 buttons; `"enemies"`; `"none"`).
 3. **Spawn**: `Game._activateRoomEnemies` → with `ROOM_INTRO.enabled`, `_updateRoomIntro` calls `room.spawnEnemies(true)` then `_scheduleStaggeredSpawns` (shuffled `beginFrozenSpawn(acc)`, +8..23 frames each); `enemySpawn` SFX + flame burst on `justAppeared`; all `unfreeze()` at end of zoom-out. `spawnEnemies`: per authored foe → `findSafeFloorCell(floor, col, row)` (skip if none) → world `minX + (col-0.5)*TILE` → `spawnSystem.createEnemy(...)` → `setNavigationFloor(...)`.
@@ -84,6 +97,7 @@ Hazard element schema (`cell.customHazards[]`, editor `_addHazardAt`): `{ type, 
 See `.agents/playbooks/add-enemy.md` and `.agents/playbooks/add-trap.md`.
 
 ## Tests
+- `node tests/test_ghostfire.js` — phased attack cycle, staggered releases, locked horizontal aim, player/minion damage, side switch, weapon health/cooldown/death, safe capped summons, final minion cleanup.
 - `node tests/test_safe_spawn.js` — `findSafeFloorCell` rules.
 - `node tests/test_player_spawns.js`, `node tests/test_hole_resistance.js` — related spawn/hole behavior.
 - No tests for `MeleeEnemy`, `CombatSystem` or traps; verify in game: `python serve.py` → http://localhost:8000 (or `npm start` for Electron).

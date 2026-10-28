@@ -16,6 +16,7 @@ import { BloodCanvas } from './particles/BloodCanvas.js';
 
 import { PlayerFactory } from './entities/PlayerFactory.js';
 import { SpawnSystem } from './systems/SpawnSystem.js';
+import { GhostfireSystem } from './systems/GhostfireSystem.js';
 import { ParticleEffects } from './systems/ParticleEffects.js';
 import { CombatSystem } from './combat/CombatSystem.js';
 import { RoomManager } from './rooms/RoomManager.js';
@@ -131,6 +132,7 @@ export class Game {
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
+        this.ghostfire = new GhostfireSystem({ spawnSystem: this.spawnSystem, particleSystem: this.particleSystem, renderer: this.renderer, audio: this.audio });
         this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio });
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
 
@@ -750,6 +752,7 @@ export class Game {
 
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
+        this.ghostfire.update(room, [p1, p2]);
 
         const liveEnemies = enemies.filter(e => e.state !== "dying");
         const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies);
@@ -951,6 +954,7 @@ export class Game {
 
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
+        this.ghostfire.drawFloor(ctx, rooms.current);
 
         if (challenge) challenge.drawButtons(ctx);
         this.particleSystem.drawSmoke(ctx);
@@ -987,6 +991,7 @@ export class Game {
         drawables.filter(e => e.y > sawY).forEach(drawEntity);
 
         this.particleSystem.drawFlames(ctx);
+        this.ghostfire.drawAir(ctx, rooms.current);
 
         if (challenge) challenge.drawWallLayer(ctx);
 
@@ -1025,6 +1030,7 @@ export class Game {
             ? (this.chain.weapon.strain ?? 0) : 0;
         this.postProcessor.setVignetteBreath(strain);
 
+        this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;

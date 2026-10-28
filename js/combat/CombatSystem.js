@@ -42,7 +42,7 @@ export class CombatSystem {
             });
             if (this.audio) {
                 if (e.justStepped) this.audio.play("enemyStep");
-                if (e.justAttacked) {
+                if (e.justAttacked && !e.isBoss) {
                     this.audio.play("enemyAttack");
                     this.audio.play("enemyAttackVoice");
                 }
@@ -71,7 +71,11 @@ export class CombatSystem {
                 Math.hypot(enemy.x - sawPos.x, enemy.y - sawPos.y) < discR + enemy.hitRadius;
 
             if (hitChain || hitDisc) {
-                enemy.startDying();
+                if (enemy.receiveWeaponHit) {
+                    if (!enemy.receiveWeaponHit()) continue;
+                } else {
+                    enemy.startDying();
+                }
                 weapon.onHit?.();
                 hits++;
                 if (this.audio) this.audio.play("monsterHurt");

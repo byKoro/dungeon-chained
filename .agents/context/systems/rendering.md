@@ -38,6 +38,8 @@ Draw the current room in crisp pixel art on a full-window 2D canvas: tiled floor
 
 ## Pixel-art rules
 
+Ghostfire uses `GhostfireRenderer`: full 100px source cells at integer 8× scale, matching the trailer anchors (52.5px normally, 39.5px for extended beam poses, Y=42px). The firing animation preserves the mouth/flame launch through source X=66, then repeats the hot strip (X=66..89, Y=41, H=3) and caps it with the original tail. Warning/fade use the final source column. The beam is extended to the opposite arena edge, flipped by side, and centered on its collision width. Rows: idle/arrival 1, summon 2, charge/warning/fire/fade/recovery 3, death 4. Boss and beam lights are queued before `PostProcessor.draw`; health, glow, reveal and teleport stretch are drawn with the boss.
+
 - `ctx.imageSmoothingEnabled = false` set in `Game` constructor and again after every resize (`_bindResize` sets canvas to `window.innerWidth/innerHeight`; resizing resets context state).
 - CSS `image-rendering: pixelated; crisp-edges` on `#gameCanvas` and UI canvases.
 - Draw sprites via source-rect crops (`cropX/cropY/cropW/cropH` within `cellSize` cells) scaled to `drawHeight`.

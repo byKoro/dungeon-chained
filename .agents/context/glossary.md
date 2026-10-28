@@ -9,7 +9,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Player 1 / P1 | Amarelo | Yellow player, keyboard WASD or gamepad 0 |
 | Player 2 / P2 | Azul | Blue player, arrow keys or gamepad 1 |
 | Chain / cable | corrente, cabo | Elastic tether between P1 and P2 that carries the saw (asset `rope.png`, key `cable`) |
-| Saw | serra | The only weapon: disc at the cable midpoint; kills any enemy it or the cable touches |
+| Saw | serra | The only weapon: disc at the cable midpoint; kills ordinary enemies on contact and damages bosses through their hit/cooldown interface |
 | Snap | arrebentar, ruptura | Cable breaks from over-stretch or a hole fall; saw is dropped |
 | Dropped saw / blade | lâmina largada | Saw lying on the floor until both players reach it |
 | Reconnect | reconectar | Both players pick the saw back up |
@@ -25,6 +25,8 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Variant | variação | Another piece with the same signature and type |
 | Start room | câmara inicial, hub | `type: "start"` piece; run begins here |
 | Boss room | sala do chefe | `type: "boss"` (no pieces authored yet) |
+| Ghostfire | Ghostfire, boss do trailer | Giant floating fire skull (`type: "ghostfire"`), with staggered minion summons and a horizontal beam; alternates arena sides |
+| Beam warning | aviso do raio | Locked, harmless line before Ghostfire fires; gives players time to dodge vertically |
 | Challenge room/corridor | desafio, sala-trap | Room with hazards; solved by holding ≥2 pressure buttons |
 | Lock rule | trancamento | How a room keeps doors closed: `auto`, `none`, `enemies`, `buttons` |
 | Hazard / trap | perigo, armadilha, trap | `spike`, `spikeRow`, `arrow`, `button` |

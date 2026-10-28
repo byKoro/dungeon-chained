@@ -5,6 +5,31 @@ export const AUDIO_CONFIG = {
     muted: false,
 
     cues: {
+        ghostfireRoar: {
+            description: "Rugido do Ghostfire do trailer",
+            files: ["assets/audio/trailer/roar.wav"],
+            volume: 0.8, rate: 0.72, rateVariance: 0, enabled: true
+        },
+        ghostfireCharge: {
+            description: "Carga do raio do Ghostfire",
+            files: ["assets/audio/trailer/beam-charge.wav"],
+            volume: 0.75, rate: 1, rateVariance: 0, enabled: true
+        },
+        ghostfireBeam: {
+            description: "Disparo do raio do Ghostfire",
+            files: ["assets/audio/trailer/beam-fire.wav"],
+            volume: 0.85, rate: 1, rateVariance: 0, enabled: true
+        },
+        ghostfireSummon: {
+            description: "Chamas da invocação do Ghostfire",
+            files: [1, 2].map(i => `assets/audio/trailer/flame-0${i}.wav`),
+            volume: 0.7, rate: 0.85, rateVariance: 0.03, enabled: true
+        },
+        ghostfireDeath: {
+            description: "Explosão final do Ghostfire",
+            files: [1, 2, 3].map(i => `assets/audio/trailer/boom-0${i}.wav`),
+            volume: 0.9, rate: 0.6, rateVariance: 0.03, enabled: true
+        },
         playerHurt: {
             description: "Dano sofrido pelos jogadores ao colidir com inimigos",
             files: [1, 2, 3].map(i => `assets/audio/player-hit-0${i}.wav`),

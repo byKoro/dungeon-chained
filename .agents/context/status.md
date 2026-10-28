@@ -21,6 +21,8 @@ Merged into `main` (fast-forward, 2026-10-26) from `feat/player-dash`, two commi
 - Individual dash while the chain is snapped. See `systems/players-and-chain.md` → Dash. The `playerDash` sound is a placeholder (pitched `arrow-fire`).
 
 ## Backlog
+
+Implemented on branch `boss` (2026-10-27): Ghostfire now reuses the opening trailer sprite geometry, pixel-art beam and audio, with staggered summons, charge/locked warning, alternating sides and full death animation. Weapon hits respect its health/cooldown. See `systems/combat-and-entities.md` and task `2026-10-27-ghostfire-trailer`. Existing unrelated working edits were preserved outside the focused boss commit. All 12 local test files pass; the isolated commit has 10/11 passing with baseline issue #5 still present. Map validation still fails on known issue #4. `graphify` is unavailable (`npm run doctor`).
 - `.agents/backlog/prop-shadow.md` — dynamic prop silhouette shadows (design approved, not implemented).
 
 ## Known bugs / gotchas (verified 2026-10-25)
