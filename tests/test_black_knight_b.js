@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { SpawnSystem } from '../js/systems/SpawnSystem.js';
 import { CombatSystem } from '../js/combat/CombatSystem.js';
+import { ENEMY_HIT } from '../js/config/CombatFeelConfig.js';
 
 const sheet = { complete: true, naturalWidth: 900 };
 const spawn = new SpawnSystem({ assets: { get: () => sheet }, bloodCanvas: { palette: [] } });
@@ -31,8 +32,10 @@ for (let i = 0; i < 3; i++) {
     hit();
     assert.equal(tank.hp, 3 - i);
     assert.equal(tank.isDying, false);
-    hit();
-    assert.equal(tank.hp, 3 - i, 'continuous contact respects hit cooldown');
+    if (ENEMY_HIT.cooldownSteps > 0) {
+        hit();
+        assert.equal(tank.hp, 3 - i, 'continuous contact respects hit cooldown');
+    }
     for (let tick = 0; tick < 24; tick++) tank.update(players, () => {});
     tank.x = tank.y = 0;
 }

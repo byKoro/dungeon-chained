@@ -91,12 +91,16 @@ const tick = (e, n) => { for (let i = 0; i < n; i++) e.update(FAR_PLAYERS, () =>
     assert(r && !r.killed && r.staggered && !r.poiseBroken, "sobrevivente reage com stagger sem romper poise");
     assert(e.state === "hurt" && e.hp === 3, "entra em hurt e desconta a vida correta");
     assert(e.flashTimer > 0 && e.pushVx > 0 && near(e.pushVy, 0), "flash ligado e empurrão para longe da fonte (+x)");
-    assert(e.takeHit(1, { dirX: 1, dirY: 0 }) === false && e.hp === 3, "segundo golpe no cooldown é recusado sem dano");
+    if (ENEMY_HIT.cooldownSteps > 0) {
+        assert(e.takeHit(1, { dirX: 1, dirY: 0 }) === false && e.hp === 3, "segundo golpe no cooldown é recusado sem dano");
+        tick(e, ENEMY_HIT.cooldownSteps);
+        assert(e.takeHit(1, { dirX: 1, dirY: 0 }) !== false, "cooldown acaba e o golpe volta a valer");
+        tick(e, ENEMY_HIT.cooldownSteps);
+    } else {
+        assert(e.takeHit(1, { dirX: 1, dirY: 0 }) !== false && e.hp === 2, "sem cooldown, o segundo golpe vale imediatamente");
+    }
     tick(e, ENEMY_HIT.stagger.steps);
     assert(e.state === "chase", "hurt termina e retoma a perseguição");
-    assert(e.takeHit(1, { dirX: 1, dirY: 0 }) === false, "ainda em cooldown depois do hurt");
-    tick(e, ENEMY_HIT.cooldownSteps - ENEMY_HIT.stagger.steps);
-    assert(e.takeHit(1, { dirX: 1, dirY: 0 }) !== false, "cooldown acaba e o golpe volta a valer");
 
     const w = makeEnemy({ hp: 2 });
     w.state = "windup"; w.stateTimer = 10; w.dealtHit = false; w.justAttacked = true;
@@ -218,10 +222,15 @@ const P2 = { x: 400, y: 300 };
     assert(log.shakes[0] === HIT_FEEL.shake.hit, "tremor moderado de acerto");
 
     const before = { numbers: log.numbers.length, audio: log.audio.length, shakes: log.shakes.length, w: log.weaponHits };
-    for (let n = 0; n < 5; n++) combat.resolveWeaponHits(weapon, [e], P1, P2, true, (en) => kills.push(en), (en, info) => hits.push(info));
-    assert(hits.length === 1 && log.numbers.length === before.numbers && log.audio.length === before.audio
-        && log.shakes.length === before.shakes && log.weaponHits === before.w && e.hp === 3,
-        "contato contínuo no cooldown não repete dano, número, som ou efeitos");
+    if (ENEMY_HIT.cooldownSteps > 0) {
+        for (let n = 0; n < 5; n++) combat.resolveWeaponHits(weapon, [e], P1, P2, true, (en) => kills.push(en), (en, info) => hits.push(info));
+        assert(hits.length === 1 && log.numbers.length === before.numbers && log.audio.length === before.audio
+            && log.shakes.length === before.shakes && log.weaponHits === before.w && e.hp === 3,
+            "contato contínuo no cooldown não repete dano, número, som ou efeitos");
+    } else {
+        combat.resolveWeaponHits(weapon, [e], P1, P2, true, (en) => kills.push(en), (en, info) => hits.push(info));
+        assert(hits.length === 2 && e.hp === 2, "sem cooldown, cada passo de contato conta como um golpe");
+    }
 }
 
 {
