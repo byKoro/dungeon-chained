@@ -57,3 +57,5 @@ neutro = neutral · assustado = scared · espantado = startled · raiva = anger 
 
 ## Misspellings kept for compatibility
 - `assets/buttom/` = button. `assets/peaks/` = spikes ("picos"). `map/corredor_ne_01.json` = legacy pt-BR file name.
+
+- **Cavaleiro Negro B / Black Knight B** (`blackKnightB`): tanque lento com três ataques alternados e morte animada.

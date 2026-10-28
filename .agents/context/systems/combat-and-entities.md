@@ -92,3 +92,10 @@ See `.agents/playbooks/add-enemy.md` and `.agents/playbooks/add-trap.md`.
 
 ## Related docs
 `weapons.md`, `.agents/playbooks/add-enemy.md`, `.agents/playbooks/add-trap.md`, `.agents/playbooks/add-weapon.md`.
+
+## Black Knight B — tanque
+`blackKnightB` (`assets/enemies/black_knight_b.png`) tem `combat.hp = 4`, velocidade 0.8, preparação de 65 ticks e recuperação de 45 ticks. Usa as três linhas de ataque em ciclo (`attack` → `attack2` → `attack3`), com dano nos `hitFrame` de cada linha. O cooldown compartilhado de acertos (24 ticks) impede perder toda a vida em um único contato contínuo.
+
+Opções de sprite `combat.cycleAttacks` e `combat.playDeathAnimation` são opt-in. A segunda mantém o estado `dying` sem ataques/movimento durante `death.frames * death.fps` ticks, desenha a linha de morte sem o flash e só então permite os gibs/remoção. Para o cavaleiro são 4 quadros × 7 ticks = 28 ticks. Outros mobs preservam a seleção aleatória de ataques e morte anterior.
+
+Verificação: `node tests/test_black_knight_b.js` cobre SpawnSystem, dano via CombatSystem, cooldown, ciclo com dano dos três ataques e os recortes reais enviados ao canvas durante a morte.
