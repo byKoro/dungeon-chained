@@ -3,8 +3,22 @@ import { DEMO, INTERACTIVES } from '../config/DemoConfig.js';
 import { connectDoors, identifyDoors, doorCells, validatePlayable, sideOf, safeSpawnPair } from '../rooms/MapConnections.js';
 import { scatterProps, randomizeFloor, placeDoor } from './MapContent.js';
 import { AssetLoader } from '../core/AssetLoader.js';
+import { editorEnemyTypes, thumbRegion } from './ContentCatalog.js';
 
 const $ = id => document.getElementById(id);
+
+const TRAPS = [
+    ['spike', 'Espinhos', 'assets/peaks/peaks_3.png'], ['spikeRow', 'Fileira', 'assets/peaks/peaks_2.png'],
+    ['arrow', 'Flechas', 'assets/arrow/arrow_1.png'], ['button', 'Botão co-op', 'assets/buttom/buttom_16.png']
+];
+const TORCHES = [
+    ['torch', 'Parede', 'torch1'], ['candlestick_1', 'Castiçal 1', 'candlestick1_1'], ['candlestick_2', 'Castiçal 2', 'candlestick2_1']
+];
+const TOOL_LABELS = {
+    paint: 'Tile', hole: 'Buraco', void: 'Vazio', collision: 'Colisão', door: 'Porta', prop: 'Prop animado', erase: 'Borracha',
+    spawn1: 'Spawn P1', spawn2: 'Spawn P2', enemy: 'Inimigo', torch: 'Tocha', hazard: 'Armadilha', interactive: 'Interativo',
+    bridge: 'Ponte da alavanca', staticProp: 'Decoração (tile como prop)', eraseContent: 'Remover conteúdo'
+};
 
 export class ContentTools {
     constructor(app) {
@@ -14,17 +28,94 @@ export class ContentTools {
         this.source = null;
         this.bridgeId = null;
         this.choice = 'spike';
+        this.enemyType = editorEnemyTypes()[0]?.key;
+        this.torchType = TORCHES[0][0];
+        this.interactiveType = Object.keys(INTERACTIVES)[0];
+        this.thumbs = [];
         this._build();
+        this._drawThumbs();
+        this.assets.whenReady().then(() => this._drawThumbs());
+    }
+
+    // Lista de botões com miniatura. Clicar escolhe o item e ativa a ferramenta.
+    _buildChoiceList(containerId, tool, items, type) {
+        const list = $(containerId);
+        for (const item of items) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn choice-btn';
+            button.dataset.tool = tool;
+            button.dataset.value = item.key;
+            button.title = item.label;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 32;
+            canvas.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.textContent = item.label;
+            button.append(canvas, text);
+            button.onclick = () => { this[type] = item.key; this.select(tool); };
+            list.append(button);
+            this.thumbs.push({ ctx: canvas.getContext('2d'), draw: item.draw });
+            // Redesenha assim que a imagem do próprio item carregar (sem esperar todos os assets).
+            const img = item.img?.();
+            if (img && !(img.complete && img.naturalWidth)) img.addEventListener('load', () => this._drawThumbs(), { once: true });
+        }
+    }
+
+    _drawThumbs() {
+        for (const { ctx, draw } of this.thumbs) {
+            ctx.clearRect(0, 0, 32, 32);
+            ctx.imageSmoothingEnabled = false;
+            draw(ctx);
+        }
+    }
+
+    _fitImage(ctx, img, sx, sy, w, h) {
+        if (!img?.complete || !img.naturalWidth) return;
+        const k = Math.min(30 / w, 30 / h), dw = w * k, dh = h * k;
+        ctx.drawImage(img, sx, sy, w, h, (32 - dw) / 2, (32 - dh) / 2, dw, dh);
+    }
+
+    _enemyItems() {
+        return editorEnemyTypes().map(t => ({
+            key: t.key, label: t.label,
+            img: () => t.config(this.assets).img,
+            draw: ctx => {
+                const cfg = t.config(this.assets), r = thumbRegion(cfg);
+                this._fitImage(ctx, cfg.img, r.sx, r.sy, r.w, r.h);
+            }
+        }));
+    }
+
+    _torchItems() {
+        return TORCHES.map(([key, label, asset]) => ({
+            key, label,
+            img: () => this.assets.get(asset),
+            draw: ctx => { const img = this.assets.get(asset); this._fitImage(ctx, img, 0, 0, img?.naturalWidth, img?.naturalHeight); }
+        }));
+    }
+
+    _interactiveItems() {
+        return Object.entries(INTERACTIVES).map(([key, def]) => ({
+            key, label: def.label,
+            draw: ctx => {
+                ctx.fillStyle = def.color; ctx.fillRect(4, 4, 24, 24);
+                ctx.fillStyle = '#111'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(def.symbol, 16, 17);
+            }
+        }));
     }
 
     _build() {
         const panel = document.createElement('section');
         panel.className = 'tool-group expanded';
         panel.dataset.view = 'room';
+        this.panel = panel;
         panel.innerHTML = `<h2 class="group-title">Conteúdo e gameplay</h2><div class="group-body"><div class="tab-panel">
+            <div id="content-active" class="active-tool" role="status" aria-live="polite"></div>
             <div class="content-actions"><button class="btn" data-content="spawn1">Spawn P1</button><button class="btn" data-content="spawn2">Spawn P2</button></div>
-            <label class="field">Inimigo<select id="content-enemy"></select></label><button class="btn" data-content="enemy">Colocar inimigo</button>
-            <label class="field">Tochas<select id="content-torch"><option value="torch">Parede</option><option value="candlestick_1">Castiçal 1</option><option value="candlestick_2">Castiçal 2</option></select></label><button class="btn" data-content="torch">Colocar tocha</button>
+            <div class="panel-title">Inimigos</div><div id="content-enemies" class="choice-grid" role="group" aria-label="Inimigo"></div>
+            <div class="panel-title">Tochas</div><div id="content-torches" class="choice-grid" role="group" aria-label="Tocha"></div>
             <div class="panel-title">Armadilhas</div><div id="content-traps" class="content-actions"></div>
             <label class="field">Ritmo<select id="content-timing"><option>normal</option><option>fast</option><option>slow</option></select></label>
             <label class="field">Atraso (s)<input id="content-delay" type="number" min="0" max="30" step="0.1" value="0"></label>
@@ -32,8 +123,8 @@ export class ContentTools {
             <label class="field">Quantidade da fileira<input id="content-count" type="number" min="1" max="20" value="3"></label>
             <label class="field">Portas da sala<select id="content-lock"><option value="none">Sempre abertas</option><option value="enemies">Derrotar inimigos</option><option value="buttons">Botões co-op</option></select></label>
             <label class="field">Tipo de sala<select id="content-room-type"><option value="normal">Normal</option><option value="boss">Boss / conclusão</option></select></label>
-            <div class="panel-title">Interativos</div><label class="field"><select id="content-interactive"></select></label>
-            <button class="btn" data-content="interactive">Colocar interativo</button><button class="btn" data-content="bridge">Marcar ponte da alavanca selecionada</button>
+            <div class="panel-title">Interativos</div><div id="content-interactives" class="choice-grid" role="group" aria-label="Interativo"></div>
+            <button class="btn" data-content="bridge">Marcar ponte da alavanca selecionada</button>
             <p class="hint">Clique novamente na alavanca para selecioná-la. Com “Marcar ponte”, clique nos buracos que formarão sua ponte.</p>
             <div class="panel-title">Decoração sobre o piso</div>
             <button class="btn" data-content="staticProp">Colocar tile selecionado como prop</button>
@@ -46,14 +137,14 @@ export class ContentTools {
         </div></div>`;
         // Depois dos cards existentes: no mapa, "Mapa" continua no topo.
         $('sidebar-left').querySelector('.tab-panel-container').append(panel);
-        for (const enemy of ENEMY_TYPES) $('content-enemy').add(new Option(enemy.label, enemy.key));
-        for (const [key, def] of Object.entries(INTERACTIVES)) $('content-interactive').add(new Option(def.label, key));
-        for (const [type, label, img] of [
-            ['spike', 'Espinhos', 'assets/peaks/peaks_3.png'], ['spikeRow', 'Fileira', 'assets/peaks/peaks_2.png'],
-            ['arrow', 'Flechas', 'assets/arrow/arrow_1.png'], ['button', 'Botão co-op', 'assets/buttom/buttom_16.png']
-        ]) {
+        this._buildChoiceList('content-enemies', 'enemy', this._enemyItems(), 'enemyType');
+        this._buildChoiceList('content-torches', 'torch', this._torchItems(), 'torchType');
+        this._buildChoiceList('content-interactives', 'interactive', this._interactiveItems(), 'interactiveType');
+        for (const [type, label, img] of TRAPS) {
             const button = document.createElement('button');
             button.className = 'btn trap-choice';
+            button.type = 'button';
+            button.dataset.trap = type;
             button.title = label;
             const image = document.createElement('img'); image.src = img; image.alt = label;
             const text = document.createElement('span'); text.textContent = label;
@@ -102,11 +193,37 @@ export class ContentTools {
 
     select(tool) {
         this.app.tool = tool;
-        $('content-hint').textContent = `Ferramenta: ${tool}. Clique na sala; Ctrl+Z desfaz.`;
+        $('content-hint').textContent = 'Clique na sala para aplicar; Ctrl+Z desfaz.';
         this.app._syncUI();
     }
 
+    _activeDescription() {
+        const tool = this.app.tool, name = TOOL_LABELS[tool] || tool;
+        const detail = {
+            enemy: () => editorEnemyTypes().find(t => t.key === this.enemyType)?.label,
+            torch: () => TORCHES.find(t => t[0] === this.torchType)?.[1],
+            interactive: () => INTERACTIVES[this.interactiveType]?.label,
+            hazard: () => TRAPS.find(t => t[0] === this.choice)?.[1]
+        }[tool]?.();
+        return detail ? `${name}: ${detail}` : name;
+    }
+
+    _markActive(button, active) {
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+    }
+
+    _syncSelection() {
+        const tool = this.app.tool;
+        $('content-active').textContent = `Ferramenta ativa: ${this._activeDescription()}`;
+        for (const b of this.panel.querySelectorAll('[data-content]')) this._markActive(b, b.dataset.content === tool);
+        for (const b of this.panel.querySelectorAll('[data-trap]')) this._markActive(b, tool === 'hazard' && b.dataset.trap === this.choice);
+        const current = { enemy: this.enemyType, torch: this.torchType, interactive: this.interactiveType };
+        for (const b of this.panel.querySelectorAll('.choice-btn')) this._markActive(b, tool === b.dataset.tool && b.dataset.value === current[b.dataset.tool]);
+    }
+
     sync() {
+        this._syncSelection();
         const room = this.app.room;
         if (room) {
             $('content-lock').value = room.lock || 'none';
@@ -142,10 +259,10 @@ export class ContentTools {
             if (!onFloor || col === 0 || row === 0 || col === r.cols - 1 || row === r.rows - 1) return true;
             r.spawns ||= safeSpawnPair(r) || {};
             r.spawns[type === 'spawn1' ? 'p1' : 'p2'] = cell;
-        } else if (type === 'enemy' && onFloor) this._toggle(r, 'enemies', { ...cell, type: $('content-enemy').value });
+        } else if (type === 'enemy' && onFloor) this._toggle(r, 'enemies', { ...cell, type: this.enemyType });
         else if (type === 'staticProp' && onFloor) this._toggle(r, 'props', { ...cell, index: a.palette.firstIndex });
         else if (type === 'torch') {
-            const torch = $('content-torch').value;
+            const torch = this.torchType;
             const side = torch === 'torch' ? sideOf(r, cell) || (col === 1 ? 'W' : col === r.cols - 2 ? 'E' : 'N') : 'F';
             if (torch === 'torch' || onFloor) this._toggle(r, 'torches', { ...cell, type: torch, side });
         } else if (type === 'hazard') {
@@ -158,7 +275,7 @@ export class ContentTools {
             const hit = (r.interactives || []).find(o => o.col === col && o.row === row);
             if (hit?.type === 'lever') { this.bridgeId = hit.id; $('content-hint').textContent = 'Alavanca selecionada. Use “Marcar ponte”.'; return true; }
             if (!onFloor) return true;
-            const object = { ...cell, type: $('content-interactive').value, id: `object_${Date.now()}_${col}_${row}` };
+            const object = { ...cell, type: this.interactiveType, id: `object_${Date.now()}_${col}_${row}` };
             if (object.type === 'lever') { object.tiles = []; this.bridgeId = object.id; }
             this._toggle(r, 'interactives', object);
         } else if (type === 'bridge') {

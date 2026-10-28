@@ -761,7 +761,11 @@ export class MapEditorApp {
             input.name = "door-type";
             input.value = type;
             input.checked = type === this.doorType;
-            input.addEventListener("change", () => { this.doorType = type; });
+            label.classList.toggle("active", input.checked);
+            input.addEventListener("change", () => {
+                this.doorType = type;
+                for (const l of list.querySelectorAll("label")) l.classList.toggle("active", l.querySelector("input").value === type);
+            });
             const swatch = document.createElement("span");
             swatch.className = "swatch";
             swatch.style.background = def.color;
@@ -880,7 +884,7 @@ export class MapEditorApp {
         $("door-type-field").hidden = this.tool !== "door";
         this._setVal("paint-kind", this.paintKind);
         $("prop-flip").checked = this.propFlip;
-        for (const btn of document.querySelectorAll("#prop-grid [data-prop]")) btn.classList.toggle("active", btn.dataset.prop === this.propType);
+        for (const btn of document.querySelectorAll("#prop-grid [data-prop]")) btn.classList.toggle("active", this.tool === "prop" && btn.dataset.prop === this.propType);
 
         const s = this.palette.selection;
         const idx = this.palette.firstIndex;
