@@ -41,7 +41,7 @@ export class AssetLoader {
             this._tilesetVariantKeys.push(key);
         }
 
-        this.load("bossGate", "assets/doors/boss-gate-opening-sheet-v1.png");
+        this.load("bossGate", "assets/doors/boss-gate-opening-strip-v8.png");
         for (let frame = 1; frame <= 4; frame++) this.load(`demoKey${frame}`, `assets/keys/keys_1_${frame}.png`);
         this.load("saw", "assets/saw/saw.png");
 

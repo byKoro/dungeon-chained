@@ -234,7 +234,7 @@ export class RoomManager {
         if (canPass) {
             for (const d of doors) {
                 if (d.blocked) continue;
-                doorHalf = d.halfWidth ?? this.doorHalfWidth;
+                doorHalf = d.passHalfWidth ?? d.halfWidth ?? this.doorHalfWidth;
                 if (d.dir === "N" || d.dir === "S") {
                     if (Math.abs(player.x - d.x) < doorHalf) has[d.dir] = d;
                 } else {
@@ -243,7 +243,8 @@ export class RoomManager {
             }
         }
 
-        doorHalf = (Object.values(has).find(Boolean)?.halfWidth) ?? this.doorHalfWidth;
+        const through = Object.values(has).find(Boolean);
+        doorHalf = through?.passHalfWidth ?? through?.halfWidth ?? this.doorHalfWidth;
         const minX = has.W ? bounds.minX - DOOR_ENTER_DEPTH : bounds.minX + r;
         const maxX = has.E ? bounds.maxX + DOOR_ENTER_DEPTH : bounds.maxX - r;
         player.x = Math.max(minX, Math.min(maxX, player.x));
@@ -268,7 +269,7 @@ export class RoomManager {
     }
 
     playerAlignedToDoor(player, door) {
-        const doorHalf = (door.halfWidth ?? this.doorHalfWidth) - player.hitRadius;
+        const doorHalf = (door.passHalfWidth ?? door.halfWidth ?? this.doorHalfWidth) - player.hitRadius;
         if (door.dir === "N" || door.dir === "S") return Math.abs(player.x - door.x) < doorHalf;
         return Math.abs(player.y - door.y) < doorHalf;
     }
