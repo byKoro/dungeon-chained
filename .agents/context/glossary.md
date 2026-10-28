@@ -59,3 +59,5 @@ neutro = neutral · assustado = scared · espantado = startled · raiva = anger 
 - `assets/buttom/` = button. `assets/peaks/` = spikes ("picos"). `map/corredor_ne_01.json` = legacy pt-BR file name.
 
 - **Cavaleiro Negro B / Black Knight B** (`blackKnightB`): tanque lento com três ataques alternados e morte animada.
+
+- **Cultista / Cultist** (`cultist`): inimigo à distância que marca um ponto fixo e invoca um pilar de fogo após aviso. `preferredDistance`: distância desejada aos jogadores, em pixels.

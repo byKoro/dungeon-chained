@@ -1,4 +1,7 @@
+import { CULTIST_SPRITE } from './CultistConfig.js';
+
 export const TINY_RPG_ENEMIES = [
+    CULTIST_SPRITE,
     {
         "key": "blackKnightA",
         "label": "Cavaleiro Negro A",

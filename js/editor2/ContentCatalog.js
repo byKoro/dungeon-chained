@@ -2,7 +2,7 @@ import { ENEMY_TYPES } from '../config/EntityConfig.js';
 
 // Inimigos liberados no editor 2.0. Acrescente a chave aqui quando um inimigo ficar pronto.
 // Salas antigas com outros tipos continuam sendo desenhadas e podem ser apagadas.
-export const EDITOR2_ENEMY_KEYS = ['demon', 'bloodMonster', 'blackKnightB'];
+export const EDITOR2_ENEMY_KEYS = ['demon', 'bloodMonster', 'blackKnightB', 'cultist'];
 
 export function editorEnemyTypes() {
     return EDITOR2_ENEMY_KEYS.map(key => ENEMY_TYPES.find(t => t.key === key)).filter(Boolean);

@@ -1011,6 +1011,7 @@ export class Game {
 
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
+        for (const enemy of rooms.current.enemies) enemy.drawAttackEffect?.(ctx);
 
         if (challenge) challenge.drawButtons(ctx);
         this.particleSystem.drawSmoke(ctx);

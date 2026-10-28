@@ -99,3 +99,12 @@ See `.agents/playbooks/add-enemy.md` and `.agents/playbooks/add-trap.md`.
 Opções de sprite `combat.cycleAttacks` e `combat.playDeathAnimation` são opt-in. A segunda mantém o estado `dying` sem ataques/movimento durante `death.frames * death.fps` ticks, desenha a linha de morte sem o flash e só então permite os gibs/remoção. Para o cavaleiro são 4 quadros × 7 ticks = 28 ticks. Outros mobs preservam a seleção aleatória de ataques e morte anterior.
 
 Verificação: `node tests/test_black_knight_b.js` cobre SpawnSystem, dano via CombatSystem, cooldown, ciclo com dano dos três ataques e os recortes reais enviados ao canvas durante a morte.
+
+## Cultista — pilar de fogo
+`cultist` usa `CultistEnemy extends MeleeEnemy`, criado pelo SpawnSystem e disponível nos dois editores. Configuração em `js/config/CultistConfig.js`; `preferredDistance` é um atributo público da instância, inicializado em 300 px, com tolerância de 24 px. Em chase, aproxima-se até essa faixa ou escolhe entre oito direções de recuo a que melhora a distância ao jogador vivo mais próximo, sem atravessar tiles bloqueados. Em situações sem rota segura ele pode ficar encurralado. Conjuração e recuperação são estacionárias.
+
+Ao entrar em windup, copia a posição do jogador vivo/não caindo mais próximo. A posição gravada não acompanha o alvo e não tem marcador circular no chão. Após 45 ticks de preparação, usa apenas a quarta linha da PNG (row 3, 14 quadros × 6 ticks). O recorte do pilar é desenhado separadamente na posição marcada por `drawAttackEffect`, chamado no passe de chão do Game; quadros 8–11 causam dano num raio de 30 px (+ hitRadius do jogador), uma vez por jogador por conjuração. Sair da área evita o ataque, entrar durante os quadros ativos permite receber dano. Não causa dano corpo a corpo. Stagger e morte cancelam a marca/pilar; hit stop e pausa congelam seus timers.
+
+Morte: última linha (row 5, 10 quadros × 7 ticks), completa antes da remoção; sem gibs por terminar em dissipação. Reutiliza spawn congelado, feedback de acerto, navegação e ciclo de morte do MeleeEnemy. `tests/test_cultist.js` verifica distância configurável, alvo fixo, esquiva, AoE, interrupção, spawn e morte.
+
+A distância máxima de conjuração é 464 px, cobrindo a faixa desejada de 300 ± 24 px. O único efeito desenhado no ponto gravado vem da spritesheet, sem círculo adicional.
