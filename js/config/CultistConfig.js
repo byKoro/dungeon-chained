@@ -1,7 +1,7 @@
 export const CULTIST = {
     hp: 2,
     speed: 1.4,
-    preferredDistance: 440,
+    preferredDistance: 300,
     distanceTolerance: 24,
     retreatProbeSteps: 12,
     castRange: 464,
