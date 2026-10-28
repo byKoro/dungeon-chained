@@ -4,6 +4,9 @@ import { connectDoors, identifyDoors, doorCells, validatePlayable, sideOf, safeS
 import { scatterProps, randomizeFloor, placeDoor } from './MapContent.js';
 import { AssetLoader } from '../core/AssetLoader.js';
 import { editorEnemyTypes, thumbRegion } from './ContentCatalog.js';
+import { occupiedCells } from '../rooms/MapOccupancy.js';
+import { arrowFireDir, arrowMountOffset, fitSpikeRow, wallSideForTile, SPIKE_ROW_WAVE } from '../rooms/HazardLayout.js';
+import { HAZARDS, TILE } from '../config/GameConfig.js';
 
 const $ = id => document.getElementById(id);
 
@@ -265,13 +268,8 @@ export class ContentTools {
             const torch = this.torchType;
             const side = torch === 'torch' ? sideOf(r, cell) || (col === 1 ? 'W' : col === r.cols - 2 ? 'E' : 'N') : 'F';
             if (torch === 'torch' || onFloor) this._toggle(r, 'torches', { ...cell, type: torch, side });
-        } else if (type === 'hazard') {
-            if (!onFloor && this.choice !== 'arrow') return true;
-            const h = { ...cell, type: this.choice, timing: $('content-timing').value, delay: Math.max(0, Number($('content-delay').value) || 0) };
-            if (h.type === 'spikeRow') Object.assign(h, { dir: $('content-direction').value, count: Math.max(1, Math.min(20, Number($('content-count').value) || 1)) });
-            if (h.type === 'arrow') h.side = ({ N: 'top', S: 'bottom', W: 'left', E: 'right' })[sideOf(r, cell)] || ({ right: 'left', left: 'right', down: 'top', up: 'bottom' })[$('content-direction').value];
-            this._toggle(r, 'hazards', h);
-        } else if (type === 'interactive') {
+        } else if (type === 'hazard') this._applyHazard(r, cell, onFloor);
+        else if (type === 'interactive') {
             const hit = (r.interactives || []).find(o => o.col === col && o.row === row);
             if (hit?.type === 'lever') { this.bridgeId = hit.id; $('content-hint').textContent = 'Alavanca selecionada. Use “Marcar ponte”.'; return true; }
             if (!onFloor) return true;
@@ -284,9 +282,66 @@ export class ContentTools {
             const i = lever.tiles.findIndex(p => p.col === col && p.row === row);
             if (i >= 0) lever.tiles.splice(i, 1); else lever.tiles.push(cell);
         } else if (type === 'eraseContent') {
-            for (const field of ['enemies', 'props', 'torches', 'hazards', 'interactives']) r[field] = (r[field] || []).filter(o => o.col !== col || o.row !== row);
+            for (const field of ['enemies', 'props', 'torches', 'interactives']) r[field] = (r[field] || []).filter(o => o.col !== col || o.row !== row);
+            // Fileira de espinhos ocupa vários tiles: clicar em qualquer um remove a fileira toda.
+            r.hazards = (r.hazards || []).filter(h => !occupiedCells(h).some(p => p.col === col && p.row === row));
         } else return false;
         return true;
+    }
+
+    _hint(text) { $('content-hint').textContent = text; }
+
+    // Armadilhas: flecha só em parede (encaixa na mais próxima se o clique foi no chão), espinhos só no chão.
+    _applyHazard(r, cell, onFloor) {
+        const timing = $('content-timing').value;
+        const delay = Math.max(0, Number($('content-delay').value) || 0);
+        if (this.choice === 'arrow') {
+            const mount = this._arrowMount(r, cell.col, cell.row);
+            if (!mount) { this._hint('Não dá para montar a flecha numa porta.'); return; }
+            this._placeHazard(r, { col: mount.col, row: mount.row, type: 'arrow', side: mount.side, phase: 0 }, cell);
+            return;
+        }
+        if (!onFloor) return;
+        if (this.choice === 'spikeRow') {
+            const dir = $('content-direction').value;
+            const fit = fitSpikeRow(r.cols, r.rows, cell.col, cell.row, dir, Number($('content-count').value));
+            const row = { type: 'spikeRow', col: fit.col, row: fit.row, timing, delay, dir, count: fit.count, phase: 0, wave: SPIKE_ROW_WAVE };
+            this._placeHazard(r, row, cell, () => occupiedCells(row).every(p => r.kinds[p.row]?.[p.col] === 'f')
+                ? '' : 'A fileira não cabe aqui: há parede ou buraco no caminho. Reduza a quantidade ou mude a direção.');
+            return;
+        }
+        const hazard = this.choice === 'spike' ? { type: 'spike', col: cell.col, row: cell.row, timing, delay } : { type: this.choice, col: cell.col, row: cell.row };
+        this._placeHazard(r, hazard, cell);
+    }
+
+    // Clicar em qualquer tile de uma armadilha existente a remove; senão coloca (se o espaço estiver livre).
+    _placeHazard(room, hazard, clicked, problem = () => '') {
+        room.hazards ||= [];
+        const at = (o) => occupiedCells(o).some(p => p.col === clicked.col && p.row === clicked.row);
+        const hit = room.hazards.findIndex(at);
+        if (hit >= 0) { room.hazards.splice(hit, 1); return; }
+        const issue = problem();
+        if (issue) { this._hint(issue); return; }
+        const cells = occupiedCells(hazard);
+        const taken = room.hazards.some(o => occupiedCells(o).some(p => cells.some(c => c.col === p.col && c.row === p.row)));
+        if (taken) { this._hint('Já existe uma armadilha nesse espaço.'); return; }
+        room.hazards.push(hazard);
+    }
+
+    // Parede onde a flecha fica montada e o lado dela. Clique no chão encaixa na borda mais próxima (como no editor 1.0).
+    _arrowMount(r, col, row) {
+        const lastCol = r.cols - 1, lastRow = r.rows - 1;
+        const border = col === 0 || row === 0 || col === lastCol || row === lastRow;
+        let target = { col, row }, side;
+        if (r.kinds[row][col] === 'w') {
+            side = border ? ({ N: 'top', S: 'bottom', W: 'left', E: 'right' })[sideOf(r, target)] : wallSideForTile(r.tiles[row][col]);
+        } else {
+            const distances = [['top', row], ['bottom', lastRow - row], ['left', col], ['right', lastCol - col]];
+            side = distances.reduce((best, item) => item[1] < best[1] ? item : best)[0];
+            target = { top: { col, row: 0 }, bottom: { col, row: lastRow }, left: { col: 0, row }, right: { col: lastCol, row } }[side];
+        }
+        const onDoor = r.doors.some(d => doorCells(r, d).some(p => p.col === target.col && p.row === target.row));
+        return onDoor ? null : { ...target, side };
     }
 
     _toggle(room, field, object) {
@@ -364,9 +419,7 @@ export class ContentTools {
             if (img?.complete && img.naturalWidth) ctx.drawImage(img, cfg.cropX, (cfg.rows.walk?.row || 0) * cfg.cellSize + cfg.cropY, cfg.cropW, cfg.cropH, ox + e.col * tile, oy + e.row * tile, tile, tile);
             else marker(e, '#ff817e', 'E');
         }
-        for (const h of room.hazards || []) {
-            image(this.assets.get(h.type === 'arrow' ? 'arrowTrap1' : h.type === 'button' ? 'button' : 'peaks3'), h);
-        }
+        for (const h of room.hazards || []) this._drawHazard(ctx, room, h, ox, oy, tile);
         for (const t of room.torches || []) {
             const f = Math.floor(this.app.now / 160) % 4 + 1;
             image(this.assets.get(t.type === 'candlestick_1' ? `candlestick1_${f}` : t.type === 'candlestick_2' ? `candlestick2_${f}` : ['W', 'E'].includes(t.side) ? `sideTorch${f}` : `torch${f}`), t);
@@ -376,6 +429,65 @@ export class ContentTools {
             for (const t of o.tiles || []) { ctx.strokeStyle = '#a6e88b'; ctx.lineWidth = 3; ctx.strokeRect(ox + t.col * tile + 3, oy + t.row * tile + 3, tile - 6, tile - 6); }
         }
         for (const [name, p] of Object.entries(room.spawns || {})) marker(p, name === 'p1' ? '#ffd166' : '#6bb4db', name.toUpperCase());
+        ctx.restore();
+    }
+
+    _drawHazard(ctx, room, h, ox, oy, tile) {
+        const ready = (img) => img?.complete && img.naturalWidth;
+        if (h.type === 'arrow') { this._drawArrowTrap(ctx, room, h, ox, oy, tile); return; }
+        if (h.type === 'button') {
+            const img = this.assets.get('button');
+            if (ready(img)) ctx.drawImage(img, 0, 0, 16, 16, ox + h.col * tile, oy + h.row * tile, tile, tile);
+            return;
+        }
+        // Espinho único e fileira: mesmo sprite do editor 1.0, um por tile ocupado.
+        const cells = occupiedCells(h), img = this.assets.get('peaks2');
+        for (const p of cells) if (ready(img)) ctx.drawImage(img, ox + p.col * tile, oy + p.row * tile, tile, tile);
+        if (h.type === 'spikeRow') this._drawWaveArrow(ctx, h, cells, ox, oy, tile);
+    }
+
+    // Seta laranja sobre a fileira, no sentido em que a onda de espinhos anda (igual ao editor 1.0).
+    _drawWaveArrow(ctx, h, cells, ox, oy, tile) {
+        const dir = h.dir || 'left';
+        const [dx, dy] = ({ right: [1, 0], left: [-1, 0], down: [0, 1], up: [0, -1] })[dir] || [-1, 0];
+        const forward = dir === 'right' || dir === 'down';
+        const a = forward ? cells[0] : cells[cells.length - 1], b = forward ? cells[cells.length - 1] : cells[0];
+        const off = tile * 0.3, head = tile * 0.18;
+        const sx = ox + (a.col + 0.5) * tile - dx * off, sy = oy + (a.row + 0.5) * tile - dy * off;
+        const ex = ox + (b.col + 0.5) * tile + dx * off, ey = oy + (b.row + 0.5) * tile + dy * off;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 137, 6, 0.95)'; ctx.lineWidth = Math.max(2, tile * 0.05); ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - dx * head - dy * head, ey - dy * head + dx * head);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - dx * head + dy * head, ey - dy * head - dx * head);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Lançador de flechas como no jogo: sprite girado para a direção do disparo e deslocado sobre o tijolo da parede.
+    _drawArrowTrap(ctx, room, h, ox, oy, tile) {
+        const interior = h.col > 0 && h.row > 0 && h.col < room.cols - 1 && h.row < room.rows - 1;
+        const dir = arrowFireDir(h.side, interior) || { x: 0, y: 1 };
+        const k = tile / TILE, off = arrowMountOffset(dir);
+        const cx = ox + (h.col + 0.5) * tile + off.x * k, cy = oy + (h.row + 0.5) * tile + off.y * k;
+        const sprite = this.assets.get('arrowTrap2');
+        if (sprite?.complete && sprite.naturalWidth) {
+            const w = HAZARDS.arrowTrap.indicatorSize * 1.6 * k, height = w * sprite.naturalHeight / sprite.naturalWidth;
+            ctx.save();
+            ctx.translate(cx, cy); ctx.rotate(Math.atan2(dir.y, dir.x) - Math.PI / 2);
+            ctx.drawImage(sprite, -w / 2, -height / 2, w, height);
+            ctx.restore();
+        }
+        // Guia laranja do sentido do disparo (como no editor 1.0).
+        const length = tile * 0.4, head = tile * 0.12, ex = cx + dir.x * length, ey = cy + dir.y * length;
+        ctx.save();
+        ctx.strokeStyle = '#ff8906'; ctx.lineWidth = Math.max(2, tile * 0.04); ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy); ctx.lineTo(ex, ey);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - dir.x * head - dir.y * head, ey - dir.y * head + dir.x * head);
+        ctx.moveTo(ex, ey); ctx.lineTo(ex - dir.x * head + dir.y * head, ey - dir.y * head - dir.x * head);
+        ctx.stroke();
         ctx.restore();
     }
 

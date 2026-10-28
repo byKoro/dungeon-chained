@@ -2,6 +2,7 @@ import { SpikeTrap } from '../entities/SpikeTrap.js';
 import { ArrowTrap } from '../entities/ArrowTrap.js';
 import { PressureButton } from '../entities/PressureButton.js';
 import { HAZARDS, TILE, ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
+import { arrowFireDir, arrowMountOffset, spikeRowPhase } from '../rooms/HazardLayout.js';
 
 export class ChallengeCorridor {
 
@@ -73,17 +74,6 @@ export class ChallengeCorridor {
         return { x: 1, y: 0 };
     }
 
-    _fireDirFromWall(side) {
-
-        switch (side) {
-            case "top": return { x: 0, y: 1 };
-            case "bottom": return { x: 0, y: -1 };
-            case "left": return { x: 1, y: 0 };
-            case "right": return { x: -1, y: 0 };
-            default: return null;
-        }
-    }
-
     _build(assets) {
         const peaks = assets && assets.peaks ? assets.peaks : null;
         const arrowTrapSprites = assets && assets.arrowTrap ? assets.arrowTrap : null;
@@ -104,9 +94,8 @@ export class ChallengeCorridor {
                     const dir = el.dir || "left";
                     const vertical = dir === "up" || dir === "down";
 
-                    const step = (dir === "right" || dir === "down") ? -(el.wave || 0) : (el.wave || 0);
                     for (let i = 0; i < count; i++) {
-                        const phase = ((((el.phase || 0) + i * step) % 1) + 1) % 1;
+                        const phase = spikeRowPhase({ ...el, dir }, i);
                         let p;
                         if (byTile) {
 
@@ -130,9 +119,10 @@ export class ChallengeCorridor {
                     const isCustomLateralWall = byTile && el.col > 0 && el.col < Math.round((this.bounds.maxX - this.bounds.minX) / TILE) + 1 &&
                         el.row > 0 && el.row < Math.round((this.bounds.maxY - this.bounds.minY) / TILE) + 1 &&
                         (inferredSide === "left" || inferredSide === "right");
-                    const dir = this._fireDirFromWall(inferredSide) || this._fireDir(el.dir || "across+");
-                    if (isCustomLateralWall) dir.x *= -1;
-                    this.arrowTraps.push(new ArrowTrap(p.x, p.y, dir, { phaseOffset: el.phase || 0, sprites: arrowTrapSprites, arrowSprite }));
+                    const dir = arrowFireDir(inferredSide, isCustomLateralWall) || this._fireDir(el.dir || "across+");
+
+                    const mount = arrowMountOffset(dir);
+                    this.arrowTraps.push(new ArrowTrap(p.x + mount.x, p.y + mount.y, dir, { phaseOffset: el.phase || 0, sprites: arrowTrapSprites, arrowSprite }));
                     break;
                 }
                 case "button": {
