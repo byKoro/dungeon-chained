@@ -60,3 +60,5 @@ Audio, UI, editor
 
 ## Cultista — 2026-10-28
 - `feat/cultist-fire-pillar`: cultista com distância pública ajustável, conjuração fixa no jogador mais próximo (quarta linha) e morte completa (última linha), disponível nos dois editores. Verificado por testes e canvas no Chromium; balanceamento cooperativo real ainda não avaliado.
+
+- Ajuste do cultista: preferredDistance aumentado para 440 px; círculo de marcação removido. Alcance de conjuração ajustado para cobrir a faixa de distância desejada.

@@ -81,12 +81,6 @@ export class CultistEnemy extends MeleeEnemy {
         const p = this.markedPosition, cfg = CULTIST.pillar;
         const frame = this.state === 'attack' ? this._currentFrameIndex(this.sprite.rows.attack) : -1;
         ctx.save();
-        ctx.strokeStyle = cfg.warningColor;
-        ctx.fillStyle = cfg.warningFill;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y, cfg.radius, cfg.radius, 0, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
         if (frame >= cfg.firstFrame && this.sheet?.complete && this.sheet.naturalWidth) {
             ctx.drawImage(this.sheet, frame * this.sprite.cellSize + cfg.cropX,
                 this.sprite.rows.attack.row * this.sprite.cellSize + cfg.cropY, cfg.cropW, cfg.cropH,

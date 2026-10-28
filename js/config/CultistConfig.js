@@ -1,10 +1,10 @@
 export const CULTIST = {
     hp: 2,
     speed: 1.4,
-    preferredDistance: 220,
+    preferredDistance: 440,
     distanceTolerance: 24,
     retreatProbeSteps: 12,
-    castRange: 420,
+    castRange: 464,
     windupFrames: 45,
     recoverFrames: 70,
     playDeathAnimation: true,
@@ -15,9 +15,7 @@ export const CULTIST = {
         damageFirstFrame: 8,
         damageLastFrame: 11,
         cropX: 70, cropY: 10, cropW: 30, cropH: 54,
-        scale: 3, anchorX: 84, anchorY: 62,
-        warningColor: '#ff643c',
-        warningFill: 'rgba(255, 75, 25, 0.22)'
+        scale: 3, anchorX: 84, anchorY: 62
     }
 };
 
