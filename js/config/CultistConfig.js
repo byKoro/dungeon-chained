@@ -14,8 +14,8 @@ export const CULTIST = {
         casterCropW: 30,
         damageFirstFrame: 8,
         damageLastFrame: 11,
-        cropX: 70, cropY: 10, cropW: 30, cropH: 40,
-        scale: 3, anchorX: 84, anchorY: 50
+        cropX: 70, cropY: 10, cropW: 30, cropH: 54,
+        scale: 3, anchorX: 84, anchorY: 62
     }
 };
 

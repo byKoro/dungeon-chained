@@ -11,6 +11,3 @@ Jogo iniciado no Chromium headless via servidor localhost; zero exceções JavaS
 
 ## Not verified
 Partida cooperativa com controles reais, balanceamento, som e empacotamento Electron. Recuo pode ser limitado por paredes ou jogadores cercando o cultista; preparação e recuperação são estacionárias.
-
-## Correção do anel da spritesheet
-Recorte vertical do pilar limitado a y<50 para excluir a base circular embutida na PNG. preferredDistance continua 440. Teste do cultista passou e quadros 0–13 foram novamente inspecionados no Chromium, sem o círculo de chão; zero exceções no boot.
