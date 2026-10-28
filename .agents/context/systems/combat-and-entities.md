@@ -108,3 +108,5 @@ Ao entrar em windup, copia a posição do jogador vivo/não caindo mais próximo
 Morte: última linha (row 5, 10 quadros × 7 ticks), completa antes da remoção; sem gibs por terminar em dissipação. Reutiliza spawn congelado, feedback de acerto, navegação e ciclo de morte do MeleeEnemy. `tests/test_cultist.js` verifica distância configurável, alvo fixo, esquiva, AoE, interrupção, spawn e morte.
 
 A distância máxima de conjuração é 464 px, cobrindo a faixa desejada de 440 ± 24 px. O único efeito desenhado no ponto gravado vem da spritesheet, sem círculo adicional.
+
+O recorte do pilar termina em y=50 da célula para excluir também o anel embutido na própria PNG (y=50–62). A âncora vertical acompanha esse recorte para manter o fogo no ponto de impacto.
