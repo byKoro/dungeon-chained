@@ -5,6 +5,7 @@ import { scatterProps, randomizeFloor, placeDoor } from './MapContent.js';
 import { AssetLoader } from '../core/AssetLoader.js';
 import { editorEnemyTypes, thumbRegion } from './ContentCatalog.js';
 import { occupiedCells } from '../rooms/MapOccupancy.js';
+import { torchPlacement, isMirroredTorch } from '../rooms/TorchLayout.js';
 import { arrowFireDir, arrowMountOffset, fitSpikeRow, wallSideForTile, SPIKE_ROW_WAVE } from '../rooms/HazardLayout.js';
 import { HAZARDS, TILE } from '../config/GameConfig.js';
 
@@ -266,8 +267,11 @@ export class ContentTools {
         else if (type === 'staticProp' && onFloor) this._toggle(r, 'props', { ...cell, index: a.palette.firstIndex });
         else if (type === 'torch') {
             const torch = this.torchType;
-            const side = torch === 'torch' ? sideOf(r, cell) || (col === 1 ? 'W' : col === r.cols - 2 ? 'E' : 'N') : 'F';
-            if (torch === 'torch' || onFloor) this._toggle(r, 'torches', { ...cell, type: torch, side });
+            if (torch === 'torch') {
+                const mount = torchPlacement(r, cell);
+                if (!mount) this._hint('Encaixe a tocha numa parede (não em porta, canto ou buraco).');
+                else this._toggle(r, 'torches', { col: mount.col, row: mount.row, type: torch, side: mount.side });
+            } else if (onFloor) this._toggle(r, 'torches', { ...cell, type: torch, side: 'F' });
         } else if (type === 'hazard') this._applyHazard(r, cell, onFloor);
         else if (type === 'interactive') {
             const hit = (r.interactives || []).find(o => o.col === col && o.row === row);
@@ -422,7 +426,13 @@ export class ContentTools {
         for (const h of room.hazards || []) this._drawHazard(ctx, room, h, ox, oy, tile);
         for (const t of room.torches || []) {
             const f = Math.floor(this.app.now / 160) % 4 + 1;
-            image(this.assets.get(t.type === 'candlestick_1' ? `candlestick1_${f}` : t.type === 'candlestick_2' ? `candlestick2_${f}` : ['W', 'E'].includes(t.side) ? `sideTorch${f}` : `torch${f}`), t);
+            const img = this.assets.get(t.type === 'candlestick_1' ? `candlestick1_${f}` : t.type === 'candlestick_2' ? `candlestick2_${f}` : ['W', 'E'].includes(t.side) ? `sideTorch${f}` : `torch${f}`);
+            if (!isMirroredTorch(t)) { image(img, t); continue; }
+            ctx.save();
+            ctx.translate(ox + (t.col + 1) * tile, oy + t.row * tile);
+            ctx.scale(-1, 1);
+            if (img?.complete && img.naturalWidth) ctx.drawImage(img, 0, 0, tile, tile);
+            ctx.restore();
         }
         for (const o of room.interactives || []) {
             const def = INTERACTIVES[o.type]; if (def) marker(o, def.color, def.symbol);

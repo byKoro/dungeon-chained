@@ -71,9 +71,9 @@ export const AUDIO_CONFIG = {
         },
 
         sawHit: {
-            description: "Lâmina cortando o monstro (hit_sound.mp3 retrabalhado: sem silêncio inicial, sub-thump e 'rip' dos dentes)",
+            description: "Lâmina cortando o monstro (3 variações de acerto da serra)",
             files: [1, 2, 3].map(i => `assets/audio/saw-hit-0${i}.wav`),
-            volume: 0.7,
+            volume: 0.85,
             rate: 1.0,
             rateVariance: 0.06,
             pitchShift: true,
