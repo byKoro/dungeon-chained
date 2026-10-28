@@ -257,6 +257,20 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
     return next;
 }
 
+// Volta a sala à moldura padrão mantendo só tamanho, id, nome e notas. Remove as conexões das portas dela.
+export function resetRoom(map, key) {
+    const room = map.rooms[key];
+    if (!room) return false;
+    const doorIds = new Set(room.doors.map(d => d.id).filter(Boolean));
+    if (map.connections) {
+        map.connections = map.connections.filter(c => ![c.from, c.to].some(e => e.room === key && doorIds.has(e.door)));
+    }
+    const fresh = createRoom(room.cols, room.rows, { id: room.id, name: room.name, notes: room.notes });
+    for (const k of Object.keys(room)) delete room[k];
+    Object.assign(room, fresh);
+    return true;
+}
+
 export function createMap(opts = {}) {
     return {
         format: MAP_FORMAT,

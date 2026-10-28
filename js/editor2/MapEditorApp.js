@@ -7,6 +7,7 @@ import { ANIMATED_PROPS, ANIMATED_PROP_KEYS } from '../config/PropConfig.js';
 import * as M from './MapModel.js';
 import { TilePalette } from './TilePalette.js';
 import { PropSprites } from './PropSprites.js';
+import { paintWallCell, voidOutside } from '../rooms/WallAutotile.js';
 
 const STORAGE_KEY = "editor2_map_state";
 const DEFAULT_FILE = "demo_map.json";
@@ -14,7 +15,7 @@ const ROOM_TILE_PX = TILE;
 const MAP_TILE_PX = 16;
 const SLOT_GAP_TILES = 3;
 const HISTORY_LIMIT = 100;
-const TOOLS = ["paint", "hole", "void", "collision", "door", "prop", "erase"];
+const TOOLS = ["paint", "hole", "void", "collision", "door", "prop", "erase", "wall"];
 const LINK_COLORS = { ok: "#2cb67d", "one-way": "#f5a623", "no-room": "#ef4565" };
 
 const $ = (id) => document.getElementById(id);
@@ -416,7 +417,7 @@ export class MapEditorApp {
             this._backToMap();
             return;
         }
-        if (this.view === "room" && /^[1-7]$/.test(key)) this._setTool(TOOLS[Number(key) - 1]);
+        if (this.view === "room" && /^[1-8]$/.test(key)) this._setTool(TOOLS[Number(key) - 1]);
     }
 
     // ---------- ferramentas da sala ----------
@@ -433,8 +434,10 @@ export class MapEditorApp {
     }
 
     _endStroke() {
-        const before = this.stroke.before;
+        const { before, mode } = this.stroke;
         this.stroke = null;
+        // Depois de pintar parede, o piso que ficou isolado do centro/portas/spawns vira vazio.
+        if (this.tool === "wall" && mode === "add" && this.room) voidOutside(this.room);
         if (this._snapshot() !== before) this._pushUndo(before);
         this._afterChange();
     }
@@ -483,6 +486,10 @@ export class MapEditorApp {
                 if (!stroke.mode) stroke.mode = M.propAt(room, col, row) ? "remove" : "add";
                 if (stroke.mode === "remove") M.removePropAt(room, col, row);
                 else M.placeProp(room, this.propType, col, row, this.propFlip);
+                break;
+            case "wall":
+                if (!stroke.mode) stroke.mode = M.getKind(room, col, row) === "w" ? "remove" : "add";
+                paintWallCell(room, col, row, stroke.mode);
                 break;
             case "erase":
                 M.eraseCell(room, col, row);
@@ -553,6 +560,15 @@ export class MapEditorApp {
             this.map.roomSize.cols = Math.max(MAP_LIMITS.minRoomCols, Math.min(MAP_LIMITS.maxRoomCols, Math.round(cols) || ROOM_COLS));
             this.map.roomSize.rows = Math.max(MAP_LIMITS.minRoomRows, Math.min(MAP_LIMITS.maxRoomRows, Math.round(rows) || ROOM_ROWS));
         });
+    }
+
+    _resetRoom() {
+        const room = this.room;
+        if (!room) return;
+        if (!confirm(`Resetar "${room.name}"? Fica só o tamanho (${room.cols}×${room.rows}), o nome e as notas; portas, props, inimigos e o resto são apagados. Dá para desfazer com Ctrl+Z.`)) return;
+        const key = this.editingKey;
+        this._commit(() => M.resetRoom(this.map, key));
+        this._syncUI();
     }
 
     _applyRoomSize() {
@@ -735,6 +751,7 @@ export class MapEditorApp {
             if (room) this._commit(() => { room.notes = e.target.value; });
         });
         $("btn-apply-size").addEventListener("click", () => this._applyRoomSize());
+        $("btn-reset-room").addEventListener("click", () => this._resetRoom());
 
         for (const btn of document.querySelectorAll("#tool-grid [data-tool]")) {
             btn.addEventListener("click", () => this._setTool(btn.dataset.tool));

@@ -19,7 +19,7 @@ const TORCHES = [
     ['torch', 'Parede', 'torch1'], ['candlestick_1', 'Castiçal 1', 'candlestick1_1'], ['candlestick_2', 'Castiçal 2', 'candlestick2_1']
 ];
 const TOOL_LABELS = {
-    paint: 'Tile', hole: 'Buraco', void: 'Vazio', collision: 'Colisão', door: 'Porta', prop: 'Prop animado', erase: 'Borracha',
+    paint: 'Tile', hole: 'Buraco', void: 'Vazio', collision: 'Colisão', door: 'Porta', prop: 'Prop animado', erase: 'Borracha', wall: 'Parede',
     spawn1: 'Spawn P1', spawn2: 'Spawn P2', enemy: 'Inimigo', torch: 'Tocha', hazard: 'Armadilha', interactive: 'Interativo',
     bridge: 'Ponte da alavanca', staticProp: 'Decoração (tile como prop)', eraseContent: 'Remover conteúdo'
 };
