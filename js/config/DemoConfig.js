@@ -8,6 +8,8 @@ export const DEMO = {
     cameraMargin: 120,
     cameraMode: 'zoom',
     gateFrameMs: 200,
+    // Metade da abertura do sprite do portão (22 px de arte × 4); os pilares bloqueiam o resto.
+    gatePassHalfWidth: 44,
     throwSpeed: 18,
     throwFriction: 0.985,
     throwMinSpeed: 1,

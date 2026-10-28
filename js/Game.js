@@ -1002,6 +1002,7 @@ export class Game {
             renderer.drawDoorStubs(rect, doors, TILE, doorHalf, DOOR_STUB_TILES);
             renderer.drawDoorGradients(doors, doorHalf, TILE, DOOR_STUB_TILES);
         }
+        this.demoDoors.drawGates(ctx);
 
         this.holes.draw(ctx);
 

@@ -1,5 +1,6 @@
 import { Dungeon } from '../core/Dungeon.js';
 import { TILE } from '../config/GameConfig.js';
+import { DEMO } from '../config/DemoConfig.js';
 import { sideOf, outgoingConnections, endpointDoor, safeSpawnPair, doorCells } from './MapConnections.js';
 
 export class AuthoredDungeon extends Dungeon {
@@ -65,8 +66,10 @@ export class AuthoredDungeon extends Dungeon {
             const target = link && endpointDoor(this.document, link.target);
             const [tx, ty] = (link?.target.room || key).split(',').map(Number);
             const horizontal = dir === 'N' || dir === 'S';
+            const halfWidth = (d.width || 1) * TILE / 2;
             return {
-                id: d.id, dir, type: d.type, width: d.width || 1, halfWidth: (d.width || 1) * TILE / 2,
+                id: d.id, dir, type: d.type, width: d.width || 1, halfWidth,
+                passHalfWidth: d.type === 'boss' ? Math.min(halfWidth, DEMO.gatePassHalfWidth) : halfWidth,
                 x: horizontal ? rect.x + (d.col + (d.width || 1) / 2) * TILE : dir === 'W' ? b.minX : b.maxX,
                 y: horizontal ? dir === 'N' ? b.minY : b.maxY : rect.y + (d.row + (d.width || 1) / 2) * TILE,
                 gx: tx, gy: ty, targetDoor: target?.id,
