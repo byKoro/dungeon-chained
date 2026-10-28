@@ -1,3 +1,4 @@
+import { CultistEnemy } from '../entities/CultistEnemy.js';
 import { FireSkullEnemy } from '../entities/FireSkullEnemy.js';
 import { MeleeEnemy } from '../entities/MeleeEnemy.js';
 import { MELEE_ENEMY_CONFIGS, ENEMY_TYPE_BY_KEY } from '../config/EntityConfig.js';
@@ -19,7 +20,8 @@ export class SpawnSystem {
         if (type === 'fireSkull' || type === 'fireSkullBoss') return new FireSkullEnemy(x, y, this.assets.get('fireSkull'), type === 'fireSkullBoss');
         const factory = (type && ENEMY_TYPE_BY_KEY[type]?.config) || null;
         const cfg = factory ? factory(this.assets) : this.randomMeleeConfig();
-        const foe = new MeleeEnemy(x, y, cfg.img, cfg, floor);
+        const Enemy = type === 'cultist' ? CultistEnemy : MeleeEnemy;
+        const foe = new Enemy(x, y, cfg.img, cfg, floor);
         foe.bloodPalette = this.bloodCanvas.palette;
         foe.gibStainConfig = BLOOD_STAIN_CONFIG.gib;
         return foe;

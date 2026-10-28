@@ -57,3 +57,6 @@ Audio, UI, editor
 23. Boss gate art replaced (2026-10-27): `assets/doors/boss-gate-opening-strip-v8.png` (4 × 32×32 frames in a row, transparent passage) replaces the generated v1 sheet; `DemoDoors` now draws it at 2×2 tiles over the door columns instead of 3×3, under the entities (`drawGates`, right after the door gradients) instead of over them. Players pass only through the sprite's 88 px opening (`passHalfWidth` = `DEMO.gatePassHalfWidth` 44); the pillars block like wall. Collision checked by a node simulation on `demo_campaign.json`; art and draw order not yet observed in the running game. Drafts and scripts: `.agents/tasks/2026-10-27-boss-gate-redesign/`.
 ## Ajuste individual de mobs — 2026-10-27
 - `blackKnightB`: tanque lento (4 HP, velocidade 0.8), três ataques em ciclo e animação completa de morte. Teste dedicado aprovado e sprites renderizadas no Chromium. Gate continua com os problemas preexistentes #4 e #5.
+
+## Cultista — 2026-10-28
+- `feat/cultist-fire-pillar`: cultista com distância pública ajustável, conjuração fixa no jogador mais próximo (quarta linha) e morte completa (última linha), disponível nos dois editores. Verificado por testes e canvas no Chromium; balanceamento cooperativo real ainda não avaliado.
