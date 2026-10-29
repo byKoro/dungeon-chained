@@ -627,6 +627,11 @@ export class VtuberHud {
         this.entries.forEach((e, i) => e.portrait.roomCleared(0.15 + i * 0.1));
     }
 
+    // Escala dos corações; outros elementos do HUD usam a mesma para manter o tamanho de pixel.
+    pixelScale(W, H) {
+        return this._layout(W, H).hs;
+    }
+
     _layout(W, H) {
         const ref = Math.min(H, W * 0.6);
         const S = Math.max(4, Math.round((ref * 0.3) / 23));

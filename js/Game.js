@@ -37,6 +37,7 @@ import { PlayerAI } from './systems/PlayerAI.js';
 import { LightingRenderer } from './systems/LightingRenderer.js';
 import { HoleEffects } from './systems/HoleEffects.js';
 import { VtuberHud } from './ui/VtuberHud.js';
+import { ScrapCounter } from './ui/ScrapCounter.js';
 import { DeathScreen } from './ui/DeathScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { setUiAudio, playUi } from './ui/UiSound.js';
@@ -160,7 +161,9 @@ export class Game {
             this.gameOver = true; this._gameOverAt = performance.now(); this.demoVictory.show();
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
-        this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`)) }) : null;
+        const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
+        this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
+        this.scrapCounter = this.scrap ? new ScrapCounter({ getAmount: () => this.scrap.amount, frames: scrapFrames }) : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -370,6 +373,7 @@ export class Game {
         this.demoVictory.hide();
         this.demoEncounter.reset();
         this.scrap?.reset();
+        this.scrapCounter?.reset();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -982,7 +986,7 @@ export class Game {
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
             const message = this.demoProgress.messageTime ? this.demoProgress.message : this.demoProgress.prompt;
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
-            if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, this.canvas.width / 2, 24); }
+            if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, 12, 24); }
             ctx.restore();
         }
     }
@@ -1130,6 +1134,7 @@ export class Game {
         }
 
         this.hud.draw(ctx, canvas.width, canvas.height);
+        this.scrapCounter?.draw(ctx, canvas.width, canvas.height, this.hud.pixelScale(canvas.width, canvas.height));
 
     }
 }
