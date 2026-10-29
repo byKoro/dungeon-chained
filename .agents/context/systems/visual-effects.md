@@ -102,3 +102,14 @@ None automated. Verify visually: `python serve.py` → http://localhost:8000 (or
 
 ## Related docs
 `audio.md`, `ui.md`, `.agents/playbooks/add-particle-effect.md`.
+
+## Arauto VFX and cinematic phase (2026-10-29)
+- `ArautoEffects` (Game-owned; injected into CombatSystem) uses `ARAUTO_FX` in `js/config/ArautoEffectsConfig.js` for material contacts, ground impact/slam shake, dash trails and phase2 lava. `effectMaterial: lavaStone` is configured on the golem; accepted saw/throw hits emit stones/embers rather than blood. SawWeapon.onHit({blood:false}) preserves motor sustain without adding blood; player blood and ordinary enemies remain.
+- `LavaFragment` lives in ParticleSystem.lavaFragments, capped180, life600steps (~10s), cooling glow90steps, fade90steps. Airborne fragments draw in drawAir, settled debris in drawFloor inside existing hole mask. Updates/clear are integrated; no BloodCanvas stamps/zones, no footprint/saw blood side effects.
+- Dash snapshots are bounded6 poses/life8steps, drawn translucently behind the boss in its depth slot. No whole-screen blur. Phase2 overlay uses cached per-row/frame sprite masks, flip/anchor alignment and dark-rock palette filtering; cracks cover the body, animated bright bands flow down, droplets originate on crack pixels and fall to ground. No new hitboxes or damage.
+- `justGroundHit` fires once at the configured melee/AoE impact even on miss; `justSlammed` remains one landing event. Arauto normal ground shake12, slam20; accepted player damage shake10. Renderer retains its existing decay/max merge.
+- `ArautoPhaseScene` owns CinematicBars, safe transition scheduling and camera snapshot. Game marks the golem phaseTransitionControlled; phase1 remains until active attack ends. A ~3s selective state stops gameplay/players/projectiles/damage while scene particles, lava and HUD animate. At1.25s phase stats/reveal + burst, at1.85s HUD anger, at2.35s return camera/bars, by3s restore exact camera and release controls. Split view becomes one view only during scene. Reset/restart restores camera/HUD. Pause freezes scene via existing loop.
+- HUD uses explicit onBossTransformation(expression|null), with cinematic expression priority; bars draw below HUD so portraits stay visible. Actual Game browser verification/captures: task2026-10-29-arauto-vfx. Human feel tuning pending.
+
+### Arauto sound pairing (2026-10-29)
+Existing ground/slam VFX now pair with dedicated stratified rock impacts and ambience duck. Dash local trail pairs with motion-only whoosh/floor scrape; saw contact pairs with spin-driven continuous metal/stone texture. See audio.md. No additional visual blast/shake increase in this task; audio is tuned first as approved.

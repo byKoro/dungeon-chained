@@ -96,3 +96,9 @@ Only within one pass: `drawables = [p1, p2, ...enemies, ...challenge.buttonOcclu
 
 - `../architecture.md` — full render order, subsystem ownership.
 - `players-and-chain.md` — saw position used for depth split.
+
+### Contorno de silhueta e luz de inimigo (2026-10-29)
+`MeleeEnemy.outline` ({ color, artPx }) desenha o contorno antes do sprite (buffer `silhouetteBuf`, separado do `tintBuf` do flash). `LightingRenderer.render` aceita `enemies` e `corpses` e adiciona, para cada um com `lightInfo()`, uma luz quente de brasa (`ENEMY_EMBER_PROFILE`).
+
+### Arauto render overlays (2026-10-29)
+Depth-sorted entity drawing calls ArautoEffects.drawTrail before the boss sprite and drawLava afterward. Lava masks cache per sheet/frame, follow horizontal flip and jump displacement, with palette filtering to keep cracks off the authored dust plume. ParticleSystem draws settled LavaFragments in its clipped floor pass and airborne fragments in its air pass. Phase cutscene temporarily uses one viewport instead of split; bars draw before HUD. User camera tuning remains unchanged.

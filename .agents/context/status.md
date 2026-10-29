@@ -79,3 +79,40 @@ Three configurable abilities and two HP phases implemented on feat/flame-golem. 
 - Aprovado mas ainda só sugerido: números de balanceamento (`hitCooldownSteps` 10, `secondPhaseHp` 50, `slam.*`).
 - Fora de escopo e não feito: ponte após vitória, altar, duas brasas, desbloqueio do Dash, cinemática de montagem.
 - Não verificado no jogo real (ver `verification.md`). `npm run check` só falha nos itens antigos #4 e #5.
+
+## Arauto das Brasas — visual (2026-10-29, `feat/flame-golem`, `.agents/tasks/2026-10-29-arauto-visual/`)
+- Implementado e testado por script: aviso do ataque pela própria animação (pose de espera) com marcas só para teste (`showMarks`), escala 195 (5x), sombra própria, contorno, luz e brasas, barra de chefe com placa de nome e nova arte. Testes agora leem os valores do config.
+- Não visto no jogo: pose de espera, sombra, contorno, luz, brasas e a barra (só uma captura isolada da barra em baixa resolução foi conferida).
+- A fase do PC do curso não está no repositório (o editor 2.0 só grava em `map/demo/` com Salvar; o resto fica no navegador daquele PC); será refeita pelo usuário.
+
+## Arauto das Brasas — investida e buraco ao sul (2026-10-29, `feat/flame-golem`)
+- Corrigido por script: investida curta quando havia jogador no trajeto (`ignoresEntityCollisions`) e golem pendurado sobre buraco ao sul/fora da sala (`_standsOnFloor` com os pés). Testes novos em `test_flame_golem_abilities.js`. Detalhes em `systems/combat-and-entities.md`.
+- Não visto no jogo. `npm test` 21/22 (só `test_modular_grid`, item antigo #4).
+
+## Arauto solid contact � 2026-10-29
+- Fixed pass-through caused by immovable excluding the golem from collisions. Players are blocked/displaced by torso, walking and animated arms; cannot push boss, including with saw contact. Airborne slam remains passable.
+- Regression tests pass, including charge distance and melee from four sides. Full check retains only #4/#5; graphify unavailable. Game feel/visual alignment not observed. Task: 2026-10-29-golem-solid-body.
+
+## Arauto saw/cable resistance � 2026-10-29
+- Saw disc and curved cable now resist grounded golem body/arms, holding player advancement and loading the motor; surface damage remains. Thrown saw rebounds. Infeasible wall pinching disconnects to a safe drop.
+- Script tests pass (23/24 total; only old grid test fails). Check also retains old unlisted-map error. Graph refreshed using escalated environment. Gameplay feel and visual alignment not verified. Task: 2026-10-29-golem-chain-resistance.
+
+## Arauto lower hitbox � 2026-10-29
+- Lowered torso blocker from y=-16 to +32 and reduced its vertical radius42?30; arms radius24?16 and lift38?12. Passing behind upper sprite remains clear; feet region stays solid.
+- Before/after diagram visually inspected: _local/golem-hitbox-comparison.png. Tests pass except existing grid failure; map check retains existing unlisted piece. No live gameplay observed. Task: 2026-10-29-golem-hitbox-lower.
+
+## Softer saw resistance � 2026-10-29
+- Implemented approved plan:3% friction, gradual inward resistance,8px compression,2px shared soft correction budget; preserve solid limit and wall pinch handling.
+- Removed collision spin loss. Active saw maintains70% minimum spin during cutting; idle contact does not start it. Ordinary enemy hits also sustain motor.
+- Tests23/24, only old grid/map check failures. Live co-op feel not observed. Task:2026-10-29-softer-saw-resistance.
+
+## Arauto VFX � 2026-10-29
+Approved grilling scope implemented: impact/player shake, local dash trail, blood-free boss debris/embers, phase2 masked flowing lava/drips, safe ~3s cinematic phase transition with bars/zoom/frozen combat/HUD reactions, corrected arms-up hold for attack2 and repeated slam preparations.
+Actual hidden Electron Game run verified rendering/state with zero console errors; captures in _local/arauto-*.png. Tests24/25 with only existing grid failure; map check retains unlisted corridor piece. Human co-op feel/performance tuning pending. Task2026-10-29-arauto-vfx.
+
+## Arauto audio � 2026-10-29
+Approved grind/whoosh/ground/slam design implemented with11remixed existing-source WAVs and Game-owned ArautoAudio. Ground sounds synchronized even on miss; slam no longer plays player fall, boss saw no longer plays flesh hit, duplicate player damage layer removed for boss. Loop lifecycle tested and realGame output recorded via stream tap. Final mix check in task2026-10-29-arauto-audio; subjective listening pending. Known grid/map failures unchanged; user camera/map edits preserved.
+
+Arauto audio follow-up: strengthened faint grinding by~9.1dB at .7spin and opened its filter. Lifecycle unchanged; tests pass apart from old grid/map failures, re-recorded Game output with no saturated samples observed. Task2026-10-29-arauto-audio.
+
+Arauto timbre revision: removed flame-like contact/dash textures. Contact now dry repeated snaps; dash thick continuous filtered wind. Controllers unchanged, tests and Game recording verified; subjective listening pending. Details task2026-10-29-arauto-audio and audio.md.

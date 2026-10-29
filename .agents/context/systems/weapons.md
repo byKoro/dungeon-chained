@@ -59,3 +59,13 @@ See `.agents/playbooks/add-weapon.md`.
 
 ## Related docs
 `combat-and-entities.md`, `.agents/playbooks/add-weapon.md`.
+
+## Golem resistance (2026-10-29)
+`ChainObstacleSystem` is constructed by Game. `beginStep(chain)` clears `weapon.obstacleContacts`; `resolve(chain,p1,p2,enemies,constrainPlayers?)` tests the curved cable (48 samples) and full disc radius against grounded immovable body ellipses. Contact displaces both players, removes inward velocity, applies friction once per enemy/step and loads the motor. Shape, friction and solver tuning: `js/config/ChainCollisionConfig.js`. Game repeats resolution after walls/clamping with a constraint callback. Infeasible pinching uses `_dropSawSafely` to disconnect and drop at a safe point. Cable geometry remains its existing curve (no wrapping).
+`CombatSystem` uses recorded physical contacts for grounded immovable enemies, preserving damage at the surface without stale straight-line hits. Airborne and ordinary enemy hit rules remain. `ThrownSaw` tests solid body ellipses during substeps, rebounds and records at most one damage attempt per enemy/throw.
+Regression: `tests/test_chain_obstacles.js`. Game feel/visual alignment not observed.
+
+### Softer resistance and cutting motor (2026-10-29)
+This supersedes the initial rigid resistance/motor load tuning: `CHAIN_COLLISION` now uses friction .03, inwardResistance .25, compression8, correctionStrength .25 and correctionPerStep2. Soft correction budget resets in beginStep and is shared by all resolve calls in a simulation step. Penetration beyond compression still receives hard correction to prevent crossing. Velocity reduction/friction applies once per enemy/step; lateral slide remains. Compression within tolerance is successful and cannot cause a pinch drop by itself.
+`ChainObstacleSystem` no longer modifies spin. `SAW_CONTACT` in `SawWeaponConfig.js` defines minimumSpin .7, activationSpin .35, holdSteps8. SawWeapon sustains an already active motor from physical obstacle contacts or accepted enemy hits, including ordinary enemies. Drop/pickup clear hold; an idle motor never starts from contact alone. Natural deceleration resumes after contact grace ends. Thrown-saw bounce remains unchanged.
+Tests: test_chain_obstacles.js. Gameplay feel not observed.

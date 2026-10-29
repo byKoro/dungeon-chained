@@ -121,3 +121,9 @@ Disabled by default; toggled with `I` (own keydown listener) or `window.playerAI
 
 ### Enemy knockback option (2026-10-28)
 Player.takeDamage(sourceX, sourceY, { knockback = 16 } = {}) accepts an optional radial velocity impulse magnitude. Only accepted damage applies it; player Dash, invulnerability and falling still reject damage and push. Golem normal/AoE/dash use configured amounts; dash synthesizes a source behind the player to push forward. Existing player movement damping and hole grace/fall detection determine the displacement and possible fall. Player Dash config is unchanged.
+
+## Chain obstruction (2026-10-29)
+Game owns `chainObstacles` (`ChainObstacleSystem`), applying grounded immovable boss resistance to saw/cable and transmitting positional correction and friction to both players. A final solve includes room walls/clamps; infeasible pinching safely releases the saw via `_dropSawSafely` (also used for falls). Tuning in `ChainCollisionConfig.js`; no wrapping simulation. See weapons.md for contact damage and thrown-saw behavior.
+
+### Softer tether contact (2026-10-29)
+Golem cable resistance now permits8px compression with a2px shared soft correction budget per step, 3% friction and25% inward velocity reduction once per contact. Hard correction still enforces the compression boundary. Allowed compression does not trigger safe drop; infeasible wall pinches still do. Motor sustain belongs to SawWeapon (weapons.md), not physical collision.

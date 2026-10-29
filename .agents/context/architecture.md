@@ -157,3 +157,9 @@ flowchart TD
 - `systems/combat-and-entities.md`, `systems/weapons.md` — enemies, traps, hearts, saw.
 - `systems/audio.md`, `systems/visual-effects.md`, `systems/ui.md`.
 - `../decisions/` — why it is built this way (ADR 0002 = subsystem architecture).
+
+## Arauto phase scene state (2026-10-29)
+Game owns ArautoEffects and ArautoPhaseScene. _step dispatches phase scene after door/intro states and before gameplay: safe scheduling marks phase control on the boss and waits until chase/recover, then suspends gameplay while updating scene visuals/particles. _render draws scene camera in a single view during split mode; entity draw slots wrap Arauto trails/lava, and cinematic bars draw below HUD. Gameplay resumes only after camera restoration. Details: systems/visual-effects.md.
+
+### ArautoAudio ownership (2026-10-29)
+Game constructs ArautoAudio with AudioManager, injects it into CombatSystem for impact events and updates its continuous contact/dash voices beside SawMotorAudio on each frame start. Activity gates include pause, room intro/transition, game over and ArautoPhaseScene. New dungeon resets/disposes its voices. Audio cues and curves remain config-owned.
