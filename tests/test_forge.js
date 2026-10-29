@@ -24,6 +24,9 @@ const player = (x, y) => ({ x, y, vx: 0, vy: 0, speed: 4.2, speedMag: 0, hitRadi
     let reconnected = 0;
     for (let i = 0; i < 60; i++) chain.update(p1, p2, { onReconnect: () => reconnected++ });
     assert(!chain.hasSaw && !chain.isConnected && reconnected === 0, "sem serra os jogadores juntos não conectam");
+    p1.speedMag = p2.speedMag = 4.2;
+    for (let i = 0; i < 60; i++) chain.update(p1, p2);
+    assert(chain.weapon.spin === 0, "sem serra o giro fica zerado (motor mudo)");
     assert(!chain.forceDrop(p1, p2), "queda não larga uma serra que não existe");
     chain.reset();
     assert(!chain.isConnected, "reset sem argumento mantém a ausência (troca de sala)");

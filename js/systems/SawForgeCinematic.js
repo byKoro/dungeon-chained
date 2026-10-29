@@ -24,7 +24,7 @@ export class SawForgeCinematic {
         this.reset();
         this.active = true;
         this.anvil = anvil;
-        if (this.camera) this.camera.focus = { x: anvil.x, y: anvil.y - 16, zoom: this.cfg.zoom };
+        if (this.camera) this.camera.focus = { x: anvil.x, y: anvil.y + this.cfg.focusOffsetY, zoom: this.cfg.zoom };
     }
 
     get anvilTop() {
@@ -46,8 +46,8 @@ export class SawForgeCinematic {
         if (!this._landed && this.t >= c.jumpEnd) {
             this._landed = true;
             this.audio?.play("sawLand");
-            this.renderer.triggerShake(5);
-            this.particleSystem.triggerFlash?.(top.x, top.y, 14, 1);
+            this.renderer.triggerShake(c.landShake);
+            this.particleSystem.triggerFlash?.(top.x, top.y, c.landFlash, 1);
         }
         if (this.t >= c.end) {
             const anvil = this.anvil;

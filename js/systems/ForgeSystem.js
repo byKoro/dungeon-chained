@@ -2,11 +2,13 @@ import { FORGE, anvilRecipes } from '../config/ForgeConfig.js';
 import { TILE } from '../config/GameConfig.js';
 
 const INTERACT_KEYS = ["e", "shiftright"];
+// Navegação e compra só pelo teclado de verdade: o controle chega pelo MenuPad (senão o analógico, que o
+// InputHandler também converte em W/S, moveria o cursor duas vezes). Fechar aceita o X do controle (interagir).
 const NAV_KEYS = {
-    up: ["w", "arrowup"],
-    down: ["s", "arrowdown"],
-    confirm: [" ", "enter"],
-    close: ["e", "shiftright", "escape"]
+    up: { keys: ["w", "arrowup"], keyboard: true },
+    down: { keys: ["s", "arrowdown"], keyboard: true },
+    confirm: { keys: [" ", "enter"], keyboard: true },
+    close: { keys: ["e", "shiftright", "escape"], keyboard: false }
 };
 
 // Bigorna: qualquer jogador perto abre o menu com interagir; enquanto aberto o Game congela a simulação e
@@ -66,7 +68,8 @@ export class ForgeSystem {
         this.anvil = anvil;
         this.recipes = anvilRecipes(anvil.prop);
         this.cursor = Math.max(0, this.recipes.findIndex(id => this.status(id) === "ok"));
-        this._navHeld = Object.fromEntries(Object.entries(NAV_KEYS).map(([k, keys]) => [k, keys.some(key => this.input.isDown(key))]));
+        this._navHeld = {};
+        this._keyEdges();
         this.audio?.play("uiOpen");
         this.onOpen?.(anvil);
     }
@@ -83,12 +86,22 @@ export class ForgeSystem {
         return this.forge.status(id, this.scrap?.amount ?? 0);
     }
 
+    _down(key, keyboardOnly) {
+        const kb = this.input.keyboardKeys;
+        return keyboardOnly && kb ? kb.has(key) : !!this.input.isDown(key);
+    }
+
+    // Borda por tecla: um jogador segurando a dele não engole o aperto do outro.
     _keyEdges() {
         const out = {};
-        for (const [name, keys] of Object.entries(NAV_KEYS)) {
-            const down = keys.some(k => this.input.isDown(k));
-            out[name] = down && !this._navHeld[name];
-            this._navHeld[name] = down;
+        for (const [name, { keys, keyboard }] of Object.entries(NAV_KEYS)) {
+            out[name] = false;
+            for (const key of keys) {
+                const id = `${name}:${key}`;
+                const down = this._down(key, keyboard);
+                if (down && !this._navHeld[id]) out[name] = true;
+                this._navHeld[id] = down;
+            }
         }
         return out;
     }
@@ -111,8 +124,8 @@ export class ForgeSystem {
     buy(id) {
         const result = this.forge.buy(id, this.scrap.wallet);
         if (!result.ok) {
-            this.denyT = 12;
-            this.audio?.play("uiMove", { rateMultiplier: 0.6 });
+            this.denyT = this.cfg.denySteps;
+            this.audio?.play("uiMove", { rateMultiplier: this.cfg.denyRate });
             return result;
         }
         this.audio?.play("forgeBuy");

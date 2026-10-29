@@ -25,6 +25,11 @@ export class DialogueSystem {
         return !!this.line || this.queue.length > 0;
     }
 
+    // Outro sistema usou o aperto de interagir (ex.: abrir a bigorna): não conta como pular a fala.
+    latchInteract() {
+        this._held = this.cfg.interactKeys.map(() => true);
+    }
+
     // `who` = índice do jogador (0 = Amarelo, 1 = Azul) ou o próprio Player.
     say(who, key, { vars = null, expr = this.cfg.defaultExpr } = {}) {
         if (!this.cfg.enabled) return false;

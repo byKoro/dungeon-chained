@@ -124,6 +124,9 @@ export class SawWeapon extends Weapon {
     pickup() {
         this.thrown = false;
         this.dropped = false;
+        this.split = 0;
+        this._splitTarget = 0;
+        this.justSplit = this.justMerged = false;
     }
 
     updateDropped() {

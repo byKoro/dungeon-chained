@@ -10,7 +10,10 @@ export const FORGE = Object.freeze({
         elasticity: { kind: "upgrade", item: "saw", costs: [8, 14, 22], perLevel: 0.15 },
         doubleSaw: { kind: "upgrade", item: "saw", costs: [30], splitAt: 0.85, mergeAt: 0.7, splitSteps: 12 }
     }),
-    defaultRecipes: Object.freeze(["saw", "size", "elasticity", "doubleSaw"])
+    defaultRecipes: Object.freeze(["saw", "size", "elasticity", "doubleSaw"]),
+    denySteps: 12,
+    denyRate: 0.6,
+    splitFeedback: Object.freeze({ shake: 3, sparks: 6, power: 0.8, splitRate: 1.35, mergeRate: 1.15 })
 });
 
 export const FORGE_RECIPE_IDS = Object.freeze(Object.keys(FORGE.recipes));
@@ -31,9 +34,13 @@ export const SAW_CINEMATIC = Object.freeze({
     outStart: 3.35,
     end: 3.8,
     zoom: 1.7,
+    focusOffsetY: -16,
     barRatio: 0.12,
+    landShake: 5,
+    landFlash: 14,
     sawLift: 18,
     firstReconnectScale: 1.1,
+    firstReconnectShake: 9,
     titleSeconds: 1.8
 });
 

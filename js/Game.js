@@ -14,7 +14,7 @@ import { ForgeSystem } from './systems/ForgeSystem.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
 import { TitleBanner } from './ui/TitleBanner.js';
-import { SAW_CINEMATIC } from './config/ForgeConfig.js';
+import { FORGE, SAW_CINEMATIC } from './config/ForgeConfig.js';
 import { t } from './i18n/I18n.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
@@ -185,8 +185,12 @@ export class Game {
         this.forgeSystem = this.scrap ? new ForgeSystem({
             rooms: this.rooms, getPlayers: () => [this.p1, this.p2], input: this.input,
             forge: this.forge, scrap: this.scrap, audio: this.audio,
-            canOpen: () => !this.rooms.current.enemies.some(e => e.state !== "dying"),
-            onOpen: () => { for (const p of this.players) { p.vx = 0; p.vy = 0; p.cancelDash(); } },
+            canOpen: () => !this.transition && !this.gameOver && !this.rooms.current.enemies.some(e => e.state !== "dying"),
+            onOpen: () => {
+                for (const p of this.players) { p.vx = 0; p.vy = 0; p.cancelDash(); }
+                this.dialogue?.latchInteract();
+                this.demoProgress.held = [true, true];
+            },
             onClose: () => { for (const p of this.players) p.latchDashKey(); },
             onBuy: (id, result, anvil) => this._onForgeBuy(id, anvil)
         }) : null;
@@ -492,8 +496,27 @@ export class Game {
         this.chain.spawnSaw(top.x, top.y);
         this.chain.weapon.dropT = 1;
         this._sawOnAnvil = true;
+        this._sawAnvilSortY = this.roomProps?.solid.find(s => s.prop === anvil.prop)?.feetSortY ?? top.y;
         this._sawFirstConnect = true;
         this.dialogue?.say(1, "talk.sawReady");
+    }
+
+    _onSawReconnect() {
+        const first = this._sawFirstConnect;
+        this._sawFirstConnect = false;
+        this._sawOnAnvil = false;
+        this.renderer.triggerShake(first ? SAW_CINEMATIC.firstReconnectShake : 4);
+
+        this.audio.play("sawPickup");
+        this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
+        this._sawLandPending = false;
+
+        if (first) {
+            this.chain.weapon?.playReconnect?.(SAW_CINEMATIC.firstReconnectScale);
+            this.titleBanner.show(t("forge.sawTitle"), SAW_CINEMATIC.titleSeconds);
+        } else {
+            this.chain.weapon?.playReconnect?.();
+        }
     }
 
     _updateSawCinematic(dt) {
@@ -504,11 +527,12 @@ export class Game {
     }
 
     _sawSplitFeedback(weapon) {
-        if (!weapon?.justSplit && !weapon?.justMerged) return;
-        this.audio.play("sawLand", { rateMultiplier: weapon.justSplit ? 1.35 : 1.15 });
-        this.renderer.triggerShake(3);
+        if (!this.chain.isConnected || (!weapon?.justSplit && !weapon?.justMerged)) return;
+        const fx = FORGE.splitFeedback;
+        this.audio.play("sawLand", { rateMultiplier: weapon.justSplit ? fx.splitRate : fx.mergeRate });
+        this.renderer.triggerShake(fx.shake);
         for (const s of weapon.getSawPositions(this.p1, this.p2)) {
-            this.particleSystem.triggerSparkBurst(s.x, s.y, weapon.discRadius, 6, 0.8);
+            this.particleSystem.triggerSparkBurst(s.x, s.y, weapon.discRadius, fx.sparks, fx.power);
         }
     }
 
@@ -529,7 +553,10 @@ export class Game {
         this.p2.cancelDash();
         this._rememberEntrySpawns();
 
+        // Saindo com a serra ainda na bigorna, a troca de sala reconecta: toca a primeira conexão aqui.
+        const firstPickup = this._sawFirstConnect && this.chain.hasSaw && !this.chain.isConnected;
         if (!this.chain.isConnected) this.chain.reset();
+        if (firstPickup) this._onSawReconnect();
         this._sawOnAnvil = false;
 
         this.particleSystem.damageNumbers = [];
@@ -634,7 +661,8 @@ export class Game {
         if (!this.sawMotor || !w) return;
         this.sawMotor.update(w.spinSpeed ?? 0, {
             connected: this.chain.isConnected,
-            active: !this.gameOver && !this.transition && !this.roomIntro && !this.gameLoop.paused,
+            active: this.chain.hasSaw && !this.gameOver && !this.transition && !this.roomIntro && !this.gameLoop.paused
+                && !this.forgeSystem?.open && !this.sawCinematic?.active,
             timeScale: this.gameLoop.timeScale
         });
     }
@@ -822,23 +850,7 @@ export class Game {
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
-            onReconnect: () => {
-                const first = this._sawFirstConnect;
-                this._sawFirstConnect = false;
-                this._sawOnAnvil = false;
-                this.renderer.triggerShake(first ? 9 : 4);
-
-                this.audio.play("sawPickup");
-                this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
-                this._sawLandPending = false;
-
-                if (first) {
-                    this.chain.weapon?.playReconnect?.(SAW_CINEMATIC.firstReconnectScale);
-                    this.titleBanner.show(t("forge.sawTitle"), SAW_CINEMATIC.titleSeconds);
-                } else {
-                    this.chain.weapon?.playReconnect?.();
-                }
-            },
+            onReconnect: () => this._onSawReconnect(),
 
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });
@@ -960,7 +972,6 @@ export class Game {
         this._updateHearts(room);
         this.chests?.update();
         this.scrap?.update([p1, p2], this.arenaBounds);
-        this.forgeSystem?.update();
 
         for (let i = this.gibs.length - 1; i >= 0; i--) {
             this.gibs[i].update(this.arenaBounds);
@@ -1009,6 +1020,8 @@ export class Game {
         }
 
         this.thrownSaw.update();
+        // Antes das falas e dos interativos: abrir a bigorna consome o aperto de interagir.
+        this.forgeSystem?.update();
         this.dialogue?.update(deltaSeconds);
         this.demoProgress.update(deltaSeconds);
         this.demoEncounter.update();
@@ -1067,7 +1080,7 @@ export class Game {
     _checkDoorTransition(doors) {
 
         if (this.mapData ? this.mapData.test?.isolated : this.playtest) return;
-        if (this.rooms.isLocked() || this.transition) return;
+        if (this.rooms.isLocked() || this.transition || this.forgeSystem?.open) return;
         const { p1, p2, rooms } = this;
         for (const door of doors) {
             if (door.blocked) continue;
@@ -1086,7 +1099,7 @@ export class Game {
         if (this.mapData && this.demoCamera.mode === 'split') this.demoCamera.renderSplit(() => this._renderView());
         else this._renderView();
         this._renderOverlays();
-        if (this.mapData) {
+        if (this.mapData && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
             const forgePrompt = this.sawCinematic?.active ? null : this.forgeSystem?.prompt;
@@ -1152,13 +1165,17 @@ export class Game {
 
         this.chain.drawChain(ctx, this.p1, this.p2);
 
-        const sawY = this.chain.weapon?.getSawPositions
-            ? this.chain.weapon.getSawPositions(this.p1, this.p2)[0].y
-            : (this.p1.y + this.p2.y) / 2;
+        const saws = this.chain.weapon?.getSawPositions?.(this.p1, this.p2) ?? [];
+        const sawY = saws.length ? saws.reduce((s, p) => s + p.y, 0) / saws.length : (this.p1.y + this.p2.y) / 2;
         const entities = [this.p1, this.p2, ...enemies];
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const propDrawables = this.roomProps?.drawables(nowMs) ?? [];
+        // Recém-forjada, a serra fica em cima da bigorna: ordenada logo depois do prop.
+        if (this._sawOnAnvil) {
+            const k = this._sawAnvilSortY + 0.5;
+            propDrawables.push({ y: k - HOLE_FALL.footOffset, feetSortY: k, draw: c => this.chain.drawDropped(c) });
+        }
         // Com props sólidos a ordem é pelos pés (inimigos têm os pés bem abaixo do centro); sem eles, pelo centro.
         const sortKey = this.roomProps ? feetSortKey : (d => d.y);
         const drawables = [...entities, ...occluders, ...propDrawables].sort((a, b) => sortKey(a) - sortKey(b));
@@ -1174,7 +1191,6 @@ export class Game {
         this.particleSystem.drawSparks(ctx);
 
         drawables.filter(e => e.y > sawY).forEach(drawEntity);
-        if (this._sawOnAnvil) this.chain.drawDropped(ctx);
         this.sawCinematic?.drawWorld(ctx);
 
         this.particleSystem.drawFlames(ctx);

@@ -66,6 +66,10 @@ export class Chain {
 
     update(p1, p2, events = {}) {
         if (this.reconnectCooldown > 0) this.reconnectCooldown--;
+        if (!this.present) {
+            this.weapon.spin = 0;
+            return;
+        }
         const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
 
         if (this.connected) {
@@ -86,7 +90,7 @@ export class Chain {
                 this.strain = 0;
                 this.reconnectCooldown = this.reconnectDelay;
 
-                const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
+                const sp = this._sawCenter(p1, p2);
                 const rawX = sp ? sp.x : (p1.x + p2.x) / 2;
                 const rawY = sp ? sp.y : (p1.y + p2.y) / 2;
 
@@ -122,12 +126,19 @@ export class Chain {
         this.connected = false;
         this.strain = 0;
         this.reconnectCooldown = this.reconnectDelay;
-        const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
+        const sp = this._sawCenter(p1, p2);
         const rawX = sp ? sp.x : (p1.x + p2.x) / 2;
         const rawY = sp ? sp.y : (p1.y + p2.y) / 2;
         const fixed = resolveDropPoint?.(rawX, rawY) ?? { x: rawX, y: rawY };
         this.weapon.drop?.(fixed.x, fixed.y);
         return true;
+    }
+
+    // Com a Serra dupla há dois discos: a serra cai no meio deles.
+    _sawCenter(p1, p2) {
+        const all = this.weapon.getSawPositions?.(p1, p2);
+        if (!all?.length) return null;
+        return { x: all.reduce((s, p) => s + p.x, 0) / all.length, y: all.reduce((s, p) => s + p.y, 0) / all.length };
     }
 
     _canReconnect(p1, p2, dist) {

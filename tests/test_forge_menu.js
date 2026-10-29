@@ -93,5 +93,26 @@ fs.handleInput();
 held.add("escape"); fs.handleInput(); held.clear();
 assert(!fs.open, "Esc fecha");
 
+// Bordas por tecla e navegação só pelo teclado real.
+{
+    const kb = new Set(), all = new Set();
+    const input2 = { keyboardKeys: kb, isDown: k => all.has(k) || kb.has(k) };
+    const forge2 = new ForgeState();
+    forge2.reset({ items: ["saw"] });
+    const sys = new ForgeSystem({ rooms, getPlayers: () => [p1, p2], input: input2, forge: forge2, scrap: new ScrapSystem() });
+    anvil.recipes = ["size", "elasticity", "doubleSaw"];
+    sys.openAt({ prop: anvil, roomKey: "1,1", x: ax, y: ay });
+    kb.add("arrowup"); sys.handleInput();
+    const afterHold = sys.cursor;
+    kb.add("w"); sys.handleInput();
+    assert(sys.cursor === (afterHold + 2) % 3, "P1 aperta W enquanto P2 segura a seta: o cursor anda");
+    kb.clear(); sys.handleInput();
+    const c0 = sys.cursor;
+    all.add("s"); sys.handleInput(); all.delete("s"); sys.handleInput();
+    assert(sys.cursor === c0, "S vindo do analógico (não teclado) não move: o MenuPad cuida do controle");
+    all.add("e"); sys.handleInput();
+    assert(!sys.open, "X do controle (vira 'e') fecha");
+}
+
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
