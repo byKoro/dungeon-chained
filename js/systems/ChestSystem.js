@@ -14,6 +14,7 @@ export class ChestSystem {
 
     reset() {
         this.opened = new Map();
+        this.hidden = new Set();
         this.justOpened = [];
         this.nearby = false;
         this._held = INTERACT_KEYS.map(() => true);
@@ -26,6 +27,28 @@ export class ChestSystem {
 
     isOpen(roomKey, prop) {
         return this.opened.has(this._id(roomKey, prop));
+    }
+
+    // Baú guardado por um evento (ex.: dentro da gaiola): não aparece, não colide e não abre por interagir.
+    setHidden(roomKey, prop, hidden) {
+        const id = this._id(roomKey, prop);
+        if (hidden) this.hidden.add(id); else this.hidden.delete(id);
+    }
+
+    isHidden(roomKey, prop) {
+        return this.hidden.has(this._id(roomKey, prop));
+    }
+
+    // Abertura pelo script da sala (sem interagir).
+    forceOpen(roomKey, prop) {
+        const id = this._id(roomKey, prop);
+        if (this.opened.has(id)) return false;
+        this.hidden.delete(id);
+        const amount = chestScrapAmount(prop);
+        this.opened.set(id, { t: 0, burst: false, amount });
+        this.justOpened.push({ prop, roomKey, amount });
+        this.audio?.play("chestOpen");
+        return true;
     }
 
     _center(prop, def, rect) {
@@ -63,6 +86,7 @@ export class ChestSystem {
             const def = this.defs[prop.type];
             if (!def?.opens) continue;
             const id = this._id(room.key, prop);
+            if (this.hidden.has(id)) continue;
             const state = this.opened.get(id);
             const c = this._center(prop, def, rect);
             if (state) {

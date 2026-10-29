@@ -7,8 +7,8 @@ const PLAYER_FOOT = HOLE_FALL.footOffset ?? 14;
 // Props animados das salas do Editor 2.0. Os que têm `base` colidem pelos pés e são ordenados por y com as entidades;
 // os outros ficam na camada do chão. `getFrame(prop, roomKey)` permite a outro sistema (baús) trocar o quadro.
 export class RoomProps {
-    constructor({ rooms, sprites, getFrame = null, defs = ANIMATED_PROPS, tile = TILE }) {
-        Object.assign(this, { rooms, sprites, getFrame, defs, tile });
+    constructor({ rooms, sprites, getFrame = null, isHidden = null, defs = ANIMATED_PROPS, tile = TILE }) {
+        Object.assign(this, { rooms, sprites, getFrame, isHidden, defs, tile });
         this._cache = new WeakMap();
     }
 
@@ -30,6 +30,11 @@ export class RoomProps {
         return layout;
     }
 
+    _visible(list) {
+        const key = this.rooms.current?.key;
+        return this.isHidden ? list.filter(s => !this.isHidden(s.prop, key)) : list;
+    }
+
     get solid() {
         return this._layout().solid;
     }
@@ -40,7 +45,7 @@ export class RoomProps {
         for (const e of entities) {
             if (!e || e.falling || e.state === "dying") continue;
             const foot = e.footY !== undefined ? e.footY - e.y : PLAYER_FOOT;
-            for (const s of solid) pushFeetOutOfBox(e, s.box, foot, PROP_COLLISION.footRadius);
+            for (const s of this._visible(solid)) pushFeetOutOfBox(e, s.box, foot, PROP_COLLISION.footRadius);
         }
     }
 
@@ -54,7 +59,7 @@ export class RoomProps {
     drawables(ms) {
         const { rect, solid } = this._layout();
         const key = this.rooms.current?.key;
-        return solid.map(s => ({
+        return this._visible(solid).map(s => ({
             y: s.sortY,
             feetSortY: s.feetSortY,
             draw: ctx => this._drawSolid(ctx, s, rect, key, ms)

@@ -11,6 +11,8 @@ import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
 import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
 import { SawDrag } from './systems/SawDrag.js';
+import { RoomEvents } from './systems/RoomEvents.js';
+import { RUN_DEATH } from './config/EventsConfig.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
@@ -166,7 +168,8 @@ export class Game {
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
         this.roomProps = this.animatedProps ? new RoomProps({
-            rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this.chests?.frameFor(prop, key)
+            rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this.chests?.frameFor(prop, key),
+            isHidden: (prop, key) => !!this.chests?.isHidden(key, prop)
         }) : null;
         const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
         this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
@@ -187,6 +190,15 @@ export class Game {
             onBlip: (i) => this.hud.talkBlip(i)
         }) : null;
         if (this.dialogue && typeof window !== "undefined") window.dialogue = this.dialogue;
+
+        this.roomEvents = this.mapData ? new RoomEvents({
+            rooms: this.rooms, spawnSystem: this.spawnSystem, getPlayers: () => [this.p1, this.p2], chain: this.chain,
+            scrap: this.scrap, chests: this.chests, dialogue: this.dialogue, audio: this.audio,
+            particleSystem: this.particleSystem, renderer: this.renderer
+        }) : null;
+        // Mapas com bigorna seguem a regra de morte da run (ADR 0012): renascer no início em vez de game over.
+        this._runRules = !!this.mapData && Object.values(this.mapData.map.rooms).some(r => (r.props || []).some(p => p.type === "anvil"));
+        this._respawnFadeAt = -Infinity;
 
         this.forgeSystem = this.scrap ? new ForgeSystem({
             rooms: this.rooms, getPlayers: () => [this.p1, this.p2], input: this.input,
@@ -428,6 +440,8 @@ export class Game {
         this.dialogue?.clear();
         this.forgeSystem?.reset();
         this.sawDrag?.reset();
+        this.roomEvents?.reset();
+        this._respawnFadeAt = -Infinity;
         this.sawCinematic?.reset();
         this._sawOnAnvil = false;
         this._sawFirstConnect = false;
@@ -514,11 +528,46 @@ export class Game {
         this.dialogue?.say(1, "talk.sawReady");
     }
 
+    // Regra de morte da run (ADR 0012): a dupla volta ao spawn da sala inicial com as vidas cheias. A sucata zera;
+    // itens, melhorias, baús abertos e eventos concluídos ficam; o encontro interrompido recomeça.
+    _respawnRun() {
+        this.roomEvents?.onDeath();
+        this.scrap?.reset();
+        this.sawDrag?.reset();
+        this.dialogue?.clear();
+        this.forgeSystem?.close({ silent: true });
+        this.gibs = [];
+        this.particleSystem.clear();
+        const start = this.rooms.dungeon.graph.start;
+        if (this.rooms.dungeon.current !== start) {
+            this.rooms.transitionTo({ gx: start.gx, gy: start.gy });
+            this.bloodCanvas.clear();
+        }
+        this.arenaBounds = this.rooms.currentBounds;
+        const spawns = this.rooms.dungeon.spawnPositions();
+        for (const [p, s] of [[this.p1, spawns.p1], [this.p2, spawns.p2]]) {
+            p.lives = 3;
+            p.respawnAt(s.x, s.y, RUN_DEATH.invulnSteps);
+            p._livesSeen = p.lives;
+            p._fallSeen = false;
+        }
+        this._sawOnAnvil = false;
+        this._sawFirstConnect = false;
+        this.chain.reset({ present: this.forge.has("saw") });
+        this._rememberEntrySpawns();
+        this.renderer.camX = (spawns.p1.x + spawns.p2.x) / 2;
+        this.renderer.camY = (spawns.p1.y + spawns.p2.y) / 2;
+        this.renderer.resetSway();
+        this._respawnFadeAt = performance.now();
+        this.screenGore.triggerFlash();
+        this.audio.play("playerFall", { rateMultiplier: 0.8 });
+    }
+
     // A serra arrastada não entra em buraco nem em parede (o disco tem o raio de colisão da serra).
     _sawDragBlocked(x, y) {
         if (this.tiles.isHoleAtWorld(x, y)) return true;
         const r = this.chain.weapon?.collisionRadius ?? 16;
-        return (this.rooms.current?.wallBoxes || []).some(b =>
+        return [...(this.rooms.current?.wallBoxes || []), ...(this.roomEvents?.solidBoxes() ?? [])].some(b =>
             Math.hypot(x - Math.max(b.x, Math.min(x, b.x + b.w)), y - Math.max(b.y, Math.min(y, b.y + b.h))) < r);
     }
 
@@ -938,7 +987,7 @@ export class Game {
         this.combat.updateEnemies(enemies, [p1, p2]);
         this.ghostfire.update(room, [p1, p2]);
 
-        const liveEnemies = enemies.filter(e => e.state !== "dying");
+        const liveEnemies = enemies.filter(e => e.state !== "dying" && !e.isHidden);
         const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies);
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
@@ -957,6 +1006,8 @@ export class Game {
             }
         }
         this.roomProps?.resolveCollisions([p1, p2, ...room.enemies]);
+        const barBoxes = this.roomEvents?.solidBoxes() ?? [];
+        if (barBoxes.length) for (const entity of [p1, p2, ...liveEnemies]) Physics.resolveBoxCollisions(entity, barBoxes);
 
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
@@ -994,6 +1045,7 @@ export class Game {
 
         this._updateHearts(room);
         this.chests?.update();
+        this.roomEvents?.update();
         this.scrap?.update([p1, p2], this.arenaBounds);
 
         for (let i = this.gibs.length - 1; i >= 0; i--) {
@@ -1034,7 +1086,9 @@ export class Game {
         this.particleSystem.update([p1, p2], this.arenaBounds);
         this.wind.update(this.arenaBounds);
 
-        if (p1.lives <= 0 || p2.lives <= 0) {
+        if ((p1.lives <= 0 || p2.lives <= 0) && this._runRules) {
+            this._respawnRun();
+        } else if (p1.lives <= 0 || p2.lives <= 0) {
             this.gameOver = true;
             this._gameOverAt = performance.now();
             this.deathScreen.show();
@@ -1169,6 +1223,7 @@ export class Game {
 
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
+        this.roomEvents?.drawFloor(ctx);
         this.ghostfire.drawFloor(ctx, rooms.current);
         for (const enemy of rooms.current.enemies) enemy.drawAttackEffect?.(ctx);
 
@@ -1194,7 +1249,7 @@ export class Game {
         const entities = [this.p1, this.p2, ...enemies];
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
-        const propDrawables = this.roomProps?.drawables(nowMs) ?? [];
+        const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? [])];
         // Recém-forjada, a serra fica em cima da bigorna: ordenada logo depois do prop.
         if (this._sawOnAnvil) {
             const k = this._sawAnvilSortY + 0.5;
@@ -1262,8 +1317,9 @@ export class Game {
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
-        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length) {
+        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length || this.roomEvents) {
             renderer.beginOverlayWorld();
+            this.roomEvents?.drawAir(ctx);
             this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
             this.particleSystem.drawDamageNumbers(ctx);
@@ -1284,6 +1340,11 @@ export class Game {
             const t = this.transition;
             const a = t.phase === "out" ? t.t : (1 - t.t);
             ctx.fillStyle = `rgba(8, 7, 14, ${Math.max(0, Math.min(1, a))})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        const fade = 1 - (performance.now() - this._respawnFadeAt) / (RUN_DEATH.fadeSeconds * 1000);
+        if (fade > 0) {
+            ctx.fillStyle = `rgba(8, 7, 14, ${Math.min(1, fade)})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
