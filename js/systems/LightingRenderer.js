@@ -49,6 +49,17 @@ const HEART_PROFILE = {
     ]
 };
 
+const ENEMY_EMBER_PROFILE = {
+    color: "255, 140, 64",
+    flickerBase: 1, flickerSine: 0.05, flickerNoise: 0.03,
+    falloff: [
+        { offset: 0.0, alpha: 0.85 },
+        { offset: 0.3, alpha: 0.5 },
+        { offset: 0.6, alpha: 0.2 },
+        { offset: 1.0, alpha: 0.0 }
+    ]
+};
+
 const BUTTON_PROFILE = {
     color: "214, 120, 112",
     flickerBase: 1, flickerSine: 0, flickerNoise: 0,
@@ -71,7 +82,9 @@ export class LightingRenderer {
         return Math.max(2, Math.round((TILE / 16) * zoom * scale));
     }
 
-    render({ players, chain, sawPos, arenaBounds, tiles, rect, doors, doorHalf, open, doorFlashT, buttons = [], hearts = [] }) {
+    render({ players, chain, sawPos, arenaBounds, tiles, rect, doors, doorHalf, open, doorFlashT, buttons = [], hearts = [], enemies = [], corpses = [] }) {
+        this._renderEnemyLights(enemies);
+        this._renderEnemyLights(corpses);
         this._renderButtonLights(buttons);
         this._renderHeartLights(hearts);
         this._renderPlayerLights(players);
@@ -80,6 +93,21 @@ export class LightingRenderer {
         this._renderWallWash(arenaBounds);
         this._renderTorches(tiles, rect);
         this._renderDoorFlash({ doors, doorHalf, open, doorFlashT });
+    }
+
+    // Inimigos que brilham (ex.: Arauto das Brasas) expõem lightInfo() = { x, y, radius, strength } ou null.
+    _renderEnemyLights(enemies) {
+        for (const e of enemies) {
+            const info = e.lightInfo?.();
+            if (!info || info.strength <= 0.01) continue;
+            const s = this.renderer.worldToScreen(info.x, info.y);
+            const px = this._lightPixel(s.zoom);
+            const strength = Math.min(1, info.strength);
+            this.postProcessor.addLight(s.x, s.y, info.radius * s.zoom, px, 0.85, {
+                ...ENEMY_EMBER_PROFILE,
+                falloff: ENEMY_EMBER_PROFILE.falloff.map(f => ({ ...f, alpha: f.alpha * strength }))
+            });
+        }
     }
 
     _renderButtonLights(buttons) {

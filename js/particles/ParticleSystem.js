@@ -5,6 +5,8 @@ import { FlashParticle } from './FlashParticle.js';
 import { FlameParticle } from './FlameParticle.js';
 import { DamageNumber } from './DamageNumber.js';
 import { DAMAGE_NUMBER } from '../config/CombatFeelConfig.js';
+import { LavaFragment } from './LavaFragment.js';
+import { ARAUTO_FX } from '../config/ArautoEffectsConfig.js';
 
 const BLOOD_PX = 4;
 
@@ -100,10 +102,12 @@ export class ParticleSystem {
         this.flashes = [];
         this.flames = [];
         this.damageNumbers = [];
+        this.lavaFragments = [];
         this.bloodCanvas = bloodCanvas;
     }
 
     clear() {
+        this.lavaFragments = [];
         this.airParticles = [];
         this.floorDebris = [];
         this.smoke = [];
@@ -117,6 +121,15 @@ export class ParticleSystem {
     triggerDamageNumber(x, y, amount, opts = {}) {
         this.damageNumbers.push(new DamageNumber(x, y, amount, opts));
         while (this.damageNumbers.length > DAMAGE_NUMBER.max) this.damageNumbers.shift();
+    }
+
+    triggerLavaDebris(x, y, amount = ARAUTO_FX.contactPieces, opts = {}) {
+        for (let i = 0; i < amount; i++) {
+            this.lavaFragments.push(new LavaFragment(x, y, { ...opts, lava: opts.lava ?? i % 2 === 0 }));
+        }
+        if (this.lavaFragments.length > ARAUTO_FX.maxFragments) {
+            this.lavaFragments.splice(0, this.lavaFragments.length - ARAUTO_FX.maxFragments);
+        }
     }
 
     // Faíscas em cone a partir do ponto de contato, na direção do golpe.
@@ -216,6 +229,7 @@ export class ParticleSystem {
     }
 
     update(players, bounds) {
+        updateAndCompact(this.lavaFragments);
 
         for (let i = 0; i < this.floorDebris.length; i++) {
             this.floorDebris[i].update(players, bounds);
@@ -250,6 +264,7 @@ export class ParticleSystem {
             ctx.clip("evenodd");
         }
         if (this.bloodCanvas) this.bloodCanvas.draw(ctx);
+        for (const fragment of this.lavaFragments) if (fragment.settled) fragment.draw(ctx);
         for (let i = 0; i < this.floorDebris.length; i++) {
             this.floorDebris[i].draw(ctx);
         }
@@ -284,6 +299,7 @@ export class ParticleSystem {
     }
 
     drawAir(ctx) {
+        for (const fragment of this.lavaFragments) if (!fragment.settled) fragment.draw(ctx);
         for (let i = 0; i < this.airParticles.length; i++) {
             this.airParticles[i].draw(ctx);
         }
