@@ -307,6 +307,17 @@ export const AUDIO_CONFIG = {
             pitchShift: true,
             cooldownMs: 120,
             enabled: true
+        },
+        voiceBlip: {
+            description: "Blip de voz do balão de fala (placeholder: blip do trailer; o tom muda por jogador)",
+            files: [1, 2].map(i => `assets/audio/trailer/blip-0${i}.wav`),
+            volume: 0.22,
+            rate: 1.0,
+            rateVariance: 0,
+            pitchShift: true,
+            cooldownMs: 30,
+            maxVoices: 2,
+            enabled: true
         }
     }
 };

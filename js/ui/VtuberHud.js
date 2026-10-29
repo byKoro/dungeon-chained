@@ -154,6 +154,15 @@ class Portrait {
         });
     }
 
+    talk(expr, dur) {
+        this.hop.kick(-30 * MOTION);
+        this._play([{ expr, dur }]);
+    }
+
+    blip() {
+        this.squash.kick(0.9 * MOTION);
+    }
+
     healed() {
         this.hop.kick(-35);
         this.squash.set(1.08);
@@ -621,6 +630,14 @@ export class VtuberHud {
 
     setPaused(paused) {
         this.entries.forEach((e, i) => e.portrait.setPaused(!!paused, i * 0.07));
+    }
+
+    speak(index, expr, dur) {
+        this.entries[index]?.portrait.talk(expr, dur);
+    }
+
+    talkBlip(index) {
+        this.entries[index]?.portrait.blip();
     }
 
     onRoomCleared() {

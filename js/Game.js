@@ -6,6 +6,7 @@ import { DemoDoors } from './systems/DemoDoors.js';
 import { ThrownSaw } from './systems/ThrownSaw.js';
 import { ScrapSystem } from './systems/ScrapSystem.js';
 import { ChestSystem } from './systems/ChestSystem.js';
+import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
@@ -172,6 +173,13 @@ export class Game {
         this.chests = this.scrap ? new ChestSystem({
             rooms: this.rooms, scrap: this.scrap, getPlayers: () => [this.p1, this.p2], audio: this.audio, particleSystem: this.particleSystem
         }) : null;
+
+        this.dialogue = new DialogueSystem({
+            getPlayers: () => [this.p1, this.p2], input: this.input, audio: this.audio,
+            onLineStart: (i, expr, dur) => this.hud.speak(i, expr, dur),
+            onBlip: (i) => this.hud.talkBlip(i)
+        });
+        if (typeof window !== "undefined") window.dialogue = this.dialogue;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -383,6 +391,7 @@ export class Game {
         this.scrap?.reset();
         this.scrapCounter?.reset();
         this.chests?.reset();
+        this.dialogue.clear();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -916,6 +925,7 @@ export class Game {
         }
 
         this.thrownSaw.update();
+        this.dialogue.update(deltaSeconds);
         this.demoProgress.update(deltaSeconds);
         this.demoEncounter.update();
         this._checkDoorTransition(doors);
@@ -1136,6 +1146,7 @@ export class Game {
         const { ctx, canvas } = this;
 
         this.screenGore.draw(ctx);
+        this.dialogue.draw(ctx, this.renderer, canvas);
 
         if (this.transition) {
             const t = this.transition;
