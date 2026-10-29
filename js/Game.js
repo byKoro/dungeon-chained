@@ -5,6 +5,7 @@ import { DemoCamera } from './systems/DemoCamera.js';
 import { DemoDoors } from './systems/DemoDoors.js';
 import { ThrownSaw } from './systems/ThrownSaw.js';
 import { ScrapSystem } from './systems/ScrapSystem.js';
+import { ChestSystem } from './systems/ChestSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
@@ -162,10 +163,15 @@ export class Game {
             this.gameOver = true; this._gameOverAt = performance.now(); this.demoVictory.show();
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
-        this.roomProps = this.animatedProps ? new RoomProps({ rooms: this.rooms, sprites: this.animatedProps }) : null;
+        this.roomProps = this.animatedProps ? new RoomProps({
+            rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this.chests?.frameFor(prop, key)
+        }) : null;
         const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
         this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
         this.scrapCounter = this.scrap ? new ScrapCounter({ getAmount: () => this.scrap.amount, frames: scrapFrames }) : null;
+        this.chests = this.scrap ? new ChestSystem({
+            rooms: this.rooms, scrap: this.scrap, getPlayers: () => [this.p1, this.p2], audio: this.audio, particleSystem: this.particleSystem
+        }) : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -376,6 +382,7 @@ export class Game {
         this.demoEncounter.reset();
         this.scrap?.reset();
         this.scrapCounter?.reset();
+        this.chests?.reset();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -859,6 +866,7 @@ export class Game {
         }, [p1, p2]);
 
         this._updateHearts(room);
+        this.chests?.update();
         this.scrap?.update([p1, p2], this.arenaBounds);
 
         for (let i = this.gibs.length - 1; i >= 0; i--) {

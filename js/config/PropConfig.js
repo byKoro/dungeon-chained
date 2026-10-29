@@ -5,7 +5,7 @@ const frames = (folder, prefix, count = 4) =>
 export const PROP_FRAME_MS = 150;
 
 // `base` = pegada no chão, em pixels de arte a partir do canto do sprite desenhado. Com `base` o prop colide
-// (só pelos pés de quem anda) e entra na ordenação por y com as entidades.
+// (só pelos pés de quem anda) e entra na ordenação por y com as entidades. `opens` = baú que abre por proximidade.
 const CHEST_BASE = Object.freeze({ x: 1, y: 8, w: 14, h: 6 });
 const MINI_CHEST_BASE = Object.freeze({ x: 3, y: 9, w: 10, h: 5 });
 
@@ -16,9 +16,9 @@ export const ANIMATED_PROPS = Object.freeze({
     box_2: { label: "Caixa 2", frames: frames("box_2", "box_2"), w: 1, h: 1, solid: true },
     mini_box_1: { label: "Caixa pequena 1", frames: frames("mini_box_1", "mini_box_1"), w: 1, h: 1, solid: true },
     mini_box_2: { label: "Caixa pequena 2", frames: frames("mini_box_2", "mini_box_2"), w: 1, h: 1, solid: true },
-    chest: { label: "Baú", frames: frames("chest", "chest"), w: 1, h: 1, solid: true, base: CHEST_BASE },
+    chest: { label: "Baú", frames: frames("chest", "chest"), w: 1, h: 1, solid: true, base: CHEST_BASE, opens: "chest_open" },
     chest_open: { label: "Baú abrindo", frames: frames("chest", "chest_open"), w: 1, h: 1, solid: true, loop: false, base: CHEST_BASE },
-    mini_chest: { label: "Baú pequeno", frames: frames("mini_chest", "mini_chest"), w: 1, h: 1, solid: true, base: MINI_CHEST_BASE },
+    mini_chest: { label: "Baú pequeno", frames: frames("mini_chest", "mini_chest"), w: 1, h: 1, solid: true, base: MINI_CHEST_BASE, opens: "mini_chest_open" },
     mini_chest_open: { label: "Baú pequeno abrindo", frames: frames("mini_chest", "mini_chest_open"), w: 1, h: 1, solid: true, loop: false, base: MINI_CHEST_BASE },
     coin: { label: "Moeda", frames: frames("coin", "coin"), w: 1, h: 1, solid: false },
     flag: { label: "Bandeira", frames: frames("flag", "flag"), w: 1, h: 1, solid: false },

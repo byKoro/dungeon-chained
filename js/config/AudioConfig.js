@@ -297,6 +297,16 @@ export const AUDIO_CONFIG = {
             cooldownMs: 35,
             maxVoices: 4,
             enabled: true
+        },
+        chestOpen: {
+            description: "Tampa do baú abrindo (placeholder: thunk do trailer)",
+            files: [1, 2].map(i => `assets/audio/trailer/thunk-0${i}.wav`),
+            volume: 0.55,
+            rate: 1.1,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 120,
+            enabled: true
         }
     }
 };

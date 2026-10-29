@@ -204,9 +204,9 @@ export function canPlaceProp(room, type, c, r) {
     return true;
 }
 
-export function placeProp(room, type, c, r, flip = false) {
+export function placeProp(room, type, c, r, flip = false, extra = null) {
     if (!canPlaceProp(room, type, c, r)) return false;
-    const prop = { type, col: c, row: r };
+    const prop = { ...extra, type, col: c, row: r };
     if (flip) prop.flip = true;
     room.props.push(prop);
     return true;

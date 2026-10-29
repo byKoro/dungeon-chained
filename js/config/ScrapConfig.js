@@ -25,5 +25,24 @@ export const SCRAP = Object.freeze({
     drawSize: 32,
     shadowRadius: 7,
     drops: Object.freeze({ demon: 1, bloodMonster: 3, blackKnightB: 5 }),
-    chestDefault: 10
+    chestDefault: 10,
+    chestMax: 999
 });
+
+// Baús abrem quando qualquer jogador chega perto; a sucata sai para a frente (sul) em arco.
+export const CHEST = Object.freeze({
+    openRadius: 2 * TILE,
+    frameSteps: 8,
+    burstDelaySteps: 10,
+    burstDir: Math.PI / 2,
+    burstSpread: Math.PI * 1.3,
+    burstLift: 14,
+    squashSteps: 22,
+    squashAmount: 0.22
+});
+
+// Quantidade autorada no Editor 2.0 (`prop.scrap`); sem valor válido, usa o padrão.
+export function chestScrapAmount(prop) {
+    const n = Number(prop?.scrap);
+    return Number.isInteger(n) && n >= 0 ? Math.min(n, SCRAP.chestMax) : SCRAP.chestDefault;
+}

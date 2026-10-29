@@ -4,6 +4,7 @@ import { Tileset } from '../core/Tileset.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, EMPTY_FLOOR_COLOR, holeTileFor } from '../config/GameConfig.js';
 import { TILE_KINDS, DOOR_TYPES, DEFAULT_DOOR_TYPE, MAP_LIMITS } from '../config/MapEditorConfig.js';
 import { ANIMATED_PROPS, ANIMATED_PROP_KEYS } from '../config/PropConfig.js';
+import { SCRAP, chestScrapAmount } from '../config/ScrapConfig.js';
 import * as M from './MapModel.js';
 import { TilePalette } from './TilePalette.js';
 import { PropSprites } from './PropSprites.js';
@@ -37,6 +38,7 @@ export class MapEditorApp {
         this.doorType = DEFAULT_DOOR_TYPE;
         this.propType = ANIMATED_PROP_KEYS[0];
         this.propFlip = false;
+        this.propScrap = SCRAP.chestDefault;
         this.showKinds = true;
         this.showGrid = true;
 
@@ -485,7 +487,7 @@ export class MapEditorApp {
             case "prop":
                 if (!stroke.mode) stroke.mode = M.propAt(room, col, row) ? "remove" : "add";
                 if (stroke.mode === "remove") M.removePropAt(room, col, row);
-                else M.placeProp(room, this.propType, col, row, this.propFlip);
+                else M.placeProp(room, this.propType, col, row, this.propFlip, this._propExtra());
                 break;
             case "wall":
                 if (!stroke.mode) stroke.mode = M.getKind(room, col, row) === "w" ? "remove" : "add";
@@ -497,6 +499,11 @@ export class MapEditorApp {
         }
     }
 
+    // Baús guardam a sucata que soltam; outros props não recebem campos extras.
+    _propExtra() {
+        return ANIMATED_PROPS[this.propType]?.opens ? { scrap: this.propScrap } : null;
+    }
+
     _eyedrop(col, row) {
         const room = this.room;
         if (!room || !M.inBounds(room, col, row)) return;
@@ -504,6 +511,7 @@ export class MapEditorApp {
         if (prop) {
             this.propType = prop.type;
             this.propFlip = !!prop.flip;
+            if (ANIMATED_PROPS[prop.type]?.opens) this.propScrap = chestScrapAmount(prop);
             this._setTool("prop");
             return;
         }
@@ -759,6 +767,10 @@ export class MapEditorApp {
         $("paint-kind").addEventListener("change", (e) => { this.paintKind = e.target.value; this._syncUI(); });
         $("show-kinds").addEventListener("change", (e) => { this.showKinds = e.target.checked; });
         $("prop-flip").addEventListener("change", (e) => { this.propFlip = e.target.checked; });
+        $("prop-scrap").addEventListener("change", (e) => {
+            this.propScrap = chestScrapAmount({ scrap: Math.round(Number(e.target.value)) });
+            e.target.value = this.propScrap;
+        });
 
         $("btn-zoom-in").addEventListener("click", () => this._zoomAt(1.25, this.canvas.width / 2, this.canvas.height / 2));
         $("btn-zoom-out").addEventListener("click", () => this._zoomAt(0.8, this.canvas.width / 2, this.canvas.height / 2));
@@ -901,6 +913,8 @@ export class MapEditorApp {
         $("door-type-field").hidden = this.tool !== "door";
         this._setVal("paint-kind", this.paintKind);
         $("prop-flip").checked = this.propFlip;
+        $("prop-scrap-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
+        this._setVal("prop-scrap", this.propScrap);
         for (const btn of document.querySelectorAll("#prop-grid [data-prop]")) btn.classList.toggle("active", this.tool === "prop" && btn.dataset.prop === this.propType);
 
         const s = this.palette.selection;
@@ -930,7 +944,10 @@ export class MapEditorApp {
         const prop = M.propAt(room, h.col, h.row);
         const parts = [`Tile ${h.col},${h.row}`, tile >= 0 ? `índice ${tile}` : null, TILE_KINDS[kind]?.label];
         if (door) parts.push(DOOR_TYPES[door.type]?.label || door.type);
-        if (prop) parts.push(ANIMATED_PROPS[prop.type]?.label || prop.type);
+        if (prop) {
+            const def = ANIMATED_PROPS[prop.type];
+            parts.push((def?.label || prop.type) + (def?.opens ? ` (${chestScrapAmount(prop)} de sucata)` : ""));
+        }
         $("status-coords").textContent = parts.filter(Boolean).join(" · ");
     }
 
