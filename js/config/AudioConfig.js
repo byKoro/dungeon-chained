@@ -318,6 +318,26 @@ export const AUDIO_CONFIG = {
             cooldownMs: 30,
             maxVoices: 2,
             enabled: true
+        },
+        forgeBuy: {
+            description: "Compra na bigorna (placeholder: sting do trailer)",
+            files: ["assets/audio/trailer/sting.wav"],
+            volume: 0.5,
+            rate: 1.2,
+            rateVariance: 0.03,
+            pitchShift: true,
+            cooldownMs: 120,
+            enabled: true
+        },
+        forgeHammer: {
+            description: "Martelada na bigorna durante a cinemática da serra (placeholder: impacto do trailer)",
+            files: [1, 2, 3].map(i => `assets/audio/trailer/impact-0${i}.wav`),
+            volume: 0.6,
+            rate: 1.25,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 80,
+            enabled: true
         }
     }
 };

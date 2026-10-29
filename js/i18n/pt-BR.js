@@ -11,5 +11,22 @@ export const PT_BR = Object.freeze({
     "talk.chest2": "Já dá pra melhorar a serra lá embaixo.",
     "talk.bossGate": "Trancado... e algo respira lá dentro.",
     "talk.rightDoor": "Vamos pela direita.",
-    "talk.debug": "Teste de balão: {who} falando."
+    "talk.debug": "Teste de balão: {who} falando.",
+    "forge.title": "BIGORNA",
+    "forge.saw": "Serra",
+    "forge.size": "Tamanho",
+    "forge.elasticity": "Elasticidade",
+    "forge.doubleSaw": "Serra dupla",
+    "forge.desc.saw": "Libera a arma da dupla.",
+    "forge.desc.size": "+20% no disco e no acerto.",
+    "forge.desc.elasticity": "+15% de cabo antes de arrebentar.",
+    "forge.desc.doubleSaw": "Esticada, a serra vira duas.",
+    "forge.max": "MAX",
+    "forge.locked": "Precisa da Serra.",
+    "forge.poor": "Falta sucata.",
+    "forge.empty": "Nada para forjar aqui.",
+    "forge.hint": "Espaço/Enter/A: forjar   E/B: sair",
+    "forge.prompt": "Bigorna: P1 E / P2 Shift direito / controle X",
+    "forge.blocked": "Inimigos por perto! Não dá para forjar.",
+    "forge.sawTitle": "SERRA"
 });

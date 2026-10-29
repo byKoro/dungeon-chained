@@ -10,6 +10,9 @@ import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
 import { ForgeState, mapOffersRecipe, applySawUpgrades } from './systems/ForgeState.js';
+import { ForgeSystem } from './systems/ForgeSystem.js';
+import { ForgeMenu } from './ui/ForgeMenu.js';
+import { t } from './i18n/I18n.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
@@ -176,6 +179,16 @@ export class Game {
         }) : null;
         if (this.dialogue && typeof window !== "undefined") window.dialogue = this.dialogue;
 
+        this.forgeSystem = this.scrap ? new ForgeSystem({
+            rooms: this.rooms, getPlayers: () => [this.p1, this.p2], input: this.input,
+            forge: this.forge, scrap: this.scrap, audio: this.audio,
+            canOpen: () => !this.rooms.current.enemies.some(e => e.state !== "dying"),
+            onOpen: () => { for (const p of this.players) { p.vx = 0; p.vy = 0; p.cancelDash(); } },
+            onClose: () => { for (const p of this.players) p.latchDashKey(); },
+            onBuy: (id, result, anvil) => this._onForgeBuy(id, anvil)
+        }) : null;
+        this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
+
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
         this.gameLoop = new GameLoop({
@@ -301,7 +314,7 @@ export class Game {
         window.addEventListener("keydown", (e) => {
             if (e.repeat) return;
             const k = e.key.toLowerCase();
-            if (k === "escape") this.togglePause();
+            if (k === "escape") { if (!this.forgeSystem?.open) this.togglePause(); }
             else if (k === "t") this.cycleTileset();
             else if (k === "r") this.restart();
 
@@ -360,6 +373,7 @@ export class Game {
             }
             return;
         }
+        if (this.forgeSystem?.open && !this.gameLoop.paused) { this.forgeSystem.handleInput(hit); return; }
         if (hit.start) { this.togglePause(); return; }
         if (!this.gameLoop.paused) return;
         if (hit.up) this.pauseScreen.move(-1);
@@ -387,6 +401,7 @@ export class Game {
         this.scrapCounter?.reset();
         this.chests?.reset();
         this.dialogue?.clear();
+        this.forgeSystem?.reset();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -450,6 +465,20 @@ export class Game {
 
     _applySawUpgrades() {
         applySawUpgrades(this.forge, this.chain, this.chain.weapon, CHAIN);
+    }
+
+    _onForgeBuy(id, anvil) {
+        this._applySawUpgrades();
+        if (id !== "saw") return;
+        this.forgeSystem.close({ silent: true });
+        this._spawnSawAtAnvil(anvil);
+    }
+
+    // A serra fica na frente (ao sul) da bigorna até os dois chegarem perto.
+    _spawnSawAtAnvil(anvil) {
+        const spot = this.tiles.safeDropPoint(anvil.x, anvil.y + TILE * 0.9, [this.p1, this.p2]);
+        this.chain.spawnSaw(spot.x, spot.y);
+        this._sawLandPending = true;
     }
 
     _sawSplitFeedback(weapon) {
@@ -630,7 +659,9 @@ export class Game {
 
     _step(deltaSeconds) {
         if (this.gameOver) return;
-        if (this.transition) {
+        if (this.forgeSystem?.open) {
+            this._updateCameraToCurrentRoom(deltaSeconds);
+        } else if (this.transition) {
             this._updateTransition();
         } else if (this.roomIntro) {
             this._updateRoomIntro(deltaSeconds);
@@ -896,6 +927,7 @@ export class Game {
         this._updateHearts(room);
         this.chests?.update();
         this.scrap?.update([p1, p2], this.arenaBounds);
+        this.forgeSystem?.update();
 
         for (let i = this.gibs.length - 1; i >= 0; i--) {
             this.gibs[i].update(this.arenaBounds);
@@ -1024,7 +1056,9 @@ export class Game {
         if (this.mapData) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const message = this.demoProgress.messageTime ? this.demoProgress.message : this.demoProgress.prompt;
+            const forgePrompt = this.forgeSystem?.prompt;
+            const message = this.demoProgress.messageTime ? this.demoProgress.message
+                : (this.demoProgress.prompt || (forgePrompt ? t(forgePrompt) : ""));
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
             if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, 12, 24); }
             ctx.restore();
@@ -1179,6 +1213,7 @@ export class Game {
 
         this.hud.draw(ctx, canvas.width, canvas.height);
         this.scrapCounter?.draw(ctx, canvas.width, canvas.height, this.hud.pixelScale(canvas.width, canvas.height));
+        this.forgeMenu?.draw(ctx, canvas);
 
     }
 }

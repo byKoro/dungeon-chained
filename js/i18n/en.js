@@ -11,5 +11,22 @@ export const EN = Object.freeze({
     "talk.chest2": "We can upgrade the saw down there now.",
     "talk.bossGate": "Locked... and something is breathing in there.",
     "talk.rightDoor": "Let's go right.",
-    "talk.debug": "Bubble test: {who} talking."
+    "talk.debug": "Bubble test: {who} talking.",
+    "forge.title": "ANVIL",
+    "forge.saw": "Saw",
+    "forge.size": "Size",
+    "forge.elasticity": "Elasticity",
+    "forge.doubleSaw": "Double saw",
+    "forge.desc.saw": "Unlocks the pair's weapon.",
+    "forge.desc.size": "+20% disc and hit radius.",
+    "forge.desc.elasticity": "+15% cable before it snaps.",
+    "forge.desc.doubleSaw": "Stretched, the saw splits in two.",
+    "forge.max": "MAX",
+    "forge.locked": "Needs the Saw.",
+    "forge.poor": "Not enough scrap.",
+    "forge.empty": "Nothing to forge here.",
+    "forge.hint": "Space/Enter/A: forge   E/B: leave",
+    "forge.prompt": "Anvil: P1 E / P2 Right Shift / pad X",
+    "forge.blocked": "Enemies nearby! You can't forge now.",
+    "forge.sawTitle": "SAW"
 });
