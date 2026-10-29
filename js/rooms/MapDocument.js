@@ -96,7 +96,7 @@ export function createRoom(cols = MAP_DEFAULTS.roomCols, rows = MAP_DEFAULTS.roo
         tiles,
         kinds,
         doors: [],
-        props: [], enemies: [], hazards: [], torches: [], interactives: [],
+        props: [], enemies: [], hazards: [], torches: [], interactives: [], zones: [], encounters: [], bars: [],
         spawns: null, lock: 'none', type: 'normal'
     };
     randomizeFloor(room);
@@ -245,10 +245,17 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
     const inside = (o) => o && o.col >= 0 && o.row >= 0 && o.col < next.cols && o.row < next.rows;
     const interior = (o) => o && o.col > 0 && o.row > 0 && o.col < next.cols - 1 && o.row < next.rows - 1;
     next.props = room.props.filter(p => p.col < next.cols - 1 && p.row < next.rows - 1).map(p => ({ ...p }));
-    for (const field of ['enemies', 'hazards', 'torches', 'interactives']) {
+    for (const field of ['enemies', 'hazards', 'torches', 'interactives', 'bars']) {
         next[field] = structuredClone((room[field] || []).filter(inside));
     }
     for (const o of next.interactives) if (o.tiles) o.tiles = o.tiles.filter(interior);
+    // Zonas são retângulos: recortadas para caber; as que ficariam vazias somem.
+    next.zones = (room.zones || []).map(z => {
+        const col = Math.max(0, z.col), row = Math.max(0, z.row);
+        const w = Math.min(z.col + z.w, next.cols) - col, h = Math.min(z.row + z.h, next.rows) - row;
+        return { ...z, col, row, w, h };
+    }).filter(z => z.w > 0 && z.h > 0);
+    next.encounters = structuredClone(room.encounters || []);
     next.spawns = room.spawns && interior(room.spawns.p1) && interior(room.spawns.p2) ? structuredClone(room.spawns) : null;
     next.lock = room.lock || 'none';
     if (room.floorPool) next.floorPool = room.floorPool;
@@ -526,6 +533,7 @@ function normalizeRoom(raw, key) {
             .map(p => ({ ...p })),
         enemies: structuredClone(raw.enemies || []), hazards: structuredClone(raw.hazards || []),
         torches: structuredClone(raw.torches || []), interactives: structuredClone(raw.interactives || []),
+        zones: structuredClone(raw.zones || []), encounters: structuredClone(raw.encounters || []), bars: structuredClone(raw.bars || []),
         spawns: structuredClone(raw.spawns || null), lock: raw.lock || 'none', type: raw.type || 'normal',
         ...(Array.isArray(raw.floorPool) ? { floorPool: raw.floorPool.filter(Number.isInteger) } : {}),
         ...(Number.isFinite(raw.propDensity) ? { propDensity: raw.propDensity } : {})

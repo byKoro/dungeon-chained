@@ -27,5 +27,8 @@ export const INTERACTIVES = {
     altarSaw: { label: 'Altar: Lançar serra', color: '#e9a55e', symbol: 'S' },
     lever: { label: 'Alavanca + ponte', color: '#a6e88b', symbol: 'L' },
     ropeKey: { label: 'Corda + chave', color: '#ffe083', symbol: 'K' },
-    key: { label: 'Chave coletável', color: '#ffe083', symbol: 'K' }
+    key: { label: 'Chave coletável', color: '#ffe083', symbol: 'K' },
+    // Encontro da gaiola (scripts de sala): não são ativados por interagir.
+    cage: { label: 'Gaiola pendurada', color: '#b49a7a', symbol: 'G', scripted: true },
+    rope: { label: 'Corda da gaiola (estaca)', color: '#d8c39a', symbol: 'C', scripted: true }
 };
