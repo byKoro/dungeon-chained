@@ -59,7 +59,7 @@ export class CombatSystem {
             });
             if (this.audio) {
                 if (e.justStepped) this.audio.play("enemyStep");
-                if (e.justAttacked) {
+                if (e.justAttacked && !e.isGhostfire) {
                     this.audio.play("enemyAttack");
                     this.audio.play("enemyAttackVoice");
                 }
