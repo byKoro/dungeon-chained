@@ -27,32 +27,39 @@ const tickToImpact = (e, players, onHit = () => {}) => {
 };
 
 assert.ok(create() instanceof FlameGolemEnemy);
+// Posições derivadas do config: mudar alcance, raio e empurrão não obriga a editar o teste.
+const ATTACK = FLAME_GOLEM.attacks.attack, AREA = FLAME_GOLEM.attacks.attack2;
+const NEAR = Math.floor(ATTACK.range * 0.5);
+const INSIDE = Math.floor(AREA.radius * 0.6);
 {
-    const e = create(), ps = [player(50), player(-50)];
+    const e = create(), ps = [player(NEAR), player(-NEAR)];
     begin(e, 'attack', ps); launch(e, ps); tickToImpact(e, ps);
     assert.equal(ps.reduce((n, p) => n + (3 - p.lives), 0), 1, 'normal hits one player');
-    assert.equal(Math.max(...ps.map(p => Math.hypot(p.vx, p.vy))), 16);
+    assert.equal(Math.max(...ps.map(p => Math.hypot(p.vx, p.vy))), ATTACK.knockback);
 }
 {
-    const e = create(), ps = [player(100), player(-100)];
+    const e = create(), ps = [player(INSIDE), player(-INSIDE)];
     begin(e, 'attack2', ps); launch(e, ps);
+    // o ataque começa na pose de espera, então só faltam alguns ticks para o impacto
     const impactTick = e.abilities.attack2.hitFrame * e.sprite.rows.attack2.fps;
-    for (let t = 1; t < impactTick; t++) e.update(ps, () => assert.fail('no early area damage'));
+    const remaining = impactTick - e.animTime;
+    assert.ok(remaining > 0);
+    for (let t = 1; t < remaining; t++) e.update(ps, () => assert.fail('no early area damage'));
     assert.equal(ps[0].lives, 3);
     let hits = 0; e.update(ps, () => hits++);
     assert.equal(hits, 2, 'area hits both players on impact');
-    assert.equal(ps[0].vx, 48); assert.equal(ps[1].vx, -48);
+    assert.equal(ps[0].vx, AREA.knockback); assert.equal(ps[1].vx, -AREA.knockback);
     for (let t = 0; t < 15; t++) e.update(ps, () => assert.fail('area cannot repeat damage'));
     assert.equal(ps[0].lives, 2);
 }
 {
-    const e = create(), ps = [player(100), player(500)];
+    const e = create(), ps = [player(INSIDE), player(AREA.radius * 3)];
     begin(e, 'attack2', ps); launch(e, ps);
-    ps[0].x = 250;
+    ps[0].x = AREA.radius + 60;
     tickToImpact(e, ps, () => assert.fail('leaving telegraphed radius avoids area'));
 }
 {
-    const e = create(), ps = [player(100), player(-100)];
+    const e = create(), ps = [player(INSIDE), player(-INSIDE)];
     ps[0].dashing = true; ps[1].invulnerableTimer = 10;
     begin(e, 'attack2', ps); launch(e, ps); tickToImpact(e, ps);
     assert.equal(ps[0].lives, 3); assert.equal(ps[1].lives, 3);
@@ -112,6 +119,37 @@ assert.ok(create() instanceof FlameGolemEnemy);
     e.update(ps, () => {});
     assert.ok(e.x + e.hitRadius < 192, 'fast dash stops before hole, including body radius');
     assert.ok(e.x > 96);
+}
+{
+    const southHole = () => {
+        const floor = Array.from({ length: 8 }, () => Array(10).fill(17));
+        for (let col = 0; col < 10; col++) floor[6][col] = -1;
+        return floor;
+    };
+    const holeTop = 5 * 64;
+    const e = create(); e.x = 320; e.y = 100;
+    e.setNavigationFloor(southHole(), { minX: 0, minY: 0 });
+    const ps = [player(320, holeTop - 20), player(320, holeTop - 20)];
+    for (let t = 0; t < 600; t++) {
+        e.update(ps, () => {});
+        e.ensureOnWalkableTile();
+        assert.ok(e.footY <= holeTop + 1, `feet stay on the floor (tick ${t}, footY ${e.footY})`);
+    }
+    assert.ok(e.y > 100, 'golem still advances toward the player near the hole');
+
+    const pushed = create(); pushed.x = 320; pushed.y = 200;
+    pushed.setNavigationFloor(southHole(), { minX: 0, minY: 0 });
+    pushed.pushVy = 40;
+    for (let t = 0; t < 40; t++) { pushed._applyPush(); pushed.ensureOnWalkableTile(); }
+    assert.ok(pushed.footY <= holeTop + 1, 'knockback cannot carry the feet over the hole');
+    assert.equal(pushed.y, 200, 'the boss takes no knockback');
+    assert.equal(pushed.pushVy, 0);
+
+    const stuck = create(); stuck.x = 320; stuck.y = 300;
+    stuck.setNavigationFloor(southHole(), { minX: 0, minY: 0 });
+    assert.ok(!stuck._standsOnFloor(stuck.x, stuck.y));
+    stuck.ensureOnWalkableTile();
+    assert.ok(stuck._standsOnFloor(stuck.x, stuck.y), 'a golem spawned over the hole is moved to solid floor');
 }
 {
     for (const phase of [1, 2]) {

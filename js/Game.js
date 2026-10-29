@@ -9,6 +9,11 @@ import { InputHandler } from './core/InputHandler.js';
 import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
 import { Chain } from './core/Chain.js';
+import { ChainObstacleSystem } from './systems/ChainObstacleSystem.js';
+import { ArautoEffects } from './systems/ArautoEffects.js';
+import { ArautoPhaseScene } from './systems/ArautoPhaseScene.js';
+import { ArautoAudio } from './systems/ArautoAudio.js';
+import { ARAUTO_FX } from './config/ArautoEffectsConfig.js';
 import { Renderer } from './core/Renderer.js';
 import { Tileset } from './core/Tileset.js';
 import { AssetLoader } from './core/AssetLoader.js';
@@ -128,6 +133,7 @@ export class Game {
             getDoors: () => (this.rooms?.isLocked() ? [] : this.rooms.doorsOfCurrent())
         });
 
+        this.chainObstacles = new ChainObstacleSystem();
         this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], {
             rest: 130,
             stiffness: 0.02,
@@ -142,7 +148,12 @@ export class Game {
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
-        this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, hitFeedback: true });
+        this.arautoEffects = new ArautoEffects({ renderer: this.renderer, particleSystem: this.particleSystem });
+        this.arautoAudio = new ArautoAudio({ audio: this.audio });
+        this.arautoScene = new ArautoPhaseScene({ renderer: this.renderer, hud: this.hud,
+            particleSystem: this.particleSystem, getPlayers: () => [this.p1, this.p2] });
+        this.combat = new CombatSystem({ renderer: this.renderer, particleSystem: this.particleSystem,
+            audio: this.audio, hitFeedback: true, arautoEffects: this.arautoEffects, arautoAudio: this.arautoAudio });
         this.effects = new ParticleEffects({ particleSystem: this.particleSystem, bloodCanvas: this.bloodCanvas, audio: this.audio });
 
         this.effects.stepBlocker = (x, y) => !!this.rooms?.current?.challenge?.coversButton(x, y);
@@ -151,7 +162,9 @@ export class Game {
         this.tiles = new DungeonTileQuery({ rooms: this.rooms });
         this.holes = new HoleEffects({ rooms: this.rooms });
         this.demoProgress = new DemoProgress({ rooms: this.rooms, input: this.input, assets: this.assets, getPlayers: () => [this.p1, this.p2], getSaw: () => this.chain.weapon });
-        this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current, safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]) });
+        this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current,
+            safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]),
+            onHit: (enemy, info) => { if (this.arautoEffects.owns(enemy)) this.arautoEffects.hit(enemy, info); } });
         this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(), mode: this.mapData?.test?.camera });
         this.demoDoors = new DemoDoors({ assets: this.assets, renderer: this.renderer, rooms: this.rooms });
         this.demoVictory = new DemoVictory({ onRestart: () => this.restart() });
@@ -390,6 +403,9 @@ export class Game {
     }
 
     newDungeon() {
+        this.arautoAudio.reset();
+        this.arautoScene.reset();
+        this.arautoEffects.reset();
         this.rooms.reset();
         this.demoProgress.reset(this.mapData?.test?.progress);
         this.demoDoors.opened.clear();
@@ -482,7 +498,7 @@ export class Game {
         ]);
     }
 
-    _dropSawOnFall() {
+    _dropSawSafely() {
         const { p1, p2 } = this;
         const seeds = [p1, p2].filter(p => !p.falling);
         for (const p of [p1, p2]) {
@@ -564,12 +580,15 @@ export class Game {
 
     _updateSawMotor() {
         const w = this.chain?.weapon;
-        if (!this.sawMotor || !w) return;
-        this.sawMotor.update(w.spinSpeed ?? 0, {
+        if (!w) return;
+        const state = {
             connected: this.chain.isConnected,
-            active: !this.gameOver && !this.transition && !this.roomIntro && !this.gameLoop.paused,
+            active: !this.gameOver && !this.transition && !this.roomIntro && !this.arautoScene.active && !this.gameLoop.paused,
             timeScale: this.gameLoop.timeScale
-        });
+        };
+        this.sawMotor?.update(w.spinSpeed ?? 0, state);
+        this.arautoAudio.update(w, this.rooms.current.enemies,
+            { ...state, players: [this.p1, this.p2] });
     }
 
     triggerHitSlowmo() {
@@ -620,6 +639,12 @@ export class Game {
         } else if (this.roomIntro) {
             this._updateRoomIntro(deltaSeconds);
         } else {
+            if (this.arautoScene.tryStart(this.rooms.current.enemies)) {
+                this.arautoScene.update(deltaSeconds);
+                this.arautoEffects.update(this.rooms.current.enemies);
+                this.particleSystem.update([], this.arenaBounds);
+                return;
+            }
             this._updateGameplay(deltaSeconds);
         }
     }
@@ -821,13 +846,16 @@ export class Game {
 
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
+        this.arautoEffects.update(enemies);
 
         const liveEnemies = enemies.filter(e => e.state !== "dying");
-        const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies.filter(e => !e.airborne));
+        const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies.filter(e => !e.ignoresEntityCollisions));
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
+        this.chainObstacles.beginStep(this.chain);
         for (let it = 0; it < 3; it++) {
             Physics.resolveEntityCollisions(allEntities);
+            this.chainObstacles.resolve(this.chain, p1, p2, liveEnemies);
             if (sawR > 0) {
 
                 const sc = weapon.getSawPositions(p1, p2)[0];
@@ -851,13 +879,21 @@ export class Game {
         rooms.clampPlayer(p1, this.arenaBounds, doors, canPass);
         rooms.clampPlayer(p2, this.arenaBounds, doors, canPass);
 
+        const tetherClear = this.chainObstacles.resolve(this.chain, p1, p2, liveEnemies, () => {
+            for (const player of [p1, p2]) {
+                if (room.wallBoxes?.length) Physics.resolveBoxCollisions(player, room.wallBoxes);
+                rooms.clampPlayer(player, this.arenaBounds, doors, canPass);
+            }
+        });
+        if (!tetherClear) this._dropSawSafely();
+
         this.tiles.checkHoleFalls([p1, p2]);
 
         for (const p of [p1, p2]) {
             if (p.falling && !p._fallSeen) {
                 this.audio.play("playerFall");
                 this.audio.duck(-8, { attackMs: 30, holdMs: 500, releaseMs: 1200 });
-                this._dropSawOnFall();
+                this._dropSawSafely();
             }
             p._fallSeen = p.falling;
             this._dashLandFeedback(p);
@@ -869,10 +905,12 @@ export class Game {
             () => this.triggerHitSlowmo(),
             (enemy, info) => {
                 enemy.freezeOnHit?.(info.hitStop);
-                this.sawMotor?.onHit();
+                if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
             }
         );
-        this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger(), [p1, p2]);
+        this.combat.resolveDeaths(room, this.gibs, enemy => {
+            if (!this.arautoEffects.owns(enemy)) this.screenGore.trigger();
+        }, [p1, p2]);
 
         this._updateHearts(room);
 
@@ -890,6 +928,7 @@ export class Game {
                 this.screenGore.triggerFlash();
 
                 if (!p.falling) {
+                    this.renderer.triggerShake(ARAUTO_FX.playerShake);
 
                     this.audio.play("playerHit", { rateMultiplier: p.lives <= 1 ? 0.88 : 1 });
                     this.audio.duck(-6, { attackMs: 10, holdMs: 150, releaseMs: 700 });
@@ -999,10 +1038,10 @@ export class Game {
     }
 
     _render() {
-        if (this.mapData && this.demoCamera.mode === 'split') this.demoCamera.renderSplit(() => this._renderView());
+        if (this.mapData && this.demoCamera.mode === 'split' && !this.arautoScene.active) this.demoCamera.renderSplit(() => this._renderView());
         else this._renderView();
         this._renderOverlays();
-        if (this.mapData) {
+        if (this.mapData && !this.arautoScene.active) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
             const message = this.demoProgress.messageTime ? this.demoProgress.message : this.demoProgress.prompt;
@@ -1061,7 +1100,11 @@ export class Game {
         if (!this.p2.falling) renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
         const enemies = rooms.current.enemies;
 
-        enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, e.shadowRadius ?? 13, 0); });
+        enemies.forEach(e => {
+            if (e.isHidden) return;
+            if (e.drawShadow) e.drawShadow(ctx);
+            else renderer.drawRoundShadow(e.x, e.y, 13, 0);
+        });
 
         this.chain.drawChain(ctx, this.p1, this.p2);
 
@@ -1073,7 +1116,12 @@ export class Game {
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const drawables = [...entities, ...(rooms.current.corpses ?? []), ...occluders].sort((a, b) => a.y - b.y);
 
-        const drawEntity = e => (e.falling ? this.holes.drawFalling(ctx, e) : e.draw(ctx));
+        const drawEntity = e => {
+            if (e.falling) { this.holes.drawFalling(ctx, e); return; }
+            this.arautoEffects.drawTrail(ctx, e);
+            e.draw(ctx);
+            this.arautoEffects.drawLava(ctx, e);
+        };
         drawables.filter(e => e.y <= sawY).forEach(drawEntity);
 
         this.chain.draw(ctx, this.p1, this.p2);
@@ -1117,7 +1165,9 @@ export class Game {
             open,
             doorFlashT: this._doorFlashT,
             buttons: this.rooms.current?.challenge?.buttons ?? [],
-            hearts: this.rooms.current?.hearts ?? []
+            hearts: this.rooms.current?.hearts ?? [],
+            enemies: this.rooms.current?.enemies ?? [],
+            corpses: this.rooms.current?.corpses ?? []
         });
 
         const strain = (this.chain.isConnected && this.chain.weapon)
@@ -1150,6 +1200,7 @@ export class Game {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
+        this.arautoScene.draw(ctx, canvas.width, canvas.height);
         this.hud.draw(ctx, canvas.width, canvas.height);
 
         const now = performance.now();

@@ -50,6 +50,7 @@ class Portrait {
     }
 
     reset() {
+        this.cinematicExpression = null;
         this.t = 0;
         this.base = 'neutro';
         this.seq = [];
@@ -229,6 +230,7 @@ class Portrait {
     }
 
     _exprName() {
+        if (this.cinematicExpression) return this.cinematicExpression;
         const step = this.seq[0];
         let name = this.base;
 
@@ -617,6 +619,10 @@ export class VtuberHud {
 
     onRoomEnter(combat) {
         this.entries.forEach((e, i) => e.portrait.roomEnter(combat, i * 0.09));
+    }
+
+    onBossTransformation(expression) {
+        this.entries.forEach(e => { e.portrait.cinematicExpression = expression; });
     }
 
     setPaused(paused) {

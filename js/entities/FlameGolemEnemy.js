@@ -1,18 +1,24 @@
 import { MeleeEnemy } from './MeleeEnemy.js';
 import { Physics } from '../core/Physics.js';
 import { FLAME_GOLEM } from '../config/FlameGolemConfig.js';
+import { SIM_HZ } from '../config/GameConfig.js';
+import { ARAUTO_FX } from '../config/ArautoEffectsConfig.js';
 
 export class FlameGolemEnemy extends MeleeEnemy {
     constructor(x, y, sheet, sprite, floor = 1) {
         super(x, y, sheet, sprite, floor);
         this.abilities = FLAME_GOLEM.attacks;
+        this.effectMaterial = sprite.combat?.effectMaterial;
         this._baseRows = sprite.rows;
         this.sprite = { ...sprite, rows: { ...sprite.rows } };
         this.phase = 1;
         this.phaseConfig = FLAME_GOLEM.phases[0];
         this._applyPhaseStats();
         this.hitRadius = FLAME_GOLEM.hitRadius;
-        this.shadowRadius = FLAME_GOLEM.shadowRadius;
+        this.outline = FLAME_GOLEM.outline;
+        this._emberAcc = 0;
+        this._lightT = 0;
+        this._slamGlow = 0;
         this.players = [];
         this.marks = [];
         this.chargeIndex = 0;
@@ -22,8 +28,12 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.slamMode = false;
         this.slam = null;
         this.airborne = false;
+        this.charging = false;
         this.jumpHeight = 0;
         this.justSlammed = false;
+        this.justGroundHit = false;
+        this.phaseTransitionControlled = false;
+        this.lavaReveal = 0;
         this._slamCursor = 0;
         this.bossName = sprite.combat?.bossBar?.name ?? FLAME_GOLEM.name;
         this.hasBossBar = !!sprite.combat?.bossBar;
@@ -36,19 +46,73 @@ export class FlameGolemEnemy extends MeleeEnemy {
         };
     }
 
+    get ignoresEntityCollisions() {
+        return this.airborne;
+    }
+
+    get immovable() {
+        return FLAME_GOLEM.immovable;
+    }
+
+    get collisionBodies() {
+        const cfg = FLAME_GOLEM.bodyCollision;
+        const anim = this._currentAnim();
+        const frame = this._currentFrameIndex(anim);
+        const attacking = this.state === 'windup' || this.state === 'attack';
+        const lift = attacking ? Math.min(1, frame / Math.max(1, this._tellFrame())) : 0;
+        const armY = cfg.armY - lift * cfg.armLift;
+        const armX = cfg.armX + lift * cfg.armSpread;
+        return [
+            { x: 0, y: cfg.torsoY, radiusX: cfg.torsoX, radiusY: cfg.torsoRadiusY },
+            ...[-1, 1].map(side => ({ x: side * armX, y: armY, radiusX: cfg.armRadius, radiusY: cfg.armRadius }))
+        ];
+    }
+
     update(players, onPlayerHit) {
         this.justSlammed = false;
-        if (!this.frozen && this.hitFreezeTimer <= 0) this._updatePhase();
+        this.justGroundHit = false;
+        this.charging = false;
+        if (!this.phaseTransitionControlled && !this.frozen && this.hitFreezeTimer <= 0) this._updatePhase();
         this.players = players.filter(p => p.lives > 0 && !p.falling);
         const next = this.abilities[this.attackKeys[this.attackIndex % this.attackKeys.length]];
         this.attackRange = this.players.length ? next.triggerRange : -1;
         const targets = this.players.length ? [this.players[0], this.players[1] || this.players[0]]
             : [{ x: this.x, y: this.y }, { x: this.x, y: this.y }];
+        const fromX = this.x, fromY = this.y;
         super.update(targets, onPlayerHit);
+        this._keepFeetOnFloor(fromX, fromY);
         if (this.state !== 'windup' && this.state !== 'attack') {
             this.marks = [];
             this._endSlam();
         }
+        this._lightT++;
+        this._slamGlow = this.justSlammed ? 1 : this._slamGlow * 0.92;
+    }
+
+    // ---- aviso do ataque: a própria animação, parada na pose de espera ----
+
+    // Quadro logo antes do impacto (ou do lançamento da investida): a pose que "mostra o que vai fazer".
+    _tellFrame(key = this.currentAttack) {
+        const cfg = this.abilities[key];
+        if (!cfg) return 0;
+        if (key === 'attack2') return cfg.raisedFrame;
+        return Math.max(0, (key === 'attack3' ? cfg.launchFrame : cfg.hitFrame) - 1);
+    }
+
+    _currentAnim() {
+        if (this.state === 'windup' && this.sprite.rows[this.currentAttack]) return this.sprite.rows[this.currentAttack];
+        return super._currentAnim();
+    }
+
+    // No windup a animação do ataque avança até a pose de espera e fica parada nela até o golpe.
+    _currentFrameIndex(anim) {
+        // O epsilon evita que fps fracionários (fase 2) derrubem a pose de espera para o quadro anterior.
+        if (this.state === 'attack') return Math.min(Math.floor(this.animTime / anim.fps + 1e-6), anim.frames - 1);
+        if (this.state !== 'windup') return super._currentFrameIndex(anim);
+        const tell = this._tellFrame();
+        if (this.currentAttack === 'attack2') return Math.min(tell, Math.floor(this.animTime / anim.fps));
+        const ramp = Math.max(1, this.windupFrames * FLAME_GOLEM.telegraph.rampRatio);
+        return Math.min(tell, Math.floor(this.animTime / (ramp / (tell + 1))));
     }
 
     _beginWindup() {
@@ -73,6 +137,9 @@ export class FlameGolemEnemy extends MeleeEnemy {
             this._aimCharge();
         }
         super._beginWindup();
+        if (this.currentAttack === 'attack2') {
+            this.stateTimer += this._tellFrame() * this.sprite.rows.attack2.fps;
+        }
         this.vx = this.vy = 0;
     }
 
@@ -109,7 +176,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
         if (this.slamMode) {
             this.state = 'attack';
             this.justAttacked = true;
-            this.animTime = 0;
+            this.animTime = this._tellFrame() * this.sprite.rows.attack2.fps;
             this.dealtHit = false;
             // A sequência de saltos encerra sozinha (stateTimer = 0); sem alvo válido encerra já.
             this.stateTimer = this.slam?.mark ? Number.MAX_SAFE_INTEGER : 0;
@@ -118,13 +185,15 @@ export class FlameGolemEnemy extends MeleeEnemy {
         }
         const anim = this.sprite.rows[this.currentAttack];
         const cfg = this.abilities[this.currentAttack];
+        // A animação continua da pose de espera (sem voltar ao quadro 0); o tempo restante desconta o que já passou.
+        const tellTicks = this._tellFrame() * anim.fps;
         this.state = 'attack';
         this.justAttacked = true;
-        this.animTime = 0;
+        this.animTime = tellTicks;
         this.dealtHit = false;
-        this.stateTimer = this.currentAttack === 'attack3'
+        this.stateTimer = (this.currentAttack === 'attack3'
             ? Math.max(anim.frames * anim.fps, cfg.launchFrame * anim.fps + this._chargeDuration())
-            : anim.frames * anim.fps;
+            : anim.frames * anim.fps) - tellTicks;
     }
 
     _updateAttack(players, onPlayerHit) {
@@ -140,6 +209,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
         }
         if (this.dealtHit || this.animTime < cfg.hitFrame * this.sprite.rows[this.currentAttack].fps) return;
         this.dealtHit = true;
+        this.justGroundHit = true;
         const targets = this.currentAttack === 'attack2' ? this.players : [this.target];
         const range = cfg.radius ?? cfg.range;
         for (const player of targets) {
@@ -210,13 +280,15 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.pushVx = this.pushVy = 0;
         s.t++;
         if (s.phase === 'air') {
-            const impactTicks = this.abilities.attack2.hitFrame * this.sprite.rows.attack2.fps;
+            const fps = this.sprite.rows.attack2.fps;
+            const impactTicks = this.abilities.attack2.hitFrame * fps;
+            const tellTicks = this._tellFrame('attack2') * fps;
             const p = Math.min(1, s.t / (cfg.airTicks / speed));
             const eased = p * p * (3 - 2 * p);
             this.x = s.from.x + (s.mark.x - s.from.x) * eased;
             this.y = s.from.y + (s.mark.y - s.from.y) * eased;
             this.jumpHeight = Math.sin(Math.PI * p) * cfg.jumpHeight;
-            this.animTime = p * Math.max(0, impactTicks - 1);
+            this.animTime = tellTicks + p * Math.max(0, impactTicks - 1 - tellTicks);
             if (p >= 1) this._landSlam(onPlayerHit, impactTicks);
         } else if (s.phase === 'recover') {
             if (s.t < cfg.betweenTicks / speed) return;
@@ -224,12 +296,14 @@ export class FlameGolemEnemy extends MeleeEnemy {
             s.index++;
             s.t = 0;
             s.phase = 'prep';
+            this.animTime = 0;
             s.mark = this._pickSlamMark(s.index);
             if (!s.mark) { this._endSlam(); this.stateTimer = 0; }
         } else if (s.phase === 'prep') {
-            this.animTime = 0;
+            const raiseTicks = this._tellFrame('attack2') * this.sprite.rows.attack2.fps;
+            this.animTime = Math.min(s.t, raiseTicks);
             this.facingLeft = s.mark.x < this.x;
-            if (s.t >= cfg.prepTicks / speed) this._launchSlam();
+            if (s.t >= raiseTicks + cfg.prepTicks / speed) this._launchSlam();
         }
     }
 
@@ -256,9 +330,55 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.jumpHeight = 0;
     }
 
+    // Sem knockback: nem o golpe da serra nem os impulsos da física (Physics._addImpulse) deslocam o chefe.
+    _applyPush() {
+        this.pushVx = this.pushVy = 0;
+    }
+
+    // O centro fica ~70 px acima dos pés: testar só o centro deixava o corpo pendurado sobre buraco ao sul ou fora da sala.
+    _standsOnFloor(x, y) {
+        const r = this.hitRadius, foot = this.footY - this.y;
+        return this._isWalkable(x, y) && [-r, 0, r].every(dx => this._isWalkable(x + dx, y + foot));
+    }
+
+    // Andar/empurrão que levaria os pés para fora do piso é cortado por eixo (desliza pela borda).
+    _keepFeetOnFloor(fromX, fromY) {
+        if (this.airborne || !this.navigationFloor || (this.x === fromX && this.y === fromY)) return;
+        if (this._standsOnFloor(this.x, this.y)) return;
+        const toX = this.x, toY = this.y;
+        if (this._standsOnFloor(toX, fromY)) { this.y = fromY; this.vy = 0; this.pushVy = 0; return; }
+        if (this._standsOnFloor(fromX, toY)) { this.x = fromX; this.vx = 0; this.pushVx = 0; return; }
+        this.x = fromX; this.y = fromY;
+        this.vx = this.vy = this.pushVx = this.pushVy = 0;
+    }
+
+    // Piso mais próximo onde o corpo cabe (busca em anéis), para nunca ficar preso fora do mapa.
+    _nearestStandingSpot() {
+        const step = 16, max = 12 * step;
+        for (let radius = step; radius <= max; radius += step) {
+            let best = null, bestDistance = Infinity;
+            for (let i = 0; i < 16; i++) {
+                const angle = i * Math.PI / 8;
+                const x = this.x + Math.cos(angle) * radius, y = this.y + Math.sin(angle) * radius;
+                if (!this._insideArena(x, y) || !this._standsOnFloor(x, y)) continue;
+                const distance = Math.hypot(x - this.x, y - this.y);
+                if (distance < bestDistance) { best = { x, y }; bestDistance = distance; }
+            }
+            if (best) return best;
+        }
+        return null;
+    }
+
     ensureOnWalkableTile() {
         if (this.airborne) return;
-        super.ensureOnWalkableTile();
+        if (!this.navigationFloor || this._standsOnFloor(this.x, this.y)) { super.ensureOnWalkableTile(); return; }
+        const spot = this._standsOnFloor(this.lastSafePosition.x, this.lastSafePosition.y)
+            ? this.lastSafePosition : this._nearestStandingSpot();
+        if (!spot) return;
+        this.x = spot.x;
+        this.y = spot.y;
+        this.lastSafePosition = { x: spot.x, y: spot.y };
+        this.vx = this.vy = this.pushVx = this.pushVy = 0;
     }
 
     // ---- investida ----
@@ -278,6 +398,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
         }
         const dir = this.chargeDirection;
         this.facingLeft = dir.x < 0;
+        this.charging = true;
         const speed = cfg.speed * this.phaseConfig.dashSpeedMultiplier;
         const steps = Math.max(1, Math.ceil(speed / Math.max(1, cfg.collisionProbePx)));
         let dx = 0, dy = 0;
@@ -301,7 +422,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
     _chargeFits(x, y) {
         const r = this.hitRadius;
         return [[0, 0], [-r, 0], [r, 0], [0, -r], [0, r]]
-            .every(([dx, dy]) => this._isWalkable(x + dx, y + dy));
+            .every(([dx, dy]) => this._isWalkable(x + dx, y + dy)) && this._standsOnFloor(x, y);
     }
 
     _chargeDuration() {
@@ -333,8 +454,62 @@ export class FlameGolemEnemy extends MeleeEnemy {
         ctx.restore();
     }
 
+    // Sombra oval nos pés, proporcional ao corpo. Fica no chão durante o salto, menor e mais fraca.
+    drawShadow(ctx) {
+        if (this.isHidden) return;
+        const cfg = FLAME_GOLEM.shadow, s = this.sprite;
+        const bodyW = s.body.w * (s.drawHeight / s.cropH);
+        const lift = this.jumpHeight > 0 ? Math.min(1, this.jumpHeight / FLAME_GOLEM.slam.jumpHeight) : 0;
+        const rx = bodyW * cfg.widthRatio * (1 - cfg.jumpShrink * lift);
+        const ry = rx * cfg.heightRatio;
+        const alpha = cfg.alpha * (1 - 0.5 * lift);
+        ctx.save();
+        ctx.translate(this.x, this.footY + cfg.yOffset);
+        ctx.scale(1, ry / rx);
+        const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, rx);
+        grad.addColorStop(0, `rgba(0, 0, 0, ${alpha})`);
+        grad.addColorStop(0.6, `rgba(0, 0, 0, ${alpha * 0.55})`);
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, rx, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Luz quente de brasa: mais forte no aviso do ataque e no impacto do slam; desbota na morte e sobra um brilho fraco nos escombros.
+    lightInfo() {
+        if (this.isHidden) return null;
+        const cfg = FLAME_GOLEM.light;
+        let strength = 0.8 + Math.sin(this._lightT * 0.05) * cfg.pulse;
+        strength += ARAUTO_FX.phaseLightBoost * (this.phase === 2 ? 1 : this.lavaReveal);
+        if (this.state === 'windup') strength += cfg.windupBoost;
+        strength += cfg.slamBoost * this._slamGlow;
+        if (this.state === 'dead') strength = cfg.corpseStrength;
+        else if (this.isDying) {
+            const k = this.dyingDuration > 0 ? Math.max(0, this.dyingTimer / this.dyingDuration) : 0;
+            strength = cfg.corpseStrength + (strength - cfg.corpseStrength) * k;
+        }
+        return { x: this.x, y: this.y - this.jumpHeight, radius: cfg.radius, strength };
+    }
+
+    // Brasas subindo dos ombros e da cabeça; mais densas no aviso do ataque. Só roda com o jogo em andamento.
+    emitEmbers(particleSystem) {
+        if (this.isHidden || this.frozen || this.isDying || this.state === 'dead') return;
+        const cfg = FLAME_GOLEM.embers;
+        const rate = cfg.perSecond * (this.state === 'windup' ? cfg.windupMultiplier : 1);
+        this._emberAcc += rate / SIM_HZ;
+        while (this._emberAcc >= 1) {
+            this._emberAcc -= 1;
+            const x = this.x + (Math.random() - 0.5) * this.drawHeight * 0.9;
+            const y = this.y - this.drawHeight * 0.35 - this.jumpHeight;
+            particleSystem?.triggerFlameBurst?.(x, y, cfg.color, { amount: cfg.amount, rise: cfg.rise, width: cfg.width });
+        }
+    }
+
     drawAttackEffect(ctx) {
         if (this.isHidden || !['windup', 'attack'].includes(this.state)) return;
+        if (!FLAME_GOLEM.telegraph.showMarks) return;
         const cfg = FLAME_GOLEM.telegraph;
         ctx.save();
         ctx.strokeStyle = cfg.color;

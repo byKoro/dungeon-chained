@@ -46,6 +46,12 @@ export class Physics {
                 const a = entities[i];
                 const b = entities[j];
 
+                if (a.immovable || b.immovable) {
+                    if (a.immovable && b.immovable) continue;
+                    Physics._resolveImmovableCollision(a.immovable ? b : a, a.immovable ? a : b, radiusXMul, radiusYMul);
+                    continue;
+                }
+
                 const rx = (a.hitRadius + b.hitRadius) * radiusXMul;
                 const ry = (a.hitRadius + b.hitRadius) * radiusYMul;
 
@@ -84,6 +90,7 @@ export class Physics {
     }
 
     static resolveCircleCollision(entity, cx, cy, radius, impulse = 0.35) {
+        if (entity.immovable) return;
         const r = radius + (entity.hitRadius ?? 0);
         let dx = entity.x - cx;
         let dy = entity.y - cy;
@@ -109,6 +116,32 @@ export class Physics {
         } else {
             e.vx += ix;
             e.vy += iy;
+        }
+    }
+
+    static _resolveImmovableCollision(entity, obstacle, radiusXMul, radiusYMul) {
+        const bodies = obstacle.collisionBodies ?? [{ x: 0, y: 0,
+            radiusX: obstacle.hitRadius * radiusXMul, radiusY: obstacle.hitRadius * radiusYMul }];
+        for (const body of bodies) {
+            const cx = obstacle.x + body.x, cy = obstacle.y + body.y;
+            const rx = body.radiusX + entity.hitRadius * radiusXMul;
+            const ry = body.radiusY + entity.hitRadius * radiusYMul;
+            let dx = entity.x - cx, dy = entity.y - cy;
+            let distance = Math.hypot(dx / rx, dy / ry);
+            if (distance >= 1) continue;
+            if (distance === 0) { dx = rx; dy = 0; distance = 1; }
+            entity.x = cx + dx / distance;
+            entity.y = cy + dy / distance;
+            const nx = dx / (rx * rx), ny = dy / (ry * ry);
+            const length = Math.hypot(nx, ny);
+            for (const [vx, vy] of [['vx', 'vy'], ['pushVx', 'pushVy']]) {
+                if (entity[vx] === undefined) continue;
+                const inward = (entity[vx] * nx + entity[vy] * ny) / length;
+                if (inward < 0) {
+                    entity[vx] -= inward * nx / length;
+                    entity[vy] -= inward * ny / length;
+                }
+            }
         }
     }
 

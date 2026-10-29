@@ -1,6 +1,7 @@
 import { Physics } from '../core/Physics.js';
 import { PLAYER_SAFE_ZONE, MAX_ACTIVE_GIBS, HEART_DROP } from '../config/GameConfig.js';
 import { ENEMY_HIT, HIT_FEEL, DAMAGE_NUMBER } from '../config/CombatFeelConfig.js';
+import { ARAUTO_FX } from '../config/ArautoEffectsConfig.js';
 
 const HIT_COMBO_WINDOW_MS = 900;
 const HIT_COMBO_PITCH_STEP = 0.035;
@@ -9,7 +10,9 @@ const HIT_COMBO_MAX_STEPS = 5;
 export class CombatSystem {
     // `hitFeedback` liga o feedback novo de acerto (impacto, números, stagger). Desligado, o comportamento
     // é o antigo: os trailers usam o CombatSystem sem ele.
-    constructor({ renderer, particleSystem, audio = null, hitFeedback = false }) {
+    constructor({ renderer, particleSystem, audio = null, hitFeedback = false, arautoEffects = null, arautoAudio = null }) {
+        this.arautoAudio = arautoAudio;
+        this.arautoEffects = arautoEffects;
         this.renderer = renderer;
         this.particleSystem = particleSystem;
         this.audio = audio;
@@ -51,20 +54,29 @@ export class CombatSystem {
     updateEnemies(enemies, players) {
         for (const e of enemies) {
             e.update(players, (hitPlayer) => {
-                this.renderer.triggerShake(14);
+                this.renderer.triggerShake(e.effectMaterial === 'lavaStone' ? ARAUTO_FX.playerShake : 14);
                 if (hitPlayer) {
-                    if (this.audio) this.audio.play("playerHurt");
+                    if (e.effectMaterial !== 'lavaStone') this.audio?.play('playerHurt');
                     this.particleSystem.triggerBlood(hitPlayer.x, hitPlayer.y, 16, 1.1);
                 }
             });
             if (this.audio) {
                 if (e.justStepped) this.audio.play("enemyStep");
-                if (e.justAttacked) {
+                if (e.justAttacked && e.effectMaterial !== 'lavaStone') {
                     this.audio.play("enemyAttack");
                     this.audio.play("enemyAttackVoice");
                 }
             }
-            if (e.justSlammed) this._slamFeedback(e);
+            if (e.justSlammed) {
+                if (e.effectMaterial === 'lavaStone') {
+                    this.arautoEffects?.groundHit(e, true);
+                    this.arautoAudio?.groundHit(true);
+                } else this._slamFeedback(e);
+            } else if (e.justGroundHit) {
+                this.arautoEffects?.groundHit(e);
+                this.arautoAudio?.groundHit();
+            }
+            e.emitEmbers?.(this.particleSystem);
         }
     }
 
@@ -99,24 +111,31 @@ export class CombatSystem {
             const dP2 = Math.hypot(enemy.x - p2.x, enemy.y - p2.y);
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
 
-            const hitChain = !nearPlayer && d < weapon.hitThreshold + enemy.hitRadius;
-            const hitDisc = discR > 0 &&
+            const contact = weapon.obstacleContacts?.get(enemy);
+            const solidContact = enemy.immovable && !enemy.ignoresEntityCollisions && weapon.obstacleContacts;
+            const hitChain = solidContact ? contact?.kind === 'chain'
+                : !nearPlayer && d < weapon.hitThreshold + enemy.hitRadius;
+            const hitDisc = solidContact ? contact?.kind === 'disc' : discR > 0 &&
                 Math.hypot(enemy.x - sawPos.x, enemy.y - sawPos.y) < discR + enemy.hitRadius;
 
             if (hitChain || hitDisc) {
                 if (!this.hitFeedback) {
                     if (enemy.takeHit) { if (!enemy.takeHit()) continue; }
                     else enemy.startDying();
-                    weapon.onHit?.();
-                    hits++;
+                    weapon.onHit?.({ blood: enemy.effectMaterial !== 'lavaStone' });
+                    if (enemy.effectMaterial !== 'lavaStone') hits++;
                     if (this.audio) this.audio.play("monsterHurt");
                     this.renderer.triggerShake(10);
-                    this.particleSystem.triggerBlood(enemy.x, enemy.y, 10, 0.9);
+                    if (enemy.effectMaterial === 'lavaStone') this._materialHit(enemy,
+                        { x: enemy.x, y: enemy.y, dirX: 0, dirY: -1 });
+                    else this.particleSystem.triggerBlood(enemy.x, enemy.y, 10, 0.9);
                     onKill?.(enemy);
                     continue;
                 }
 
-                const impact = hitDisc
+                const impact = contact
+                    ? this._impact(enemy, { x: contact.x, y: contact.y, kind: contact.kind })
+                    : hitDisc
                     ? this._impact(enemy, { x: sawPos.x, y: sawPos.y, radius: discR, kind: "disc" })
                     : this._impact(enemy, {
                         ...Physics.closestPointOnSegment(enemy.x, enemy.y, p1.x, p1.y, p2.x, p2.y),
@@ -131,8 +150,8 @@ export class CombatSystem {
                 } else enemy.startDying();
 
                 const info = this._hitInfo(enemy, result, impact);
-                weapon.onHit?.();
-                hits++;
+                weapon.onHit?.({ blood: enemy.effectMaterial !== 'lavaStone' });
+                if (enemy.effectMaterial !== 'lavaStone') hits++;
                 heavy = heavy || info.poiseBroken;
                 this._hitFeedback(enemy, info);
                 onHit?.(enemy, info);
@@ -174,7 +193,9 @@ export class CombatSystem {
 
         ps.triggerHitSparks?.(info.x, info.y, info.dirX, info.dirY, fx.sparks[tier], fx.sparks.power, fx.sparks.cone);
         ps.triggerFlash?.(info.x, info.y, fx.glint.amount, fx.glint.power);
-        if (info.killed) {
+        if (enemy.effectMaterial === 'lavaStone') {
+            this._materialHit(enemy, info);
+        } else if (info.killed) {
             ps.triggerBlood(enemy.x, enemy.y, 10, 0.9);
         } else {
             ps.triggerHitBlood?.(info.x, info.y, info.dirX, info.dirY, fx.blood[tier], fx.blood.spread);
@@ -185,6 +206,12 @@ export class CombatSystem {
         ps.triggerDamageNumber?.(enemy.x, top, info.damage, {
             color: info.killed ? DAMAGE_NUMBER.killColor : info.poiseBroken ? DAMAGE_NUMBER.breakColor : DAMAGE_NUMBER.color
         });
+    }
+
+    _materialHit(enemy, info) {
+        if (this.arautoEffects) this.arautoEffects.hit(enemy, info);
+        else this.particleSystem.triggerLavaDebris?.(info.x, info.y, ARAUTO_FX.contactPieces,
+            { dirX: -info.dirX, dirY: -info.dirY, groundY: enemy.footY });
     }
 
     resolveDeaths(room, gibs, onKill = null, players = []) {

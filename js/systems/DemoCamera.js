@@ -7,7 +7,7 @@ export class DemoCamera {
     }
 
     referenceZoom() {
-        return Math.min(this.canvas.width / (ROOM_COLS * TILE + CAM_MARGIN * 2), this.canvas.height / (ROOM_ROWS * TILE + CAM_MARGIN * 2));
+        return Math.min(this.canvas.width / (ROOM_COLS * TILE + CAM_MARGIN * 2), this.canvas.height / (ROOM_ROWS * TILE + CAM_MARGIN * 1));
     }
 
     update() {

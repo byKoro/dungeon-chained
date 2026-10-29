@@ -2,15 +2,21 @@ export const FLAME_GOLEM = {
     name: 'Arauto das Brasas',
     hp: 100,
     speed: 0.8,
-    // Dobro da escala anterior (123). Colisão e alcances continuam separados abaixo.
-    drawHeight: 246,
-    hitRadius: 24,
-    shadowRadius: 26,
+    // 5x a arte (39 px): escala inteira mantém os pixels nítidos (156 = 4x, igual ao cenário).
+    // Colisão e alcances continuam separados abaixo.
+    drawHeight: 195,
+    hitRadius: 36,
+    // O contato desloca apenas o outro corpo; o chefe mantém seu movimento.
+    immovable: true,
+    bodyCollision: {
+        torsoX: 48, torsoRadiusY: 30, torsoY: 32,
+        armX: 48, armY: 24, armRadius: 16, armLift: 12, armSpread: 8
+    },
     walkTicksPerFrame: 6,
     // Morte lenta, independente da aceleração da fase 2 (ticks por quadro da última linha da PNG).
     deathTicksPerFrame: 12,
     // Valor provisório de balanceamento: ticks de invulnerabilidade entre dois acertos da serra.
-    hitCooldownSteps: 10,
+    hitCooldownSteps: 5,
     secondPhaseHp: 50,
     phases: [
         { movementSpeedMultiplier: 1, animationSpeedMultiplier: 1, dashSpeedMultiplier: 1, dashCount: 1 },
@@ -18,15 +24,16 @@ export const FLAME_GOLEM = {
     ],
     attacks: {
         attack: {
-            triggerRange: 64, range: 72, knockback: 16,
+            triggerRange: 110, range: 120, knockback: 16,
             windupTicks: 40, recoverTicks: 36, ticksPerFrame: 5, hitFrame: 6
         },
         attack2: {
-            triggerRange: 160, radius: 150, knockback: 48,
-            windupTicks: 50, recoverTicks: 55, ticksPerFrame: 6, hitFrame: 6
+            raisedFrame: 4,
+            triggerRange: 160, radius: 100, knockback: 48,
+            windupTicks: 35, recoverTicks: 55, ticksPerFrame: 6, hitFrame: 6
         },
         attack3: {
-            triggerRange: 480, speed: 12, durationTicks: 18, hitRadius: 30,
+            triggerRange: 480, speed: 12, durationTicks: 18, hitRadius: 60,
             // 0 fixa a direcao marcada; 1 aponta para o alvo a cada tick.
             knockback: 52, trackingStrength: 0.025,
             windupTicks: 40, recoverTicks: 60, ticksPerFrame: 5, launchFrame: 5,
@@ -40,19 +47,31 @@ export const FLAME_GOLEM = {
         prepTicks: 24,
         airTicks: 30,
         jumpHeight: 110,
-        radius: 130,
+        radius: 100,
         knockback: 56,
         // Pausa depois de cada impacto antes do próximo salto.
-        betweenTicks: 16,
+        betweenTicks: 20,
         // Recuperação depois do último impacto, antes da próxima habilidade.
-        finalRecoverTicks: 110,
+        finalRecoverTicks: 100,
         // Alcance máximo da busca por piso seguro ao redor do ponto desejado (px).
         landingSearchPx: 192
     },
     telegraph: {
+        // Marcas no chão só para teste: o aviso final é a própria animação do ataque (pose de espera).
+        showMarks: true,
+        // Fração do windup em que a animação avança até a pose de espera; depois ela fica parada nessa pose.
+        rampRatio: 0.6,
         color: '#ffad57', secondaryColor: '#80534c', lineWidth: 3,
         markerRadius: 20, crossSize: 8, dashLine: [10, 8]
-    }
+    },
+    // Sombra oval nos pés (proporções da largura do corpo em px de mundo).
+    shadow: { widthRatio: 0.62, heightRatio: 0.34, yOffset: -6, alpha: 0.6, jumpShrink: 0.35 },
+    // Contorno escuro de 1 pixel de arte em volta da silhueta.
+    outline: { color: '#140a12', artPx: 0 },
+    // Luz quente de brasa em volta do golem (raio em px de mundo).
+    light: { radius: 190, windupBoost: 0.35, slamBoost: 0.6, pulse: 0.08, corpseStrength: 0.25 },
+    // Brasas subindo dos ombros e da cabeça.
+    embers: { perSecond: 7, windupMultiplier: 2.5, rise: 70, width: 70, amount: 2, color: [255, 150, 70] }
 };
 
 export const FLAME_GOLEM_SPRITE = {
@@ -60,6 +79,7 @@ export const FLAME_GOLEM_SPRITE = {
     cellSize: 100, cropX: 30, cropY: 20, cropW: 59, cropH: 39,
     body: { x: 36, y: 29, w: 32, h: 28 }, drawHeight: FLAME_GOLEM.drawHeight,
     combat: {
+        effectMaterial: 'lavaStone',
         hp: FLAME_GOLEM.hp, speed: FLAME_GOLEM.speed, playDeathAnimation: true,
         // Recebe dano sem stagger, empurrão ou hit stop local; morre só com a animação e deixa escombros.
         superArmor: true, hitCooldownSteps: FLAME_GOLEM.hitCooldownSteps, leavesCorpse: true,

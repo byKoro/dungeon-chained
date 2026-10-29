@@ -20,7 +20,7 @@ export const MAX_FOOTPRINTS = 60;
 
 export const MAX_PLAYER_SEPARATION = 620;
 
-export const CAM_MARGIN = 90;
+export const CAM_MARGIN = 30;
 
 export const CAMERA_DRONE = {
     enabled: true,

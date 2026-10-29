@@ -22,6 +22,23 @@ function tintedCrop(sheet, sx, sy, w, h, color, alpha) {
     return tintBuf;
 }
 
+let silhouetteBuf = null;
+
+// Silhueta do recorte pintada com `color` (contorno). Buffer próprio: o do flash continua válido no mesmo draw.
+function silhouetteCrop(sheet, sx, sy, w, h, color) {
+    if (!silhouetteBuf) silhouetteBuf = document.createElement('canvas');
+    if (silhouetteBuf.width !== w || silhouetteBuf.height !== h) { silhouetteBuf.width = w; silhouetteBuf.height = h; }
+    const b = silhouetteBuf.getContext('2d');
+    b.globalCompositeOperation = 'source-over';
+    b.globalAlpha = 1;
+    b.clearRect(0, 0, w, h);
+    b.drawImage(sheet, sx, sy, w, h, 0, 0, w, h);
+    b.globalCompositeOperation = 'source-atop';
+    b.fillStyle = color;
+    b.fillRect(0, 0, w, h);
+    return silhouetteBuf;
+}
+
 export class MeleeEnemy extends Entity {
     constructor(x, y, sheet, spriteConfig, floor = 1) {
         super(x, y, 18);
@@ -38,6 +55,8 @@ export class MeleeEnemy extends Entity {
         this.hitCooldownSteps = spriteConfig.combat?.hitCooldownSteps ?? ENEMY_HIT.cooldownSteps;
         // Em vez de gibs, vira escombros decorativos no último quadro da animação de morte.
         this.leavesCorpse = !!spriteConfig.combat?.leavesCorpse;
+        // { color, artPx }: contorno escuro de `artPx` pixels de arte em volta da silhueta (null = sem contorno).
+        this.outline = null;
         this.speed = spriteConfig.combat?.speed ?? 1.7;
 
         this.poiseMax = spriteConfig.combat?.poise ?? 0;
@@ -194,8 +213,13 @@ export class MeleeEnemy extends Entity {
         return { x: this.navigationBounds.minX + (col - 0.5) * TILE, y: this.navigationBounds.minY + (row - 0.5) * TILE };
     }
 
+    // Corpo apoiado em piso válido. Inimigos pequenos usam só o centro; chefes grandes sobrescrevem para incluir os pés.
+    _standsOnFloor(x, y) {
+        return this._isWalkable(x, y);
+    }
+
     ensureOnWalkableTile() {
-        if (this._isWalkable(this.x, this.y)) {
+        if (this._standsOnFloor(this.x, this.y)) {
             this.lastSafePosition = { x: this.x, y: this.y };
             return;
         }
@@ -580,9 +604,9 @@ export class MeleeEnemy extends Entity {
         if (this.pushVx !== 0 || this.pushVy !== 0) {
             const nx = this.x + this.pushVx;
             const ny = this.y + this.pushVy;
-            const stuck = !this._isWalkable(this.x, this.y);
-            if (stuck || this._isWalkable(nx, this.y)) this.x = nx; else this.pushVx = 0;
-            if (stuck || this._isWalkable(this.x, ny)) this.y = ny; else this.pushVy = 0;
+            const stuck = !this._standsOnFloor(this.x, this.y);
+            if (stuck || this._standsOnFloor(nx, this.y)) this.x = nx; else this.pushVx = 0;
+            if (stuck || this._standsOnFloor(this.x, ny)) this.y = ny; else this.pushVy = 0;
         }
         this.pushVx *= 0.85;
         this.pushVy *= 0.85;
@@ -695,6 +719,14 @@ export class MeleeEnemy extends Entity {
 
             ctx.rect(-drawW, revealLineY, drawW * 2, drawH / 2 - revealLineY + 2);
             ctx.clip();
+        }
+
+        if (this.outline && typeof document !== 'undefined') {
+            const step = Math.max(1, Math.round(this.outline.artPx * scale));
+            const silhouette = silhouetteCrop(this.sheet, srcX, srcY, cw, ch, this.outline.color);
+            for (const [ox, oy] of [[-step, 0], [step, 0], [0, -step], [0, step]]) {
+                ctx.drawImage(silhouette, 0, 0, cw, ch, -drawW / 2 + ox, -drawH / 2 + oy, drawW, drawH);
+            }
         }
 
         ctx.drawImage(
