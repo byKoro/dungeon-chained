@@ -51,6 +51,7 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `forge` | ForgeState | js/systems/ForgeState.js | bought recipes/levels this run (reset in `newDungeon`) |
 | `forgeSystem` / `forgeMenu` | ForgeSystem / ForgeMenu | js/systems/ForgeSystem.js, js/ui/ForgeMenu.js | anvil proximity, open/close, shared cursor, purchase; canvas menu. `null` without `scrap` |
 | `sawDrag` | SawDrag | js/systems/SawDrag.js | drag the dropped saw with a short cable (hold interact), Peso stats. Updated after the players, before `chain.update`. `null` without `mapData` |
+| `roomEvents` | RoomEvents (+ CageEncounter, roomScripts/*) | js/systems/RoomEvents.js | per-room scripts (ADR 0011): zones, encounters, bars (collision + y-sorted draw), completed events; updated after `chests.update`. `null` without `mapData` |
 | `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | ~3,8 s craft cutscene (letterbox, camera focus, hammer hits, saw jump). `null` without `scrap` |
 | `dialogue` | DialogueSystem | js/systems/DialogueSystem.js | speech bubbles queue, typewriter, voice blips (`window.dialogue` debug global). `null` without `mapData` |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
@@ -87,7 +88,7 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 12. `resolveDeaths` also calls `scrap.dropFromEnemy(enemy)`. `_updateHearts` (pickup if `lives < 3`), `chests.update`, `scrap.update`, gibs update, `effects.update`, damage detection via `p._livesSeen`, `screenGore.update`.
 13. `rooms.tryClearCurrent()` → door flash, zoom punch, `hud.onRoomCleared`.
 14. `particleSystem.update`, `wind.update`.
-15. Death check: `p1.lives <= 0 || p2.lives <= 0` → `gameOver`, `deathScreen.show()`.
+15. Death check: `p1.lives <= 0 || p2.lives <= 0` → on maps with an anvil `_respawnRun()` (ADR 0012), otherwise `gameOver`, `deathScreen.show()`.
 16. `thrownSaw.update`, `dialogue.update`, `demoProgress.update`, `demoEncounter.update`.
 17. `_checkDoorTransition` (both players aligned and inside door depth; disabled in playtest) → `_updateCameraToCurrentRoom`. `transitionThroughDoor` first credits chests still opening (`chests.flushPending`) and leftover floor scrap (`scrap.collectAll`).
 

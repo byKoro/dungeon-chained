@@ -92,3 +92,9 @@ Branch from `feat/scrap-chest` (needs the scrap pot). Task: `.agents/tasks/2026-
 Branch from `feat/anvil-forge`. Task: `.agents/tasks/2026-10-29-saw-drag/`. `feat/scrap-chest` and `feat/anvil-forge` pushed to origin; no PR opened yet (no `gh` CLI on this machine). `feat/room-fog` was discarded at the user's request (last commit `782f9e8`, plus a stash `backup room-fog working tree before discard`).
 - Done: drag the dropped saw (hold interact, short cable, slower walk, no dash, snaps after the drag distance, partner arriving reconnects) and the Peso upgrade (2 → 3 → 4 tiles, 40% → 55% → 70%). See `systems/weapons.md` → Dragging the saw.
 - Known limits: the short cable art is a placeholder (stroked curves, almost hidden at 46 px); the dragged saw stops at holes/walls instead of sliding around them; holding interact near the anvil or a chest also triggers their tap on the first frame.
+
+## Início — fatia 4 `feat/room-events` (2026-10-29)
+Branch from `feat/saw-drag`. Task: `.agents/tasks/2026-10-29-room-events/`. ADRs 0011 (room events) and 0012 (run progression).
+- Done: editor zones, bars, encounters, cage/rope interactives; `RoomEvents` + `CageEncounter` + `InicialRoomScript`; Salão encounter in `inicial.json` (zones bigorna/salao/topo, 4 waves per the design, cage at 14,12, ropes 16,15 auto / 3,10 / 4,16 / 27,10, bars at row 18 cols 15–17 and row 9 cols 23–25, Baú 2 with 15 under the cage). The map commit also carries Baú 1 at (22,27), moved by the user.
+- Deviations from the design: the north corridor is cols 23–25 in the current map (design said 21–24); loose enemies placed in a room still spawn on entry.
+- Known limits: cage, ropes, bars and debris are procedural placeholders; enemy navigation ignores bars; the dropped enemies do not fall visibly from the cage (shadow + reveal at the landing spot); a room script is keyed by the room name.

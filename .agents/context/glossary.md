@@ -58,6 +58,11 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Upgrade | melhoria | Tamanho (+20% disc), Elasticidade (+15% cable), Serra dupla; Peso comes in slice 3 |
 | Double saw | serra dupla | Upgrade: near the break distance the disc splits into two at 1/3 and 2/3 of the cable and merges back when the pair closes in |
 | Drag the saw | arrastar a serra | With the cable snapped, one player holds interact near the dropped saw and pulls it on a short cable, slower; the Peso upgrade extends distance and speed |
+| Zone | zona | Named rectangle of a room (`room.zones`); "enter the zone" means both players inside |
+| Encounter / wave | encontro / leva | Named list of waves (`room.encounters`); the room script decides when each wave drops |
+| Bars | grade | Bar tiles at a zone's accesses; closed (solid) while an encounter runs |
+| Cage / rope / stake | gaiola / corda / estaca | The Salão set piece: a hanging cage held by ropes tied to stakes; cutting ropes drops waves, the last cut drops the cage |
+| Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 

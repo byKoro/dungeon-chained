@@ -1,6 +1,6 @@
 # room events
 
-Status: in-progress   <!-- planned | in-progress | done | abandoned -->
+Status: done   <!-- planned | in-progress | done | abandoned -->
 Branch: feat/room-events (from feat/saw-drag)  Base: fb3117f  Date: 2026-10-29
 
 ## Goal
@@ -18,9 +18,9 @@ Fatia 4 do design `../2026-10-29-inicio-core-loop/design.md` (seção 2 "Eventos
 - Falas do encontro (corda 1, leva 1 limpa, baú 2) entram aqui; o resto do roteiro é da fatia 5.
 
 ## Steps
-- [ ] 1. Dados: `zones`, `encounters`, `bars` em `normalizeRoom`/resize; interativos `cage` e `rope`.
-- [ ] 2. Editor 2.0: ferramentas Zona (dois cliques + id), Grade (tile), painel de Encontros (id + levas em texto), Gaiola/Corda (+ "arrebenta sozinha"); desenho no editor.
-- [ ] 3. `EventsConfig`, `RoomEvents` (registro de scripts, grades com colisão e desenho, persistência de concluídos), `CageEncounter`, `InicialRoomScript`; baú escondido/aberto pelo script; aspirar sucata ao limpar uma leva.
-- [ ] 4. Regra de morte (ADR 0012) e ADR 0011.
-- [ ] 5. Montar no `inicial.json`: zonas, encontro do salão, gaiola, cordas, baú 2 (15), grades.
-- [ ] 6. Testes, verificação no Electron, docs, review, verification.
+- [x] 1. Dados: `zones`, `encounters`, `bars` em `normalizeRoom`/resize; interativos `cage` e `rope`.
+- [x] 2. Editor 2.0: ferramentas Zona (dois cliques + id), Grade (tile), painel de Encontros (id + levas em texto), Gaiola/Corda (+ "arrebenta sozinha"); desenho no editor.
+- [x] 3. `EventsConfig`, `RoomEvents` (registro de scripts, grades com colisão e desenho, persistência de concluídos), `CageEncounter`, `InicialRoomScript`; baú escondido/aberto pelo script; aspirar sucata ao limpar uma leva.
+- [x] 4. Regra de morte (ADR 0012) e ADR 0011.
+- [x] 5. Montar no `inicial.json`: zonas, encontro do salão, gaiola, cordas, baú 2 (15), grades.
+- [x] 6. Testes, verificação no Electron, docs, review, verification.
