@@ -48,6 +48,8 @@ How enemies are defined, spawned, navigate, attack and die; how players take dam
 
 The boss starts on the right side, finds a non-negative floor cell without an authored wall, and runs `appear → roar → summon → wait → charge → indicator → beam → fade → recover → teleport`. Teleport switches sides and repeats the arrival. During charge it tracks the live players' mean Y along walkable floor; the horizontal beam locks before the warning and stays fixed through firing/fade. Beam origin is the sprite's mouth, endpoint is the opposite arena edge, and damage is active only during `beam` (players use `takeDamage`; enemies intersecting the beam die).
 
+Gameplay beam pacing uses 108 wait ticks (1.8s), 30 charge ticks (0.5s), 33 locked-warning ticks (0.55s), and 54 recovery ticks (0.9s). Charge plus warning gives 1.05s before firing. The active beam lasts 30 ticks (0.5s). These timings are tuned in `GhostfireConfig.js`.
+
 Summons release one at a time during the spit pose (ticks 18, 23, 28, 33, 38), cycling `hellbat`, `demonessA`, `demonessB`. Preferred positions are in front of the boss; forward safe grid cells and then the rest of the room are fallbacks. Holes, negative floor, walls, proximity to players/enemies and the six-minion cap are respected. Room size and obstacles can reduce the wave.
 
 `CombatSystem.resolveWeaponHits` uses `receiveWeaponHit()` when available and emits hit feedback only for accepted hits. Ghostfire has eight health, a 45-tick hit cooldown, and immunity while frozen, arriving or teleporting. Ordinary enemies retain `startDying()` behavior. The death animation lasts 48 ticks before gibs; `GhostfireSystem` plays a single final burst and kills remaining non-boss minions, as in the trailer.
