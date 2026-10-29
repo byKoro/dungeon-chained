@@ -61,3 +61,8 @@ neutro = neutral · assustado = scared · espantado = startled · raiva = anger 
 - **Cavaleiro Negro B / Black Knight B** (`blackKnightB`): tanque lento com três ataques alternados e morte animada.
 
 - **Cultista / Cultist** (`cultist`): inimigo à distância que marca um ponto fixo e invoca um pilar de fogo após aviso. `preferredDistance`: distância desejada aos jogadores, em pixels.
+
+- **Flame Golem / Golem de Chamas** (flameGolem): slow resistant melee baseline using flame_golem.png; planned visual identity for the sanctuary herald. Final herald behavior remains undecided.
+
+- **Golem phase / fase do golem**: HP-triggered permanent combat stage; phase 2 increases speed and uses two charges per cast.
+- **Marked charge / investida marcada**: saved player positions telegraph the charge before launch; trackingStrength controls subsequent steering toward a live target.

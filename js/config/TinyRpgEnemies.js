@@ -1,3 +1,4 @@
+import { FLAME_GOLEM_SPRITE } from './FlameGolemConfig.js';
 import { CULTIST_SPRITE } from './CultistConfig.js';
 
 export const TINY_RPG_ENEMIES = [
@@ -657,67 +658,7 @@ export const TINY_RPG_ENEMIES = [
             }
         }
     },
-    {
-        "key": "flameGolem",
-        "label": "Golem de Chamas",
-        "src": "assets/enemies/flame_golem.png",
-        "cellSize": 100,
-        "cropX": 30,
-        "cropY": 20,
-        "cropW": 59,
-        "cropH": 39,
-        "body": {
-            "x": 36,
-            "y": 29,
-            "w": 32,
-            "h": 28
-        },
-        "drawHeight": 123,
-        "rows": {
-            "walk": {
-                "row": 1,
-                "frames": 12,
-                "fps": 6
-            },
-            "attack": {
-                "row": 2,
-                "frames": 9,
-                "fps": 5,
-                "hitFrame": 6
-            },
-            "attack2": {
-                "row": 3,
-                "frames": 9,
-                "fps": 5,
-                "hitFrame": 6
-            },
-            "attack3": {
-                "row": 4,
-                "frames": 9,
-                "fps": 5,
-                "hitFrame": 6
-            },
-            "death": {
-                "row": 5,
-                "frames": 6,
-                "fps": 7
-            }
-        },
-        "deathFlash": {
-            "row": 0,
-            "frame": 0
-        },
-        "gib": {
-            "gridCols": 5,
-            "gridRows": 4,
-            "box": {
-                "x": 36,
-                "y": 41,
-                "w": 37,
-                "h": 18
-            }
-        }
-    },
+    FLAME_GOLEM_SPRITE,
     {
         "key": "ghostfire",
         "label": "Fogo Fantasma (Voador)",

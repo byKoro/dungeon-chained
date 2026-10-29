@@ -601,6 +601,69 @@
       "type": "normal",
       "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29],
       "propDensity": 0.12
+    },
+    "0,0": {
+      "id": "sala_0_0",
+      "name": "santuario_teste.json",
+      "notes": "mapa de conquista da habilidade de dash",
+      "cols": 16,
+      "rows": 12,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 25],
+        [20, 21, 28, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 25],
+        [20, 21, 8, 6, -1, -1, 16, 29, 18, 27, 18, 19, -1, -1, -1, 25],
+        [20, 21, 28, 18, -1, -1, 26, 28, 27, 6, 26, 29, -1, -1, -1, 25],
+        [20, 21, 7, 8, -1, -1, 8, 16, 8, 6, 19, 28, 27, 19, 16, 16],
+        [20, 21, 27, 19, -1, -1, 29, 8, 29, 18, 17, 16, 6, 7, 16, 16],
+        [20, 21, 29, 17, -1, -1, 6, 26, 26, 17, 19, 16, -1, -1, -1, 25],
+        [20, 21, 7, 17, -1, -1, 8, 9, 27, 28, 8, 16, -1, -1, -1, 25],
+        [20, 21, 6, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 25],
+        [20, 31, 32, 32, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 25],
+        [40, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwwwww",
+        "wfffhhhhhhhhhhhw",
+        "wfffhhhhhhhhhhhw",
+        "wfffhhffffffhhhw",
+        "wfffhhffffffhhhw",
+        "wfffhhffffffffff",
+        "wfffhhffffffffff",
+        "wfffhhffffffhhhw",
+        "wfffhhffffffhhhw",
+        "wfffhhhhhhhhhhhw",
+        "wfffhhhhhhhhhhhw",
+        "wwwwwwwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 15, "row": 5, "type": "normal", "width": 2, "id": "door_0" }
+      ],
+      "props": [],
+      "enemies": [
+        { "col": 7, "row": 5, "type": "flameGolem" }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 4, "row": 0, "type": "torch", "side": "N" },
+        { "col": 8, "row": 0, "type": "torch", "side": "N" },
+        { "col": 10, "row": 0, "type": "torch", "side": "N" },
+        { "col": 12, "row": 0, "type": "torch", "side": "N" },
+        { "col": 6, "row": 0, "type": "torch", "side": "N" },
+        { "col": 4, "row": 11, "type": "torch", "side": "S" },
+        { "col": 6, "row": 11, "type": "torch", "side": "S" },
+        { "col": 8, "row": 11, "type": "torch", "side": "S" },
+        { "col": 10, "row": 11, "type": "torch", "side": "S" },
+        { "col": 12, "row": 11, "type": "torch", "side": "S" },
+        { "col": 14, "row": 11, "type": "torch", "side": "S" },
+        { "col": 14, "row": 0, "type": "torch", "side": "N" }
+      ],
+      "interactives": [],
+      "spawns": null,
+      "lock": "none",
+      "type": "normal",
+      "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29],
+      "propDensity": 0
     }
   },
   "connections": [

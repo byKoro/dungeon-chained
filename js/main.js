@@ -35,6 +35,7 @@ async function bootstrap() {
         if (started) return;
         started = true;
         overlay?.hide();
+        await trailer?.finish();
         trailer?.stop();
         let game = null;
         await loading.run('Preparing the dungeon…', [

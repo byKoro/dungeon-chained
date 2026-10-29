@@ -64,3 +64,12 @@ Audio, UI, editor
 - Ajuste do cultista: preferredDistance aumentado para 440 px; círculo de marcação removido. Alcance de conjuração ajustado para cobrir a faixa de distância desejada.
 
 - Cultista: preferredDistance ajustado de 440 para 300 px.
+
+## Sanctuary cinematic bars - 2026-10-28
+Planning: design/demo/02-santuario-do-dash.md. Branch feat/cinematic-bars: reusable bars integrated only into the trailer (0.4 s entry, 0.18 s exit before game startup). Room remains planned; Dash unchanged. Timing and trailer integration tested; visual inspection pending. Graphify unavailable; check retains failures #4/#5.
+
+## Flame Golem - 2026-10-28
+Branch feat/flame-golem: approved provisional melee baseline (6 HP, speed 0.8, three cycling attacks, full death), available in both editors. Existing asset/crop/scale preserved. Task: 2026-10-28-flame-golem. Tests and actual Chromium draw passed; co-op balance pending. Sanctuary room and final herald moveset not implemented. Check retains #4/#5; graphify unavailable.
+
+## Flame Golem abilities - 2026-10-28
+Three configurable abilities and two HP phases implemented on feat/flame-golem. Config: FlameGolemConfig.js. Default phase threshold 3 HP; phase one one slower charge; phase two two charges and faster movement/animations. Large AoE hits both players and can push into holes. Real Game test in the user's sanctuary room confirmed a fall; screenshot _local/golem-abilities-game.png. Tests pass apart from #4/#5, graphify unavailable. Balance/human co-op pending. No authored map changes, bridge, altar or intro implementation in this task.

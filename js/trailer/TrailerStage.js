@@ -1,3 +1,4 @@
+import { CinematicBars } from '../ui/CinematicBars.js';
 import { Renderer } from '../core/Renderer.js';
 import { SeamlessTileset as Tileset } from './kit/SeamlessTileset.js';
 import { Player } from '../entities/Player.js';
@@ -20,6 +21,7 @@ const BUBBLE_PIXEL_RATIO = 0.5;
 export class TrailerStage {
     constructor(canvas, assets) {
         this.canvas = canvas;
+        this.bars = new CinematicBars();
         this.ctx = canvas.getContext('2d');
         this.ctx.imageSmoothingEnabled = false;
         this.assets = assets;
@@ -116,7 +118,7 @@ export class TrailerStage {
 
     get portrait() { return this.canvas.height > this.canvas.width; }
     get refSize() { return Math.min(this.canvas.width, this.canvas.height); }
-    get barH() { return Math.round(this.refSize * 0.10); }
+    get barH() { return this.bars.inset(this.canvas.height); }
     get fitW() { return this.portrait ? 0.45 : 0.5; }
     get fitH() { return this.portrait ? 0.36 : 0.4; }
     get fitDown() { return this.portrait ? 0.30 : this.fitH; }
@@ -197,14 +199,7 @@ export class TrailerStage {
     }
 
     drawLetterbox() {
-        const { ctx, canvas } = this;
-        const barH = this.barH;
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, barH);
-        ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
-        ctx.restore();
+        this.bars.draw(this.ctx, this.canvas.width, this.canvas.height);
     }
 
     logoScale() {

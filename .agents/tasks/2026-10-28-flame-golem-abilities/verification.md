@@ -1,0 +1,7 @@
+# Verification
+- test_flame_golem_abilities.js: normal single-target damage; area hits both at correct frame, radial push, escape avoids hit, invulnerability/player dash avoids damage and push; fixed marks; enemy hit stop and stagger cancellation; swept charge hit at speed 200; once-per-player-per-charge; tracking 0/1; high-speed hole boundary with body radius; one vs two charges, HP threshold, movement/animation/windup multipliers; death cancellation; ordinary knockback stays 16; phase stats isolated per instance; edited phase-one knobs work and preserve frame on transition.
+- test_flame_golem.js, test_black_knight_b.js, test_cultist.js and test_combat_feel.js: passed after lifecycle extraction.
+- npm.cmd run check: 20/21 tests passed; only pre-existing Curva SE and unlisted corridor_vertical_ns_1.json failures (#4/#5).
+- npm.cmd run graph: graphify missing; run npm run doctor.
+- Real Game in Chromium, using a copy of map/demo/demo_campaign.json with start 0,0 in memory. Actual authored room, actual player/enemy updates, physics and hole detection. Area produced vx +48/-48; left player entered falling after existing 18-tick grace, right player stayed on entrance bridge. Phase 2 produced two fixed marks. PASS reported by browser; screenshot inspected at _local/golem-abilities-game.png. No disk map edits.
+- Full human co-op play, balance, controller input and packaged Electron remain unverified. Shared enemy sounds retained; no new audio cues.

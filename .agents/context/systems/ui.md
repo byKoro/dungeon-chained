@@ -82,3 +82,6 @@ New screen: follow the `DeathScreen` pattern (root in `index.html` + CSS `.visib
 
 ## Related docs
 `audio.md` (UI cues, `MasterVolume`), `visual-effects.md` (render order), `.agents/playbooks/add-ui-screen.md`.
+
+## Cinematic bars (2026-10-28)
+CinematicBars (js/ui) uses CINEMATIC_BARS (js/config): 10% of canvas height per edge, cubic ease-out over 0.4 s in / 0.18 s out. TrailerStage owns it; TrailerPlayer updates it only while unpaused. finish() freezes the scene and resolves after the bars exit; bootstrap awaits it before stopping the trailer/loading Game. Stage barH reserves the full inset for portrait framing, independent of animation and zoom. Sanctuary integration remains planned.

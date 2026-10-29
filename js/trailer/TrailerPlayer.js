@@ -176,8 +176,11 @@ export class TrailerPlayer {
     }
 
     _begin(from = 0) {
+        this._finishing = null;
         if (this._paused) this.setPaused(false, { silent: true });
         this.stage.attach();
+        this.stage.bars.reset();
+        if (this.letterbox) this.stage.bars.show();
         this.stage.resetActors();
         this.scenes.forEach(s => s.reset?.());
         this.index = Math.max(0, Math.min(from, this.scenes.length - 1));
@@ -194,6 +197,14 @@ export class TrailerPlayer {
             this._raf = requestAnimationFrame(this._frame);
         }
         if (this.onBegin) { const cb = this.onBegin; this.onBegin = null; cb(); }
+    }
+
+    finish() {
+        if (this._finishing) return this._finishing;
+        if (this._paused) this.setPaused(false, { silent: true });
+        this.stage.bars.hide();
+        this._finishing = new Promise(resolve => { this._finishResolve = resolve; });
+        return this._finishing;
     }
 
     stop() {
@@ -293,6 +304,14 @@ export class TrailerPlayer {
 
     update(dt) {
         const st = this.stage;
+        st.bars.update(dt);
+        if (this._finishing) {
+            if (st.bars.hidden) {
+                this._finishResolve?.();
+                this._finishResolve = null;
+            }
+            return;
+        }
         this.time += dt;
         this.sceneTime += dt;
         this.current.update(dt);

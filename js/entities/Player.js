@@ -238,7 +238,7 @@ export class Player extends Entity {
         }
     }
 
-    takeDamage(sourceX, sourceY) {
+    takeDamage(sourceX, sourceY, { knockback = 16 } = {}) {
 
         if (this.falling || this.dashing || this.invulnerableTimer > 0) return false;
 
@@ -248,8 +248,8 @@ export class Player extends Entity {
         this.scaredTimer = this.scaredDuration;
 
         const pushAngle = Math.atan2(this.y - sourceY, this.x - sourceX);
-        this.vx += Math.cos(pushAngle) * 16;
-        this.vy += Math.sin(pushAngle) * 16;
+        this.vx += Math.cos(pushAngle) * knockback;
+        this.vy += Math.sin(pushAngle) * knockback;
         return true;
     }
 

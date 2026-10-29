@@ -118,3 +118,6 @@ Disabled by default; toggled with `I` (own keydown listener) or `window.playerAI
 
 - `../architecture.md` — loop/update order.
 - `rendering.md` — shadows, depth sort around saw Y.
+
+### Enemy knockback option (2026-10-28)
+Player.takeDamage(sourceX, sourceY, { knockback = 16 } = {}) accepts an optional radial velocity impulse magnitude. Only accepted damage applies it; player Dash, invulnerability and falling still reject damage and push. Golem normal/AoE/dash use configured amounts; dash synthesizes a source behind the player to push forward. Existing player movement damping and hole grace/fall detection determine the displacement and possible fall. Player Dash config is unchanged.

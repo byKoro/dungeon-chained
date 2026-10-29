@@ -447,10 +447,7 @@ export class MeleeEnemy extends Entity {
 
                 if (distToTarget <= this.attackRange && this._hasClearWalkablePath(this.target)) {
 
-                    this.state = "windup";
-                    this.stateTimer = this.windupFrames;
-                    this.animTime = 0;
-                    this.dealtHit = false;
+                    this._beginWindup();
                 }
                 break;
             }
@@ -462,42 +459,18 @@ export class MeleeEnemy extends Entity {
                 this.stateTimer--;
                 if (this.stateTimer <= 0) {
 
-                    this.currentAttack = this.attackKeys[
-                        this.sprite.combat?.cycleAttacks
-                            ? this.attackIndex++ % this.attackKeys.length
-                            : Math.floor(Math.random() * this.attackKeys.length)
-                    ];
-                    const atk = this.sprite.rows[this.currentAttack];
-                    this.state = "attack";
-                    this.justAttacked = true;
-                    this.stateTimer = atk.frames * atk.fps;
-                    this.animTime = 0;
-                    this.dealtHit = false;
+                    this._beginAttack();
                 }
                 break;
             }
 
             case "attack": {
 
-                this.vx *= 0.5;
-                this.vy *= 0.5;
-
-                const atk = this.sprite.rows[this.currentAttack];
-                const hitAt = (atk.hitFrame ?? Math.floor(atk.frames / 2)) * atk.fps;
-                if (!this.dealtHit && this.animTime >= hitAt) {
-                    this.dealtHit = true;
-                    if (distToTarget <= this.hitRange && this._hasClearWalkablePath(this.target)) {
-                        if (this.target.takeDamage(this.x, this.y)) {
-                            onPlayerHit(this.target);
-                        }
-                    }
-                }
+                this._updateAttack(players, onPlayerHit);
 
                 this.stateTimer--;
                 if (this.stateTimer <= 0) {
-                    this.state = "recover";
-                    this.stateTimer = this.recoverFrames;
-                    this.animTime = 0;
+                    this._finishAttack();
                 }
                 break;
             }
@@ -538,6 +511,47 @@ export class MeleeEnemy extends Entity {
         } else if (this.state !== "chase") {
             this.stepDistance = 0;
         }
+    }
+
+    _beginWindup() {
+        this.state = "windup";
+        this.stateTimer = this.windupFrames;
+        this.animTime = 0;
+        this.dealtHit = false;
+    }
+
+    _beginAttack() {
+        this.currentAttack = this.attackKeys[
+            this.sprite.combat?.cycleAttacks
+                ? this.attackIndex++ % this.attackKeys.length
+                : Math.floor(Math.random() * this.attackKeys.length)
+        ];
+        const atk = this.sprite.rows[this.currentAttack];
+        this.state = "attack";
+        this.justAttacked = true;
+        this.stateTimer = atk.frames * atk.fps;
+        this.animTime = 0;
+        this.dealtHit = false;
+    }
+
+    _updateAttack(players, onPlayerHit) {
+        this.vx *= 0.5;
+        this.vy *= 0.5;
+        const atk = this.sprite.rows[this.currentAttack];
+        const hitAt = (atk.hitFrame ?? Math.floor(atk.frames / 2)) * atk.fps;
+        if (!this.dealtHit && this.animTime >= hitAt) {
+            this.dealtHit = true;
+            const distance = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+            if (distance <= this.hitRange && this._hasClearWalkablePath(this.target)) {
+                if (this.target.takeDamage(this.x, this.y)) onPlayerHit(this.target);
+            }
+        }
+    }
+
+    _finishAttack() {
+        this.state = "recover";
+        this.stateTimer = this.recoverFrames;
+        this.animTime = 0;
     }
 
     // Empurrão nunca leva o inimigo para buraco/borda; o Game ainda resolve paredes e limites da sala.
