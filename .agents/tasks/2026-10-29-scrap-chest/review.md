@@ -1,5 +1,5 @@
 # Review — scrap chest
-Verdict: approved after fixes in `7e42414` (was changes-requested); #8 waits for the user
+Verdict: approved after fixes in `7e42414` (was changes-requested)
 Range: main..HEAD
 
 ## Resolution
@@ -8,7 +8,7 @@ Range: main..HEAD
 - #5 fixed: `ChestSystem.flushPending()` runs before `scrap.collectAll()` in `transitionThroughDoor`; test added.
 - #9 fixed: `DialogueSystem` (and `window.dialogue`) only with `mapData`.
 - #3, #4, #6, #7, #10 accepted and documented as known limits (status.md, ui.md, combat-and-entities.md, room-editor.md).
-- #8 open: the extra changes in `inicial.json` were not intended by this slice; the user decides which version stays.
+- #8 resolved: the user confirmed the new `inicial.json` layout stays.
 - #11 done.
 
 Includes the uncommitted docs in the working tree (`.agents/context/*`, ADR 0013). Review by reading code only. I did not open the game, so nothing below is runtime-observed. `npm test` and `npm run check` fail only on the pre-existing status.md #4 (`corridor_vertical_ns_1.json`) and #5 (`test_modular_grid.js`). Doc drift is clean.

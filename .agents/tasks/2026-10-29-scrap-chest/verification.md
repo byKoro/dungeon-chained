@@ -20,4 +20,4 @@ Mapa: `map/demo/inicial.json` via sessionStorage do teste do Editor 2.0 (`index.
 - Som: os três cues novos (`scrapPickup`, `chestOpen`, `voiceBlip`) não foram ouvidos; só a chamada foi vista.
 - Inimigos andando contra a bigorna/baús (navegação não conhece os props) e a ordem por pés entre inimigos e props, só por leitura.
 - Fala em modo split (F6), build empacotado (`npm run dist`) e o trailer (`/` sem `?skipTrailer`) não foram abertos; o trailer usa `SpeechBubble.js` e `PixelFont.js` (só glifos novos).
-- `map/demo/inicial.json` no commit `9ef00b1` traz, além do baú, uma versão diferente da sala (vazios viraram piso, faixa do topo uma linha abaixo, 19 props a menos). Essa diferença não foi uma edição intencional desta fatia e a origem não foi confirmada; aguarda o usuário dizer qual versão vale. Os testes no jogo acima usaram essa versão.
+- `map/demo/inicial.json` no commit `9ef00b1` traz, além do baú, uma versão nova da sala (vazios viraram piso, faixa do topo uma linha abaixo, 19 props a menos). O usuário confirmou que essa versão fica. Os testes no jogo acima usaram essa versão.
