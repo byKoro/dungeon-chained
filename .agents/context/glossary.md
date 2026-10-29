@@ -50,7 +50,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Poise | poise, postura | Invisible per-enemy buffer for strong enemies (`combat.poise`); breaking it causes a long stun (`"stunned"`) and a vulnerability window |
 | Scrap | sucata | Shared currency of the pair (`ScrapSystem`, one pot). Drops from enemies and chests, rests 0,4 s, then a magnet pulls it to the nearest player within ~2,5 tiles. Editor 2.0 maps only |
 | Vacuum | aspirar, puxar a sucata | `ScrapSystem.vacuum()`: every scrap on the floor flies to the nearest player, any distance (used when a wave is cleared, slice 4) |
-| Chest | baú | Prop `chest`/`mini_chest` that opens once when any player gets within ~2 tiles and bursts its authored scrap (`prop.scrap`) |
+| Chest | baú | Prop `chest`/`mini_chest` that sits still with a sweeping shine while closed; a player right next to it (1 tile) presses interact to open it once, and it bursts its authored scrap (`prop.scrap`) |
 | Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
 | Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
 | Anvil / forge | bigorna / forja | Prop `anvil`; interact opens the forge menu (`ForgeSystem`), which sells the recipes the anvil offers (`prop.recipes`) for scrap |

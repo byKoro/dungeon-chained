@@ -51,7 +51,6 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `forge` | ForgeState | js/systems/ForgeState.js | bought recipes/levels this run (reset in `newDungeon`) |
 | `forgeSystem` / `forgeMenu` | ForgeSystem / ForgeMenu | js/systems/ForgeSystem.js, js/ui/ForgeMenu.js | anvil proximity, open/close, shared cursor, purchase; canvas menu. `null` without `scrap` |
 | `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | ~3,8 s craft cutscene (letterbox, camera focus, hammer hits, saw jump). `null` without `scrap` |
-| `titleBanner` | TitleBanner | js/ui/TitleBanner.js | big centered title ("SERRA") |
 | `dialogue` | DialogueSystem | js/systems/DialogueSystem.js | speech bubbles queue, typewriter, voice blips (`window.dialogue` debug global). `null` without `mapData` |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
 
