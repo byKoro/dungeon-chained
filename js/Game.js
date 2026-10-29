@@ -8,6 +8,7 @@ import { ScrapSystem } from './systems/ScrapSystem.js';
 import { ChestSystem } from './systems/ChestSystem.js';
 import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
+import { CHAIN } from './config/ChainConfig.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
@@ -54,7 +55,7 @@ import {
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
-    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
+    SIM_STEP, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
 } from './config/GameConfig.js';
 
 const feetSortKey = d => d.feetSortY ?? d.footY ?? d.y + HOLE_FALL.footOffset;
@@ -134,17 +135,7 @@ export class Game {
             getDoors: () => (this.rooms?.isLocked() ? [] : this.rooms.doorsOfCurrent())
         });
 
-        this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], {
-            rest: 130,
-            stiffness: 0.02,
-            breakDistance: 240,
-            strainDistance: 165,
-            strainLimit: 30,
-            reconnectDistance: 110,
-            pickupRadius: 60,
-            snapImpulse: 12,
-            playerSafeZone: PLAYER_SAFE_ZONE
-        });
+        this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], CHAIN);
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
