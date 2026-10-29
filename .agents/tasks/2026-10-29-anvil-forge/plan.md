@@ -1,6 +1,6 @@
 # anvil forge
 
-Status: in-progress   <!-- planned | in-progress | done | abandoned -->
+Status: done   <!-- planned | in-progress | done | abandoned -->
 Branch: feat/anvil-forge (from feat/scrap-chest)  Base: be85582  Date: 2026-10-29
 
 ## Goal
@@ -19,17 +19,17 @@ Fatia 2 do design `../2026-10-29-inicio-core-loop/design.md` (seções 1, 2 "Big
 
 ## Steps
 <!-- ordered; each step leaves the game loadable -->
-- [ ] 1. Tuning do cabo em `js/config/ChainConfig.js` (`CHAIN`), lida pelo `Game`.
+- [x] 1. Tuning do cabo em `js/config/ChainConfig.js` (`CHAIN`), lida pelo `Game`.
       Verify: testes existentes; jogo carrega igual.
-- [ ] 2. Serra ausente: `Chain` com `present`, `removeSaw()`, `spawnSaw(x, y)`; `reset()` e a troca de sala respeitam a ausência. `DemoProgress.state.saw`; início sem serra quando o mapa oferece a receita; caixa "Serra" no teste do editor.
+- [x] 2. Serra ausente: `Chain` com `present`, `removeSaw()`, `spawnSaw(x, y)`; `reset()` e a troca de sala respeitam a ausência. `DemoProgress.state.saw`; início sem serra quando o mapa oferece a receita; caixa "Serra" no teste do editor.
       Verify: teste de Chain (sem reconexão, sem desenho; spawn exige os dois perto).
-- [ ] 3. `js/config/ForgeConfig.js` (catálogo) + `js/systems/ForgeState.js` (comprar, apagado por item/sucata, níveis).
+- [x] 3. `js/config/ForgeConfig.js` (catálogo) + `js/systems/ForgeState.js` (comprar, apagado por item/sucata, níveis).
       Verify: teste unitário.
-- [ ] 4. Melhorias na serra: Tamanho (raio do disco e de acerto), Elasticidade (tensão e ruptura), Serra dupla (duas serras em 1/3 e 2/3 acima de ~85% da ruptura, junta de novo ao aproximar). `CombatSystem` e a colisão consideram todas as serras.
+- [x] 4. Melhorias na serra: Tamanho (raio do disco e de acerto), Elasticidade (tensão e ruptura), Serra dupla (duas serras em 1/3 e 2/3 acima de ~85% da ruptura, junta de novo ao aproximar). `CombatSystem` e a colisão consideram todas as serras.
       Verify: teste (raios, distâncias, divisão/junção com histerese, dois discos acertam).
-- [ ] 5. Menu da bigorna: `ForgeSystem` (proximidade, abrir/fechar, compra, congelamento) + `js/ui/ForgeMenu.js` (desenho). Editor 2.0: receitas por bigorna.
+- [x] 5. Menu da bigorna: `ForgeSystem` (proximidade, abrir/fechar, compra, congelamento) + `js/ui/ForgeMenu.js` (desenho). Editor 2.0: receitas por bigorna.
       Verify: teste da lógica de input do menu; observar no jogo.
-- [ ] 6. Cinemática da serra (~4 s): letterbox, foco da câmera na bigorna, três marteladas com faísca e shake crescente, serra salta girando e cai na bigorna; fala "Juntos, perto da serra!"; reconexão ampliada e título "SERRA".
+- [x] 6. Cinemática da serra (~4 s): letterbox, foco da câmera na bigorna, três marteladas com faísca e shake crescente, serra salta girando e cai na bigorna; fala "Juntos, perto da serra!"; reconexão ampliada e título "SERRA".
       Verify: observar no jogo por script.
 
 ## Assets requested (placeholders in this slice)
@@ -37,5 +37,5 @@ Fatia 2 do design `../2026-10-29-inicio-core-loop/design.md` (seções 1, 2 "Big
 - Sons: martelada (placeholder: impacto do trailer), compra na bigorna.
 
 ## Docs to update when done
-- [ ] .agents/context/systems/weapons.md, players-and-chain.md, ui.md, room-editor.md, architecture.md
-- [ ] .agents/context/status.md (#11 parcial), glossary.md (forja, melhorias, serra dupla)
+- [x] .agents/context/systems/weapons.md, players-and-chain.md, ui.md, room-editor.md, architecture.md
+- [x] .agents/context/status.md (#11 parcial), glossary.md (forja, melhorias, serra dupla)

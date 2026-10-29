@@ -48,6 +48,10 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `scrap` | ScrapSystem (+ ScrapWallet, ScrapPickup) | js/systems/ScrapSystem.js | shared scrap pot, pickups (arc, rest, magnet, vacuum). `null` without `mapData` |
 | `scrapCounter` | ScrapCounter | js/ui/ScrapCounter.js | top-center HUD counter. `null` without `scrap` |
 | `chests` | ChestSystem | js/systems/ChestSystem.js | proximity chests, open-once state, scrap burst. `null` without `scrap` |
+| `forge` | ForgeState | js/systems/ForgeState.js | bought recipes/levels this run (reset in `newDungeon`) |
+| `forgeSystem` / `forgeMenu` | ForgeSystem / ForgeMenu | js/systems/ForgeSystem.js, js/ui/ForgeMenu.js | anvil proximity, open/close, shared cursor, purchase; canvas menu. `null` without `scrap` |
+| `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | ~3,8 s craft cutscene (letterbox, camera focus, hammer hits, saw jump). `null` without `scrap` |
+| `titleBanner` | TitleBanner | js/ui/TitleBanner.js | big centered title ("SERRA") |
 | `dialogue` | DialogueSystem | js/systems/DialogueSystem.js | speech bubbles queue, typewriter, voice blips (`window.dialogue` debug global). `null` without `mapData` |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
 
@@ -62,6 +66,8 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 ## `Game._step(dt)` state dispatch
 
 - `gameOver` → no simulation (render continues).
+- `sawCinematic.active` → `_updateSawCinematic`: cinematic timeline, players held still, particles, camera (DemoCamera `focus`). Nothing else simulates.
+- `forgeSystem.open` → only the camera updates; the menu reads input per frame in `_pollMenuPad` (`forgeSystem.handleInput(menuPad hit)`), Esc and Start close it instead of pausing.
 - `transition` (door fade `{phase:"out"|"in", t}`, `t += TRANSITION_SPEED` per step) → `_updateTransition`; at `out` end calls `transitionThroughDoor(door)`.
 - `roomIntro` (`{phase:"zoomIn"|"hold"|"zoomOut"}`) → `_updateRoomIntro`: players frozen, intro zoom, enemies spawned frozen with staggered `beginFrozenSpawn`, flame bursts.
 - else `_updateGameplay`.
@@ -123,7 +129,8 @@ Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant
 - `DialogueConfig.js`: `DIALOGUE` (typing speed, hold time, blip rates per player, default HUD expression, `enabled` switch).
 - `PropConfig.js`: `ANIMATED_PROPS` (+ `base` footprint for solid props, `opens` for chests), `PROP_COLLISION`.
 - Game text: `js/i18n/pt-BR.js` / `en.js`, read with `t(key)` (ADR 0013).
-- Not in config (hardcoded): Chain params in `Game` constructor; player speed/lives/invuln in `Player`; Renderer camera lerp factors.
+- `ChainConfig.js`: `CHAIN` (cable tuning). `ForgeConfig.js`: `FORGE` (catalog: costs, per-level effects, open radius, default recipes), `anvilRecipes(prop)`, `SAW_CINEMATIC` (timeline).
+- Not in config (hardcoded): player speed/lives/invuln in `Player`; Renderer camera lerp factors.
 
 ## Module dependency rules observed
 

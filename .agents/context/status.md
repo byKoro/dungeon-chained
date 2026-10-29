@@ -8,6 +8,7 @@ Only branches with commits ahead of `main` contain unmerged work. Check before s
 
 | Branch | Ahead | Author | Content |
 |---|---|---|---|
+| `feat/anvil-forge` | ~9 on top of `feat/scrap-chest` | Kiro (slice 2) | Start without saw, anvil menu, Size/Elasticity/Double saw, saw cinematic, cable tuning in config. See the Início section below |
 | `feat/scrap-chest` | ~10 | Kiro (slice 1 of the Início design) | Scrap, HUD counter, proximity chests, solid props, i18n, speech bubbles. See the Início section below |
 | `origin/inimigos-novos` | 2 | Rodrigo Yamauchi | Two new enemies: cleave demon, frost guardian |
 | `origin/branch-inimigo-novo-skull` | 1 | Rodrigo Yamauchi | `FireSkullEnemy` + SpawnSystem/AssetLoader wiring (very old base, ~90 commits behind) |
@@ -47,7 +48,7 @@ Combat & entities
 8. `MeleeEnemy.setNavigationFloor` ignores its `walls` argument → BFS paths through wall blocks; `findSafeFloorCell` ignores custom walls (enemies may spawn inside walls).
 9. Enemy hit plays both `playerHurt` (CombatSystem) and `playerHit` (Game) — same wav set, doubled.
 10. Dead code: `MeleeEnemy` "dead" state, `Chain.applyToEnemies`, `Chain.cycleWeapon`, `Weapon.hitsTarget`, `HAZARDS.spike.*Frames`, `ParticleSystem.triggerExplosion`, `BloodCanvas.stampGib`, `PostProcessor.addAreaLight`, `TORCHES.minPerWall/...`. (`preloadUi` is used again by the trailer.)
-11. Lives cap 3 hard-coded in `Game._updateHearts` / `Player` (ignores `HEART_DROP.maxLives`). Chain tuning hard-coded in `Game` constructor.
+11. Lives cap 3 hard-coded in `Game._updateHearts` / `Player` (ignores `HEART_DROP.maxLives`). ~~Chain tuning hard-coded in `Game` constructor~~ moved to `js/config/ChainConfig.js` on `feat/anvil-forge`.
 12. Cable hit uses the straight p1→p2 segment, not the drawn sagging cable; a still saw also kills.
 
 Audio, UI, editor
@@ -79,3 +80,10 @@ Design: `.agents/tasks/2026-10-29-inicio-core-loop/design.md`; task: `.agents/ta
 - Done (Editor 2.0 maps only): shared scrap pot with arc/rest/magnet pickups and enemy drops, top-center counter, chests that open by proximity with the amount authored in the editor, anvil and chests solid at their base and y-sorted, `t()` tables (ADR 0013), speech bubbles (`DialogueSystem.say`, debug global `window.dialogue`). `map/demo/inicial.json` got Baú 1 at (21,26) with 10 scrap. `active.json` still points at `demo_campaign.json` (slice 5).
 - Placeholders: scrap uses the coin sprite at half pixel size; `scrapPickup`, `chestOpen`, `voiceBlip` reuse trailer wavs. Asset requests: scrap floor sprite + HUD icon, speech bubble art, real sounds.
 - Known limits: chests open by straight distance (through walls); scrap flies over walls and holes (only clamped to the arena) and can rest in a walled pocket outside the magnet radius; enemies' navigation ignores solid props; dialogue lines are not wired to events yet (script = slice 5); button icons inside bubbles not done; an interact tap that skips a line also triggers a `DemoProgress` interactive in range; the bubble is misplaced in F6 split mode; restart closes opened chests (death rule = slice 4). Scrap left on the floor, and scrap of a chest still opening, is credited when leaving the room.
+
+## Início — fatia 2 `feat/anvil-forge` (2026-10-29)
+Branch from `feat/scrap-chest` (needs the scrap pot). Task: `.agents/tasks/2026-10-29-anvil-forge/`.
+- Done (Editor 2.0 maps): runs start without cable/saw when an anvil offers the Serra (`demo_campaign.json` has no anvil and keeps the saw); anvil menu with shared cursor and frozen game; recipes per anvil in the editor; Serra (10), Tamanho, Elasticidade, Serra dupla; saw cinematic, saw on the anvil, bigger first reconnect + "SERRA" title; `CHAIN` config (#11, cable part).
+- Out of this slice: Peso and saw drag (slice 3), boots and the Boots-room anvil, zones (the menu is blocked by live enemies in the room, not by a zone), the death rule that keeps items (restart clears purchases).
+- Known limits: Serra dupla lives in the 204–240 px band, above the strain distance, so it usually lasts until the strain snap (~0,5 s) unless the pair closes in or has Elasticidade; tune when playing. The saw drawn during the cinematic jump is under the darkness. Menu icons and hammer art are missing (text rows, sparks only). `forgeBuy`/`forgeHammer` are trailer placeholders.
+- Observed on `demo_campaign.json` (main map, `?skipTrailer`): the pair spawns ~470 px apart and the cable snaps on the first frame. Spawn code was not touched by this slice; not confirmed on `main`.

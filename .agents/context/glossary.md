@@ -53,6 +53,11 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Chest | baú | Prop `chest`/`mini_chest` that opens once when any player gets within ~2 tiles and bursts its authored scrap (`prop.scrap`) |
 | Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
 | Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
+| Anvil / forge | bigorna / forja | Prop `anvil`; interact opens the forge menu (`ForgeSystem`), which sells the recipes the anvil offers (`prop.recipes`) for scrap |
+| Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`, `elasticity`, `doubleSaw`), with a cost per level |
+| Upgrade | melhoria | Tamanho (+20% disc), Elasticidade (+15% cable), Serra dupla; Peso comes in slice 3 |
+| Double saw | serra dupla | Upgrade: near the break distance the disc splits into two at 1/3 and 2/3 of the cable and merges back when the pair closes in |
+| Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 
 ## Enemies (editor labels)

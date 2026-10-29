@@ -91,7 +91,8 @@ Disabled by default; toggled with `I` (own keydown listener) or `window.playerAI
 
 ## Config knobs
 
-- `js/Game.js` constructor (hardcoded Chain config): `rest 130`, `stiffness 0.02`, `breakDistance 240`, `strainDistance 165`, `strainLimit 30`, `reconnectDistance 110`, `pickupRadius 60`, `snapImpulse 12`, `playerSafeZone: PLAYER_SAFE_ZONE`. `reconnectDelay` default 20 (Chain.js).
+- `js/config/ChainConfig.js` `CHAIN` (was hard-coded in the `Game` constructor until `feat/anvil-forge`): `rest 130`, `stiffness 0.02`, `breakDistance 240`, `strainDistance 165`, `strainLimit 30`, `reconnectDistance 110`, `pickupRadius 60`, `snapImpulse 12`, `playerSafeZone: PLAYER_SAFE_ZONE`. `reconnectDelay` default 20 (Chain.js). The Elasticidade upgrade rewrites `chain.strainDistance`/`breakDistance` from these bases (`applySawUpgrades`).
+- Saw absent (Editor 2.0 maps whose anvil offers the Serra recipe): `chain.reset({ present: false })` → `hasSaw` false, not connected, `_canReconnect` and `forceDrop` refuse, nothing is drawn. `reset()` without arguments keeps the current `present` (door transition). `chain.spawnSaw(x, y)` makes it present and dropped at a point; both players must then come within `pickupRadius`. While absent, players walk free and dash only if `demoProgress.state.dash`.
 - `js/config/GameConfig.js`: `PLAYER_DASH`, `MAX_PLAYER_SEPARATION`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `graceFrames`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
 - `js/config/EntityConfig.js`: `playerConfigs` (color, controls, name, sprite crops, `drawHeight`, hurt/scared sheets).
 - `Player.js` (hardcoded): `speed`, `lives`, invuln 65, knockback 16, `hurtDuration`, `scaredDuration`, `fallDuration`, `slideDuration`.

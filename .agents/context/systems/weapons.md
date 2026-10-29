@@ -42,7 +42,15 @@ The only weapon is a saw disc riding the midpoint of the cable that chains P1 an
 6. Render: `chain.drawChain` before entities; `chain.draw` between entities with `y <= sawY` and `y > sawY` (depth sort around the disc); `chain.drawDropped`.
 
 ## Config knobs
-SawWeapon module constants (top of `SawWeapon.js`); Chain options in `Game` constructor; `PLAYER_SAFE_ZONE`, `HIT_SLOWMO` in `GameConfig.js`; motor constants at top of `SawMotorAudio.js`; cues `sawHit`, `sawSnap`, `sawLand`, `sawPickup`, `sawMotor` (loop, `volume 0.38`) in `js/config/AudioConfig.js`.
+SawWeapon module constants (top of `SawWeapon.js`); Chain options in `js/config/ChainConfig.js` (`CHAIN`); forge upgrades in `js/config/ForgeConfig.js`; `PLAYER_SAFE_ZONE`, `HIT_SLOWMO` in `GameConfig.js`; motor constants at top of `SawMotorAudio.js`; cues `sawHit`, `sawSnap`, `sawLand`, `sawPickup`, `sawMotor` (loop, `volume 0.38`) in `js/config/AudioConfig.js`.
+
+## Forge upgrades (Editor 2.0 maps, `feat/anvil-forge`)
+`applySawUpgrades(forge, chain, weapon, CHAIN)` (`js/systems/ForgeState.js`) turns bought levels into parameters; `Game._applySawUpgrades` calls it after each purchase and in `newDungeon`.
+- **Tamanho** (3 levels, 8/14/22): `weapon.sizeScale = 1 + 0.2·level`. `discRadius` (disc hits), `collisionRadius` and the drawn size (connected, dropped, `drawAt`) scale with it. The cable hit width (`hitThreshold` 14) does not.
+- **Elasticidade** (3 levels, 8/14/22): `strainDistance` and `breakDistance` × `1 + 0.15·level`.
+- **Serra dupla** (1 level, 30): `weapon.doubleSaw`. `Chain.update` feeds `weapon.setStretch(dist / breakDistance)`. At `splitAt` (0,85) the target becomes split, at `mergeAt` (0,7) whole again (hysteresis); `split` eases 0→1 over `splitSteps` (12). While split, `getSawPositions` returns two discs at t = 0,5 ∓ k/6 of the cable (1/3 and 2/3 when fully split). One-frame flags `justSplit`/`justMerged` → `Game._sawSplitFeedback` (pitched `sawLand`, shake 3, spark bursts). A dropped saw is never split. Note: 85% of 240 = 204 px is above `strainDistance` 165, so the split normally lasts until the strain timer (30 steps) snaps the cable, unless the pair closes in.
+- `CombatSystem.resolveWeaponHits` and the saw collision in `Game._updateGameplay` loop over every saw position; drop point, sparks, light and the render split still use `[0]`.
+- `playReconnect(scale = 0.5)`: the first reconnect after the forge uses `SAW_CINEMATIC.firstReconnectScale` (1,1). `drawAt(ctx, x, y, { rotation, sx, sy, glow })` draws a loose disc for the cinematic.
 
 ## Invariants & gotchas
 - Code assumes `getSawPositions(...)[0]` exists whenever the method exists (Game render and FX index `[0]` without checks).

@@ -60,6 +60,7 @@ Web Audio graph: `loop gain → _duckNode → _preNode → _masterNode → desti
 - `playerStep` also at dash landing (`Game._dashLandFeedback`, rate × `PLAYER_DASH.landStepRate`).
 - `playerDash` `Game._dashFeedback` on `player.justDashed`. PLACEHOLDER: reuses the `arrow-fire-0N.wav` files at `rate` 1.45 until a real whoosh exists.
 - `scrapPickup` `ScrapSystem._playPickup` (streak: +3% rate per pickup within 900 ms, up to 10); `chestOpen` `ChestSystem.update`; `voiceBlip` `DialogueSystem._blip` (rate 0.92 Amarelo / 1.18 Azul, ±5%). PLACEHOLDERS: all three reuse trailer files (`assets/audio/trailer/pop-0N`, `thunk-0N`, `blip-0N`) until real assets exist.
+- `forgeBuy` `ForgeSystem.buy` (placeholder `trailer/sting.wav`); `forgeHammer` `SawForgeCinematic.update`, rate +6% per hit (placeholder `trailer/impact-0N`). `sawLand` also on the cinematic landing and, pitched up, on Serra dupla split/merge (`Game._sawSplitFeedback`).
 - `uiMove`, `uiConfirm` `PixelButton`/`PixelSlider`; `uiOpen`/`uiClose`/`uiConfirm` `Game.setPaused`, `_pollMenuPad`, `_bindButtons`
 - Loops: `ambience` (`setLoopLevel` −12 dB paused, −10 dB game over, 0 on resume/new dungeon), `sawMotor` (LoopVoice)
 - Ducks: sawHit −7, sawSnap −9, playerFall −8, playerHit −6, sawPickup −4 dB.
