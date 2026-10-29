@@ -17,9 +17,9 @@ Implement the Início core loop, one slice at a time, starting with **slice 1, `
 |---|---|---|---|
 | `feat/editor2-anvil-prop` | `ae41338` | yes (this handoff) | anvil prop (`01f4f2b`) + `inicial.json` layout (`ae41338`) |
 | `feat/scrap-chest` | this handoff commit, on top of `14c7bb7` | yes (this handoff) | design.md, slice 1 plan, this handoff |
-| `main` (local) | `ae41338` | **no** | fast-forwarded locally to `feat/editor2-anvil-prop`; `origin/main` is still `7a20a5d` |
+| `main` | `ae41338` | yes (user asked for a direct push) | fast-forward to `feat/editor2-anvil-prop` (anvil prop + `inicial.json` layout) |
 
-Pending decision for the user: how `feat/editor2-anvil-prop` reaches `origin/main`, either a PR (the `AGENTS.md` workflow) or a direct push. Until then, `feat/scrap-chest` is based on a commit that is not on `origin/main` yet. That works, but the PR for slice 1 will also show those two commits.
+`feat/editor2-anvil-prop` is fully merged into `main` and can be deleted. `feat/scrap-chest` branches from `main` at `ae41338`.
 
 ## Resume on the new PC
 ```powershell
