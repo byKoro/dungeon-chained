@@ -1,4 +1,5 @@
 import { Weapon } from './Weapon.js';
+import { SAW_CONTACT } from '../config/SawWeaponConfig.js';
 
 const SAW_FRAME = { size: 16, cols: 4 };
 const ROW_INERTIA_CLEAN = 0;
@@ -48,6 +49,7 @@ export class SawWeapon extends Weapon {
         this.bloodTimer = 0;
         this.onBlood = false;
         this.spin = 0;
+        this._cuttingSteps = 0;
         this.rotation = 0;
         this.wasSpinning = false;
         this.spinKick = 0;
@@ -96,6 +98,7 @@ export class SawWeapon extends Weapon {
     }
 
     drop(x, y) {
+        this._cuttingSteps = 0;
         this.dropped = true;
         this.dropX = x;
         this.dropY = y;
@@ -107,6 +110,8 @@ export class SawWeapon extends Weapon {
     }
 
     pickup() {
+        this._cuttingSteps = 0;
+        this.obstacleContacts?.clear();
         this.thrown = false;
         this.dropped = false;
     }
@@ -142,6 +147,12 @@ export class SawWeapon extends Weapon {
             const mag = Math.min(p1.speedMag ?? 0, p2.speedMag ?? 0);
             target = Math.max(0, Math.min(1, mag / speed));
         }
+        if (this.obstacleContacts?.size) this._sustainCutting();
+        if (this._cuttingSteps > 0) {
+            this._cuttingSteps--;
+            target = Math.max(target, SAW_CONTACT.minimumSpin);
+            this.spin = Math.max(this.spin, SAW_CONTACT.minimumSpin);
+        }
 
         if (p1 && p2) {
             const vx = (p1.vx + p2.vx) / 2;
@@ -173,8 +184,13 @@ export class SawWeapon extends Weapon {
         if (this.spinKick > 0) this.spinKick = Math.max(0, this.spinKick - 0.08);
     }
 
-    onHit() {
-        this.bloodTimer = BLOOD_DURATION;
+    onHit({ blood = true } = {}) {
+        if (blood) this.bloodTimer = BLOOD_DURATION;
+        this._sustainCutting();
+    }
+
+    _sustainCutting() {
+        if (this.spin >= SAW_CONTACT.activationSpin) this._cuttingSteps = SAW_CONTACT.holdSteps;
     }
 
     setOnBlood(flag) {
