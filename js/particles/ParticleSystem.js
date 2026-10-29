@@ -4,7 +4,8 @@ import { SparkParticle } from './SparkParticle.js';
 import { FlashParticle } from './FlashParticle.js';
 import { FlameParticle } from './FlameParticle.js';
 import { DamageNumber } from './DamageNumber.js';
-import { DAMAGE_NUMBER } from '../config/CombatFeelConfig.js';
+import { DamageCombo } from './DamageCombo.js';
+import { DAMAGE_NUMBER, DAMAGE_COMBO } from '../config/CombatFeelConfig.js';
 import { LavaFragment } from './LavaFragment.js';
 import { ARAUTO_FX } from '../config/ArautoEffectsConfig.js';
 
@@ -102,6 +103,7 @@ export class ParticleSystem {
         this.flashes = [];
         this.flames = [];
         this.damageNumbers = [];
+        this.damageCombos = [];
         this.lavaFragments = [];
         this.bloodCanvas = bloodCanvas;
     }
@@ -114,13 +116,28 @@ export class ParticleSystem {
         this.sparks = [];
         this.flashes = [];
         this.flames = [];
-        this.damageNumbers = [];
+        this.clearDamageNumbers();
         if (this.bloodCanvas) this.bloodCanvas.clear();
+    }
+
+    clearDamageNumbers() {
+        this.damageNumbers = [];
+        this.damageCombos = [];
     }
 
     triggerDamageNumber(x, y, amount, opts = {}) {
         this.damageNumbers.push(new DamageNumber(x, y, amount, opts));
         while (this.damageNumbers.length > DAMAGE_NUMBER.max) this.damageNumbers.shift();
+    }
+
+    // Soma o golpe no combo aberto do inimigo, ou abre um novo. `top` = onde nasce o número individual.
+    triggerDamageCombo(target, top, amount, opts = {}) {
+        const combo = this.damageCombos.find(c => c.open && c.target === target);
+        if (combo) { combo.add(amount, top, opts); return combo; }
+        const created = new DamageCombo(target, top, amount, opts);
+        this.damageCombos.push(created);
+        while (this.damageCombos.length > DAMAGE_COMBO.max) this.damageCombos.shift();
+        return created;
     }
 
     triggerLavaDebris(x, y, amount = ARAUTO_FX.contactPieces, opts = {}) {
@@ -242,14 +259,17 @@ export class ParticleSystem {
         updateAndCompact(this.flashes);
         updateAndCompact(this.flames);
         updateAndCompact(this.damageNumbers);
+        updateAndCompact(this.damageCombos);
     }
 
     get hasDamageNumbers() {
-        return this.damageNumbers.length > 0;
+        return this.damageNumbers.length > 0 || this.damageCombos.length > 0;
     }
 
+    // Os totais vêm depois: ficam por cima dos números individuais.
     drawDamageNumbers(ctx) {
         for (let i = 0; i < this.damageNumbers.length; i++) this.damageNumbers[i].draw(ctx);
+        for (let i = 0; i < this.damageCombos.length; i++) this.damageCombos[i].draw(ctx);
     }
 
     drawFloor(ctx, clip, holes = null) {

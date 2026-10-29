@@ -1,21 +1,8 @@
-import { FRAME } from './PixelButton.js';
+import { FACE_H, LIP, drawStoneFrame } from './PixelButton.js';
 import { drawText, measureText } from './PixelFont.js';
 import { BOSS_BAR } from '../config/BossBarConfig.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
-// Chama de pixel (o = laranja, y = amarelo, d = contorno escuro, . = vazio).
-const FLAME = [
-    '...d...',
-    '..dod..',
-    '..doo.d',
-    '.dooood',
-    '.dooyod',
-    'doooyyod',
-    'doyyyyod',
-    '.dyyyyd.',
-    '..dyyd..'
-].map(row => row.padEnd(8, '.'));
 
 // Barra de vida do chefe em coordenadas de tela. `getState()` devolve { name, hp, max, phase, phaseAt? } enquanto
 // houver um encontro ativo e null caso contrário (o Game decide); esta classe só desenha e anima.
@@ -60,9 +47,9 @@ export class BossHealthBar {
         else this.trail = this.ratio;
     }
 
-    // Paleta do preenchimento: a fase 2 usa o degradê mais quente.
+    // Cores da face da vida: vermelho do RESUME na fase 1, lava na fase 2.
     palette() {
-        return this.config.colors.fill[this.phase >= 2 ? 1 : 0];
+        return this.config.colors.face[this.phase >= 2 ? 1 : 0];
     }
 
     // Altura da placa de nome em pixels lógicos (texto de 7 px na escala do nome, mais respiro).
@@ -75,7 +62,7 @@ export class BossHealthBar {
         const c = this.config;
         const S = Math.max(c.minScale, Math.round(H / c.scaleDivisor));
         const plateH = this.plateHeight();
-        const hL = plateH + c.plateGap + c.barHeight + c.padding * 2;
+        const hL = plateH + c.plateGap + c.barHeight + c.padding * 2 + c.dripRoom;
         const hPx = hL * S;
         const margin = Math.round(Math.max(10, S * 1.5));
         const free = span || { left: margin, right: W - margin, top: H };
@@ -119,22 +106,59 @@ export class BossHealthBar {
         return { left: dx, right: dx + w * k };
     }
 
-    _drawFlame(g, x, y, flip = false) {
-        const c = this.config.colors.flame;
-        for (let r = 0; r < FLAME.length; r++) {
-            for (let col = 0; col < FLAME[r].length; col++) {
-                const ch = FLAME[r][flip ? FLAME[r].length - 1 - col : col];
-                if (ch === '.') continue;
-                g.fillStyle = c[ch];
-                g.fillRect(x + col, y + r, 1, 1);
+    _pulse(hz, offset = 0) {
+        return 0.5 + 0.5 * Math.sin(this.time * Math.PI * 2 * hz + offset);
+    }
+
+    // Face da vida no mesmo desenho do botão RESUME (brilho, sombra, reflexo e lábio), cortada no HP.
+    _drawFace(g, rect, x0, y0, w) {
+        const c = this.config, f = this.palette();
+        const fillW = Math.round(w * this.ratio);
+        const trailW = Math.round(w * this.trail);
+        if (trailW > fillW) rect(x0 + fillW, y0, trailW - fillW, FACE_H, c.colors.trail);
+        if (fillW > 0) {
+            rect(x0, y0, fillW, FACE_H, f.base);
+            rect(x0, y0, fillW, 1, f.light);
+            rect(x0, y0 + 1, 1, FACE_H - 2, f.light);
+            rect(x0, y0 + FACE_H - 1, fillW, 1, f.dark);
+            if (fillW > 1) rect(x0 + fillW - 1, y0 + 1, 1, FACE_H - 1, f.dark);
+            for (const [sx, sy] of [[1, 1], [2, 1], [1, 2]]) if (sx < fillW - 1) rect(x0 + sx, y0 + sy, 1, 1, f.spec);
+            if (this.phase >= 2 && fillW > 2) {
+                g.globalAlpha = 0.25 * this._pulse(c.pulseHz);
+                rect(x0 + 1, y0 + 3, fillW - 2, 1, f.spec);
+                g.globalAlpha = 1;
             }
+            rect(x0, y0 + FACE_H, fillW, LIP, f.lip);
         }
+        g.globalAlpha = 0.45;
+        for (let t = c.tickEvery; t < 1 - 1e-6; t += c.tickEvery) rect(x0 + Math.round(w * t), y0, 1, FACE_H, c.colors.tick);
+        g.globalAlpha = 1;
+        if (this.phaseAt != null && this.phaseAt > 0 && this.phaseAt < 1) {
+            const mx = x0 + Math.round(w * this.phaseAt);
+            rect(mx - 1, y0 - 1, 3, FACE_H + LIP + 2, c.colors.phaseMark);
+            rect(mx, y0 - 1, 1, FACE_H + LIP + 2, f.light);
+        }
+    }
+
+    // Pingos de lava pendurados na borda de baixo da moldura (no lugar dos pingos de sangue do RESUME).
+    // A ponta brilha devagar, cada pingo fora de fase com os outros.
+    _drawDrips(g, rect, W, H) {
+        const c = this.config, d = c.colors.drip;
+        c.drips.forEach(([at, len], i) => {
+            const dx = Math.floor(W * at);
+            rect(dx, H - 1, 1, 1, d.base);
+            if (len > 1) rect(dx, H, 1, len - 1, d.body);
+            rect(dx, H - 1 + len, 1, 1, d.body);
+            g.globalAlpha = this._pulse(c.dripPulseHz, i * 1.7);
+            rect(dx, H - 1 + len, 1, 1, d.tip);
+            g.globalAlpha = 1;
+        });
     }
 
     draw(ctx, W, H, span = null) {
         if (!this.visible || this.alpha <= 0) return;
         const c = this.config;
-        const { S, x, y, wL, hL, plateH, barTop } = this.layout(W, H, span);
+        const { S, x, y, wL, hL, barTop } = this.layout(W, H, span);
         if (!this._buf) this._buf = document.createElement('canvas');
         const buf = this._buf;
         if (buf.width !== wL || buf.height !== hL) { buf.width = wL; buf.height = hL; }
@@ -142,76 +166,19 @@ export class BossHealthBar {
         g.clearRect(0, 0, wL, hL);
         const rect = (rx, ry, w, h, color) => { g.fillStyle = color; g.fillRect(rx, ry, w, h); };
 
-        // --- placa de nome, centralizada, com chamas dos dois lados ---
         const text = this.name.toUpperCase();
-        const maxChars = Math.max(0, Math.floor((wL - 28) / (6 * c.nameScale)));
+        const maxChars = Math.max(0, Math.floor((wL - 4) / (6 * c.nameScale)));
         const shown = text.length > maxChars ? text.slice(0, maxChars) : text;
-        if (shown) {
-            const span2 = this._drawName(g, shown, wL / 2, 1);
-            const fy = Math.round((plateH - FLAME.length) / 2);
-            this._drawFlame(g, span2.left - 12, fy);
-            this._drawFlame(g, span2.right + 4, fy, true);
-        }
+        if (shown) this._drawName(g, shown, wL / 2, 1);
 
-        // --- moldura de pedra da barra ---
-        const bh = hL - barTop;
-        rect(0, barTop, wL, bh, FRAME.outline);
-        rect(1, barTop + 1, wL - 2, bh - 2, FRAME.stone);
-        rect(1, barTop + 1, wL - 2, 1, FRAME.stoneLight);
-        rect(1, barTop + bh - 2, wL - 2, 1, FRAME.stoneDark);
-        rect(1, barTop + 1, 1, bh - 2, FRAME.stoneLight);
-        rect(wL - 2, barTop + 1, 1, bh - 2, FRAME.stoneDark);
-        // rebites nos cantos
-        for (const [rx, ry] of [[2, barTop + 2], [wL - 4, barTop + 2], [2, barTop + bh - 4], [wL - 4, barTop + bh - 4]]) {
-            rect(rx, ry, 2, 2, FRAME.iron);
-            rect(rx, ry, 1, 1, FRAME.ironLight);
-        }
-
-        const pad = c.padding;
-        const wellX = pad + 1, wellY = barTop + pad, wellW = wL - (pad + 1) * 2, wellH = bh - pad * 2;
-        rect(wellX, wellY, wellW, wellH, c.colors.well);
-
-        // emblema de chama na ponta esquerda, num disco de pedra escura
-        const em = c.emblemSize;
-        const emX = wellX + 1, emY = wellY + Math.floor((wellH - em) / 2);
-        rect(emX, emY, em, em, c.colors.emblemBack);
-        rect(emX, emY, em, 1, FRAME.stoneDark);
-        rect(emX, emY + em - 1, em, 1, FRAME.stoneLight);
-        this._drawFlame(g, emX + Math.floor((em - 8) / 2) + 1, emY + Math.floor((em - FLAME.length) / 2));
-
-        // --- trilho de vida ---
-        const trackX = emX + em + 2, trackY = wellY + 1, trackH = wellH - 2;
-        const trackW = wellX + wellW - 1 - trackX;
-        if (trackW > 4) {
-            const [light, mid, dark] = this.palette();
-            rect(trackX, trackY, trackW, trackH, c.colors.trackBack);
-            const trailW = Math.round(trackW * this.trail);
-            const fillW = Math.round(trackW * this.ratio);
-            if (trailW > fillW) rect(trackX + fillW, trackY, trailW - fillW, trackH, c.colors.trail);
-            if (fillW > 0) {
-                const band = Math.max(1, Math.floor(trackH / 4));
-                rect(trackX, trackY, fillW, trackH, mid);
-                rect(trackX, trackY, fillW, band, light);
-                rect(trackX, trackY + trackH - band, fillW, band, dark);
-                // brilho que corre na fase 2 (pulso)
-                if (this.phase >= 2) {
-                    const pulse = 0.5 + 0.5 * Math.sin(this.time * Math.PI * 2 * c.pulseHz);
-                    g.globalAlpha = 0.25 * pulse;
-                    rect(trackX, trackY + band, fillW, 1, '#fff2c4');
-                    g.globalAlpha = 1;
-                }
-                // ponta da vida com brasa acesa
-                rect(trackX + fillW - 1, trackY, 1, trackH, light);
-            }
-            // marcações de 10% em 10%
-            g.globalAlpha = 0.45;
-            for (let t = c.tickEvery; t < 1 - 1e-6; t += c.tickEvery) rect(trackX + Math.round(trackW * t), trackY, 1, trackH, c.colors.tick);
-            g.globalAlpha = 1;
-            if (this.phaseAt != null && this.phaseAt > 0 && this.phaseAt < 1) {
-                rect(trackX + Math.round(trackW * this.phaseAt) - 1, trackY - 1, 3, trackH + 2, c.colors.phaseMark);
-                rect(trackX + Math.round(trackW * this.phaseAt), trackY - 1, 1, trackH + 2, this.palette()[0]);
-            }
-        }
+        // Moldura do RESUME (largura - 1: a sombra cai 1 px à direita e abaixo).
+        const fw = wL - 1, fh = c.barHeight + c.padding * 2;
+        g.save();
+        g.translate(0, barTop);
+        drawStoneFrame(g, fw, fh);
+        this._drawFace(g, rect, 3, 3, fw - 6);
+        this._drawDrips(g, rect, fw, fh);
+        g.restore();
 
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);

@@ -711,7 +711,7 @@ export class Game {
         if (firstPickup) this._onSawReconnect();
         this._sawOnAnvil = false;
 
-        this.particleSystem.damageNumbers = [];
+        this.particleSystem.clearDamageNumbers();
 
         const combat = this._activateRoomEnemies();
         if (!combat && !this.rooms.isLocked()) {

@@ -209,6 +209,7 @@ export class CombatSystem {
         ps.triggerDamageNumber?.(enemy.x, top, info.damage, {
             color: info.killed ? DAMAGE_NUMBER.killColor : info.poiseBroken ? DAMAGE_NUMBER.breakColor : DAMAGE_NUMBER.color
         });
+        ps.triggerDamageCombo?.(enemy, top, info.damage, { killed: info.killed });
     }
 
     _materialHit(enemy, info) {

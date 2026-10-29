@@ -60,3 +60,28 @@ export const DAMAGE_NUMBER = Object.freeze({
     breakColor: '#ffd24a',
     outline: '#1a0d14'
 });
+
+// Total do combo: soma os golpes seguidos no mesmo inimigo e flutua acima dos números individuais.
+// Tempos em passos de simulação (60 por segundo).
+export const DAMAGE_COMBO = Object.freeze({
+    max: 8,
+    // O combo continua se o próximo golpe vier até esta janela depois do anterior (0,8 s).
+    windowSteps: 48,
+    // Depois do fim do combo (ou da morte do inimigo): fica parado e então some (~0,5 s no total).
+    holdSteps: 16,
+    fadeSteps: 14,
+    // O total só aparece a partir deste número de golpes.
+    minHits: 2,
+    // Acima do ponto onde nascem os números individuais (eles sobem ~26 px até parar).
+    offsetY: 34,
+    // 1,5x o pixel do número individual.
+    pixel: 6,
+    popScale: 1.45,
+    popSteps: 6,
+    outline: '#1a0d14',
+    // [total mínimo, cor]: branco → amarelo claro → escuro → vermelho claro → escuro.
+    ramp: [
+        [2, '#ffffff'], [3, '#fff1a8'], [5, '#ffd24a'], [7, '#e8a317'],
+        [10, '#ff6b4a'], [14, '#e8262a'], [20, '#a8121c']
+    ]
+});

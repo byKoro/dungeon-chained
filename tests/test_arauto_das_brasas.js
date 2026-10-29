@@ -422,7 +422,8 @@ const startAttack2 = (e, ps) => {
     const wide = bar.layout(1920, 1080, { left: 500, right: 1400, top: 960 });
     assert.ok(wide.x >= 500 && wide.x + wide.wL * wide.S <= 1400, 'não invade os retratos');
     assert.ok(wide.y + wide.hL * wide.S <= 1080);
-    assert.equal(wide.hL, bar.plateHeight() + BOSS_BAR.plateGap + BOSS_BAR.barHeight + BOSS_BAR.padding * 2, 'altura inclui a placa de nome');
+    assert.equal(wide.hL, bar.plateHeight() + BOSS_BAR.plateGap + BOSS_BAR.barHeight + BOSS_BAR.padding * 2 + BOSS_BAR.dripRoom, 'altura inclui a placa de nome e os pingos');
+    assert.equal(BOSS_BAR.barHeight + BOSS_BAR.padding * 2, 19, 'mesma altura do botão RESUME');
     assert.equal(wide.barTop, bar.plateHeight() + BOSS_BAR.plateGap, 'a barra fica abaixo da placa de nome');
     const narrow = bar.layout(700, 900, { left: 380, right: 320, top: 800 });
     assert.ok(narrow.y + narrow.hL * narrow.S <= 800, 'janela estreita: barra acima do HUD');
