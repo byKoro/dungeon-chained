@@ -69,3 +69,10 @@ export function applySawUpgrades(forge, chain, weapon, base, recipes = FORGE.rec
     weapon.mergeAt = recipes.doubleSaw.mergeAt;
     weapon.splitSteps = recipes.doubleSaw.splitSteps;
 }
+
+// Arrasto com o nível atual de Peso: distância máxima (px) e escala de velocidade de quem arrasta.
+export function sawDragStats(forge, tile, recipes = FORGE.recipes) {
+    const r = recipes.weight;
+    const lvl = Math.min(forge.level("weight"), r.dragTiles.length - 1);
+    return { limit: r.dragTiles[lvl] * tile, speedScale: r.dragSpeed[lvl] };
+}

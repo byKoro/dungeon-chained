@@ -53,7 +53,7 @@ assert(!fs.open && fs.prompt === "forge.blocked", "com inimigos vivos não abre"
 enemiesAlive = false;
 
 tap(fs, "shiftright");
-assert(fs.open && fs.recipes.join() === "saw,size,elasticity,doubleSaw", "P2 perto abre com as receitas padrão");
+assert(fs.open && fs.recipes.join() === "saw,size,elasticity,weight,doubleSaw", "P2 perto abre com as receitas padrão");
 assert(sounds.includes("uiOpen"), "som de abrir");
 fs.handleInput();
 assert(fs.open, "a tecla que abriu não fecha no frame seguinte");
@@ -71,7 +71,7 @@ fs.handleInput({ up: true });
 fs.handleInput({});
 assert(fs.cursor === 0, "D-pad sobe o cursor");
 fs.handleInput({ up: true });
-assert(fs.cursor === 3, "o cursor dá a volta");
+assert(fs.cursor === 4, "o cursor dá a volta");
 fs.handleInput({ down: true }); fs.handleInput({ down: true });
 fs.handleInput({ a: true });
 assert(bought[1] === "size" && scrap.amount === 12, "A do controle compra Tamanho (8)");

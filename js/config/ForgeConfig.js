@@ -8,15 +8,33 @@ export const FORGE = Object.freeze({
         saw: { kind: "item", costs: [10] },
         size: { kind: "upgrade", item: "saw", costs: [8, 14, 22], perLevel: 0.2 },
         elasticity: { kind: "upgrade", item: "saw", costs: [8, 14, 22], perLevel: 0.15 },
-        doubleSaw: { kind: "upgrade", item: "saw", costs: [30], splitAt: 0.85, mergeAt: 0.7, splitSteps: 12 }
+        doubleSaw: { kind: "upgrade", item: "saw", costs: [30], splitAt: 0.85, mergeAt: 0.7, splitSteps: 12 },
+        // Por nível (índice 0 = sem a melhoria): distância de arrasto em tiles e velocidade de quem arrasta.
+        weight: { kind: "upgrade", item: "saw", costs: [10, 18], dragTiles: [2, 3, 4], dragSpeed: [0.4, 0.55, 0.7] }
     }),
-    defaultRecipes: Object.freeze(["saw", "size", "elasticity", "doubleSaw"]),
+    defaultRecipes: Object.freeze(["saw", "size", "elasticity", "weight", "doubleSaw"]),
     denySteps: 12,
     denyRate: 0.6,
     splitFeedback: Object.freeze({ shake: 3, sparks: 6, power: 0.8, splitRate: 1.35, mergeRate: 1.15 })
 });
 
 export const FORGE_RECIPE_IDS = Object.freeze(Object.keys(FORGE.recipes));
+
+// Arrastar a serra largada: um jogador segura interagir perto dela e a puxa por um cabo curto.
+// Distâncias em px de mundo, tempos em steps de 60 Hz.
+export const SAW_DRAG = Object.freeze({
+    grabRadius: 70,
+    grabSteps: 14,
+    ropeLength: 46,
+    ropeSlack: 40,
+    regrabSteps: 30,
+    snapShake: 4,
+    snapSparks: 6,
+    ropeColor: "#2a2230",
+    ropeLight: "#6e6684",
+    ropeWidth: 4,
+    ropeSag: 10
+});
 
 // Cinemática de craft da Serra (~4 s, segundos de simulação).
 export const SAW_CINEMATIC = Object.freeze({

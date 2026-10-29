@@ -17,10 +17,12 @@ export const EN = Object.freeze({
     "forge.size": "Size",
     "forge.elasticity": "Elasticity",
     "forge.doubleSaw": "Double saw",
+    "forge.weight": "Weight",
     "forge.desc.saw": "Unlocks the pair's weapon.",
     "forge.desc.size": "+20% disc and hit radius.",
     "forge.desc.elasticity": "+15% cable before it snaps.",
     "forge.desc.doubleSaw": "Stretched, the saw splits in two.",
+    "forge.desc.weight": "Drag the saw farther and faster.",
     "forge.max": "MAX",
     "forge.locked": "Needs the Saw.",
     "forge.poor": "Not enough scrap.",
@@ -28,5 +30,6 @@ export const EN = Object.freeze({
     "forge.hint": "Space/Enter/A: forge   E/B: leave",
     "forge.prompt": "Anvil: P1 E / P2 Right Shift / pad X",
     "forge.blocked": "Enemies nearby! You can't forge now.",
+    "drag.prompt": "Saw: hold E / Right Shift / pad X to drag",
     "chest.prompt": "Chest: P1 E / P2 Right Shift / pad X"
 });

@@ -17,10 +17,12 @@ export const PT_BR = Object.freeze({
     "forge.size": "Tamanho",
     "forge.elasticity": "Elasticidade",
     "forge.doubleSaw": "Serra dupla",
+    "forge.weight": "Peso",
     "forge.desc.saw": "Libera a arma da dupla.",
     "forge.desc.size": "+20% no disco e no acerto.",
     "forge.desc.elasticity": "+15% de cabo antes de arrebentar.",
     "forge.desc.doubleSaw": "Esticada, a serra vira duas.",
+    "forge.desc.weight": "Arrasta a serra mais longe e mais rápido.",
     "forge.max": "MAX",
     "forge.locked": "Precisa da Serra.",
     "forge.poor": "Falta sucata.",
@@ -28,5 +30,6 @@ export const PT_BR = Object.freeze({
     "forge.hint": "Espaço/Enter/A: forjar   E/B: sair",
     "forge.prompt": "Bigorna: P1 E / P2 Shift direito / controle X",
     "forge.blocked": "Inimigos por perto! Não dá para forjar.",
+    "drag.prompt": "Serra: segure E / Shift direito / controle X para arrastar",
     "chest.prompt": "Baú: P1 E / P2 Shift direito / controle X"
 });

@@ -9,7 +9,8 @@ import { ChestSystem } from './systems/ChestSystem.js';
 import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
-import { ForgeState, mapOffersRecipe, applySawUpgrades } from './systems/ForgeState.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
+import { SawDrag } from './systems/SawDrag.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
@@ -200,6 +201,14 @@ export class Game {
             onBuy: (id, result, anvil) => this._onForgeBuy(id, anvil)
         }) : null;
         this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
+        this.sawDrag = this.mapData ? new SawDrag({
+            chain: this.chain, getPlayers: () => [this.p1, this.p2], input: this.input,
+            getStats: () => sawDragStats(this.forge, TILE),
+            isBlocked: (x, y) => this._sawDragBlocked(x, y),
+            getBounds: () => this.arenaBounds,
+            canDrag: () => !this._sawOnAnvil && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
+        }) : null;
         this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
             renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
             getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
@@ -418,6 +427,7 @@ export class Game {
         this.chests?.reset();
         this.dialogue?.clear();
         this.forgeSystem?.reset();
+        this.sawDrag?.reset();
         this.sawCinematic?.reset();
         this._sawOnAnvil = false;
         this._sawFirstConnect = false;
@@ -504,6 +514,14 @@ export class Game {
         this.dialogue?.say(1, "talk.sawReady");
     }
 
+    // A serra arrastada não entra em buraco nem em parede (o disco tem o raio de colisão da serra).
+    _sawDragBlocked(x, y) {
+        if (this.tiles.isHoleAtWorld(x, y)) return true;
+        const r = this.chain.weapon?.collisionRadius ?? 16;
+        return (this.rooms.current?.wallBoxes || []).some(b =>
+            Math.hypot(x - Math.max(b.x, Math.min(x, b.x + b.w)), y - Math.max(b.y, Math.min(y, b.y + b.h))) < r);
+    }
+
     _onSawReconnect() {
         const first = this._sawFirstConnect;
         this._sawFirstConnect = false;
@@ -558,6 +576,7 @@ export class Game {
         // Saindo com a serra ainda na bigorna, a troca de sala reconecta: toca a primeira conexão aqui.
         const firstPickup = this._sawFirstConnect && this.chain.hasSaw && !this.chain.isConnected;
         if (!this.chain.isConnected) this.chain.reset();
+        this.sawDrag?.reset();
         if (firstPickup) this._onSawReconnect();
         this._sawOnAnvil = false;
 
@@ -823,8 +842,9 @@ export class Game {
         this.playerAI.update();
 
         const canDash = !this.chain.isConnected && (!this.mapData || this.demoProgress.state.dash);
-        p1.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p1) });
-        p2.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p2) });
+        const drag = this.sawDrag;
+        p1.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(0), feetInHole: this.tiles.feetInHole(p1), speedScale: drag?.speedScaleFor(0) ?? 1 });
+        p2.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(1), feetInHole: this.tiles.feetInHole(p2), speedScale: drag?.speedScaleFor(1) ?? 1 });
         this._dashFeedback(p1);
         this._dashFeedback(p2);
 
@@ -834,6 +854,7 @@ export class Game {
         this.effects.processPlayer(p1);
         this.effects.processPlayer(p2);
 
+        this.sawDrag?.update();
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {
@@ -1104,7 +1125,7 @@ export class Game {
         if (this.mapData && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const promptKey = this.sawCinematic?.active ? null : (this.chests?.prompt || this.forgeSystem?.prompt);
+            const promptKey = this.sawCinematic?.active ? null : (this.chests?.prompt || this.forgeSystem?.prompt || this.sawDrag?.prompt);
             const message = this.demoProgress.messageTime ? this.demoProgress.message
                 : (this.demoProgress.prompt || (promptKey ? t(promptKey) : ""));
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
@@ -1166,6 +1187,7 @@ export class Game {
         this.scrap?.drawShadows(ctx);
 
         this.chain.drawChain(ctx, this.p1, this.p2);
+        this.sawDrag?.drawRope(ctx);
 
         const saws = this.chain.weapon?.getSawPositions?.(this.p1, this.p2) ?? [];
         const sawY = saws.length ? saws.reduce((s, p) => s + p.y, 0) / saws.length : (this.p1.y + this.p2.y) / 2;
