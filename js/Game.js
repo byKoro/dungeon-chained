@@ -9,7 +9,7 @@ import { ChestSystem } from './systems/ChestSystem.js';
 import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
-import { ForgeState, mapOffersRecipe } from './systems/ForgeState.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades } from './systems/ForgeState.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
@@ -448,7 +448,18 @@ export class Game {
         return !mapOffersRecipe(this.mapData.map, "saw");
     }
 
-    _applySawUpgrades() {}
+    _applySawUpgrades() {
+        applySawUpgrades(this.forge, this.chain, this.chain.weapon, CHAIN);
+    }
+
+    _sawSplitFeedback(weapon) {
+        if (!weapon?.justSplit && !weapon?.justMerged) return;
+        this.audio.play("sawLand", { rateMultiplier: weapon.justSplit ? 1.35 : 1.15 });
+        this.renderer.triggerShake(3);
+        for (const s of weapon.getSawPositions(this.p1, this.p2)) {
+            this.particleSystem.triggerSparkBurst(s.x, s.y, weapon.discRadius, 6, 0.8);
+        }
+    }
 
     transitionThroughDoor(door) {
         this.chests?.flushPending();
@@ -770,6 +781,7 @@ export class Game {
         this._updateSawLanding();
 
         const weapon = this.chain.weapon;
+        this._sawSplitFeedback(weapon);
         if (this.chain.isConnected && weapon?.isHighSpeed) {
             this.renderer.triggerShake(1.6);
         }
@@ -834,10 +846,8 @@ export class Game {
         for (let it = 0; it < 3; it++) {
             Physics.resolveEntityCollisions(allEntities);
             if (sawR > 0) {
-
-                const sc = weapon.getSawPositions(p1, p2)[0];
-                for (const e of allEntities) {
-                    Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
+                for (const sc of weapon.getSawPositions(p1, p2)) {
+                    for (const e of allEntities) Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
                 }
             }
         }

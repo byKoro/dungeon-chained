@@ -72,8 +72,8 @@ export class CombatSystem {
     resolveWeaponHits(weapon, enemies, p1, p2, connected = true, onKill = null, onHit = null) {
         if (!connected) return;
 
-        const sawPos = weapon.getSawPositions ? weapon.getSawPositions(p1, p2)[0] : null;
-        const discR = (sawPos && weapon.discRadius) ? weapon.discRadius : 0;
+        const saws = weapon.getSawPositions ? weapon.getSawPositions(p1, p2) : [];
+        const discR = (saws.length && weapon.discRadius) ? weapon.discRadius : 0;
         let hits = 0;
         let heavy = false;
 
@@ -87,8 +87,11 @@ export class CombatSystem {
             const nearPlayer = dP1 < PLAYER_SAFE_ZONE || dP2 < PLAYER_SAFE_ZONE;
 
             const hitChain = !nearPlayer && d < weapon.hitThreshold + enemy.hitRadius;
-            const hitDisc = discR > 0 &&
-                Math.hypot(enemy.x - sawPos.x, enemy.y - sawPos.y) < discR + enemy.hitRadius;
+            // Com a Serra dupla há dois discos; vale o que acertou.
+            const sawPos = discR > 0
+                ? saws.find(s => Math.hypot(enemy.x - s.x, enemy.y - s.y) < discR + enemy.hitRadius)
+                : null;
+            const hitDisc = !!sawPos;
 
             if (hitChain || hitDisc) {
                 if (!this.hitFeedback) {

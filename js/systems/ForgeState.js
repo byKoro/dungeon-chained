@@ -56,3 +56,16 @@ export function mapOffersRecipe(map, id) {
     }
     return false;
 }
+
+// Converte os níveis comprados em parâmetros do cabo e da serra (valores-base em `base`).
+export function applySawUpgrades(forge, chain, weapon, base, recipes = FORGE.recipes) {
+    const elastic = 1 + recipes.elasticity.perLevel * forge.level("elasticity");
+    chain.strainDistance = base.strainDistance * elastic;
+    chain.breakDistance = base.breakDistance * elastic;
+    if (!weapon) return;
+    weapon.sizeScale = 1 + recipes.size.perLevel * forge.level("size");
+    weapon.doubleSaw = forge.has("doubleSaw");
+    weapon.splitAt = recipes.doubleSaw.splitAt;
+    weapon.mergeAt = recipes.doubleSaw.mergeAt;
+    weapon.splitSteps = recipes.doubleSaw.splitSteps;
+}

@@ -68,10 +68,25 @@ export class SawWeapon extends Weapon {
         this.dropHover = 0;
 
         this.reconnectTimer = 0;
+        this.reconnectScale = RECONNECT_SCALE;
+
+        // Melhorias da forja (aplicadas pelo Game): tamanho do disco e Serra dupla.
+        this.sizeScale = 1;
+        this.doubleSaw = false;
+        this.splitAt = 0.85;
+        this.mergeAt = 0.7;
+        this.splitSteps = 12;
+        this.stretch = 0;
+        this.split = 0;
+        this._splitTarget = 0;
+        this.justSplit = false;
+        this.justMerged = false;
     }
 
-    playReconnect() {
+    // `scale` = quanto o disco cresce no pulo da reconexão (a primeira, depois da forja, é maior).
+    playReconnect(scale = RECONNECT_SCALE) {
         this.reconnectTimer = RECONNECT_FRAMES;
+        this.reconnectScale = scale;
     }
 
     get _reconnectT() {
@@ -82,10 +97,10 @@ export class SawWeapon extends Weapon {
         if (this.reconnectTimer <= 0) return 1;
         const t = this._reconnectT;
         if (t < RECONNECT_GROW_END) {
-            return 1 + RECONNECT_SCALE * easeOutCubic(t / RECONNECT_GROW_END);
+            return 1 + this.reconnectScale * easeOutCubic(t / RECONNECT_GROW_END);
         }
         const k = (t - RECONNECT_GROW_END) / (1 - RECONNECT_GROW_END);
-        return 1 + RECONNECT_SCALE * (1 - easeOutBack(k));
+        return 1 + this.reconnectScale * (1 - easeOutBack(k));
     }
 
     get _reconnectFlash() {
@@ -129,8 +144,12 @@ export class SawWeapon extends Weapon {
         if (this.dropped) {
 
             this.spin += (0 - this.spin) * SPIN_DECEL;
+            this.split = 0;
+            this._splitTarget = 0;
+            this.justSplit = this.justMerged = false;
             return;
         }
+        this._updateSplit();
 
         if (this.reconnectTimer > 0) this.reconnectTimer--;
 
@@ -194,7 +213,23 @@ export class SawWeapon extends Weapon {
     }
 
     get discRadius() {
-        return SAW_DRAW_LARGE / 2;
+        return SAW_DRAW_LARGE * this.sizeScale / 2;
+    }
+
+    // Esticado (distância / ruptura) vindo do Chain; com a Serra dupla, acima de `splitAt` o disco se divide.
+    setStretch(k) {
+        this.stretch = k || 0;
+    }
+
+    _updateSplit() {
+        const was = this.split;
+        if (!this.doubleSaw) this._splitTarget = 0;
+        else if (this.stretch >= this.splitAt) this._splitTarget = 1;
+        else if (this.stretch <= this.mergeAt) this._splitTarget = 0;
+        const step = 1 / Math.max(1, this.splitSteps);
+        this.split = this._splitTarget > this.split ? Math.min(1, this.split + step) : Math.max(0, this.split - step);
+        this.justSplit = was === 0 && this.split > 0;
+        this.justMerged = was > 0 && this.split === 0;
     }
 
     get collisionRadius() {
@@ -217,7 +252,13 @@ export class SawWeapon extends Weapon {
     }
 
     getSawPositions(p1, p2) {
-
+        if (this.split > 0) {
+            const k = this.split * this.split * (3 - 2 * this.split);
+            return [0.5 - k / 6, 0.5 + k / 6].map(t => {
+                const q = this.cablePoint(p1, p2, t);
+                return { x: q.x, y: q.y, radius: 14 };
+            });
+        }
         const mid = this.cablePoint(p1, p2, 0.5);
         return [{ x: mid.x, y: mid.y, radius: 14 }];
     }
@@ -371,7 +412,7 @@ export class SawWeapon extends Weapon {
 
         this.getSawPositions(p1, p2).forEach(({ x, y, radius }, index) => {
             const dir = index % 2 === 1 ? 1 : -1;
-            const draw = radius >= 14 ? SAW_DRAW_LARGE : SAW_DRAW_SMALL;
+            const draw = (radius >= 14 ? SAW_DRAW_LARGE : SAW_DRAW_SMALL) * this.sizeScale;
 
             if (flash > 0.01) {
                 ctx.save();
@@ -432,7 +473,7 @@ export class SawWeapon extends Weapon {
         const prevSmoothing = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = false;
 
-        const draw = SAW_DRAW_LARGE;
+        const draw = SAW_DRAW_LARGE * this.sizeScale;
         const bloody = this.bloodTimer > 0;
 
         const row = (bloody ? ROW_INERTIA_BLOODY : ROW_INERTIA_CLEAN) * SAW_FRAME.size;

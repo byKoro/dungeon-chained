@@ -111,6 +111,7 @@ export class Chain {
         }
 
         this.weapon.setStrain?.(strainLevel);
+        this.weapon.setStretch?.(this.connected ? dist / this.breakDistance : 0);
         this.weapon.update(p1, p2);
 
         if (!this.connected) this.weapon.updateDropped?.();
