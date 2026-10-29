@@ -10,4 +10,5 @@ export class InicialRoomScript {
     onDeath() { this.cage.onDeath(); }
     drawFloor(ctx) { this.cage.drawFloor(ctx); }
     drawAir(ctx) { this.cage.drawAir(ctx); }
+    lights() { return this.cage.lights(); }
 }

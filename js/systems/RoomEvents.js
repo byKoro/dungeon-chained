@@ -1,5 +1,5 @@
-import { BARS } from '../config/EventsConfig.js';
-import { TILE } from '../config/GameConfig.js';
+import { BARS, STAKE_LIGHT } from '../config/EventsConfig.js';
+import { TILE, LIGHT_PIXEL_SCALE } from '../config/GameConfig.js';
 import { findSafeFloorCell } from '../rooms/SafeSpawn.js';
 import { InicialRoomScript } from './roomScripts/InicialRoomScript.js';
 
@@ -9,8 +9,8 @@ const ROOM_SCRIPTS = Object.freeze({ inicial: InicialRoomScript });
 
 export class RoomEvents {
     constructor({ rooms, spawnSystem, getPlayers, chain, scrap = null, chests = null, dialogue = null, audio = null,
-        particleSystem = null, renderer = null, assets = null, scripts = ROOM_SCRIPTS, tile = TILE }) {
-        Object.assign(this, { rooms, spawnSystem, getPlayers, chain, scrap, chests, dialogue, audio, particleSystem, renderer, assets, scripts, tile });
+        particleSystem = null, renderer = null, assets = null, hooks = {}, scripts = ROOM_SCRIPTS, tile = TILE }) {
+        Object.assign(this, { rooms, spawnSystem, getPlayers, chain, scrap, chests, dialogue, audio, particleSystem, renderer, assets, hooks, scripts, tile });
         this.reset();
     }
 
@@ -62,7 +62,7 @@ export class RoomEvents {
                 return { x: r.x + (col + 0.5) * tile, y: r.y + (row + 0.5) * tile };
             },
             // Inimigo do encontro: nasce escondido e "cai" por `delay` steps (spawn congelado do MeleeEnemy).
-            spawnEnemy(type, x, y, delay) {
+            spawnEnemy(type, x, y, delay, { airborne = false } = {}) {
                 const r = rect();
                 const col = Math.floor((x - r.x) / tile), row = Math.floor((y - r.y) / tile);
                 const safe = self._floorCellNear(room, col, row);
@@ -72,14 +72,43 @@ export class RoomEvents {
                 const ey = same ? y : r.y + (safe.row + 0.5) * tile;
                 const enemy = self.spawnSystem.createEnemy(ex, ey, 1, type);
                 enemy.setNavigationFloor?.(room.tiles.floor, room.bounds, room.tiles.walls);
+                // No ar (salto controlado pelo script): sem colisão, sem sombra do Game; revelação curta ao aparecer.
+                if (airborne) { enemy.airborne = true; enemy.spawnFxDuration = 10; }
                 enemy.beginFrozenSpawn?.(delay);
                 room.enemies.push(enemy);
                 return enemy;
             },
             removeEnemies(list) {
                 room.enemies = room.enemies.filter(e => !list.includes(e));
-            }
+            },
+            hitStop: s => self.hooks.hitStop?.(s),
+            pushPlayers(x, y, radius, force) {
+                for (const p of self.getPlayers() || []) {
+                    if (!p || p.falling || p.lives <= 0) continue;
+                    const dx = p.x - x, dy = p.y - y, d = Math.hypot(dx, dy);
+                    if (d >= radius) continue;
+                    const k = force * (1 - d / radius), n = d || 1;
+                    p.vx += (d ? dx / n : 1) * k;
+                    p.vy += (d ? dy / n : 0) * k * 0.7;
+                }
+            },
+            // Move um prop autorado (ex.: o baú que cai) e avisa quem guarda o layout dos props.
+            moveProp(prop, col, row) {
+                if (prop.col === col && prop.row === row) return;
+                prop.col = col; prop.row = row;
+                self.hooks.propsChanged?.(room);
+            },
+            drawPropFrame: (ctx, type, frame, dx, dy, sx, sy) => self.hooks.drawPropFrame?.(ctx, type, frame, dx, dy, sx, sy)
         };
+    }
+
+    // Luzes pedidas pelo script da sala (ex.: estacas), em coordenadas do mundo.
+    renderLights(renderer, postProcessor) {
+        for (const l of this._script()?.lights?.() || []) {
+            const s = renderer.worldToScreen(l.x, l.y);
+            const px = Math.max(2, Math.round((this.tile / 16) * s.zoom * LIGHT_PIXEL_SCALE));
+            postProcessor.addLight(s.x, s.y, l.radius * s.zoom, px, 1, STAKE_LIGHT);
+        }
     }
 
     // Tile de chão mais perto (o findSafeFloorCell não conhece as paredes autoradas: usa `kinds`).

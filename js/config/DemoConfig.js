@@ -7,6 +7,8 @@ export const DEMO = {
     interactionRadius: 88,
     cameraMargin: 120,
     cameraMode: 'zoom',
+    // Aproximação da câmera dos mapas do Editor 2.0 sobre o enquadramento de uma sala 14×9.
+    cameraZoom: 1.2,
     gateFrameMs: 200,
     // Metade da abertura do sprite do portão (22 px de arte × 4); os pilares bloqueiam o resto.
     gatePassHalfWidth: 44,

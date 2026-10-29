@@ -194,7 +194,12 @@ export class Game {
         this.roomEvents = this.mapData ? new RoomEvents({
             rooms: this.rooms, spawnSystem: this.spawnSystem, getPlayers: () => [this.p1, this.p2], chain: this.chain,
             scrap: this.scrap, chests: this.chests, dialogue: this.dialogue, audio: this.audio,
-            particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets
+            particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets,
+            hooks: {
+                hitStop: s => this.gameLoop?.triggerHitStop(s),
+                propsChanged: room => this.roomProps?.invalidate(room),
+                drawPropFrame: (ctx, type, frame, dx, dy, sx, sy) => this.animatedProps?.drawFrame(ctx, type, frame, dx, dy, TILE, false, sx, sy)
+            }
         }) : null;
         // Mapas com bigorna seguem a regra de morte da run (ADR 0012): renascer no início em vez de game over.
         this._runRules = !!this.mapData && Object.values(this.mapData.map.rooms).some(r => (r.props || []).some(p => p.type === "anvil"));
@@ -987,7 +992,7 @@ export class Game {
         this.combat.updateEnemies(enemies, [p1, p2]);
         this.ghostfire.update(room, [p1, p2]);
 
-        const liveEnemies = enemies.filter(e => e.state !== "dying" && !e.isHidden);
+        const liveEnemies = enemies.filter(e => e.state !== "dying" && !e.isHidden && !e.airborne);
         const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies);
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
@@ -1238,7 +1243,7 @@ export class Game {
         if (!this.p2.falling) renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
         const enemies = rooms.current.enemies;
 
-        enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
+        enemies.forEach(e => { if (!e.isHidden && !e.airborne) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
         this.scrap?.drawShadows(ctx);
 
         this.chain.drawChain(ctx, this.p1, this.p2);
@@ -1271,6 +1276,8 @@ export class Game {
 
         drawables.filter(e => e.y > sawY).forEach(drawEntity);
         this.sawCinematic?.drawWorld(ctx);
+        // Cordas e gaiolas caindo: no passe do mundo, para a luz do ambiente atuar nelas.
+        this.roomEvents?.drawAir(ctx);
 
         this.particleSystem.drawFlames(ctx);
         this.ghostfire.drawAir(ctx, rooms.current);
@@ -1314,12 +1321,13 @@ export class Game {
         this.postProcessor.setVignetteBreath(strain);
 
         this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
+        this.roomEvents?.renderLights(renderer, this.postProcessor);
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
-        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length || this.roomEvents) {
+        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length) {
             renderer.beginOverlayWorld();
-            this.roomEvents?.drawAir(ctx);
+
             this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
             this.particleSystem.drawDamageNumbers(ctx);

@@ -102,11 +102,12 @@ World pass (inside `renderer.beginFrame()` camera transform, clipped to room rec
 5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce; skipped while falling) and visible enemies (r 13), `scrap.drawShadows`.
 6. `chain.drawChain` (cable).
 7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders, ...roomProps.drawables]` sorted by `y`; a falling player goes through `holes.drawFalling`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.
+7b. `sawCinematic.drawWorld` → `roomEvents.drawAir` (ropes, falling cages and chest; lit by the ambient).
 8. `particleSystem.drawFlames` → `challenge.drawWallLayer` → `renderer.drawFrontWall` (bottom row redrawn over entities) → `demoDoors.draw` (closed normal door tiles of authored maps) → gibs → `challenge.drawAirLayer` → `particleSystem.drawAir` → wind if `WIND.layer === "world"`.
 9. `ctx.restore()`, `renderer.endFrame()`.
 
 Screen passes:
-10. `lighting.render({...})` (queues lights into postProcessor in screen space).
+10. `lighting.render({...})` (queues lights into postProcessor in screen space), then `ghostfire.renderLights` and `roomEvents.renderLights` (stake lights from the room script's `lights()`).
 11. `postProcessor.setVignetteBreath(chain strain)`, `postProcessor.draw()` (light map + vignette).
 12. Overlay world pass (`beginOverlayWorld`), above darkness: `scrap.drawOverlay`, `heart.drawOverlay`, damage numbers.
 13. Wind if `WIND.layer === "screen"`.

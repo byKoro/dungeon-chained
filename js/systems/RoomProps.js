@@ -35,6 +35,11 @@ export class RoomProps {
         return this.isHidden ? list.filter(s => !this.isHidden(s.prop, key)) : list;
     }
 
+    // Um prop mudou de lugar (ex.: baú que cai): refaz o layout da sala.
+    invalidate(room = this.rooms.current) {
+        if (room) this._cache.delete(room);
+    }
+
     get solid() {
         return this._layout().solid;
     }
