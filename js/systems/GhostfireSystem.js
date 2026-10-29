@@ -15,7 +15,7 @@ export class GhostfireSystem {
     }
 
     update(room, players) {
-        for (const boss of room.enemies.filter(e => e.isBoss && !e.frozen)) {
+        for (const boss of room.enemies.filter(e => e.isGhostfire && !e.frozen)) {
             if (boss.state === "dying") {
                 if (!this._deathEffects.has(boss)) {
                     this._deathEffects.add(boss);
@@ -111,14 +111,14 @@ export class GhostfireSystem {
 
     drawFloor(ctx, room) {
         for (const boss of room.enemies) {
-            if (boss.isHidden || boss.frozen || boss.state !== "indicator" || !boss.beam) continue;
+            if (!boss.isGhostfire || boss.isHidden || boss.frozen || boss.state !== "indicator" || !boss.beam) continue;
             this.bossRenderer.drawBeam(ctx, boss);
         }
     }
 
     drawAir(ctx, room) {
         for (const boss of room.enemies) {
-            if (boss.isHidden || boss.frozen || !["beam", "fade"].includes(boss.state) || !boss.beam) continue;
+            if (!boss.isGhostfire || boss.isHidden || boss.frozen || !["beam", "fade"].includes(boss.state) || !boss.beam) continue;
             this.bossRenderer.drawBeam(ctx, boss);
         }
     }
@@ -130,7 +130,7 @@ export class GhostfireSystem {
             postProcessor.addLight(point.x, point.y, radius * point.zoom, pixel, 1, GHOSTFIRE.lightProfile);
         };
         for (const boss of room.enemies) {
-            if (!boss.isBoss || boss.isHidden || boss.state === "dying") continue;
+            if (!boss.isGhostfire || boss.isHidden || boss.state === "dying") continue;
             const alpha = boss.state === "teleport" ? boss.stateTimer / GHOSTFIRE.teleportFrames : 1;
             addLight(boss.x, boss.y + boss.hoverOffset, GHOSTFIRE.lightRadius * alpha);
             if (!boss.beam || !["indicator", "beam", "fade"].includes(boss.state)) continue;

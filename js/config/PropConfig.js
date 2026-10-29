@@ -22,7 +22,9 @@ export const ANIMATED_PROPS = Object.freeze({
     key_1: { label: "Chave 1", frames: frames("keys", "keys_1"), w: 1, h: 1, solid: false },
     key_2: { label: "Chave 2", frames: frames("keys", "keys_2"), w: 1, h: 1, solid: false },
     flamethrower_v: { label: "Lança-chamas vertical", frames: frames("flamethrower", "flamethrower_1"), w: 1, h: 2, solid: true },
-    flamethrower_h: { label: "Lança-chamas horizontal", frames: frames("flamethrower", "flamethrower_2"), w: 2, h: 1, solid: true }
+    flamethrower_h: { label: "Lança-chamas horizontal", frames: frames("flamethrower", "flamethrower_2"), w: 2, h: 1, solid: true },
+    // `art` = tamanho do PNG em pixels de arte; o sprite é desenhado nesse tamanho, centrado no footprint, sem esticar.
+    anvil: { label: "Bigorna", frames: ["assets/anvil/anvil.png"], w: 2, h: 1, solid: true, art: { w: 24, h: 24 } }
 });
 
 export const ANIMATED_PROP_KEYS = Object.freeze(Object.keys(ANIMATED_PROPS));

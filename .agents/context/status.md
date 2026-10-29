@@ -22,6 +22,8 @@ Merged into `main` (fast-forward, 2026-10-26) from `feat/player-dash`, two commi
 
 ## Backlog
 
+Integration prepared for `main` and `boss` (2026-10-28): merged current main with Ghostfire size/pacing adjustments. Kept cultist/FireSkull spawning and combat hit feedback; Ghostfire implements `takeHit` and local hit stop, and its effects/lights exclude other boss types. Focused regression coverage is in `test_ghostfire.js`. Pre-existing local edits remain outside this merge.
+
 Adjusted on branch `boss` (2026-10-28): Ghostfire's beam attack is slightly slower: wait 108, charge 30, warning 33, recovery 54 ticks. Charge plus warning now takes 1.05s (previously 0.83s). Active beam duration remains 30 ticks. Gameplay feel has not been verified in a browser.
 
 Adjusted on branch `boss` (2026-10-28): Ghostfire now shares the trailer's integer 21× sprite scale (previously 8× in gameplay); its beam width follows that scale at 63 world pixels, and hit radius scales proportionally to 115.5 pixels. Browser appearance has not been verified.
@@ -48,11 +50,25 @@ Combat & entities
 12. Cable hit uses the straight p1→p2 segment, not the drawn sagging cable; a still saw also kills.
 
 Audio, UI, editor
-13. `monsterHurt`, `enemyAttackVoice` cues are `enabled: false` with no files.
+13. `monsterHurt`, `enemyAttackVoice` cues are `enabled: false` with no files. Missing assets for the saw-hit feel: an enemy wound sound and a heavier poise-break impact (a poise break currently reuses `sawHit`, lower and louder).
 14. `R` restarts instantly at any time (even paused); `T` cycles tileset (debug). Debug globals `window.audio`, `window.audioConfig`, `window.sawMotor`, `window.playerAI`.
 15. `AssetLoader` requests `tileset_1..6` but only `tileset_1.png` exists (404s).
 16. Editor hazard-on-spawn warning never shows (`#spawn-warning-box` missing); Save never overwrites (duplicates); import rebuilds `floor` (hand-edited tile values lost).
 17. `serve.py` has no auth and binds all interfaces: anyone on the LAN can write/delete `map/` while it runs (now also `map/demo/` via `/api/save-map`). Dev-only; never expose it.
 18. ~~Opening trailer missing~~ Fixed on `fix/restore-trailer` (2026-10-26): `9b13c52` had deleted `js/trailer/` as dead code although `main.js` played it at boot. Restored only the boot trailer (no `trailer.html`/`b3`/`matchcut`); see `systems/ui.md` → Opening trailer.
 19. ~~Trailer gamepad gaps~~ Fixed on `feat/gamepad-ui` (2026-10-26): gate, SKIP, START, both pauses and the death screen work with a pad (`MenuPad`). Remaining limit: in a browser, a pad-only player gets the trailer muted (pad buttons don't unlock audio). The game's `AudioManager` also stays suspended until a key/click. Electron is not affected.
-20. Editor 2.0 (`editor2.html`, branch `novo_editor`) saves `map/demo/*.json`, but the game does not load that format yet (variable room size, per-tile doors, door types, animated props). Playtest works only for 14×9 rooms through the old single-room path.
+20. Editor 2.0 on branch `novo_editor`: the game now loads the full map (`?editor2=true` test, or `map/demo/active.json` as main map) with variable room sizes, door-to-door connections, room locks, interactives and the boss gate. Verified by script in Electron; see `.agents/tasks/2026-10-26-editor2-demo-scope/verification.md` for what was not exercised (camera comparison, real input, saw ricochet/damage, packaged build). Lever/bridge, thrown saw and rope/key were exercised in game.
+21. Saw-hit game-feel (branch `feat/combat-hit-gamefeel`, `.agents/tasks/2026-10-27-combat-hit-gamefeel/`): the new impact feedback (flash, directional sparks/blood, damage number, hit stop, stagger/poise) only runs for the connected cable/disc hits resolved by `CombatSystem` with `hitFeedback: true`. Not covered: `ThrownSaw` hits (call `takeHit()` without impact info, so no stagger/feedback), `FireSkullEnemy` (own `takeHit`, keeps its alpha blink, no flash/knockback/poise), and the trailer scenes (feedback intentionally off).
+23. Armadilhas (`.agents/tasks/2026-10-27-editor2-hazards/`): flecha leste/oeste ficava "no ar" (cabeça do lançador sobre a metade escura do tile) e a fileira de espinhos do editor 2.0 não gravava `wave` (disparava toda junta). Corrigido; a flecha norte/sul não foi alterada. Não coberto: flechas em salas de peças antigas (`map/*.json`) também passam a ser deslocadas no jogo (mesma arte de parede), sem conferência visual em jogo real com iluminação.
+22. Editor 2.0 enemy picker (`.agents/tasks/2026-10-27-editor2-enemy-picker/`): the content panel only offers the enemies in `EDITOR2_ENEMY_KEYS` (`js/editor2/ContentCatalog.js`: demon, bloodMonster, blackKnightB); add keys there as each enemy is finished. Maps that already contain other types (assassin, tank, fireSkull...) still draw and can be erased. Interactives have no sprite, so their thumbnail is color + symbol. No automated DOM test for the panel (checked by script in headless Chrome).
+
+23. Boss gate art replaced (2026-10-27): `assets/doors/boss-gate-opening-strip-v8.png` (4 × 32×32 frames in a row, transparent passage) replaces the generated v1 sheet; `DemoDoors` now draws it at 2×2 tiles over the door columns instead of 3×3, under the entities (`drawGates`, right after the door gradients) instead of over them. Players pass only through the sprite's 88 px opening (`passHalfWidth` = `DEMO.gatePassHalfWidth` 44); the pillars block like wall. Collision checked by a node simulation on `demo_campaign.json`; art and draw order not yet observed in the running game. Drafts and scripts: `.agents/tasks/2026-10-27-boss-gate-redesign/`.
+## Ajuste individual de mobs — 2026-10-27
+- `blackKnightB`: tanque lento (4 HP, velocidade 0.8), três ataques em ciclo e animação completa de morte. Teste dedicado aprovado e sprites renderizadas no Chromium. Gate continua com os problemas preexistentes #4 e #5.
+
+## Cultista — 2026-10-28
+- `feat/cultist-fire-pillar`: cultista com distância pública ajustável, conjuração fixa no jogador mais próximo (quarta linha) e morte completa (última linha), disponível nos dois editores. Verificado por testes e canvas no Chromium; balanceamento cooperativo real ainda não avaliado.
+
+- Ajuste do cultista: preferredDistance aumentado para 440 px; círculo de marcação removido. Alcance de conjuração ajustado para cobrir a faixa de distância desejada.
+
+- Cultista: preferredDistance ajustado de 440 para 300 px.

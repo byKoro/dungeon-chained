@@ -9,6 +9,9 @@ import {
     toLegacyPiece, legacyIssues, findPlaytestSpawn, defaultKindForTile
 } from '../js/editor2/MapModel.js';
 import { ROOM_COLS, ROOM_ROWS } from '../js/config/GameConfig.js';
+import { DEMO } from '../js/config/DemoConfig.js';
+import { connectDoors, outgoingConnections, validatePlayable, safeSpawnPair, doorCells } from '../js/rooms/MapConnections.js';
+import { placeDoor } from '../js/editor2/MapContent.js';
 
 let passed = 0;
 let failed = 0;
@@ -29,7 +32,8 @@ function assert(condition, message) {
     assert(room.tiles.length === 9 && room.tiles[0].length === 14, "createRoom gera 14x9");
     assert(room.kinds[0] === "w".repeat(14), "borda superior é parede");
     assert(room.kinds[4][0] === "w" && room.kinds[4][13] === "w", "bordas laterais são parede");
-    assert(room.kinds[4][5] === "f" && room.tiles[4][5] === 16, "miolo é piso 16");
+    assert(room.kinds[4][5] === "f" && DEMO.floorTiles.includes(room.tiles[4][5]), "miolo é piso sorteado do conjunto de chão");
+    assert(Array.isArray(room.floorPool) && room.floorPool.length > 0, "sala guarda o conjunto de chão usado");
     assert(createRoom(1, 1).cols === 5, "tamanho mínimo é respeitado");
 }
 
@@ -155,6 +159,50 @@ function assert(condition, message) {
     assert(legacyIssues(createRoom(20, 12)).length === 1, "tamanho diferente é avisado");
     const spawn = findPlaytestSpawn(room);
     assert(spawn && room.kinds[spawn.p1.row][spawn.p1.col] === "f" && room.kinds[spawn.p2.row][spawn.p2.col] === "f", "spawn de teste em piso");
+}
+
+// Portas largas e conexões livres entre portas (editor 2.0 → jogo)
+{
+    const map = createMap({ gridCols: 3, gridRows: 2 });
+    const a = addRoom(map, 0, 0);
+    const b = addRoom(map, 2, 1, { cols: 20, rows: 12 });
+    assert(placeDoor(a, 6, 0, "normal", 2) && a.doors[0].width === 2, "porta larga de 2 tiles");
+    assert(doorCells(a, a.doors[0]).length === 2 && a.kinds[0][7] === "f" && a.kinds[1][7] === "f", "porta larga abre borda e anel");
+    assert(!placeDoor(a, 7, 0, "normal", 2), "não sobrepõe outra porta");
+    assert(!placeDoor(a, 0, 0, "normal", 2), "não aceita canto");
+    assert(!placeDoor(a, 0, 4, "boss", 2), "portão do boss só no norte");
+    placeDoor(a, 13, 3, "normal", 2);
+    placeDoor(b, 0, 5, "normal", 2);
+    placeDoor(b, 9, 11, "normal", 2);
+
+    const A1 = { room: "0,0", door: a.doors[0].id }, A2 = { room: "0,0", door: a.doors[1].id };
+    const B1 = { room: "2,1", door: b.doors[0].id }, B2 = { room: "2,1", door: b.doors[1].id };
+    assert(connectDoors(map, A1, B1), "norte de A liga ao oeste de B (lados diferentes)");
+    assert(connectDoors(map, A2, B2, { oneWay: true }), "segunda ligação entre as mesmas salas");
+    assert(!connectDoors(map, A1, B2), "uma porta tem um único destino");
+    assert(!connectDoors(map, A1, { room: "0,0", door: a.doors[1].id }), "não liga a sala a ela mesma");
+    assert(outgoingConnections(map, "0,0").length === 2, "A tem duas saídas");
+    assert(outgoingConnections(map, "2,1").length === 1, "mão única não volta");
+
+    const spawn = safeSpawnPair(b, b.doors[0]);
+    assert(spawn && spawn.p1.col <= 3 && b.kinds[spawn.p1.row][spawn.p1.col] === "f", "chegada segura junto à porta de destino");
+
+    const resized = resizeRoom(b, 16, 10);
+    assert(resized.doors.some(d => d.id === b.doors[0].id && d.width === 2), "redimensionar mantém id e largura das portas");
+
+    a.spawns = { p1: { col: 3, row: 3 }, p2: { col: 4, row: 3 } };
+    b.spawns = { p1: { col: 5, row: 5 }, p2: { col: 6, row: 5 } };
+    assert(validatePlayable(map).length === 0, "mapa conectado é jogável");
+    placeDoor(a, 6, 8, "normal", 2);
+    assert(validatePlayable(map).some(e => e.includes("sem conexão")), "porta solta é apontada no teste do mapa");
+    assert(validatePlayable(map, { roomKey: "0,0" }).length === 0, "porta solta não bloqueia o teste da sala");
+    a.spawns.p2 = { col: 0, row: 3 };
+    assert(validatePlayable(map, { roomKey: "0,0" }).some(e => e.includes("spawn")), "spawn na parede bloqueia o teste");
+
+    const back = normalizeMap(JSON.parse(formatMapJson(serializeMap(map))));
+    assert(JSON.stringify(back.connections) === JSON.stringify(map.connections), "conexões sobrevivem a salvar e abrir");
+    removeRoom(map, "2,1");
+    assert(map.connections.length === 0, "excluir a sala remove suas conexões");
 }
 
 console.log(`\n${passed} passaram, ${failed} falharam.`);

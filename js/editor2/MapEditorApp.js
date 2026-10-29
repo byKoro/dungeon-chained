@@ -1,3 +1,5 @@
+import { ContentTools } from './ContentTools.js';
+import { identifyDoors, validatePlayable, doorCells } from '../rooms/MapConnections.js';
 import { Tileset } from '../core/Tileset.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, EMPTY_FLOOR_COLOR, holeTileFor } from '../config/GameConfig.js';
 import { TILE_KINDS, DOOR_TYPES, DEFAULT_DOOR_TYPE, MAP_LIMITS } from '../config/MapEditorConfig.js';
@@ -5,6 +7,7 @@ import { ANIMATED_PROPS, ANIMATED_PROP_KEYS } from '../config/PropConfig.js';
 import * as M from './MapModel.js';
 import { TilePalette } from './TilePalette.js';
 import { PropSprites } from './PropSprites.js';
+import { paintWallCell, voidOutside } from '../rooms/WallAutotile.js';
 
 const STORAGE_KEY = "editor2_map_state";
 const DEFAULT_FILE = "demo_map.json";
@@ -12,7 +15,7 @@ const ROOM_TILE_PX = TILE;
 const MAP_TILE_PX = 16;
 const SLOT_GAP_TILES = 3;
 const HISTORY_LIMIT = 100;
-const TOOLS = ["paint", "hole", "void", "collision", "door", "prop", "erase"];
+const TOOLS = ["paint", "hole", "void", "collision", "door", "prop", "erase", "wall"];
 const LINK_COLORS = { ok: "#2cb67d", "one-way": "#f5a623", "no-room": "#ef4565" };
 
 const $ = (id) => document.getElementById(id);
@@ -74,6 +77,7 @@ export class MapEditorApp {
         this._loadFromStorage();
         this._buildDoorTypes();
         this._buildPropGrid();
+        this.contentTools = new ContentTools(this);
         this._bindUI();
         this._bindCanvas();
         this._resizeCanvas();
@@ -100,6 +104,7 @@ export class MapEditorApp {
     _commit(fn) {
         const before = this._snapshot();
         const result = fn();
+        identifyDoors(this.map);
         if (this._snapshot() !== before) this._pushUndo(before);
         this._afterChange();
         return result;
@@ -372,7 +377,7 @@ export class MapEditorApp {
     }
 
     _onDoubleClick(e) {
-        if (this.view !== "map") return;
+        if (this.view !== "map" || this.contentTools.connecting) return;
         const key = this._slotAt(e.clientX, e.clientY);
         if (!key) return;
         if (!this.map.rooms[key]) this._createRoomAt(key);
@@ -380,6 +385,7 @@ export class MapEditorApp {
     }
 
     _mapMouseDown(e) {
+        if (this.contentTools.mapClick(e)) return;
         const key = this._slotAt(e.clientX, e.clientY);
         this.selectedKey = key;
         if (key && this.map.rooms[key]) this.mapDrag = { key, x: e.clientX, y: e.clientY, moved: false };
@@ -411,7 +417,7 @@ export class MapEditorApp {
             this._backToMap();
             return;
         }
-        if (this.view === "room" && /^[1-7]$/.test(key)) this._setTool(TOOLS[Number(key) - 1]);
+        if (this.view === "room" && /^[1-8]$/.test(key)) this._setTool(TOOLS[Number(key) - 1]);
     }
 
     // ---------- ferramentas da sala ----------
@@ -428,8 +434,10 @@ export class MapEditorApp {
     }
 
     _endStroke() {
-        const before = this.stroke.before;
+        const { before, mode } = this.stroke;
         this.stroke = null;
+        // Depois de pintar parede, o piso que ficou isolado do centro/portas/spawns vira vazio.
+        if (this.tool === "wall" && mode === "add" && this.room) voidOutside(this.room);
         if (this._snapshot() !== before) this._pushUndo(before);
         this._afterChange();
     }
@@ -442,6 +450,7 @@ export class MapEditorApp {
         stroke.visited.add(key);
         if (this.tool !== "paint" && !M.inBounds(room, col, row)) return;
 
+        if (this.contentTools.apply(col, row)) return;
         switch (this.tool) {
             case "paint": {
                 const stamp = this.palette.stamp;
@@ -477,6 +486,10 @@ export class MapEditorApp {
                 if (!stroke.mode) stroke.mode = M.propAt(room, col, row) ? "remove" : "add";
                 if (stroke.mode === "remove") M.removePropAt(room, col, row);
                 else M.placeProp(room, this.propType, col, row, this.propFlip);
+                break;
+            case "wall":
+                if (!stroke.mode) stroke.mode = M.getKind(room, col, row) === "w" ? "remove" : "add";
+                paintWallCell(room, col, row, stroke.mode);
                 break;
             case "erase":
                 M.eraseCell(room, col, row);
@@ -547,6 +560,15 @@ export class MapEditorApp {
             this.map.roomSize.cols = Math.max(MAP_LIMITS.minRoomCols, Math.min(MAP_LIMITS.maxRoomCols, Math.round(cols) || ROOM_COLS));
             this.map.roomSize.rows = Math.max(MAP_LIMITS.minRoomRows, Math.min(MAP_LIMITS.maxRoomRows, Math.round(rows) || ROOM_ROWS));
         });
+    }
+
+    _resetRoom() {
+        const room = this.room;
+        if (!room) return;
+        if (!confirm(`Resetar "${room.name}"? Fica só o tamanho (${room.cols}×${room.rows}), o nome e as notas; portas, props, inimigos e o resto são apagados. Dá para desfazer com Ctrl+Z.`)) return;
+        const key = this.editingKey;
+        this._commit(() => M.resetRoom(this.map, key));
+        this._syncUI();
     }
 
     _applyRoomSize() {
@@ -674,24 +696,7 @@ export class MapEditorApp {
     }
 
     _playtest() {
-        const room = this.room;
-        if (!room) return;
-        if (room.cols !== ROOM_COLS || room.rows !== ROOM_ROWS) {
-            alert(`O jogo ainda só carrega salas ${ROOM_COLS}×${ROOM_ROWS}. Ajuste o tamanho desta sala para testar.`);
-            return;
-        }
-        const issues = M.legacyIssues(room);
-        if (issues.length && !confirm(`Avisos:\n- ${issues.join("\n- ")}\n\nTestar mesmo assim?`)) return;
-        const spawn = M.findPlaytestSpawn(room);
-        if (!spawn) {
-            alert("Não há 2 tiles de piso livres lado a lado para os jogadores nascerem.");
-            return;
-        }
-        const piece = M.toLegacyPiece(room, { type: "start" });
-        piece.testSpawn = spawn;
-        this._persistNow();
-        sessionStorage.setItem("editor_custom_room", JSON.stringify(piece));
-        window.location.href = "index.html?playtest=true";
+        this.contentTools.playtest(true);
     }
 
     // ---------- UI ----------
@@ -746,6 +751,7 @@ export class MapEditorApp {
             if (room) this._commit(() => { room.notes = e.target.value; });
         });
         $("btn-apply-size").addEventListener("click", () => this._applyRoomSize());
+        $("btn-reset-room").addEventListener("click", () => this._resetRoom());
 
         for (const btn of document.querySelectorAll("#tool-grid [data-tool]")) {
             btn.addEventListener("click", () => this._setTool(btn.dataset.tool));
@@ -772,7 +778,11 @@ export class MapEditorApp {
             input.name = "door-type";
             input.value = type;
             input.checked = type === this.doorType;
-            input.addEventListener("change", () => { this.doorType = type; });
+            label.classList.toggle("active", input.checked);
+            input.addEventListener("change", () => {
+                this.doorType = type;
+                for (const l of list.querySelectorAll("label")) l.classList.toggle("active", l.querySelector("input").value === type);
+            });
             const swatch = document.createElement("span");
             swatch.className = "swatch";
             swatch.style.background = def.color;
@@ -827,6 +837,7 @@ export class MapEditorApp {
 
         if (isRoom) this._syncRoomUI();
         else this._syncMapUI();
+        this.contentTools?.sync();
     }
 
     _syncMapUI() {
@@ -879,18 +890,18 @@ export class MapEditorApp {
         this._setVal("room-cols", room.cols);
         this._setVal("room-rows", room.rows);
 
-        const issues = M.legacyIssues(room);
+        const issues = validatePlayable(this.map, { roomKey: this.editingKey });
         const info = $("legacy-info");
         info.className = issues.length ? "hint warn" : "hint ok";
         info.textContent = issues.length ? `Testar no jogo: ${issues.join(" ")}` : "Esta sala pode ser testada no jogo.";
-        $("btn-playtest").disabled = room.cols !== ROOM_COLS || room.rows !== ROOM_ROWS;
+        $("btn-playtest").disabled = false;
 
         for (const btn of document.querySelectorAll("#tool-grid [data-tool]")) btn.classList.toggle("active", btn.dataset.tool === this.tool);
         $("paint-kind-field").hidden = this.tool !== "paint";
         $("door-type-field").hidden = this.tool !== "door";
         this._setVal("paint-kind", this.paintKind);
         $("prop-flip").checked = this.propFlip;
-        for (const btn of document.querySelectorAll("#prop-grid [data-prop]")) btn.classList.toggle("active", btn.dataset.prop === this.propType);
+        for (const btn of document.querySelectorAll("#prop-grid [data-prop]")) btn.classList.toggle("active", this.tool === "prop" && btn.dataset.prop === this.propType);
 
         const s = this.palette.selection;
         const idx = this.palette.firstIndex;
@@ -965,7 +976,7 @@ export class MapEditorApp {
     }
 
     _drawDoors(ctx, room, ox, oy, T, detailed) {
-        for (const d of room.doors) {
+        for (const door of room.doors) for (const d of doorCells(room, door).map(p => ({ ...door, ...p }))) {
             const def = DOOR_TYPES[d.type] || DOOR_TYPES[DEFAULT_DOOR_TYPE];
             const x = ox + d.col * T, y = oy + d.row * T;
             ctx.save();
@@ -995,7 +1006,9 @@ export class MapEditorApp {
     _drawProps(ctx, room, ox, oy, T) {
         for (const p of room.props) {
             const x = ox + p.col * T, y = oy + p.row * T;
-            if (!this.props.draw(ctx, p.type, x, y, T, this.now, !!p.flip)) {
+            if (Number.isInteger(p.index)) {
+                this.tileset.draw(ctx, p.index, x, y, T, T);
+            } else if (!this.props.draw(ctx, p.type, x, y, T, this.now, !!p.flip)) {
                 const { w, h } = M.propFootprint(p);
                 ctx.fillStyle = "rgba(255, 137, 6, 0.5)";
                 ctx.fillRect(x, y, w * T, h * T);
@@ -1036,6 +1049,7 @@ export class MapEditorApp {
                 this._drawTiles(ctx, room, o.x, o.y, MAP_TILE_PX);
                 this._drawProps(ctx, room, o.x, o.y, MAP_TILE_PX);
                 this._drawDoors(ctx, room, o.x, o.y, MAP_TILE_PX, false);
+                this.contentTools.drawRoom(ctx, room, o.x, o.y, MAP_TILE_PX);
 
                 const label = `${order.has(key) ? `#${order.get(key) + 1} ` : ""}${room.name}${map.start === key ? "  ★ início" : ""}`;
                 ctx.font = `700 ${12 * px}px "Segoe UI", sans-serif`;
@@ -1049,7 +1063,7 @@ export class MapEditorApp {
             }
         }
 
-        for (const link of M.roomLinks(map)) {
+        for (const link of map.connections ? [] : M.roomLinks(map)) {
             const { gx, gy } = M.parseKey(link.from);
             const room = map.rooms[link.from];
             const o = this._roomOrigin(room, gx, gy, L);
@@ -1072,6 +1086,7 @@ export class MapEditorApp {
             ctx.restore();
         }
 
+        this.contentTools.drawConnections(ctx);
         const highlight = (key, color, width) => {
             if (!key) return;
             const { gx, gy } = M.parseKey(key);
@@ -1095,6 +1110,7 @@ export class MapEditorApp {
         if (this.showKinds) this._drawKinds(ctx, room, T);
         this._drawProps(ctx, room, 0, 0, T);
         this._drawDoors(ctx, room, 0, 0, T, true);
+        this.contentTools.drawRoom(ctx, room, 0, 0, T);
 
         if (this.showGrid) {
             ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";

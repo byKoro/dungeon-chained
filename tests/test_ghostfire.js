@@ -35,7 +35,7 @@ const minion = {
 
 const room = {
   enemies: [
-    { isBoss: true, frozen: false, state: 'beam', x: 0, y: 0, beam: { x: 0, y: 0, endX: 200, endY: 0 }, justSummoned: false, justAttacked: false, justTeleported: false, stateTimer: 0 },
+    { isBoss: true, isGhostfire: true, frozen: false, state: 'beam', x: 0, y: 0, beam: { x: 0, y: 0, endX: 200, endY: 0 }, justSummoned: false, justAttacked: false, justTeleported: false, stateTimer: 0 },
     minion
   ],
   tiles: { floor: [[0]], walls: [] }
@@ -133,5 +133,55 @@ const survivingMinion = { isBoss: false, state: 'chase', startDying() { this.sta
 const aftermath = { enemies: [foe, survivingMinion] };
 ghostfireSystem.update(aftermath, []);
 assert.equal(survivingMinion.state, 'dying', 'explosão final limpa os minions como no trailer');
+
+const feedbackBoss = spawner.createEnemy(400, 280, 1, 'ghostfire');
+const feedbackCombat = new CombatSystem({
+    renderer: { triggerShake() {} }, particleSystem: { triggerBlood() {} }, hitFeedback: true
+});
+const feedbackSaw = { getSawPositions: () => [{ x: 400, y: 280 }], discRadius: 30, hitThreshold: 8 };
+const feedbackPlayers = [{ x: 300, y: 280 }, { x: 500, y: 280 }];
+const acceptedHits = [], kills = [];
+const strike = () => feedbackCombat.resolveWeaponHits(feedbackSaw, [feedbackBoss], ...feedbackPlayers, true,
+    enemy => kills.push(enemy), (enemy, info) => acceptedHits.push(info));
+strike();
+assert.equal(feedbackBoss.health, GHOSTFIRE.health, 'feedback novo respeita imunidade na chegada');
+feedbackBoss._enter('wait', GHOSTFIRE.waitFrames);
+strike();
+strike();
+assert.equal(feedbackBoss.health, GHOSTFIRE.health - 1, 'feedback novo respeita vida e cooldown do Ghostfire');
+assert.equal(acceptedHits.length, 1);
+assert.equal(kills.length, 0, 'golpe não letal não dispara callback de morte');
+feedbackBoss.freezeOnHit(1 / 60);
+const timerBeforeHitStop = feedbackBoss.stateTimer;
+feedbackBoss.update([]);
+assert.equal(feedbackBoss.stateTimer, timerBeforeHitStop, 'hit stop local pausa o ciclo do boss');
+for (let i = 1; i < GHOSTFIRE.health; i++) {
+    feedbackBoss.hitCooldown = 0;
+    strike();
+}
+assert.equal(kills.length, 1);
+assert.equal(acceptedHits.at(-1).killed, true);
+
+const fireSkullBoss = spawner.createEnemy(400, 280, 1, 'fireSkullBoss');
+const untouchedMinion = { isBoss: false, state: 'chase', startDying() { this.state = 'dying'; } };
+const otherBossRoom = { enemies: [fireSkullBoss, untouchedMinion] };
+const attackSounds = [];
+const audioCombat = new CombatSystem({
+    renderer: {}, particleSystem: {}, audio: { play(cue) { attackSounds.push(cue); } }
+});
+fireSkullBoss.state = 'shotWarning';
+fireSkullBoss.stateTimer = 1;
+audioCombat.updateEnemies([fireSkullBoss], [{ x: 300, y: 280, lives: 3 }]);
+assert(attackSounds.includes('enemyAttack'), 'FireSkull boss mantém áudio genérico de ataque');
+attackSounds.length = 0;
+const silentGhostfire = spawner.createEnemy(400, 280, 1, 'ghostfire');
+silentGhostfire._enter('indicator', 1);
+audioCombat.updateEnemies([silentGhostfire], []);
+assert.equal(attackSounds.length, 0, 'Ghostfire usa apenas seu áudio dedicado');
+ghostfireSystem.renderLights(otherBossRoom, { worldToScreen() { assert.fail('Ghostfire não ilumina outro boss'); } }, {});
+fireSkullBoss.state = 'dying';
+ghostfireSystem.update(otherBossRoom, []);
+assert.equal(untouchedMinion.state, 'chase', 'morte de outro boss não dispara explosão do Ghostfire');
+assert.equal(spawner.createEnemy(100, 200, 1, 'cultist').constructor.name, 'CultistEnemy');
 
 console.log('PASS ghostfire boss test');

@@ -1,4 +1,4 @@
-import { SIM_STEP, MAX_SIM_STEPS_PER_FRAME, HIT_SLOWMO } from '../config/GameConfig.js';
+import { SIM_STEP, MAX_SIM_STEPS_PER_FRAME, HIT_SLOWMO, HIT_STOP } from '../config/GameConfig.js';
 
 const RESUME_RAMP = 0.25;
 
@@ -14,6 +14,8 @@ export class GameLoop {
         this._slowmoT = 0;
         this._paused = false;
         this._resumeT = 0;
+        this._hitStopT = 0;
+        this._hitStopGap = 0;
         this._running = false;
 
         this._tick = this._tick.bind(this);
@@ -30,11 +32,25 @@ export class GameLoop {
         this._slowmoT = HIT_SLOWMO.duration;
     }
 
+    // Congela só a simulação por `seconds` de tempo real (limitado a HIT_STOP.min..max); o render segue.
+    // Pedidos durante outro hit stop só estendem até o maior valor (não somam); retorna se foi aceito.
+    triggerHitStop(seconds) {
+        if (this._paused || this._hitStopGap > 0 || !(seconds > 0)) return false;
+        const t = Math.min(HIT_STOP.max, Math.max(HIT_STOP.min, seconds));
+        this._hitStopT = Math.max(this._hitStopT, t);
+        return true;
+    }
+
+    get hitStopActive() {
+        return this._hitStopT > 0;
+    }
+
     setPaused(paused) {
         paused = !!paused;
         if (paused === this._paused) return;
         this._paused = paused;
         this._simAccumulator = 0;
+        if (paused) { this._hitStopT = 0; this._hitStopGap = 0; }
         this._resumeT = paused ? 0 : RESUME_RAMP;
     }
 
@@ -68,6 +84,17 @@ export class GameLoop {
         this._lastFrameTimestamp = timestamp;
 
         this._onFrameStart();
+
+        // Hit stop: a simulação não avança e os timers de slow-mo/retomada ficam parados, então o
+        // slow-mo de abate toca depois do congelamento. Render e polling de entrada continuam.
+        if (this._hitStopT > 0 && !this._paused) {
+            this._hitStopT = Math.max(0, this._hitStopT - frameSeconds);
+            if (this._hitStopT === 0) this._hitStopGap = HIT_STOP.minGap;
+            this._onRender();
+            requestAnimationFrame(this._tick);
+            return;
+        }
+        if (this._hitStopGap > 0) this._hitStopGap = Math.max(0, this._hitStopGap - frameSeconds);
 
         const timeScale = this._timeScale();
 

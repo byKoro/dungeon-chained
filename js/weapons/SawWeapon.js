@@ -107,6 +107,7 @@ export class SawWeapon extends Weapon {
     }
 
     pickup() {
+        this.thrown = false;
         this.dropped = false;
     }
 

@@ -25,16 +25,17 @@ How enemies are defined, spawned, navigate, attack and die; how players take dam
 
 **`MeleeEnemy(x, y, sheet, spriteConfig, floor=1)`** (hitRadius 18)
 - Tuning (hard-coded in constructor): `speed 1.7`, `attackRange 44`, `hitRange 58`, `windupFrames = max(16, 55 - (floor-1)*6)`, `recoverFrames 28`, `dyingDuration 9`.
-- States (`state`): `"chase" → "windup" → "attack" → "recover" → "chase"`; `"dying"` after a hit. `"dead"` branch exists (`isDead`, `deathDone`, `corpseTimer`) but nothing sets it — dead code.
+- States (`state`): `"chase" → "windup" → "attack" → "recover" → "chase"`; `"hurt"` / `"stunned"` after a surviving saw hit (back to `"chase"` when `stateTimer` ends); `"dying"` when hp reaches 0. `"dead"` branch exists (`isDead`, `deathDone`, `corpseTimer`) but nothing sets it — dead code.
 - Spawn: `beginFrozenSpawn(delay)`, `unfreeze()`, `isHidden` (spawnDelay>0), `spawnFx`, `justAppeared`.
 - Navigation: `setNavigationFloor(floor, bounds, walls)`, `_isWalkable`, `_chaseWaypoint` (4-dir BFS over the floor grid, returns the next tile center), `_hasClearWalkablePath` (sampled line check, used before windup and before dealing damage), `ensureOnWalkableTile()` (snap back to `lastSafePosition`).
 - Death: `startDying()`, `isDying`, `readyToGib` (dying && `dyingTimer<=0`), `explodeIntoGibs()` → `GibPiece[]` cut from the last `death` frame.
+- Hit reaction (`takeHit(damage = 1, hit = null)`, numbers in `ENEMY_HIT`, `js/config/CombatFeelConfig.js`). Returns `false` when refused (`hitTimer` cooldown 24 steps, `frozen`, `dying`); otherwise `{ damage, killed, staggered, poiseBroken, vulnerable }`. Without `hit` (`{ dirX, dirY }`, source → enemy) it only subtracts hp (legacy callers: trailers, `ThrownSaw`). With `hit`, a surviving enemy interrupts windup/attack/recover (`dealtHit`/`justAttacked` cleared), freezes its current frame (`_hurtPose`), enters `"hurt"` (14 steps), gets a knockback impulse (`pushVx/Vy`, stopped by `_isWalkable`) and a white→red flash (`flashTimer`, tinted in `draw`). Strong enemies (`combat.poise > 0`, e.g. `tank`) lose `perHit` poise per accepted hit; at 0 the poise resets, the enemy is `"stunned"` for 60 steps with a stronger push and `vulnerableTimer` (72 steps) where damage × `vulnerableDamageMult` (2) and the sprite pulses yellow. Poise refills after `regenDelaySteps` without hits. A lethal hit goes straight to `"dying"` (no knockback).
 - Per-frame flags read by `CombatSystem`: `justStepped` (every 48px while chasing), `justAttacked`.
 - `draw(ctx)`: sprite-sheet crop; blinks `deathFlash` frame while dying; bottom-up reveal clip during `spawnFx`.
 
-**`CombatSystem({ renderer, particleSystem, audio })`**
+**`CombatSystem({ renderer, particleSystem, audio, hitFeedback = false })`** (`Game` passes `hitFeedback: true`; trailers keep the old behaviour)
 - `updateEnemies(enemies, players)` — calls `e.update(players, onPlayerHit)`; on hit: shake 14, `playerHurt` SFX, blood. Plays `enemyStep`, `enemyAttack`, `enemyAttackVoice` from flags.
-- `resolveWeaponHits(weapon, enemies, p1, p2, connected, onKill)` — see weapons.md; hit ⇒ `enemy.startDying()`, `weapon.onHit()`, `monsterHurt`, blood, `onKill`; then `_playSawHit(hits)` (combo pitch step 0.035, window 900 ms, + audio duck).
+- `resolveWeaponHits(weapon, enemies, p1, p2, connected, onKill, onHit)` — see weapons.md. Per accepted hit (once; `takeHit` refuses during the enemy cooldown, so contact frames do not repeat anything): impact point (disc ⇒ point on the disc rim toward the enemy; cable ⇒ closest point on the p1→p2 segment, `Physics.closestPointOnSegment`), `takeHit(ENEMY_HIT.sawDamage, impact)`, `weapon.onHit()`, then `_hitFeedback`: shake by tier (`HIT_FEEL.shake`), directional sparks + glint at the impact, directional blood + dust (or the old `triggerBlood` on a kill), floating damage number with the real damage. `onHit(enemy, info)` runs for every accepted hit (`info = { damage, killed, poiseBroken, staggered, tier: hit|kill|poiseBreak, hitStop, x, y, dirX, dirY }`; `Game` uses it for `enemy.freezeOnHit(info.hitStop)` (freezes only that enemy) + `sawMotor.onHit()`); `onKill(enemy)` only when the hit kills (`Game` ⇒ hit slow-mo). Then `_playSawHit(hits, heavy)` once (combo pitch step 0.035, window 900 ms, + audio duck; a poise break plays it lower/louder and ducks −9 dB). `monsterHurt` is still called but is disabled/empty, so it is not feedback.
 - `resolveDeaths(room, gibs, onKill, players)` — for each `readyToGib`: blood + pool, push gibs (cap `MAX_ACTIVE_GIBS`=90, FIFO), maybe drop heart, `room.removeEnemyAt(i)`.
 - `canDropHeart(room, players)` — true only if total missing lives (vs `HEART_DROP.maxLives`) > hearts already in room.
 
@@ -52,7 +53,7 @@ Gameplay beam pacing uses 108 wait ticks (1.8s), 30 charge ticks (0.5s), 33 lock
 
 Summons release one at a time during the spit pose (ticks 18, 23, 28, 33, 38), cycling `hellbat`, `demonessA`, `demonessB`. Preferred positions are in front of the boss; forward safe grid cells and then the rest of the room are fallbacks. Holes, negative floor, walls, proximity to players/enemies and the six-minion cap are respected. Room size and obstacles can reduce the wave.
 
-`CombatSystem.resolveWeaponHits` uses `receiveWeaponHit()` when available and emits hit feedback only for accepted hits. Ghostfire has eight health, a 45-tick hit cooldown, and immunity while frozen, arriving or teleporting. Ordinary enemies retain `startDying()` behavior. The death animation lasts 48 ticks before gibs; `GhostfireSystem` plays a single final burst and kills remaining non-boss minions, as in the trailer.
+`CombatSystem.resolveWeaponHits` uses `takeHit()` and emits hit feedback only for accepted hits. Ghostfire forwards `takeHit()` to its `receiveWeaponHit()` rules, preserving eight health, a 45-tick hit cooldown, and immunity while frozen, arriving or teleporting for both connected and thrown saws. Local hit stop pauses its state timer. The death animation lasts 48 ticks before gibs; `GhostfireSystem` plays a single final burst and kills remaining non-boss minions, as in the trailer. Ghostfire-specific effects and lights use `isGhostfire` so the separate FireSkull boss keeps its own behavior.
 
 `Game` calls `ghostfire.update` after enemy updates, warning drawing on the floor, the firing/fading beam in the air, and `renderLights` before post-processing. Generic melee attack audio is suppressed for bosses; `ghostfireRoar`, `ghostfireSummon`, `ghostfireCharge`, `ghostfireBeam`, `ghostfireDeath` reuse the trailer clips through `AudioConfig`.
 1. **Authoring**: room pieces (`map/*.json`, made in `editor.html`) carry `enemies: [{type, col, row}]` and `hazards: [...]`. `RoomManager` copies them to `cell.customEnemies` / `cell.customHazards`.
@@ -78,7 +79,7 @@ Hazard element schema (`cell.customHazards[]`, editor `_addHazardAt`): `{ type, 
 - `HeartPickup.sheet` is static, set in `Game` constructor from `assets.get("heartPickup")`; 12×12 art drawn at 4×.
 
 ## Config knobs
-`HAZARDS.{spike.damageRadius,drawSize; arrowTrap.*; arrow.*; button.*; challenge.holdFrames}`, `HEART_DROP.{chance,maxLives}`, `PLAYER_SAFE_ZONE` (46), `MAX_ACTIVE_GIBS`, `BLOOD_STAIN_CONFIG.gib`, `ROOM_INTRO`, audio cues in `js/config/AudioConfig.js` (`AUDIO_CONFIG.cues`). Enemy stats are not in config (constructor constants in `MeleeEnemy`).
+`HAZARDS.{spike.damageRadius,drawSize; arrowTrap.*; arrow.*; button.*; challenge.holdFrames}`, `HEART_DROP.{chance,maxLives}`, `PLAYER_SAFE_ZONE` (46), `MAX_ACTIVE_GIBS`, `BLOOD_STAIN_CONFIG.gib`, `ROOM_INTRO`, audio cues in `js/config/AudioConfig.js` (`AUDIO_CONFIG.cues`). `js/config/CombatFeelConfig.js`: `ENEMY_HIT` (damage, cooldown, stagger, poise, flash, jitter), `HIT_FEEL` (shake, hit stop per tier, sparks, blood, dust, glint), `DAMAGE_NUMBER`; `GameConfig.HIT_STOP` (min/max/gap). Per-enemy `hp`/`poise`/`speed` come from `combat` in `DemoCombatConfig.js`; other enemy stats are constructor constants in `MeleeEnemy`.
 
 ## Invariants & gotchas
 - Enemy spawn tiles: `isSafeFloorCell` rejects `HOLE_TILE` (-1), any negative (incl. `EMPTY_FLOOR_TILE` -2) and the border ring. It does **not** check `cell.customWalls`, so an authored foe can spawn inside a wall block (box collision then pushes it).
@@ -102,7 +103,24 @@ See `.agents/playbooks/add-enemy.md` and `.agents/playbooks/add-trap.md`.
 - `node tests/test_ghostfire.js` — phased attack cycle, staggered releases, locked horizontal aim, player/minion damage, side switch, weapon health/cooldown/death, safe capped summons, final minion cleanup.
 - `node tests/test_safe_spawn.js` — `findSafeFloorCell` rules.
 - `node tests/test_player_spawns.js`, `node tests/test_hole_resistance.js` — related spawn/hole behavior.
-- No tests for `MeleeEnemy`, `CombatSystem` or traps; verify in game: `python serve.py` → http://localhost:8000 (or `npm start` for Electron).
+- `node tests/test_combat_feel.js` — `MeleeEnemy` stagger/poise/knockback, `CombatSystem` impact point/dedupe/events (fake renderer, particles, audio), `GameLoop` hit stop vs pause/slow-mo, damage numbers.
+- No tests for traps; verify in game: `python serve.py` → http://localhost:8000 (or `npm start` for Electron).
 
 ## Related docs
 `weapons.md`, `.agents/playbooks/add-enemy.md`, `.agents/playbooks/add-trap.md`, `.agents/playbooks/add-weapon.md`.
+
+## Black Knight B — tanque
+`blackKnightB` (`assets/enemies/black_knight_b.png`) tem `combat.hp = 4`, velocidade 0.8, preparação de 65 ticks e recuperação de 45 ticks. Usa as três linhas de ataque em ciclo (`attack` → `attack2` → `attack3`), com dano nos `hitFrame` de cada linha. O cooldown compartilhado de acertos (24 ticks) impede perder toda a vida em um único contato contínuo.
+
+Opções de sprite `combat.cycleAttacks` e `combat.playDeathAnimation` são opt-in. A segunda mantém o estado `dying` sem ataques/movimento durante `death.frames * death.fps` ticks, desenha a linha de morte sem o flash e só então permite os gibs/remoção. Para o cavaleiro são 4 quadros × 7 ticks = 28 ticks. Outros mobs preservam a seleção aleatória de ataques e morte anterior.
+
+Verificação: `node tests/test_black_knight_b.js` cobre SpawnSystem, dano via CombatSystem, cooldown, ciclo com dano dos três ataques e os recortes reais enviados ao canvas durante a morte.
+
+## Cultista — pilar de fogo
+`cultist` usa `CultistEnemy extends MeleeEnemy`, criado pelo SpawnSystem e disponível nos dois editores. Configuração em `js/config/CultistConfig.js`; `preferredDistance` é um atributo público da instância, inicializado em 300 px, com tolerância de 24 px. Em chase, aproxima-se até essa faixa ou escolhe entre oito direções de recuo a que melhora a distância ao jogador vivo mais próximo, sem atravessar tiles bloqueados. Em situações sem rota segura ele pode ficar encurralado. Conjuração e recuperação são estacionárias.
+
+Ao entrar em windup, copia a posição do jogador vivo/não caindo mais próximo. A posição gravada não acompanha o alvo e não tem marcador circular no chão. Após 45 ticks de preparação, usa apenas a quarta linha da PNG (row 3, 14 quadros × 6 ticks). O recorte do pilar é desenhado separadamente na posição marcada por `drawAttackEffect`, chamado no passe de chão do Game; quadros 8–11 causam dano num raio de 30 px (+ hitRadius do jogador), uma vez por jogador por conjuração. Sair da área evita o ataque, entrar durante os quadros ativos permite receber dano. Não causa dano corpo a corpo. Stagger e morte cancelam a marca/pilar; hit stop e pausa congelam seus timers.
+
+Morte: última linha (row 5, 10 quadros × 7 ticks), completa antes da remoção; sem gibs por terminar em dissipação. Reutiliza spawn congelado, feedback de acerto, navegação e ciclo de morte do MeleeEnemy. `tests/test_cultist.js` verifica distância configurável, alvo fixo, esquiva, AoE, interrupção, spawn e morte.
+
+A distância máxima de conjuração é 464 px, cobrindo a faixa desejada de 300 ± 24 px. O único efeito desenhado no ponto gravado vem da spritesheet, sem círculo adicional.

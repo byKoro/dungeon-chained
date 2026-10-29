@@ -70,7 +70,7 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 6. `room.challenge.update` + button/arrow-trap audio feedback.
 7. `combat.updateEnemies`.
 8. 3 iterations: `Physics.resolveEntityCollisions` + saw disc as circle obstacle; then `Physics.resolveBoxCollisions` vs `room.wallBoxes`; `enemy.ensureOnWalkableTile`.
-9. `rooms.clampEnemy` / `rooms.clampPlayer` (door openings passable only when unlocked).
+9. `rooms.clampEnemy` / `rooms.clampPlayer` (door openings passable only when unlocked; the passable width is `door.passHalfWidth`, narrower than the door for the boss gate, `DEMO.gatePassHalfWidth`).
 10. `tiles.checkHoleFalls`; first frame of fall → audio + `_dropSawOnFall` (forced chain drop); then `holes.update([p1, p2])` (also called with no players during the room intro).
 11. `combat.resolveWeaponHits` (hit → slow-mo), `combat.resolveDeaths` (gibs, screen gore).
 12. `_updateHearts` (pickup if `lives < 3`), gibs update, `effects.update`, damage detection via `p._livesSeen`, `screenGore.update`.
@@ -84,12 +84,12 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 World pass (inside `renderer.beginFrame()` camera transform, clipped to room rect + `DOOR_STUB_TILES`):
 1. `drawBackground(BACKGROUND_TILE)` (before clip, fills view).
 2. `drawRoom` (floor incl. auto-tiled holes, walls, props, torches, closed door tiles).
-3. If open: `drawDoorStubs`, `drawDoorGradients`.
+3. If open: `drawDoorStubs`, `drawDoorGradients`. Then `demoDoors.drawGates` (boss gate sprite, under the entities so players walk in front of it).
 4. `holes.draw` (motes clipped to hole tiles) → `challenge.drawFloorLayer` → `particleSystem.drawFloor` (blood canvas; masked by `tiles.darkHoleRects()`) → `effects.draw` (footprints) → `challenge.drawButtons` → `particleSystem.drawSmoke`.
 5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce; skipped while falling) and visible enemies (r 13).
 6. `chain.drawChain` (cable).
 7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders]` sorted by `y`; a falling player goes through `holes.drawFalling`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.
-8. `particleSystem.drawFlames` → `challenge.drawWallLayer` → `renderer.drawFrontWall` (bottom row redrawn over entities) → gibs → `challenge.drawAirLayer` → `particleSystem.drawAir` → wind if `WIND.layer === "world"`.
+8. `particleSystem.drawFlames` → `challenge.drawWallLayer` → `renderer.drawFrontWall` (bottom row redrawn over entities) → `demoDoors.draw` (closed normal door tiles of authored maps) → gibs → `challenge.drawAirLayer` → `particleSystem.drawAir` → wind if `WIND.layer === "world"`.
 9. `ctx.restore()`, `renderer.endFrame()`.
 
 Screen passes:

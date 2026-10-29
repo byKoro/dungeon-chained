@@ -22,7 +22,7 @@ export class Room {
         this.challenge = null;
 
         const seed = (cell.gx * 73856093) ^ (cell.gy * 19349663);
-        this.tiles = new RoomTiles(ROOM_COLS, ROOM_ROWS, cell.doors, seed, cell.kind === "room");
+        this.tiles = new RoomTiles(cell.authored?.cols ?? ROOM_COLS, cell.authored?.rows ?? ROOM_ROWS, cell.authored ? {} : cell.doors, seed, cell.kind === "room");
 
         if (cell.customFloor && Array.isArray(cell.customFloor)) {
             this.tiles.floor = cell.customFloor;
@@ -33,6 +33,7 @@ export class Room {
             }
         }
 
+        if (cell.authored) this.tiles.doorCells = [];
         this.tiles.walls = Array.isArray(cell.customWalls) ? cell.customWalls : [];
         this.wallBoxes = this.tiles.walls.map(wall => ({ x: bounds.minX - TILE + wall.col * TILE, y: bounds.minY - TILE + wall.row * TILE, w: TILE, h: TILE }));
 

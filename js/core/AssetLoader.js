@@ -27,6 +27,7 @@ export class AssetLoader {
 
         this.load("heartPickup", "assets/heart/heart_pickup.png");
 
+        this.load("fireSkull", "assets/enemies/skull_fire_sheet.png");
         this.load("demon", "assets/enemies/demon.png");
         this.load("bloodMonster", "assets/enemies/blood_monster.png");
 
@@ -40,6 +41,8 @@ export class AssetLoader {
             this._tilesetVariantKeys.push(key);
         }
 
+        this.load("bossGate", "assets/doors/boss-gate-opening-strip-v8.png");
+        for (let frame = 1; frame <= 4; frame++) this.load(`demoKey${frame}`, `assets/keys/keys_1_${frame}.png`);
         this.load("saw", "assets/saw/saw.png");
 
         this.load("cable", "assets/saw/rope.png");

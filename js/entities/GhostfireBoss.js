@@ -9,6 +9,7 @@ export class GhostfireBoss extends MeleeEnemy {
         super(x, y, sheet, spriteConfig, floor);
         this.sprite = { ...spriteConfig, drawHeight: spriteConfig.cropH * GHOSTFIRE.sprite.scale };
         this.isBoss = true;
+        this.isGhostfire = true;
         this.health = GHOSTFIRE.health;
         this.hitRadius = GHOSTFIRE.hitRadius;
         this.hitCooldown = 0;
@@ -72,6 +73,10 @@ export class GhostfireBoss extends MeleeEnemy {
         this.vx = this.vy = this.pushVx = this.pushVy = 0;
     }
 
+    takeHit() {
+        return this.receiveWeaponHit();
+    }
+
     receiveWeaponHit() {
         if (this.frozen || this.state === "dying" || this.state === "teleport" || this.state === "appear" || this.hitCooldown > 0) return false;
         this.health--;
@@ -120,7 +125,7 @@ export class GhostfireBoss extends MeleeEnemy {
         this.justAttacked = false;
         this.justStepped = false;
         this.justCharging = this.justRoared = this.justArrived = false;
-        if (this.frozen || this.state === "dying") {
+        if (this.frozen || this.state === "dying" || this.hitFreezeTimer > 0) {
             super.update(players, onPlayerHit);
             return;
         }

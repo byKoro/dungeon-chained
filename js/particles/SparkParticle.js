@@ -3,15 +3,27 @@ export class SparkParticle {
     constructor(cx, cy, radius = 24, spinDir = 1, opts = {}) {
         const burst = !!opts.burst;
         const power = opts.power ?? 1;
+        const dir = opts.dir || null;
 
-        const a = Math.random() * Math.PI * 2;
+        // Com `dir`, as faíscas saem do ponto (cx, cy) dentro de um cone ao redor da direção do golpe.
+        const a = dir
+            ? Math.atan2(dir.y, dir.x) + (Math.random() - 0.5) * 2 * (opts.cone ?? 0.9)
+            : Math.random() * Math.PI * 2;
         const nx = Math.cos(a);
         const ny = Math.sin(a);
 
-        this.x = cx + nx * radius;
-        this.y = cy + ny * radius;
+        this.x = cx + (dir ? 0 : nx * radius);
+        this.y = cy + (dir ? 0 : ny * radius);
 
-        if (burst) {
+        if (dir) {
+            const speed = (4 + Math.random() * 7) * power;
+            this.vx = nx * speed;
+            this.vy = ny * speed - (0.5 + Math.random() * 1.5);
+            this.gravity = 0.3;
+            this.friction = 0.88;
+            this.size = 2 + ((Math.random() * 3) | 0);
+            this.life = 10 + ((Math.random() * 10) | 0);
+        } else if (burst) {
 
             const speed = (5 + Math.random() * 7) * power;
             this.vx = nx * speed + (Math.random() - 0.5) * 2;

@@ -1,3 +1,4 @@
+import { DemoMapLoader } from './rooms/DemoMapLoader.js';
 import { Game } from './Game.js';
 import { RoomCatalog } from './rooms/RoomCatalog.js';
 import { AssetLoader } from './core/AssetLoader.js';
@@ -40,7 +41,16 @@ async function bootstrap() {
             {
                 weight: 1,
                 task: async (p) => {
-                    game = new Game(canvas, { roomCatalog, assets });
+                    let mapData = null;
+                    try {
+                        mapData = await DemoMapLoader.load();
+                    } catch (err) {
+                        // Mapa com erro não pode travar o boot: avisa e cai no jogo clássico.
+                        console.error(err);
+                        alert(`Não foi possível carregar o mapa da demo:\n\n${err.message}\n\nO jogo vai abrir no modo clássico.`);
+                    }
+                    game = new Game(canvas, { roomCatalog, assets, mapData });
+                    window.game = game;
                     await game.audio.whenReady(4000, (d, t) => p(t ? d / t : 1));
                 }
             }
