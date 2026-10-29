@@ -12,6 +12,12 @@ export class DemoCamera {
 
     update() {
         const [p1, p2] = this.getPlayers(), r = this.getRect();
+        const bounds = { minX: r.x, minY: r.y, maxX: r.x + r.w, maxY: r.y + r.h };
+        // Cinemáticas: `focus = { x, y, zoom }` (zoom multiplica o de referência) substitui o alvo dos jogadores.
+        if (this.focus) {
+            this.renderer.updateCamera({ x: this.focus.x, y: this.focus.y, zoom: this.referenceZoom() * this.focus.zoom, bounds });
+            return;
+        }
         let zoom = this.referenceZoom();
         if (this.mode === 'zoom') zoom = Math.min(zoom,
             this.canvas.width / (Math.abs(p1.x - p2.x) + DEMO.cameraMargin * 2),

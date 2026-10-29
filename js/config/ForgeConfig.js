@@ -15,6 +15,28 @@ export const FORGE = Object.freeze({
 
 export const FORGE_RECIPE_IDS = Object.freeze(Object.keys(FORGE.recipes));
 
+// Cinemática de craft da Serra (~4 s, segundos de simulação).
+export const SAW_CINEMATIC = Object.freeze({
+    letterboxIn: 0.45,
+    hits: Object.freeze([0.7, 1.25, 1.8]),
+    hitShake: Object.freeze([3, 5, 8]),
+    hitSparks: Object.freeze([10, 14, 20]),
+    jumpStart: 2.05,
+    jumpEnd: 2.85,
+    jumpHeight: 120,
+    jumpSpins: 3,
+    squashTime: 0.3,
+    squashAmount: 0.32,
+    glowTime: 0.6,
+    outStart: 3.35,
+    end: 3.8,
+    zoom: 1.7,
+    barRatio: 0.12,
+    sawLift: 18,
+    firstReconnectScale: 1.1,
+    titleSeconds: 1.8
+});
+
 // Sem `recipes` autorado, a bigorna oferece o catálogo padrão; uma lista vazia não oferece nada.
 export function anvilRecipes(prop) {
     if (!Array.isArray(prop?.recipes)) return FORGE.defaultRecipes;

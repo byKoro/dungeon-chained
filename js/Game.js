@@ -12,6 +12,9 @@ import { CHAIN } from './config/ChainConfig.js';
 import { ForgeState, mapOffersRecipe, applySawUpgrades } from './systems/ForgeState.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
+import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
+import { TitleBanner } from './ui/TitleBanner.js';
+import { SAW_CINEMATIC } from './config/ForgeConfig.js';
 import { t } from './i18n/I18n.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
@@ -188,6 +191,11 @@ export class Game {
             onBuy: (id, result, anvil) => this._onForgeBuy(id, anvil)
         }) : null;
         this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
+        this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
+            renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
+            getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
+        }) : null;
+        this.titleBanner = new TitleBanner();
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -402,6 +410,10 @@ export class Game {
         this.chests?.reset();
         this.dialogue?.clear();
         this.forgeSystem?.reset();
+        this.sawCinematic?.reset();
+        this.titleBanner.clear();
+        this._sawOnAnvil = false;
+        this._sawFirstConnect = false;
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -471,14 +483,24 @@ export class Game {
         this._applySawUpgrades();
         if (id !== "saw") return;
         this.forgeSystem.close({ silent: true });
-        this._spawnSawAtAnvil(anvil);
+        this.sawCinematic.start(anvil);
     }
 
-    // A serra fica na frente (ao sul) da bigorna até os dois chegarem perto.
-    _spawnSawAtAnvil(anvil) {
-        const spot = this.tiles.safeDropPoint(anvil.x, anvil.y + TILE * 0.9, [this.p1, this.p2]);
-        this.chain.spawnSaw(spot.x, spot.y);
-        this._sawLandPending = true;
+    // Fim da cinemática: a serra fica em cima da bigorna até os dois chegarem perto.
+    _onSawForged(anvil) {
+        const top = this.sawCinematic.anvilTop;
+        this.chain.spawnSaw(top.x, top.y);
+        this.chain.weapon.dropT = 1;
+        this._sawOnAnvil = true;
+        this._sawFirstConnect = true;
+        this.dialogue?.say(1, "talk.sawReady");
+    }
+
+    _updateSawCinematic(dt) {
+        this.sawCinematic.update(dt);
+        for (const p of this.players) { p.vx = 0; p.vy = 0; }
+        this.particleSystem.update([this.p1, this.p2], this.arenaBounds);
+        this._updateCameraToCurrentRoom(dt);
     }
 
     _sawSplitFeedback(weapon) {
@@ -508,6 +530,7 @@ export class Game {
         this._rememberEntrySpawns();
 
         if (!this.chain.isConnected) this.chain.reset();
+        this._sawOnAnvil = false;
 
         this.particleSystem.damageNumbers = [];
 
@@ -659,7 +682,9 @@ export class Game {
 
     _step(deltaSeconds) {
         if (this.gameOver) return;
-        if (this.forgeSystem?.open) {
+        if (this.sawCinematic?.active) {
+            this._updateSawCinematic(deltaSeconds);
+        } else if (this.forgeSystem?.open) {
             this._updateCameraToCurrentRoom(deltaSeconds);
         } else if (this.transition) {
             this._updateTransition();
@@ -798,13 +823,21 @@ export class Game {
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
             onReconnect: () => {
-                this.renderer.triggerShake(4);
+                const first = this._sawFirstConnect;
+                this._sawFirstConnect = false;
+                this._sawOnAnvil = false;
+                this.renderer.triggerShake(first ? 9 : 4);
 
                 this.audio.play("sawPickup");
                 this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
                 this._sawLandPending = false;
 
-                this.chain.weapon?.playReconnect?.();
+                if (first) {
+                    this.chain.weapon?.playReconnect?.(SAW_CINEMATIC.firstReconnectScale);
+                    this.titleBanner.show(t("forge.sawTitle"), SAW_CINEMATIC.titleSeconds);
+                } else {
+                    this.chain.weapon?.playReconnect?.();
+                }
             },
 
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
@@ -1135,11 +1168,14 @@ export class Game {
 
         this.chain.draw(ctx, this.p1, this.p2);
 
-        this.chain.drawDropped(ctx);
+        // Recém-forjada, a serra fica em cima da bigorna: desenhada depois do prop.
+        if (!this._sawOnAnvil) this.chain.drawDropped(ctx);
 
         this.particleSystem.drawSparks(ctx);
 
         drawables.filter(e => e.y > sawY).forEach(drawEntity);
+        if (this._sawOnAnvil) this.chain.drawDropped(ctx);
+        this.sawCinematic?.drawWorld(ctx);
 
         this.particleSystem.drawFlames(ctx);
         this.ghostfire.drawAir(ctx, rooms.current);
@@ -1213,6 +1249,8 @@ export class Game {
 
         this.hud.draw(ctx, canvas.width, canvas.height);
         this.scrapCounter?.draw(ctx, canvas.width, canvas.height, this.hud.pixelScale(canvas.width, canvas.height));
+        this.sawCinematic?.drawOverlay(ctx, canvas);
+        this.titleBanner.draw(ctx, canvas);
         this.forgeMenu?.draw(ctx, canvas);
 
     }

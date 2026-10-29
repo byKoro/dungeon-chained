@@ -464,6 +464,37 @@ export class SawWeapon extends Weapon {
         ctx.restore();
     }
 
+    // Disco solto em (x, y) para cinemáticas; `sx`/`sy` escalam a partir da base (squash), `glow` 0..1.
+    drawAt(ctx, x, y, { rotation = 0, sx = 1, sy = 1, glow = 0 } = {}) {
+        const sprite = this.sprite;
+        const size = SAW_DRAW_LARGE * this.sizeScale;
+        ctx.save();
+        if (glow > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = glow * 0.7;
+            ctx.fillStyle = "#cfe4ff";
+            ctx.beginPath();
+            ctx.arc(x, y, size * (0.4 + glow * 0.35), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(x, y + size / 2);
+        ctx.scale(sx, sy);
+        ctx.translate(0, -size / 2);
+        ctx.rotate(rotation);
+        if (sprite?.complete && sprite.naturalWidth > 0) {
+            ctx.drawImage(sprite, INERTIA_FRAME * SAW_FRAME.size, ROW_INERTIA_CLEAN * SAW_FRAME.size, SAW_FRAME.size, SAW_FRAME.size, -size / 2, -size / 2, size, size);
+        } else {
+            ctx.fillStyle = "#c8ccd4";
+            ctx.beginPath();
+            ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
     drawDropped(ctx) {
         if (!this.dropped) return;
 
