@@ -194,7 +194,7 @@ export class Game {
         this.roomEvents = this.mapData ? new RoomEvents({
             rooms: this.rooms, spawnSystem: this.spawnSystem, getPlayers: () => [this.p1, this.p2], chain: this.chain,
             scrap: this.scrap, chests: this.chests, dialogue: this.dialogue, audio: this.audio,
-            particleSystem: this.particleSystem, renderer: this.renderer
+            particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets
         }) : null;
         // Mapas com bigorna seguem a regra de morte da run (ADR 0012): renascer no início em vez de game over.
         this._runRules = !!this.mapData && Object.values(this.mapData.map.rooms).some(r => (r.props || []).some(p => p.type === "anvil"));

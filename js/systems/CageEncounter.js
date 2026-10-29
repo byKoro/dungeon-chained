@@ -190,28 +190,51 @@ export class CageEncounter {
         this._restore();
     }
 
-    // ---------- desenho (placeholders procedurais) ----------
+    // ---------- desenho (sprites de assets/cage, 1 pixel de arte = cfg.art px de mundo) ----------
 
-    _cageY() {
-        if (this.phase === "falling") return this.cagePos.y - this.cfg.hang * (1 - easeIn(this.fallT / this.cfg.fallSteps));
-        return this.cagePos.y - this.cfg.hang;
+    _img(key) {
+        const img = this.api.assets?.get?.(key);
+        return img?.complete && img.naturalWidth > 0 ? img : null;
+    }
+
+    // Topo do sprite da gaiola: pendurada, caindo ou j· no ch„o.
+    _cageTop() {
+        const c = this.cagePos, s = this.cfg.sprite;
+        const hung = c.y - this.cfg.hang - s.bodyBottom * this.cfg.art;
+        const floor = c.y + s.floorOffset - s.bodyBottom * this.cfg.art;
+        if (this.phase === "falling") return hung + (floor - hung) * easeIn(this.fallT / this.cfg.fallSteps);
+        return hung;
+    }
+
+    // Ponto do sprite (pixel de arte) no mundo, girado pela inclinaÁ„o em volta do gancho.
+    _cagePoint(ax, ay) {
+        const A = this.cfg.art, s = this.cfg.sprite, c = this.cagePos, top = this._cageTop();
+        const hx = c.x, hy = top + s.hookY * A;
+        const lx = (ax - s.w / 2) * A, ly = (ay - s.hookY) * A;
+        const cos = Math.cos(this.tilt), sin = Math.sin(this.tilt);
+        return { x: hx + lx * cos - ly * sin, y: hy + lx * sin + ly * cos };
+    }
+
+    _stakeKnot(r) {
+        const A = this.cfg.art, s = this.cfg.sprite;
+        return { x: r.x + (s.knotX - s.stakeW / 2) * A, y: r.y + s.stakeFoot - (s.stakeH - s.knotY) * A };
     }
 
     drawFloor(ctx) {
         if (!this.valid) return;
-        const col = this.cfg.colors, c = this.cagePos;
+        const col = this.cfg.colors, c = this.cagePos, A = this.cfg.art, s = this.cfg.sprite;
         ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const stake = this._img("ropeStake");
         for (const r of this.ropes) {
-            ctx.fillStyle = col.stake;
-            ctx.fillRect(r.x - 6, r.y - 10, 12, 18);
-            ctx.fillStyle = col.ropeDark;
-            ctx.fillRect(r.x - 8, r.y - 4, 16, 4);
+            if (stake) ctx.drawImage(stake, Math.round(r.x - s.stakeW * A / 2), Math.round(r.y + s.stakeFoot - s.stakeH * A), s.stakeW * A, s.stakeH * A);
+            if (r.cut) this._ropeEnd(ctx, this._stakeKnot(r), 0);
         }
         if (this.phase !== "fallen" && this.phase !== "done") {
             const k = this.phase === "falling" ? easeIn(this.fallT / this.cfg.fallSteps) : 0;
             ctx.fillStyle = col.shadow;
             ctx.beginPath();
-            ctx.ellipse(c.x, c.y + 20, this.cfg.width * (0.45 + k * 0.2), this.cfg.width * (0.16 + k * 0.08), 0, 0, Math.PI * 2);
+            ctx.ellipse(c.x, c.y + s.floorOffset, this.cfg.width * (0.42 + k * 0.2), this.cfg.width * (0.15 + k * 0.08), 0, 0, Math.PI * 2);
             ctx.fill();
         }
         for (const e of this.spawned) {
@@ -221,71 +244,91 @@ export class CageEncounter {
             ctx.ellipse(e.x, (e.footY ?? e.y + 20), 16, 6, 0, 0, Math.PI * 2);
             ctx.fill();
         }
-        if (this.debrisT > 0) {
+        const broken = this._img("cageBroken");
+        if (this.debrisT > 0 && broken) {
             ctx.globalAlpha = Math.min(1, this.debrisT / 60);
-            for (const d of this.debris) {
-                ctx.save();
-                ctx.translate(d.x, d.y);
-                ctx.rotate(d.a);
-                ctx.fillStyle = col.bar; ctx.fillRect(-d.len / 2, -3, d.len, 6);
-                ctx.fillStyle = col.barLight; ctx.fillRect(-d.len / 2, -3, d.len, 2);
-                ctx.restore();
-            }
+            const w = broken.naturalWidth * A, h = broken.naturalHeight * A;
+            ctx.drawImage(broken, Math.round(c.x - w / 2), Math.round(c.y + s.floorOffset - h + 8), w, h);
         }
         ctx.restore();
     }
 
-    // Gaiola e cordas ficam no alto: desenhadas por cima de tudo (no passe acima da escurid√£o).
+    // Gaiola e cordas ficam no alto: desenhadas por cima de tudo (no passe acima da escurid„o).
     drawAir(ctx) {
         if (!this.valid || this.phase === "fallen" || this.phase === "done") return;
-        const col = this.cfg.colors, c = this.cagePos, W = this.cfg.width, H = this.cfg.height, px = this.cfg.art;
-        const cy = this._cageY();
+        const A = this.cfg.art, s = this.cfg.sprite, c = this.cagePos;
         const [p1, p2] = this.api.getPlayers();
         const chain = this.api.chain;
         ctx.save();
+        ctx.imageSmoothingEnabled = false;
         for (const r of this.ropes) {
-            const attachX = c.x + Math.sign(r.x - c.x) * W * 0.45, attachY = cy + H * 0.1;
-            let near = false;
-            if (!r.cut && this.phase === "active" && chain.isConnected) {
-                near = Physics.distToSegment(r.x, r.y, p1.x, p1.y, p2.x, p2.y) < this.cfg.nearRadius;
+            const a = this._cagePoint(r.x < c.x ? s.ropeLeftX : s.ropeRightX, s.ropeY);
+            if (r.cut) {
+                const k = Math.min(1, r.cutT);
+                this._ropeEnd(ctx, { x: a.x + (r.x - a.x) * 0.06 * k, y: a.y + 30 + 10 * k }, 1, a);
+                continue;
             }
+            const knot = this._stakeKnot(r);
+            const near = this.phase === "active" && chain.isConnected
+                && Physics.distToSegment(r.x, r.y, p1.x, p1.y, p2.x, p2.y) < this.cfg.nearRadius;
             const wob = near ? Math.sin(this._pulse * 0.9) * 3 : 0;
-            if (!r.cut) {
-                if (near) { ctx.strokeStyle = col.glow; ctx.lineWidth = 10; this._rope(ctx, r.x, r.y - 8, attachX, attachY, wob); }
-                ctx.strokeStyle = col.ropeDark; ctx.lineWidth = 5; this._rope(ctx, r.x, r.y - 8, attachX, attachY, wob);
-                ctx.strokeStyle = col.rope; ctx.lineWidth = 2; this._rope(ctx, r.x, r.y - 9, attachX, attachY - 1, wob);
-            } else {
-                const k = 1 - r.cutT * 0.7;
-                ctx.strokeStyle = col.rope; ctx.lineWidth = 3;
-                this._rope(ctx, attachX, attachY, attachX + (r.x - attachX) * 0.15 * k, attachY + 40 * (1 - k * 0.3), 0);
+            if (near) {
+                ctx.strokeStyle = this.cfg.colors.glow;
+                ctx.lineWidth = s.ropeThick + 8;
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(knot.x, knot.y);
+                ctx.quadraticCurveTo((knot.x + a.x) / 2 + wob, (knot.y + a.y) / 2 + s.ropeSag + wob, a.x, a.y);
+                ctx.stroke();
             }
+            this._ropeAlong(ctx, knot, a, wob);
         }
-        ctx.translate(c.x, cy + H / 2);
-        ctx.rotate(this.tilt);
-        ctx.translate(-W / 2, -H / 2);
-        ctx.fillStyle = col.frame;
-        ctx.fillRect(0, 0, W, 3 * px);
-        ctx.fillRect(0, H - 3 * px, W, 3 * px);
-        const bars = 6;
-        for (let i = 0; i < bars; i++) {
-            const x = Math.round((i / (bars - 1)) * (W - 2 * px));
-            ctx.fillStyle = col.bar; ctx.fillRect(x, 0, 2 * px, H);
-            ctx.fillStyle = col.barLight; ctx.fillRect(x, 0, px, H);
-        }
-        ctx.fillStyle = col.barLight;
-        ctx.fillRect(0, 0, W, px);
-        if (this.flashT > 0) {
-            ctx.globalAlpha = this.flashT / this.cfg.flashSteps;
-            ctx.fillStyle = "#fff4c8";
-            ctx.fillRect(W * 0.3, H - 3 * px, W * 0.4, 3 * px);
+        const img = this._img(this.flashT > 0 ? "cageOpen" : "cageHang");
+        if (img) {
+            const top = this._cageTop();
+            ctx.translate(c.x, top + s.hookY * A);
+            ctx.rotate(this.tilt);
+            ctx.drawImage(img, -s.w * A / 2, -s.hookY * A, s.w * A, img.naturalHeight * A);
         }
         ctx.restore();
     }
 
-    _rope(ctx, x1, y1, x2, y2, wob) {
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.quadraticCurveTo((x1 + x2) / 2 + wob, (y1 + y2) / 2 + 10 + wob, x2, y2);
-        ctx.stroke();
+    // Corda texturizada ao longo de uma curva (mesma ideia do cabo da serra).
+    _ropeAlong(ctx, p, q, wob) {
+        const tex = this._img("cageRope"), s = this.cfg.sprite;
+        const mx = (p.x + q.x) / 2 + wob, my = (p.y + q.y) / 2 + s.ropeSag + wob;
+        const at = t => ({
+            x: (1 - t) * (1 - t) * p.x + 2 * (1 - t) * t * mx + t * t * q.x,
+            y: (1 - t) * (1 - t) * p.y + 2 * (1 - t) * t * my + t * t * q.y
+        });
+        const N = 20;
+        let prev = at(0), u = 0;
+        for (let i = 1; i <= N; i++) {
+            const cur = at(i / N);
+            const len = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+            ctx.save();
+            ctx.translate((prev.x + cur.x) / 2, (prev.y + cur.y) / 2);
+            ctx.rotate(Math.atan2(cur.y - prev.y, cur.x - prev.x));
+            if (tex) {
+                const tw = tex.naturalWidth, srcW = Math.max(1, Math.min(tw, Math.round(len / s.ropeThick * tex.naturalHeight)));
+                const sx = Math.floor(u) % Math.max(1, tw - srcW + 1);
+                ctx.drawImage(tex, sx, 0, srcW, tex.naturalHeight, -len / 2 - 0.5, -s.ropeThick / 2, len + 1, s.ropeThick);
+                u += srcW;
+            } else {
+                ctx.fillStyle = this.cfg.colors.rope;
+                ctx.fillRect(-len / 2, -s.ropeThick / 4, len, s.ropeThick / 2);
+            }
+            ctx.restore();
+            prev = cur;
+        }
+    }
+
+    // Ponta desfiada de corda cortada; com `from`, desenha antes o pedaÁo pendurado atÈ ela.
+    _ropeEnd(ctx, at, dangling, from = null) {
+        if (from) this._ropeAlong(ctx, from, at, 0);
+        const img = this._img("cageRopeEnd"), A = this.cfg.art;
+        if (!img) return;
+        const w = img.naturalWidth * A * 0.75, h = img.naturalHeight * A * 0.75;
+        ctx.drawImage(img, Math.round(at.x - w / 2), Math.round(at.y - h / 2 + dangling * 4), w, h);
     }
 }

@@ -9,8 +9,8 @@ const ROOM_SCRIPTS = Object.freeze({ inicial: InicialRoomScript });
 
 export class RoomEvents {
     constructor({ rooms, spawnSystem, getPlayers, chain, scrap = null, chests = null, dialogue = null, audio = null,
-        particleSystem = null, renderer = null, scripts = ROOM_SCRIPTS, tile = TILE }) {
-        Object.assign(this, { rooms, spawnSystem, getPlayers, chain, scrap, chests, dialogue, audio, particleSystem, renderer, scripts, tile });
+        particleSystem = null, renderer = null, assets = null, scripts = ROOM_SCRIPTS, tile = TILE }) {
+        Object.assign(this, { rooms, spawnSystem, getPlayers, chain, scrap, chests, dialogue, audio, particleSystem, renderer, assets, scripts, tile });
         this.reset();
     }
 
@@ -37,7 +37,7 @@ export class RoomEvents {
             room, tile, rect,
             authored,
             getPlayers: this.getPlayers, chain: this.chain, scrap: this.scrap, chests: this.chests,
-            dialogue: this.dialogue, audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer,
+            dialogue: this.dialogue, audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets,
             zone(id) {
                 const z = (authored.zones || []).find(o => o.id === id);
                 if (!z) return null;
