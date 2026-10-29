@@ -61,7 +61,7 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
 2. `PlayerAI.update()` overwrites P1's movement keys when enabled.
 3. `p.update(input, bounds)` → velocity, position (`Entity.update`), anim/step flags.
 4. `Chain.update`:
-   - Connected: `Physics.applyChainConstraint(p1, p2, rest, stiffness)` adds spring velocity beyond `rest`. `strain++` while `dist > strainDistance`, else `strain -= 2`.
+   - Connected: `Physics.applyChainConstraint(p1, p2, rest, stiffness)` adds spring velocity beyond `rest`. `strain++` while `dist > strainDistance` (held while the Serra dupla is split), else `strain -= 2`.
    - Snap when `dist > breakDistance` OR `strain >= strainLimit`: players pushed apart by `snapImpulse`, `connected=false`, cooldown `reconnectDelay`, saw dropped at `resolveDropPoint(midpoint)` (`tiles.reachableDropPoint` → nearest reachable walkable tile), `onSnap` (shake 14, `sawSnap` audio, duck, sparks/flash).
    - Disconnected: reconnect when cooldown over and `_canReconnect`: if saw dropped, BOTH players within `pickupRadius` of drop point; otherwise `dist < reconnectDistance`. Then `weapon.pickup()`, `onReconnect`.
    - `weapon.setStrain(0..1)` (max of strain ratio and distance ratio), `weapon.update`, `weapon.updateDropped` when loose.

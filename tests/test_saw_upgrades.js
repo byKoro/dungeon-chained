@@ -77,6 +77,19 @@ const setup = (buys = []) => {
     assert(w2.getSawPositions(player(0, 0), player(d, 0)).length === 1, "sem a melhoria nunca divide");
 }
 
+// Serra dupla aberta: a tensão não sobe, só a distância de ruptura arrebenta o cabo.
+{
+    const { chain, weapon } = setup(["doubleSaw"]);
+    const d = 0.9 * 240;
+    const p1 = player(0, 0), p2 = player(d, 0);
+    for (let i = 0; i < 120; i++) { p1.x = 0; p2.x = d; p1.y = p2.y = 0; chain.update(p1, p2); }
+    assert(chain.isConnected && weapon.split === 1, "dividida a 90% da ruptura, 2 s sem arrebentar pela tensão");
+    assert(chain.strain < chain.strainLimit, `tensão parada enquanto dividida (${chain.strain})`);
+    const { chain: plain } = setup();
+    for (let i = 0; i < 120 && plain.isConnected; i++) plain.update(player(0, 0), player(d, 0));
+    assert(!plain.isConnected, "sem a melhoria, a mesma distância arrebenta pela tensão");
+}
+
 // Os dois discos acertam.
 {
     const { chain, weapon } = setup(["doubleSaw"]);

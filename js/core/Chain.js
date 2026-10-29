@@ -76,7 +76,9 @@ export class Chain {
 
             Physics.applyChainConstraint(p1, p2, this.rest, this.stiffness);
 
-            if (dist > this.strainDistance) this.strain++;
+            // Serra dupla aberta: a tensão não sobe (só a ruptura por distância vale), para a dupla poder usar a faixa.
+            const split = (this.weapon.split ?? 0) > 0;
+            if (dist > this.strainDistance) { if (!split) this.strain++; }
             else this.strain = Math.max(0, this.strain - 2);
 
             if (dist > this.breakDistance || this.strain >= this.strainLimit) {
