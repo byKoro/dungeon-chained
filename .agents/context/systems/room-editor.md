@@ -92,7 +92,7 @@ Separate tool; the old editor above is untouched. Authors a whole map: a grid of
 | `js/editor2/TilePalette.js` | Clickable tileset; drag selects a rectangular stamp. |
 | `js/editor2/PropSprites.js` | Loads and animates the prop frames. |
 | `js/config/MapEditorConfig.js` | Format id/version, limits, tile kinds, `WALL_TILE_INDICES` (auto kind), `DOOR_TYPES` (`normal`, `boss`; `sprite: null` until the boss gate art exists). |
-| `js/config/PropConfig.js` | `ANIMATED_PROPS` (box, mini box, chest, chest opening, coin, flag, flasks 1–4, keys 1–2, flamethrower 1×2 and 2×1), 4 frames each, `PROP_FRAME_MS`. |
+| `js/config/PropConfig.js` | `ANIMATED_PROPS` (box, mini box, chest, chest opening, coin, flag, flasks 1–4, keys 1–2, flamethrower 1×2 and 2×1: 4 frames each; anvil `assets/anvil/anvil.png`: 1 frame, 2×1 footprint), `PROP_FRAME_MS`. Frames are stretched to the footprint unless the prop has `art: {w, h}` (PNG size in art px): then `PropSprites.draw` draws it at native size (`tilePx/16` per art px) centred on the footprint. The 24×24 anvil uses this so it stays at an integer scale. |
 
 Map file `map/demo/<name>.json` (`format: "dungeon-chained-map"`, `version: 1`): `name`, `grid {cols, rows}`, `roomSize` (default for new rooms), `start` (`"gx,gy"`), `rooms {"gx,gy": room}`. Room: `id, name, notes, cols, rows, tiles[r][c]` (tileset index; `-1` hole; `-2` void), `kinds[r]` (one char per column: `f` floor, `w` wall/collision, `h` hole, `v` void), `doors [{col,row,type}]` (border tiles, not corners; a door on side N of `gx,gy` leads to `gx,gy-1`), `props [{type,col,row,flip?}]`. Saved pretty-printed (`_pretty` in `serve.py` = `formatMapJson`): one tile row per line, `kinds` reads as a drawing of the room.
 
