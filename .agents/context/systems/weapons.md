@@ -52,6 +52,14 @@ SawWeapon module constants (top of `SawWeapon.js`); Chain options in `js/config/
 - `CombatSystem.resolveWeaponHits` and the saw collision in `Game._updateGameplay` loop over every saw position; the drop point (`Chain._sawCenter`) and the render split use the mean of the discs; sparks, blood pickup and the light still use `[0]`. While the saw is absent `Chain.update` returns early with `spin = 0`, so the motor stays silent; `pickup()` clears the split.
 - `playReconnect(scale = 0.5)`: the first reconnect after the forge uses `SAW_CINEMATIC.firstReconnectScale` (1,1). `drawAt(ctx, x, y, { rotation, sx, sy, glow })` draws a loose disc for the cinematic.
 
+## Dragging the saw (`SawDrag`, Editor 2.0 maps, `feat/saw-drag`)
+- Only with the saw present, the cable snapped, the saw dropped and not thrown, and not while the fresh saw sits on the anvil / the forge menu or cinematic is up (`canDrag`).
+- A player within `SAW_DRAG.grabRadius` (70 px) holds their interact key for `grabSteps` (14) → attached. A tap does nothing (taps belong to chests/forge/dialogue). The prompt bar shows `drag.prompt` while someone is in range.
+- While attached: that player walks at `dragSpeed[level]` (`Player.update({ speedScale })`) and cannot dash; the saw is pulled to stay within `ropeLength` (46 px, less than `CHAIN.pickupRadius` 60, so the partner arriving reconnects normally through `Chain._canReconnect`). `dropSpin = 0` (no spin; a dropped saw never cuts). The saw does not enter holes or wall boxes (`Game._sawDragBlocked`) and is clamped to the arena; stretched more than `ropeSlack` past the rope, the short cable snaps.
+- `traveled` (path of the saw) reaching `dragTiles[level]` tiles snaps the short cable: `sawSnap` at 1,35 rate, shake, sparks, `regrabSteps` cooldown, and the player must release the key before grabbing again. Releasing the key lets go without a snap.
+- **Peso** (`FORGE.recipes.weight`, 2 levels, 10/18): drag distance 2 → 3 → 4 tiles, dragger speed 40% → 55% → 70% (`sawDragStats(forge, TILE)`). Offered by default anvils.
+- Short cable drawn by `SawDrag.drawRope` right after `chain.drawChain` (placeholder: two stroked curves).
+
 ## Invariants & gotchas
 - Code assumes `getSawPositions(...)[0]` exists whenever the method exists (Game render and FX index `[0]` without checks).
 - `Game._render` calls `getSawPositions` even while disconnected (for draw sorting).

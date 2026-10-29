@@ -87,3 +87,8 @@ Branch from `feat/scrap-chest` (needs the scrap pot). Task: `.agents/tasks/2026-
 - Out of this slice: Peso and saw drag (slice 3), boots and the Boots-room anvil, zones (the menu is blocked by live enemies in the room, not by a zone), the death rule that keeps items (restart clears purchases).
 - Known limits: Serra dupla lives in the 204–240 px band, above the strain distance, so it usually lasts until the strain snap (~0,5 s) unless the pair closes in or has Elasticidade; tune when playing. The saw drawn during the cinematic jump is under the darkness. Menu icons and hammer art are missing (text rows, sparks only). `forgeBuy`/`forgeHammer` are trailer placeholders.
 - Observed on `demo_campaign.json` (main map, `?skipTrailer`): the pair spawns ~470 px apart and the cable snaps on the first frame. Spawn code was not touched by this slice; not confirmed on `main`.
+
+## Início — fatia 3 `feat/saw-drag` (2026-10-29)
+Branch from `feat/anvil-forge`. Task: `.agents/tasks/2026-10-29-saw-drag/`. `feat/scrap-chest` and `feat/anvil-forge` pushed to origin; no PR opened yet (no `gh` CLI on this machine). `feat/room-fog` was discarded at the user's request (last commit `782f9e8`, plus a stash `backup room-fog working tree before discard`).
+- Done: drag the dropped saw (hold interact, short cable, slower walk, no dash, snaps after the drag distance, partner arriving reconnects) and the Peso upgrade (2 → 3 → 4 tiles, 40% → 55% → 70%). See `systems/weapons.md` → Dragging the saw.
+- Known limits: the short cable art is a placeholder (stroked curves, almost hidden at 46 px); the dragged saw stops at holes/walls instead of sliding around them; holding interact near the anvil or a chest also triggers their tap on the first frame.

@@ -57,6 +57,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`, `elasticity`, `doubleSaw`), with a cost per level |
 | Upgrade | melhoria | Tamanho (+20% disc), Elasticidade (+15% cable), Serra dupla; Peso comes in slice 3 |
 | Double saw | serra dupla | Upgrade: near the break distance the disc splits into two at 1/3 and 2/3 of the cable and merges back when the pair closes in |
+| Drag the saw | arrastar a serra | With the cable snapped, one player holds interact near the dropped saw and pulls it on a short cable, slower; the Peso upgrade extends distance and speed |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 
