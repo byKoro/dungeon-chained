@@ -1,12 +1,19 @@
-import { CinematicBars } from '../ui/CinematicBars.js';
 import { ARAUTO_FX } from '../config/ArautoEffectsConfig.js';
 import { FLAME_GOLEM } from '../config/FlameGolemConfig.js';
+import { LETTERBOX } from '../config/LetterboxConfig.js';
+import { letterboxAmount, drawLetterbox } from '../ui/Letterbox.js';
 
 export class ArautoPhaseScene {
     constructor({ renderer, hud, particleSystem, getPlayers }) {
         Object.assign(this, { renderer, hud, particleSystem, getPlayers });
-        this.bars = new CinematicBars();
         this.reset();
+    }
+
+    // Faixas no estilo da forja: entram no início e saem de `returnAt` até o fim.
+    get letterbox() {
+        if (!this.enemy) return 0;
+        const cfg = ARAUTO_FX.scene;
+        return letterboxAmount(this.elapsed, LETTERBOX.inSeconds, cfg.returnAt, cfg.duration);
     }
 
     reset() {
@@ -16,10 +23,10 @@ export class ArautoPhaseScene {
             this.renderer.zoom = this.camera.zoom;
             this.enemy.lavaReveal = this.enemy.phase === 2 ? 1 : 0;
             this.hud.onBossTransformation(null);
+            for (const p of this.getPlayers()) if (p) p.expression = null;
         }
         this.enemy = null;
         this.elapsed = 0;
-        this.bars.reset();
     }
 
     get active() { return !!this.enemy; }
@@ -36,9 +43,8 @@ export class ArautoPhaseScene {
             this.burst = false;
             this.angry = false;
             this.camera = { x: this.renderer.camX, y: this.renderer.camY, zoom: this.renderer.zoom };
-            this.bars.show();
             this.hud.onBossTransformation('assustado');
-            for (const p of this.getPlayers()) p.latchDashKey?.();
+            for (const p of this.getPlayers()) { p.latchDashKey?.(); p.expression = 'assustado'; }
             return true;
         }
         return false;
@@ -61,10 +67,9 @@ export class ArautoPhaseScene {
         if (!this.angry && t >= cfg.angerAt) {
             this.angry = true;
             this.hud.onBossTransformation('raiva');
+            for (const p of this.getPlayers()) p.expression = 'raiva';
         }
         const returning = t >= cfg.returnAt;
-        if (returning) this.bars.hide();
-        this.bars.update(dt);
         const k = returning ? Math.max(0, (cfg.duration - t) / (cfg.duration - cfg.returnAt))
             : Math.min(1, t / cfg.burstAt);
         const eased = k * k * (3 - 2 * k);
@@ -74,12 +79,11 @@ export class ArautoPhaseScene {
         this.renderer.zoom = this.camera.zoom * (1 + (cfg.zoom - 1) * eased);
         if (t >= cfg.duration) {
             this.renderer.camX = this.camera.x; this.renderer.camY = this.camera.y; this.renderer.zoom = this.camera.zoom;
-            for (const p of this.getPlayers()) p.latchDashKey?.();
+            for (const p of this.getPlayers()) { p.latchDashKey?.(); p.expression = null; }
             this.hud.onBossTransformation(null);
             this.enemy = null;
-            this.bars.reset();
         }
     }
 
-    draw(ctx, width, height) { this.bars.draw(ctx, width, height); }
+    drawOverlay(ctx, canvas) { drawLetterbox(ctx, canvas, this.letterbox); }
 }

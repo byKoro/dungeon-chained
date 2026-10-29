@@ -29,6 +29,9 @@ import { ChainObstacleSystem } from './systems/ChainObstacleSystem.js';
 import { ArautoEffects } from './systems/ArautoEffects.js';
 import { ArautoPhaseScene } from './systems/ArautoPhaseScene.js';
 import { ArautoAudio } from './systems/ArautoAudio.js';
+import { ArautoIntroScene } from './systems/ArautoIntroScene.js';
+import { HoldToSkip } from './ui/HoldToSkip.js';
+import { drawLetterbox, letterboxHeight } from './ui/Letterbox.js';
 import { ARAUTO_FX } from './config/ArautoEffectsConfig.js';
 import { Renderer } from './core/Renderer.js';
 import { Tileset } from './core/Tileset.js';
@@ -178,6 +181,15 @@ export class Game {
             safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]),
             onHit: (enemy, info) => { if (this.arautoEffects.owns(enemy)) this.arautoEffects.hit(enemy, info); } });
         this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(), mode: this.mapData?.test?.camera });
+        // A câmera da cena usa `demoCamera.focus`, que só vale no mapa da demo; no modo clássico a câmera fica parada.
+        this.arautoIntro = new ArautoIntroScene({ camera: this.demoCamera, hud: this.hud, effects: this.arautoEffects,
+            arautoAudio: this.arautoAudio, audio: this.audio, particles: this.particleSystem,
+            getPlayers: () => [this.p1, this.p2],
+            storage: typeof sessionStorage === 'undefined' ? null : sessionStorage,
+            forceFull: !!this.mapData?.test?.repeatArautoIntro,
+            onFinish: () => { for (const p of this.players) p.latchDashKey(); } });
+        this.introSkip = new HoldToSkip({ isHeld: () => this.input.isDown('e') });
+        this._interactLatched = false;
         this.demoDoors = new DemoDoors({ assets: this.assets, renderer: this.renderer, rooms: this.rooms });
         this.demoVictory = new DemoVictory({ onRestart: () => this.restart() });
         this.demoEncounter = new DemoEncounter({ rooms: this.rooms, spawnSystem: this.spawnSystem, onVictory: () => {
@@ -251,7 +263,7 @@ export class Game {
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
         this.gameLoop = new GameLoop({
-            onFrameStart: () => { this.input.pollGamepads(); this._pollMenuPad(); this._updateSawMotor(); },
+            onFrameStart: () => { this.input.pollGamepads(); this._maskLatchedInteract(); this._pollMenuPad(); this._updateSawMotor(); },
             onStep: (dt) => this._step(dt),
             onRender: () => this._render()
         });
@@ -404,6 +416,7 @@ export class Game {
 
     // Estado da barra de chefe: só durante o encontro ativo (chefe da sala atual, já fora do spawn congelado).
     _bossBarState() {
+        if (this.arautoIntro?.active) return null;
         const boss = this.rooms?.current?.enemies?.find(e => e.hasBossBar && !e.isHidden && !e.frozen);
         return boss ? boss.bossBarState : null;
     }
@@ -449,6 +462,13 @@ export class Game {
         this.setPaused(!this.gameLoop.paused);
     }
 
+    // Depois de pular a cena segurando E, o E fica fora do input até ser solto (não abre bigorna/baú no mesmo instante).
+    _maskLatchedInteract() {
+        if (!this._interactLatched) return;
+        if (this.input.isDown('e')) this.input.keys.delete('e');
+        else this._interactLatched = false;
+    }
+
     _pollMenuPad() {
         const hit = this.menuPad.poll();
 
@@ -481,6 +501,8 @@ export class Game {
     newDungeon() {
         this.arautoAudio.reset();
         this.arautoScene.reset();
+        this.arautoIntro.reset();
+        this.introSkip.reset();
         this.arautoEffects.reset();
         this.rooms.reset();
         this.demoProgress.reset(this.mapData?.test?.progress);
@@ -743,9 +765,35 @@ export class Game {
     _activateRoomEnemies() {
         const room = this.rooms.current;
         if (!room.hasPendingEnemies) return false;
+        if (this._startArautoIntro(room)) return true;
         if (ROOM_INTRO.enabled) this._beginRoomIntro();
         else room.spawnEnemies(false);
         return true;
+    }
+
+    // Sala do Arauto: em vez do intro genérico, o golem nasce desmontado e a apresentação dele toca.
+    _startArautoIntro(room) {
+        if (!room._authoredEnemies.some(foe => foe.type === 'flameGolem')) return false;
+        const golem = room.spawnEnemies(false).find(e => e.effectMaterial === 'lavaStone');
+        if (!golem) return true;
+        this.introSkip.reset();
+        this.arautoIntro.start(golem);
+        return true;
+    }
+
+    _updateArautoIntro(dt) {
+        this.introSkip.update(dt);
+        if (this.introSkip.done) {
+            this.arautoIntro.skip();
+            this._interactLatched = true;
+            playUi("uiConfirm");
+        } else {
+            this.arautoIntro.update(dt);
+        }
+        for (const p of this.players) { p.vx = 0; p.vy = 0; }
+        this.arautoEffects.update(this.rooms.current.enemies);
+        this.particleSystem.update([this.p1, this.p2], this.arenaBounds);
+        this._updateCameraToCurrentRoom(dt);
     }
 
     _beginRoomIntro() {
@@ -792,7 +840,7 @@ export class Game {
         const state = {
             connected: this.chain.isConnected,
             active: this.chain.hasSaw && !this.gameOver && !this.transition && !this.roomIntro
-                && !this.arautoScene.active && !this.gameLoop.paused && !this.forgeSystem?.open && !this.sawCinematic?.active,
+                && !this.arautoScene.active && !this.arautoIntro.active && !this.gameLoop.paused && !this.forgeSystem?.open && !this.sawCinematic?.active,
             timeScale: this.gameLoop.timeScale
         };
         this.sawMotor?.update(w.spinSpeed ?? 0, state);
@@ -851,6 +899,8 @@ export class Game {
             this._updateTransition();
         } else if (this.roomIntro) {
             this._updateRoomIntro(deltaSeconds);
+        } else if (this.arautoIntro?.active) {
+            this._updateArautoIntro(deltaSeconds);
         } else {
             if (this.arautoScene.tryStart(this.rooms.current.enemies)) {
                 this.arautoScene.update(deltaSeconds);
@@ -1264,11 +1314,12 @@ export class Game {
     }
 
     _render() {
-        if (this.mapData && this.demoCamera.mode === 'split' && !this.arautoScene.active) this.demoCamera.renderSplit(() => this._renderView());
+        const cinematic = this.arautoScene.active || this.arautoIntro.active;
+        if (this.mapData && this.demoCamera.mode === 'split' && !cinematic) this.demoCamera.renderSplit(() => this._renderView());
         else this._renderView();
         this.arautoEffects.drawCamera(this.ctx, this.canvas);
         this._renderOverlays();
-        if (this.mapData && !this.arautoScene.active && !this.forgeSystem?.open) {
+        if (this.mapData && !cinematic && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
             const promptKey = this.sawCinematic?.active ? null : (this.chests?.prompt || this.forgeSystem?.prompt || this.sawDrag?.prompt);
@@ -1455,10 +1506,15 @@ export class Game {
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        this.arautoScene.draw(ctx, canvas.width, canvas.height);
         this.hud.draw(ctx, canvas.width, canvas.height);
         this.scrapCounter?.draw(ctx, canvas.width, canvas.height, this.hud.pixelScale(canvas.width, canvas.height));
         this.sawCinematic?.drawOverlay(ctx, canvas);
+        this.arautoScene.drawOverlay(ctx, canvas);
+        if (this.arautoIntro.active) {
+            const k = this.arautoIntro.letterbox;
+            drawLetterbox(ctx, canvas, k);
+            this.introSkip.draw(ctx, canvas, this.hud.pixelScale(canvas.width, canvas.height), letterboxHeight(canvas.height, k));
+        }
         this.forgeMenu?.draw(ctx, canvas);
 
         const now = performance.now();

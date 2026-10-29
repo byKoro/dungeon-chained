@@ -1,0 +1,11 @@
+# Verification
+- npm.cmd test -- arauto: 5/5 suites passed, including new entrance timeline/skip/retry/reset/freeze/actual-clamp/animation/input/audio checks.
+- npm.cmd test -- i18n: passed.
+- Final npm.cmd run check:40/41 suites; only preexisting test_modular_grid Curva SE assertion and map/corridor_vertical_ns_1.json unlisted-map failure. Docs drift OK. Gate does not fully pass.
+- git diff --check: passed. No map modifications from this task; user local map/camera changes retained.
+- npm.cmd run graph (escalated configured environment): rebuilt3216nodes/6574edges. Graph missing on default shell PATH.
+- Generated10original PCM16 mono44100 WAVs; unit tests confirm paths, format, usable RMS and peaks below0.9.
+- Actual hidden Electron Game constructed with an authored Arauto room, loaded sprites/audio, stepped full scene, captured dormant/notice/raised/impact/ready/end frames. Visually inspected dormant, raised and ready; adjusted skip hint to avoid bossbar overlap.
+- Actual stream tap recorded full scene, all3step cues and6vocal cues plus wake/arms/impact playing. Latest recording peak0.717834, RMS0.084885; no saturated samples observed. Recording9.6s wall time under CPU/offscreen captures, timeline is6s simulation; not a performance benchmark.
+- Runtime fullCompleted=true, playersFinite=true, shortRetry=true after actual _respawnRun, shortEnded=true, fullEditorRepeat=true after restart override, skipEnded=true, errors:[]. Artifacts: _local/arauto-entrance-result.json, _local/arauto-entrance-preview.wav, _local/entrance-*.png. Harnesses _local/arauto-entrance-runtime.cjs and browser.js.
+- Subjective listening, physical gamepad/human co-op play, all authored room layouts and packaged app build not verified. Existing NPC AI and gameplay timing beyond0.8s intro recovery unchanged.

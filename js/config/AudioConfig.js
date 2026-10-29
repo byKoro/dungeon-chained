@@ -27,6 +27,12 @@ export const AUDIO_CONFIG = {
             volume: 0.5, rate: 1, rateVariance: 0.03, pitchShift: true,
             cooldownMs: 50, maxVoices: 2, enabled: true
         },
+        arautoAssemble: {
+            description: 'Pedra se encaixando na remontagem do Arauto (provisório: pancada de rocha mais leve e aguda)',
+            files: [1, 2, 3].map(i => `assets/audio/arauto-ground-0${i}.wav`),
+            volume: 0.32, rate: 1.45, rateVariance: 0.08, pitchShift: true,
+            cooldownMs: 60, maxVoices: 2, enabled: true
+        },
         arautoSlam: {
             description: 'Aterrissagem pesada do Arauto: estrondo mais grave e cauda de pedras',
             files: [1, 2, 3].map(i => `assets/audio/arauto-slam-0${i}.wav`),

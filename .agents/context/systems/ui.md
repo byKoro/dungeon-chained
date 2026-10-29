@@ -107,3 +107,8 @@ CinematicBars (js/ui) uses CINEMATIC_BARS (js/config): 10% of canvas height per 
 
 ### Boss phase cinematic HUD (2026-10-29)
 VtuberHud.onBossTransformation(expression|null) explicitly overrides both portraits (assustado then raiva), clearing at completion/reset. CinematicBars are reused below HUD, keeping reactions visible. ArautoPhaseScene in Game coordinates ~3s camera/bars/phase reveal and selective gameplay freeze. See visual-effects.md; actual Game screenshots checked.
+
+## Faixas de cinemática e segurar E para pular (2026-10-29)
+- `ui/Letterbox.js` (`LetterboxConfig.js`: `barRatio` 0.12, `#050409`, entrada 0,45 s): `letterboxAmount(t, inEnd, outStart, end)` e `drawLetterbox(ctx, canvas, k)`. Mesmo estilo da forja da serra; desenhado em `Game._renderOverlays` depois do `hud.draw`, então cobre parte dos avatares. Usado pela apresentação do Arauto e pela cena da fase 2 (`ArautoPhaseScene.drawOverlay`, que trocou o `CinematicBars`). O trailer continua com `CinematicBars`.
+- `ui/HoldToSkip.js`: tecla "E" em pixel art no canto inferior direito, acima da faixa de baixo, com anel (`ctx.arc`) que enche enquanto segura (`ARAUTO_INTRO.skip.holdSeconds`, esvazia em `drainSeconds`). Escala = `hud.pixelScale`. Só conta depois de o E ser solto uma vez desde o início da cena. X do controle do P1 conta (o `InputHandler` mapeia para `e`). Ao pular, `Game._interactLatched` tira `e` do input (`_maskLatchedInteract` em `onFrameStart`) até ser solto.
+- Barra de chefe, prompts, indicadores e tela dividida ficam desligados durante a apresentação.

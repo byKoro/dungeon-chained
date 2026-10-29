@@ -34,6 +34,8 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.justGroundHit = false;
         this.phaseTransitionControlled = false;
         this.lavaReveal = 0;
+        // Só desenho: `{ row, frame, glow }` fixa linha/quadro do sprite durante a apresentação.
+        this.introPose = null;
         this._slamCursor = 0;
         this.bossName = sprite.combat?.bossBar?.name ?? FLAME_GOLEM.name;
         this.hasBossBar = !!sprite.combat?.bossBar;
@@ -100,12 +102,14 @@ export class FlameGolemEnemy extends MeleeEnemy {
     }
 
     _currentAnim() {
+        if (this.introPose) return this.sprite.rows[this.introPose.row];
         if (this.state === 'windup' && this.sprite.rows[this.currentAttack]) return this.sprite.rows[this.currentAttack];
         return super._currentAnim();
     }
 
     // No windup a animação do ataque avança até a pose de espera e fica parada nela até o golpe.
     _currentFrameIndex(anim) {
+        if (this.introPose) return this.introPose.frame;
         // O epsilon evita que fps fracionários (fase 2) derrubem a pose de espera para o quadro anterior.
         if (this.state === 'attack') return Math.min(Math.floor(this.animTime / anim.fps + 1e-6), anim.frames - 1);
         if (this.state !== 'windup') return super._currentFrameIndex(anim);
@@ -490,12 +494,14 @@ export class FlameGolemEnemy extends MeleeEnemy {
             const k = this.dyingDuration > 0 ? Math.max(0, this.dyingTimer / this.dyingDuration) : 0;
             strength = cfg.corpseStrength + (strength - cfg.corpseStrength) * k;
         }
+        if (this.introPose) strength *= this.introPose.glow ?? 1;
         return { x: this.x, y: this.y - this.jumpHeight, radius: cfg.radius, strength };
     }
 
     // Brasas subindo dos ombros e da cabeça; mais densas no aviso do ataque. Só roda com o jogo em andamento.
     emitEmbers(particleSystem) {
         if (this.isHidden || this.frozen || this.isDying || this.state === 'dead') return;
+        if (this.introPose && (this.introPose.glow ?? 1) < 1) return;
         const cfg = FLAME_GOLEM.embers;
         const rate = cfg.perSecond * (this.state === 'windup' ? cfg.windupMultiplier : 1);
         this._emberAcc += rate / SIM_HZ;

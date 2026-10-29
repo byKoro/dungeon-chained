@@ -110,3 +110,6 @@ Scrap pickups are not sorted: shadows are drawn with the entity shadows and the 
 
 ### Arauto render overlays (2026-10-29)
 Depth-sorted entity drawing calls ArautoEffects.drawTrail before the boss sprite and drawLava afterward. Lava masks cache per sheet/frame, follow horizontal flip and jump displacement, with palette filtering to keep cracks off the authored dust plume. ParticleSystem draws settled LavaFragments in its clipped floor pass and airborne fragments in its air pass. Phase cutscene temporarily uses one viewport instead of split; bars draw before HUD. User camera tuning remains unchanged.
+
+## Faixas de cinemática depois do HUD (2026-10-29)
+`Game._renderOverlays`: `hud.draw` → `scrapCounter` → `sawCinematic.drawOverlay` → `arautoScene.drawOverlay` → (apresentação do Arauto) `drawLetterbox` + `introSkip.draw` → `forgeMenu` → barra de chefe. A cena da fase 2 deixou de desenhar antes do HUD. Detalhes em `ui.md`.

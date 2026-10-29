@@ -162,3 +162,7 @@ Merged main0368672 and Arauto featureb7272f7 locally, preserving both histories.
 
 ## Arauto visual fixes (2026-10-29)
 Branch codex/arauto-visual-fixes: removed generated silhouette outline and attack debug marks; stronger attack/impact shake and transient world blur, HUD remains crisp. Focused tests pass; full check retains prior grid/map failures. Task 2026-10-29-arauto-visual-fixes.
+
+## Arauto das Brasas — apresentação refeita (2026-10-29, `.agents/tasks/2026-10-29-arauto-intro/`)
+- Cena nova (golem remonta com a morte ao contrário, ergue os braços e bate no chão) substitui a do Codex (`2026-10-29-arauto-entrance-scene`, código removido). Segurar E pula. Faixas no estilo da forja também na fase 2. Expressões no boneco em campo.
+- Testado por script (`test_arauto_intro.js`); não visto no jogo. Pendente: avaliar o som provisório `arautoAssemble` e a transição morte→attack2. WAVs `arauto-intro-*` sem uso.

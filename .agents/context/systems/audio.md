@@ -109,3 +109,6 @@ This supersedes the initial grinding/wind-floor-scrape palette. Contactloop now 
 
 ### Double-saw merge compatibility (2026-10-29)
 ArautoAudio tests all actual getSawPositions discs for rockcontact, supporting the forge's Serra dupla. Cue/volume/timbre unchanged by merge. Game activity gate combines hasSaw, forge/sawcinematic and Arauto scene states. Regression test_arauto_double_saw.js.
+
+## Apresentação do Arauto (2026-10-29)
+`arautoAssemble` (provisório): reusa `arauto-ground-0x` com `volume` 0.32 e `rate` 1.45, tocado pela `ArautoIntroScene` a cada quadro da remontagem. O impacto da cena usa `ArautoAudio.groundHit(true)` (`arautoSlam` + duck). Sem vozes dos jogadores. Os WAVs `assets/audio/arauto-intro-*` da cena antiga do Codex ficaram sem uso (não removidos).
