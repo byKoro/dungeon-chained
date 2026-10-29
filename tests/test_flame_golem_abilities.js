@@ -65,13 +65,13 @@ assert.ok(create() instanceof FlameGolemEnemy);
     ps[0].x = 200; ps[0].y = 150;
     assert.deepEqual([e.marks[0].x, e.marks[0].y], [100, 0], 'marks are snapshots');
     e.freezeOnHit(0.1);
+    assert.equal(e.hitFreezeTimer, 0, 'chefe não congela no acerto');
     const timer = e.stateTimer;
-    for (let t = 0; t < 6; t++) e.update(ps, () => assert.fail('hit stop cannot attack'));
-    assert.equal(e.stateTimer, timer);
-    e.takeHit(1, { dirX: 1, dirY: 0 });
-    assert.equal(e.state, 'hurt');
-    e.update(ps, () => assert.fail('stagger cancels charge'));
-    assert.equal(e.marks.length, 0);
+    e.update(ps, () => assert.fail('windup cannot hit'));
+    assert.equal(e.stateTimer, timer - 1, 'windup segue andando depois de freezeOnHit');
+    assert.ok(e.takeHit(1, { dirX: 1, dirY: 0 }));
+    assert.equal(e.state, 'windup', 'acerto não interrompe a habilidade');
+    assert.equal(e.marks.length, 2, 'marcas da investida continuam');
 }
 {
     const e = create(), ps = [player(100), player(400)];
@@ -161,7 +161,7 @@ assert.ok(create() instanceof FlameGolemEnemy);
         const e = create();
         assert.equal(e.speed, FLAME_GOLEM.speed * 1.5);
         assert.equal(e.sprite.rows.walk.fps, FLAME_GOLEM.walkTicksPerFrame / 2);
-        assert.equal(e.dyingDuration, 6 * FLAME_GOLEM.deathTicksPerFrame / 2);
+        assert.equal(e.dyingDuration, 6 * FLAME_GOLEM.deathTicksPerFrame, 'a morte não acelera com a fase');
         e.animTime = 3;
         const frame = e.animTime / e.sprite.rows.walk.fps;
         e.hp = FLAME_GOLEM.secondPhaseHp;

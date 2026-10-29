@@ -34,6 +34,7 @@ import { PlayerAI } from './systems/PlayerAI.js';
 import { LightingRenderer } from './systems/LightingRenderer.js';
 import { HoleEffects } from './systems/HoleEffects.js';
 import { VtuberHud } from './ui/VtuberHud.js';
+import { BossHealthBar } from './ui/BossHealthBar.js';
 import { DeathScreen } from './ui/DeathScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { setUiAudio, playUi } from './ui/UiSound.js';
@@ -69,6 +70,8 @@ export class Game {
             spriteConfigs: cfgs.map(c => c.sprite),
             colors: cfgs.map(c => c.color)
         });
+        this.bossBar = new BossHealthBar({ getState: () => this._bossBarState() });
+        this._bossBarAt = null;
 
         this.deathScreen = new DeathScreen({ onRestart: () => this.restart() });
 
@@ -178,12 +181,24 @@ export class Game {
         this.transition = null;
         this.roomIntro = null;
         this._doorFlashT = 0;
+        // Só o teste do editor 2.0 pode ligar a vida infinita; o jogo normal sempre começa desligado.
+        this.infiniteLives = !!this.mapData?.test?.infiniteLives;
 
         this._bindButtons();
         if (this.mapData?.test) {
             const back = document.createElement('a'); back.href = 'editor2.html'; back.textContent = '← Voltar ao Editor 2.0';
             back.style.cssText = 'position:fixed;right:12px;top:12px;z-index:100;color:white;background:#252035;padding:10px;border-radius:6px'; document.body.append(back);
+            const lives = document.createElement('button');
+            lives.type = 'button'; lives.tabIndex = -1;
+            lives.style.cssText = 'position:fixed;right:12px;top:56px;z-index:100;color:white;background:#252035;padding:8px 10px;border:1px solid #7f5af0;border-radius:6px;font:inherit;cursor:pointer';
+            // Sem foco no botão: Enter/Espaço são dash e não podem acioná-lo.
+            lives.addEventListener('mousedown', e => e.preventDefault());
+            lives.addEventListener('click', () => this.setInfiniteLives(!this.infiniteLives));
+            document.body.append(lives);
+            this._infiniteLivesButton = lives;
+            this.setInfiniteLives(this.infiniteLives);
             window.addEventListener('keydown', e => {
+                if (e.code === 'F7') { e.preventDefault(); this.setInfiniteLives(!this.infiniteLives); return; }
                 if (e.code !== 'F6') return;
                 e.preventDefault(); const modes = ['zoom', 'fixed', 'split'];
                 this.demoCamera.mode = modes[(modes.indexOf(this.demoCamera.mode) + 1) % modes.length];
@@ -299,6 +314,22 @@ export class Game {
         return performance.now() - (this._gameOverAt ?? 0) >= GAME_OVER_INPUT_DELAY_MS;
     }
 
+    // Estado da barra de chefe: só durante o encontro ativo (chefe da sala atual, já fora do spawn congelado).
+    _bossBarState() {
+        const boss = this.rooms?.current?.enemies?.find(e => e.hasBossBar && !e.isHidden && !e.frozen);
+        return boss ? boss.bossBarState : null;
+    }
+
+    // Vida infinita (só teste): acertos e quedas seguem acontecendo, a vida não desce.
+    setInfiniteLives(on) {
+        this.infiniteLives = !!on;
+        for (const p of [this.p1, this.p2]) if (p) p.infiniteLives = this.infiniteLives;
+        if (this._infiniteLivesButton) {
+            this._infiniteLivesButton.textContent = `Vida infinita: ${this.infiniteLives ? 'ON' : 'OFF'} (F7)`;
+            this._infiniteLivesButton.setAttribute('aria-pressed', String(this.infiniteLives));
+        }
+    }
+
     restart() {
         this.floor = 1;
         this.players = this.playerFactory.create();
@@ -374,6 +405,8 @@ export class Game {
         this.screenGore.clear();
         this.gameOver = false;
         this.deathScreen.hide();
+        this.bossBar.reset();
+        this.setInfiniteLives(this.infiniteLives);
 
         if (this.gameLoop.paused) this.setPaused(false, { silent: true });
         this._sawLandPending = false;
@@ -415,6 +448,7 @@ export class Game {
     }
 
     transitionThroughDoor(door) {
+        this.bossBar.reset();
         this.rooms.transitionTo(door);
         this.arenaBounds = this.rooms.currentBounds;
 
@@ -469,7 +503,7 @@ export class Game {
 
     _resolveFall(p) {
         if (!p.falling || !p.fallComplete) return;
-        p.lives = Math.max(0, p.lives - (HOLE_FALL.livesLost ?? 1));
+        p.loseLife(HOLE_FALL.livesLost ?? 1);
         if (p.lives <= 0) { p.fallComplete = false; return; }
 
         const spot = this._entrySpawns?.get(p) ?? this.rooms.cellCenter();
@@ -789,7 +823,7 @@ export class Game {
         this.combat.updateEnemies(enemies, [p1, p2]);
 
         const liveEnemies = enemies.filter(e => e.state !== "dying");
-        const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies);
+        const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies.filter(e => !e.airborne));
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
         for (let it = 0; it < 3; it++) {
@@ -804,7 +838,7 @@ export class Game {
         }
 
         if (room.wallBoxes?.length) {
-            for (const entity of [p1, p2, ...room.enemies]) {
+            for (const entity of [p1, p2, ...room.enemies.filter(e => !e.airborne)]) {
                 Physics.resolveBoxCollisions(entity, room.wallBoxes);
             }
         }
@@ -850,7 +884,9 @@ export class Game {
         this.effects.update();
 
         for (const p of [p1, p2]) {
-            if (p._livesSeen !== undefined && p.lives < p._livesSeen) {
+            // damageTaken sobe a cada acerto aceito, inclusive com vida infinita (a vida não muda).
+            const hurt = p._livesSeen !== undefined && (p.lives < p._livesSeen || p.damageTaken > (p._damageSeen ?? 0));
+            if (hurt) {
                 this.screenGore.triggerFlash();
 
                 if (!p.falling) {
@@ -860,6 +896,7 @@ export class Game {
                 }
             }
             p._livesSeen = p.lives;
+            p._damageSeen = p.damageTaken;
         }
 
         this.screenGore.update();
@@ -1024,7 +1061,7 @@ export class Game {
         if (!this.p2.falling) renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
         const enemies = rooms.current.enemies;
 
-        enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
+        enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, e.shadowRadius ?? 13, 0); });
 
         this.chain.drawChain(ctx, this.p1, this.p2);
 
@@ -1034,7 +1071,7 @@ export class Game {
         const entities = [this.p1, this.p2, ...enemies];
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
-        const drawables = [...entities, ...occluders].sort((a, b) => a.y - b.y);
+        const drawables = [...entities, ...(rooms.current.corpses ?? []), ...occluders].sort((a, b) => a.y - b.y);
 
         const drawEntity = e => (e.falling ? this.holes.drawFalling(ctx, e) : e.draw(ctx));
         drawables.filter(e => e.y <= sawY).forEach(drawEntity);
@@ -1115,5 +1152,10 @@ export class Game {
 
         this.hud.draw(ctx, canvas.width, canvas.height);
 
+        const now = performance.now();
+        const dt = this._bossBarAt === null ? 0 : Math.min(0.05, (now - this._bossBarAt) / 1000);
+        this._bossBarAt = now;
+        this.bossBar.update(dt);
+        this.bossBar.draw(ctx, canvas.width, canvas.height, this.hud.freeSpan(canvas.width, canvas.height));
     }
 }

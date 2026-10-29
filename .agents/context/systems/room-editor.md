@@ -115,3 +115,7 @@ Not done yet (runtime, cronograma #12): the game does not load `map/demo/*.json`
 - Testes: `tests/test_room_reset.js`, `tests/test_wall_autotile.js`. O visual das variações de tile não foi conferido no tileset.
 
 Flame Golem (2026-10-28): flameGolem added to EDITOR2_ENEMY_KEYS; selectable as Golem de Chamas. Classic editor already lists it through ENEMY_TYPES. Placement and existing maps are unchanged.
+
+### Vida infinita no teste (editor 2.0)
+
+Card "Teste e demo": checkbox `#test-infinite-lives` ("Vida infinita (ambos os jogadores)", padrão desligado). `ContentTools.playtest` grava `infiniteLives` na sessão (`sessionStorage[DEMO.sessionKey]`); `DemoMapLoader` devolve em `mapData.test` e `Game` aplica aos dois jogadores (`Game.setInfiniteLives`). Dentro do teste há um botão no canto superior direito e a tecla F7 para ligar/desligar sem reabrir o editor (mostra ON/OFF). O jogo normal e o editor antigo nunca ligam a opção. Detalhes de comportamento em `combat-and-entities.md`.

@@ -13,6 +13,7 @@ export class Room {
         this.key = `${cell.gx},${cell.gy}`;
 
         this.enemies = [];
+        this.corpses = [];
         this.hearts = [];
         this.cleared = false;
         this.populated = false;

@@ -85,3 +85,7 @@ New screen: follow the `DeathScreen` pattern (root in `index.html` + CSS `.visib
 
 ## Cinematic bars (2026-10-28)
 CinematicBars (js/ui) uses CINEMATIC_BARS (js/config): 10% of canvas height per edge, cubic ease-out over 0.4 s in / 0.18 s out. TrailerStage owns it; TrailerPlayer updates it only while unpaused. finish() freezes the scene and resolves after the bars exit; bootstrap awaits it before stopping the trailer/loading Game. Stage barH reserves the full inset for portrait framing, independent of animation and zoom. Sanctuary integration remains planned.
+
+## Barra de chefe (`BossHealthBar`)
+
+`js/ui/BossHealthBar.js` + `js/config/BossBarConfig.js`. Construída por `Game` (`this.bossBar`), desenhada em `_renderOverlays` logo depois do HUD, em coordenadas de tela (não deforma com zoom, pausa ou resize). `getState()` devolve `{ name, hp, max, phaseAt }` do chefe da sala atual que tem `hasBossBar` e já saiu do spawn congelado (`Game._bossBarState`); null quando não há encontro. Mostra HP zero durante a animação de morte e some quando o chefe vira escombro. `Game.newDungeon` e `transitionThroughDoor` chamam `reset()`. Visual: moldura de pedra (`FRAME` de `PixelButton`), texto em `PixelFont` ("Arauto das Brasas") à esquerda e preenchimento vermelho com rastro de dano e marca da fase 2. O layout (`layout()`) usa `VtuberHud.freeSpan()` (faixa livre entre os retratos/corações dos jogadores); em janela estreita a barra sobe para acima do HUD. Não há barra para os golems das cenas roteirizadas do trailer.

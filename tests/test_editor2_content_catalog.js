@@ -9,7 +9,7 @@ for (const key of EDITOR2_ENEMY_KEYS) assert.ok(ENEMY_TYPE_BY_KEY[key], `${key} 
 
 assert.deepEqual(editorEnemyTypes().map(t => t.key), ['demon', 'bloodMonster', 'blackKnightB', 'cultist', 'flameGolem']);
 assert.deepEqual(editorEnemyTypes().map(t => t.label), [
-    'Demônio (Rápido)', 'Monstro de Sangue (Tanque)', 'Cavaleiro Negro B (Tanque)', 'Cultista (Pilar de Fogo)', 'Golem de Chamas'
+    'Demônio (Rápido)', 'Monstro de Sangue (Tanque)', 'Cavaleiro Negro B (Tanque)', 'Cultista (Pilar de Fogo)', 'Arauto das Brasas'
 ]);
 
 // blackKnightB tem "body": o recorte usa o corpo.

@@ -43,3 +43,6 @@ As referências direcao-de-arte.md e references/santuario-style-reference.png n�
 - Fase 1: uma investida mais lenta. Fase 2: duas investidas, movimento e animações mais rápidas. Limiar de vida configurável.
 - Implementado em FlameGolemEnemy e FlameGolemConfig. Padrão provisório: fase 2 em 3 HP, movimento/animação x1,35 e investida x1,6.
 - Empurrão até o abismo verificado com o Game real na sala criada pelo usuário, sem alterar seu mapa. Balanceamento cooperativo pendente.
+
+## Estado do Arauto das Brasas (2026-10-28)
+Implementado na branch `feat/flame-golem`: resistência sem stagger, 100 HP, escala 2×, três saltos com slam na fase 2, morte lenta com escombros, barra de chefe e vida infinita de teste. Ainda sugerido/provisório: números de balanceamento. Pendente (fora deste escopo): ponte após a vitória, altar, duas brasas, desbloqueio do Dash e cinemática de montagem. Veja `.agents/tasks/2026-10-28-arauto-das-brasas/verification.md`.

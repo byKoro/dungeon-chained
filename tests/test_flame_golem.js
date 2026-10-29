@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { SpawnSystem } from '../js/systems/SpawnSystem.js';
 import { ENEMY_TYPE_BY_KEY } from '../js/config/EntityConfig.js';
-import { ENEMY_HIT } from '../js/config/CombatFeelConfig.js';
+import { FLAME_GOLEM } from '../js/config/FlameGolemConfig.js';
 import { editorEnemyTypes, thumbRegion } from '../js/editor2/ContentCatalog.js';
 
 const sheet = { complete: true, naturalWidth: 1200 };
@@ -44,17 +44,20 @@ frozen.update(players, () => {});
 assert.equal(frozen.state, 'windup');
 
 const dying = create();
-for (let i = 0; i < 6; i++) {
+assert.equal(dying.hp, FLAME_GOLEM.hp);
+for (let i = 0; i < FLAME_GOLEM.hp; i++) {
     assert.ok(dying.takeHit());
-    assert.equal(dying.hp, 5 - i);
-    if (i < 5) {
+    assert.equal(dying.hp, FLAME_GOLEM.hp - 1 - i);
+    if (i < FLAME_GOLEM.hp - 1) {
         assert.equal(dying.isDying, false);
-        for (let t = 0; t < ENEMY_HIT.cooldownSteps; t++) dying.update(far, () => {});
+        for (let t = 0; t < dying.hitCooldownSteps; t++) dying.update(far, () => {});
     }
 }
+dying.flashTimer = 0; // o flash do último acerto usaria um canvas de tinta, que não existe no Node
 const crops = [];
 const ctx = { save() {}, restore() {}, translate() {}, scale() {}, drawImage(...args) { crops.push(args.slice(1, 5)); } };
-for (let t = 0; t < 42; t++) {
+const deathTicks = 6 * FLAME_GOLEM.deathTicksPerFrame;
+for (let t = 0; t < deathTicks; t++) {
     assert.equal(dying.readyToGib, false);
     dying.draw(ctx);
     dying.update(players, () => assert.fail('dying golem cannot attack'));

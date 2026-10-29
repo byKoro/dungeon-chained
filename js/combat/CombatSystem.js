@@ -64,7 +64,20 @@ export class CombatSystem {
                     this.audio.play("enemyAttackVoice");
                 }
             }
+            if (e.justSlammed) this._slamFeedback(e);
         }
+    }
+
+    // Impacto de aterrissagem do chefe: tremor forte e poeira em anel.
+    _slamFeedback(enemy) {
+        this.renderer.triggerShake(18);
+        const n = 10;
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            const cx = Math.cos(a), cy = Math.sin(a);
+            this.particleSystem.triggerDust?.(enemy.x + cx * 40, enemy.y + enemy.hitRadius * 0.6 + cy * 16, cx, cy, 3);
+        }
+        this.audio?.play("playerFall");
     }
 
     // `onKill(enemy)` roda só quando o golpe mata. `onHit(enemy, info)` roda em todo golpe aceito, com
@@ -180,10 +193,16 @@ export class CombatSystem {
             const enemy = enemies[i];
             if (!enemy.readyToGib) continue;
 
-            this.particleSystem.triggerBlood(enemy.x, enemy.y, 26, 1.35);
-            this.particleSystem.triggerBloodPool(enemy.x, enemy.y);
-            gibs.push(...enemy.explodeIntoGibs());
-            while (gibs.length > MAX_ACTIVE_GIBS) gibs.shift();
+            // Chefe com escombros: sem sangue de desmembramento nem gibs; fica como corpo decorativo.
+            if (enemy.leavesCorpse) {
+                enemy.becomeCorpse();
+                (room.corpses ??= []).push(enemy);
+            } else {
+                this.particleSystem.triggerBlood(enemy.x, enemy.y, 26, 1.35);
+                this.particleSystem.triggerBloodPool(enemy.x, enemy.y);
+                gibs.push(...enemy.explodeIntoGibs());
+                while (gibs.length > MAX_ACTIVE_GIBS) gibs.shift();
+            }
 
             if (this.canDropHeart(room, players)) {
                 const chanceField = room.cell.heartDropChance;

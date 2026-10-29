@@ -10,6 +10,10 @@ export class Player extends Entity {
         this.name = name;
         this.speed = 4.2;
         this.lives = 3;
+        // Só para testes: acertos e quedas continuam acontecendo, mas não descontam vida.
+        this.infiniteLives = false;
+        // Contador de acertos aceitos (sobe mesmo com vida infinita) para o Game dar feedback.
+        this.damageTaken = 0;
         this.invulnerableTimer = 0;
         this.hurtTimer = 0;
         this.hurtDuration = 30;
@@ -238,11 +242,19 @@ export class Player extends Entity {
         }
     }
 
+    // Único ponto que desconta vida (acerto ou queda); com vida infinita não faz nada. Retorna se descontou.
+    loseLife(amount = 1) {
+        if (this.infiniteLives) return false;
+        this.lives = Math.max(0, this.lives - amount);
+        return true;
+    }
+
     takeDamage(sourceX, sourceY, { knockback = 16 } = {}) {
 
         if (this.falling || this.dashing || this.invulnerableTimer > 0) return false;
 
-        this.lives--;
+        this.loseLife(1);
+        this.damageTaken++;
         this.invulnerableTimer = 65;
         this.hurtTimer = this.hurtDuration;
         this.scaredTimer = this.scaredDuration;

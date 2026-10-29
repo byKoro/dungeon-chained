@@ -30,8 +30,14 @@ export class MeleeEnemy extends Entity {
         this.isSkeleton = false;
 
         this.hp = spriteConfig.combat?.hp ?? 1;
+        this.maxHp = this.hp;
         this.hitTimer = 0;
         this.hitFreezeTimer = 0;
+        // Chefes com superArmor perdem vida e piscam, mas nunca entram em hurt/stunned nem congelam no acerto.
+        this.superArmor = !!spriteConfig.combat?.superArmor;
+        this.hitCooldownSteps = spriteConfig.combat?.hitCooldownSteps ?? ENEMY_HIT.cooldownSteps;
+        // Em vez de gibs, vira escombros decorativos no último quadro da animação de morte.
+        this.leavesCorpse = !!spriteConfig.combat?.leavesCorpse;
         this.speed = spriteConfig.combat?.speed ?? 1.7;
 
         this.poiseMax = spriteConfig.combat?.poise ?? 0;
@@ -220,12 +226,17 @@ export class MeleeEnemy extends Entity {
         const result = { damage: dealt, killed: false, staggered: false, poiseBroken: false, vulnerable };
 
         this.hp -= dealt;
-        this.hitTimer = ENEMY_HIT.cooldownSteps;
+        this.hitTimer = this.hitCooldownSteps;
 
         if (this.hp <= 0) {
+            this.hp = 0;
             this.startDying();
             result.killed = true;
-            if (hit) this._startFlash(ENEMY_HIT.flash.steps);
+            if (hit || this.superArmor) this._startFlash(ENEMY_HIT.flash.steps);
+            return result;
+        }
+        if (this.superArmor) {
+            this._startFlash(ENEMY_HIT.flash.steps);
             return result;
         }
         if (!hit) return result;
@@ -298,6 +309,15 @@ export class MeleeEnemy extends Entity {
         this.pushVy = 0;
     }
 
+    // Escombros: mantém o último quadro da animação de morte, sem ataque, movimento nem colisão.
+    becomeCorpse() {
+        this.state = "dead";
+        this.deathDone = true;
+        this.animTime = (this.sprite.rows.death.frames + 1) * this.sprite.rows.death.fps;
+        this.vx = this.vy = this.pushVx = this.pushVy = 0;
+        this.flashTimer = 0;
+    }
+
     explodeIntoGibs() {
         const s = this.sprite;
         const cell = s.cellSize;
@@ -363,6 +383,7 @@ export class MeleeEnemy extends Entity {
 
     // Congela só este inimigo (hit stop local); jogadores, serra e resto da sala seguem normais.
     freezeOnHit(seconds) {
+        if (this.superArmor) return;
         const steps = Math.round(seconds * SIM_HZ);
         if (steps > this.hitFreezeTimer) this.hitFreezeTimer = steps;
     }

@@ -635,6 +635,18 @@ export class VtuberHud {
         return { S, hs, margin };
     }
 
+    // Faixa horizontal livre entre os retratos/corações dos dois jogadores (estimativa conservadora) e o
+    // topo da área do HUD. Usada pela barra de chefe para não sobrepor o HUD.
+    freeSpan(W, H) {
+        const { S, hs, margin } = this._layout(W, H);
+        const cluster = (e) => e.portrait.sprite.cropW * S + 2 * S + MAX_LIVES * HEART_ART * hs * 1.4;
+        return {
+            left: margin + cluster(this.entries[0]),
+            right: W - margin - cluster(this.entries[1]),
+            top: H - margin - HEART_ART * hs - S * 6
+        };
+    }
+
     draw(ctx, W, H) {
         const now = performance.now();
         const dt = this._last === null ? 0 : Math.min(0.05, (now - this._last) / 1000);

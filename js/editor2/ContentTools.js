@@ -183,10 +183,11 @@ export class ContentTools {
             <label><input type="checkbox" id="test-dash"> Dash liberado</label>
             <label><input type="checkbox" id="test-saw"> Lançar serra liberado</label>
             <label><input type="checkbox" id="test-key"> Chave do boss</label>
+            <label><input type="checkbox" id="test-infinite-lives"> Vida infinita (ambos os jogadores)</label>
             <label class="field">Câmera para comparar<select id="test-camera"><option value="zoom">Zoom-out</option><option value="fixed">Zoom fixo + indicadores</option><option value="split">Tela dividida</option></select></label>
             <button class="btn btn-primary" id="content-test-map">Testar mapa</button>
             <button class="btn" id="content-main">Definir mapa salvo como principal</button>
-            <p class="hint">No jogo: P1 E / P2 Shift direito / controle X interagem. F6 alterna as câmeras durante o teste.</p>
+            <p class="hint">No jogo: P1 E / P2 Shift direito / controle X interagem. F6 alterna as câmeras e F7 liga/desliga a vida infinita durante o teste.</p>
         </div></div>`;
         connections.after(tests);
         $('content-test-map').onclick = () => this.playtest(false);
@@ -507,7 +508,7 @@ export class ContentTools {
         const errors = validatePlayable(map, { roomKey: isolated ? map.start : null });
         if (errors.length) { alert(errors.join('\n')); return; }
         const progress = { dash: $('test-dash').checked, sawThrow: $('test-saw').checked, bossKey: $('test-key').checked };
-        sessionStorage.setItem(DEMO.sessionKey, JSON.stringify({ map, isolated, progress, camera: $('test-camera').value }));
+        sessionStorage.setItem(DEMO.sessionKey, JSON.stringify({ map, isolated, progress, camera: $('test-camera').value, infiniteLives: $('test-infinite-lives').checked }));
         a._persistNow();
         location.href = 'index.html?playtest=true&editor2=true';
     }

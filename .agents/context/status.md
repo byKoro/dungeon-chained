@@ -73,3 +73,9 @@ Branch feat/flame-golem: approved provisional melee baseline (6 HP, speed 0.8, t
 
 ## Flame Golem abilities - 2026-10-28
 Three configurable abilities and two HP phases implemented on feat/flame-golem. Config: FlameGolemConfig.js. Default phase threshold 3 HP; phase one one slower charge; phase two two charges and faster movement/animations. Large AoE hits both players and can push into holes. Real Game test in the user's sanctuary room confirmed a fall; screenshot _local/golem-abilities-game.png. Tests pass apart from #4/#5, graphify unavailable. Balance/human co-op pending. No authored map changes, bridge, altar or intro implementation in this task.
+
+## Arauto das Brasas — 2026-10-28 (`feat/flame-golem`, `.agents/tasks/2026-10-28-arauto-das-brasas/`)
+- Implementado e testado por script: superarmor (sem stagger/empurrão/hit stop), 100 HP, escala 2×, fase 2 em 50 HP com três saltos com slam, morte lenta com escombros (sem gibs), barra de chefe inferior e vida infinita de teste (editor 2.0 + botão/F7 no teste). Detalhes em `systems/combat-and-entities.md`, `systems/ui.md`, `systems/room-editor.md`.
+- Aprovado mas ainda só sugerido: números de balanceamento (`hitCooldownSteps` 10, `secondPhaseHp` 50, `slam.*`).
+- Fora de escopo e não feito: ponte após vitória, altar, duas brasas, desbloqueio do Dash, cinemática de montagem.
+- Não verificado no jogo real (ver `verification.md`). `npm run check` só falha nos itens antigos #4 e #5.

@@ -66,3 +66,9 @@ neutro = neutral · assustado = scared · espantado = startled · raiva = anger 
 
 - **Golem phase / fase do golem**: HP-triggered permanent combat stage; phase 2 increases speed and uses two charges per cast.
 - **Marked charge / investida marcada**: saved player positions telegraph the charge before launch; trackingStrength controls subsequent steering toward a live target.
+
+| Arauto das Brasas | boss (Flame Golem) | Nome aprovado do chefe `flameGolem`: 100 HP, sem stagger, três saltos com slam na fase 2, morte com escombros e barra de chefe |
+| Super armor | `superArmor` | Flag de `sprite.combat`: o inimigo recebe dano mas não sofre stagger, empurrão nem hit stop local |
+| Slam | slam | Salto do chefe que aterrissa numa marca fixa e causa dano radial com empurrão |
+| Escombros | `room.corpses` | Corpo decorativo no último quadro da animação de morte, sem gibs |
+| Vida infinita | `infiniteLives` | Opção de teste: acertos e quedas continuam, a vida não desce |
