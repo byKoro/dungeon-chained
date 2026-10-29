@@ -7,6 +7,7 @@ import { ThrownSaw } from './systems/ThrownSaw.js';
 import { ScrapSystem } from './systems/ScrapSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { PropSprites } from './core/PropSprites.js';
+import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
 import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
@@ -161,6 +162,7 @@ export class Game {
             this.gameOver = true; this._gameOverAt = performance.now(); this.demoVictory.show();
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
+        this.roomProps = this.animatedProps ? new RoomProps({ rooms: this.rooms, sprites: this.animatedProps }) : null;
         const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
         this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
         this.scrapCounter = this.scrap ? new ScrapCounter({ getAmount: () => this.scrap.amount, frames: scrapFrames }) : null;
@@ -820,6 +822,7 @@ export class Game {
                 Physics.resolveBoxCollisions(entity, room.wallBoxes);
             }
         }
+        this.roomProps?.resolveCollisions([p1, p2, ...room.enemies]);
 
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
@@ -1010,9 +1013,8 @@ export class Game {
 
         renderer.drawRoom(rect, this.arenaBounds, tiles, TILE, open, doors, doorHalf);
 
-        if (this.animatedProps) for (const p of tiles.props) {
-            if (p.type) this.animatedProps.draw(ctx, p.type, rect.x + p.col * TILE, rect.y + p.row * TILE, TILE, performance.now(), !!p.flip);
-        }
+        const nowMs = performance.now();
+        this.roomProps?.drawFloor(ctx, nowMs);
         this.demoProgress.draw(ctx);
         if (open) {
             renderer.drawDoorStubs(rect, doors, TILE, doorHalf, DOOR_STUB_TILES);
@@ -1052,7 +1054,8 @@ export class Game {
         const entities = [this.p1, this.p2, ...enemies];
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
-        const drawables = [...entities, ...occluders].sort((a, b) => a.y - b.y);
+        const propDrawables = this.roomProps?.drawables(nowMs) ?? [];
+        const drawables = [...entities, ...occluders, ...propDrawables].sort((a, b) => a.y - b.y);
 
         const drawEntity = e => (e.falling ? this.holes.drawFalling(ctx, e) : e.draw(ctx));
         drawables.filter(e => e.y <= sawY).forEach(drawEntity);
