@@ -84,12 +84,19 @@
       "props": [
         { "col": 27, "row": 18, "index": 84 },
         { "type": "anvil", "col": 24, "row": 26 },
-        { "type": "chest", "col": 21, "row": 26, "scrap": 10 }
+        { "scrap": 10, "type": "chest", "col": 22, "row": 27 },
+        { "type": "chest", "col": 14, "row": 12, "scrap": 15 }
       ],
       "enemies": [],
       "hazards": [],
       "torches": [],
-      "interactives": [],
+      "interactives": [
+        { "col": 14, "row": 12, "type": "cage", "id": "cage_salao" },
+        { "col": 16, "row": 15, "type": "rope", "id": "rope_1", "auto": true },
+        { "col": 3, "row": 10, "type": "rope", "id": "rope_2" },
+        { "col": 4, "row": 16, "type": "rope", "id": "rope_3" },
+        { "col": 27, "row": 10, "type": "rope", "id": "rope_4" }
+      ],
       "spawns": {
         "p1": { "col": 2, "row": 26 },
         "p2": { "col": 4, "row": 26 }
@@ -97,7 +104,43 @@
       "lock": "none",
       "type": "normal",
       "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29],
-      "propDensity": 0
+      "propDensity": 0,
+      "zones": [
+        { "id": "bigorna", "col": 1, "row": 23, "w": 28, "h": 6 },
+        { "id": "salao", "col": 1, "row": 10, "w": 28, "h": 8 },
+        { "id": "topo", "col": 0, "row": 1, "w": 30, "h": 6 }
+      ],
+      "encounters": [
+        {
+          "id": "salao",
+          "waves": [
+            [
+              { "type": "demon", "count": 3 }
+            ],
+            [
+              { "type": "bloodMonster", "count": 1 },
+              { "type": "demon", "count": 3 }
+            ],
+            [
+              { "type": "blackKnightB", "count": 1 },
+              { "type": "demon", "count": 2 }
+            ],
+            [
+              { "type": "demon", "count": 3 },
+              { "type": "bloodMonster", "count": 1 },
+              { "type": "blackKnightB", "count": 1 }
+            ]
+          ]
+        }
+      ],
+      "bars": [
+        { "col": 15, "row": 18 },
+        { "col": 16, "row": 18 },
+        { "col": 17, "row": 18 },
+        { "col": 23, "row": 9 },
+        { "col": 24, "row": 9 },
+        { "col": 25, "row": 9 }
+      ]
     }
   }
 }
