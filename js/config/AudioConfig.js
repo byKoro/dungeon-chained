@@ -5,6 +5,34 @@ export const AUDIO_CONFIG = {
     muted: false,
 
     cues: {
+        arautoSawStone: {
+            description: 'Estalos secos de pedra no contato da serra, repetidos conforme o giro',
+            files: ['assets/audio/arauto-saw-stone-loop.wav'],
+            volume: 0.78, loop: true, enabled: true
+        },
+        arautoDashLoop: {
+            description: 'Vento forte e encorpado durante a investida do Arauto',
+            files: ['assets/audio/arauto-dash-loop.wav'],
+            volume: 0.45, loop: true, enabled: true
+        },
+        arautoDashStart: {
+            description: 'Whoosh pesado na arrancada da investida do Arauto',
+            files: [1, 2, 3].map(i => `assets/audio/arauto-dash-0${i}.wav`),
+            volume: 0.6, rate: 1, rateVariance: 0.04, pitchShift: true,
+            cooldownMs: 50, maxVoices: 2, enabled: true
+        },
+        arautoGround: {
+            description: 'Pancada de rocha no chão: ataque seco, grave e pedregulhos',
+            files: [1, 2, 3].map(i => `assets/audio/arauto-ground-0${i}.wav`),
+            volume: 0.5, rate: 1, rateVariance: 0.03, pitchShift: true,
+            cooldownMs: 50, maxVoices: 2, enabled: true
+        },
+        arautoSlam: {
+            description: 'Aterrissagem pesada do Arauto: estrondo mais grave e cauda de pedras',
+            files: [1, 2, 3].map(i => `assets/audio/arauto-slam-0${i}.wav`),
+            volume: 0.6, rate: 1, rateVariance: 0.03, pitchShift: true,
+            cooldownMs: 50, maxVoices: 2, enabled: true
+        },
         playerHurt: {
             description: "Dano sofrido pelos jogadores ao colidir com inimigos",
             files: [1, 2, 3].map(i => `assets/audio/player-hit-0${i}.wav`),
