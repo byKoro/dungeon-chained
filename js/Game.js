@@ -4,6 +4,8 @@ import { DemoProgress } from './systems/DemoProgress.js';
 import { DemoCamera } from './systems/DemoCamera.js';
 import { DemoDoors } from './systems/DemoDoors.js';
 import { ThrownSaw } from './systems/ThrownSaw.js';
+import { ScrapSystem } from './systems/ScrapSystem.js';
+import { SCRAP } from './config/ScrapConfig.js';
 import { PropSprites } from './core/PropSprites.js';
 import { InputHandler } from './core/InputHandler.js';
 import { MenuPad } from './core/MenuPad.js';
@@ -158,6 +160,7 @@ export class Game {
             this.gameOver = true; this._gameOverAt = performance.now(); this.demoVictory.show();
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
+        this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`)) }) : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -366,6 +369,7 @@ export class Game {
         this.demoDoors.opened.clear();
         this.demoVictory.hide();
         this.demoEncounter.reset();
+        this.scrap?.reset();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -417,6 +421,7 @@ export class Game {
     }
 
     transitionThroughDoor(door) {
+        this.scrap?.collectAll();
         this.rooms.transitionTo(door);
         this.arenaBounds = this.rooms.currentBounds;
 
@@ -841,9 +846,13 @@ export class Game {
                 this.sawMotor?.onHit();
             }
         );
-        this.combat.resolveDeaths(room, this.gibs, () => this.screenGore.trigger(), [p1, p2]);
+        this.combat.resolveDeaths(room, this.gibs, (enemy) => {
+            this.screenGore.trigger();
+            this.scrap?.dropFromEnemy(enemy);
+        }, [p1, p2]);
 
         this._updateHearts(room);
+        this.scrap?.update([p1, p2], this.arenaBounds);
 
         for (let i = this.gibs.length - 1; i >= 0; i--) {
             this.gibs[i].update(this.arenaBounds);
@@ -1029,6 +1038,7 @@ export class Game {
         const enemies = rooms.current.enemies;
 
         enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
+        this.scrap?.draw(ctx);
 
         this.chain.drawChain(ctx, this.p1, this.p2);
 

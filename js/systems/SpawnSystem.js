@@ -18,6 +18,12 @@ export class SpawnSystem {
     }
 
     createEnemy(x, y, floor, type = null) {
+        const foe = this._build(x, y, floor, type);
+        foe.typeKey = type;
+        return foe;
+    }
+
+    _build(x, y, floor, type) {
         if (type === 'fireSkull' || type === 'fireSkullBoss') return new FireSkullEnemy(x, y, this.assets.get('fireSkull'), type === 'fireSkullBoss');
         const factory = (type && ENEMY_TYPE_BY_KEY[type]?.config) || null;
         const cfg = factory ? factory(this.assets) : this.randomMeleeConfig();

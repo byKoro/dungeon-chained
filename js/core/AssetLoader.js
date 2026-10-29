@@ -1,4 +1,5 @@
 import { TINY_RPG_ENEMIES } from '../config/TinyRpgEnemies.js';
+import { SCRAP } from '../config/ScrapConfig.js';
 
 export const PLAYER_EXPRESSIONS = [
     'neutro', 'assustado', 'espantado', 'raiva', 'furia', 'preocupado',
@@ -43,6 +44,7 @@ export class AssetLoader {
 
         this.load("bossGate", "assets/doors/boss-gate-opening-strip-v8.png");
         for (let frame = 1; frame <= 4; frame++) this.load(`demoKey${frame}`, `assets/keys/keys_1_${frame}.png`);
+        SCRAP.frames.forEach((src, i) => this.load(`scrap${i + 1}`, src));
         this.load("saw", "assets/saw/saw.png");
 
         this.load("cable", "assets/saw/rope.png");

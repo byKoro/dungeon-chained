@@ -286,6 +286,17 @@ export const AUDIO_CONFIG = {
             pitchShift: true,
             cooldownMs: 80,
             enabled: true
+        },
+        scrapPickup: {
+            description: "Coleta de sucata (placeholder: pop do trailer; tom sobe em coletas seguidas)",
+            files: [1, 2, 3].map(i => `assets/audio/trailer/pop-0${i}.wav`),
+            volume: 0.32,
+            rate: 1.0,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 35,
+            maxVoices: 4,
+            enabled: true
         }
     }
 };
