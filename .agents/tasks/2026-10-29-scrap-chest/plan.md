@@ -1,6 +1,6 @@
 # scrap chest
 
-Status: planned   <!-- planned | in-progress | done | abandoned -->
+Status: in-progress   <!-- planned | in-progress | done | abandoned -->
 Branch: feat/scrap-chest  Base: ae41338  Date: 2026-10-29
 
 ## Goal
