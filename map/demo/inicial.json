@@ -85,13 +85,12 @@
         { "col": 27, "row": 18, "index": 84 },
         { "type": "anvil", "col": 24, "row": 26 },
         { "scrap": 10, "type": "chest", "col": 22, "row": 27 },
-        { "type": "chest", "col": 14, "row": 12, "scrap": 15 }
+        { "type": "chest", "col": 14, "row": 12, "scrap": 15, "encounter": "salao" }
       ],
       "enemies": [],
       "hazards": [],
       "torches": [],
       "interactives": [
-        { "col": 14, "row": 12, "type": "cage", "id": "cage_salao" },
         { "col": 16, "row": 15, "type": "rope", "id": "rope_1", "auto": true },
         { "col": 3, "row": 10, "type": "rope", "id": "rope_2" },
         { "col": 4, "row": 16, "type": "rope", "id": "rope_3" },

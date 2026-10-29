@@ -27,7 +27,7 @@ export class DemoProgress {
         this.held = pressed;
         this.prompt = '';
         for (const o of room.cell.authored.interactives || []) {
-            if (INTERACTIVES[o.type]?.scripted) continue;
+            if (!INTERACTIVES[o.type] || INTERACTIVES[o.type].scripted) continue;
             const id = `${room.key}/${o.id}`;
             if (this.activated.has(id)) continue;
             const x = rect.x + (o.col + 0.5) * TILE, y = rect.y + (o.row + 0.5) * TILE;

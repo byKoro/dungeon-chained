@@ -41,6 +41,7 @@ export class MapEditorApp {
         this.propType = ANIMATED_PROP_KEYS[0];
         this.propFlip = false;
         this.propScrap = SCRAP.chestDefault;
+        this.propEncounter = "";
         this.propRecipes = [...FORGE.defaultRecipes];
         this.showKinds = true;
         this.showGrid = true;
@@ -506,7 +507,8 @@ export class MapEditorApp {
     // Baús guardam a sucata que soltam; outros props não recebem campos extras.
     _propExtra() {
         if (this.propType === "anvil") return { recipes: [...this.propRecipes] };
-        return ANIMATED_PROPS[this.propType]?.opens ? { scrap: this.propScrap } : null;
+        if (!ANIMATED_PROPS[this.propType]?.opens) return null;
+        return this.propEncounter ? { scrap: this.propScrap, encounter: this.propEncounter } : { scrap: this.propScrap };
     }
 
     _buildRecipeChecks() {
@@ -532,7 +534,7 @@ export class MapEditorApp {
         if (prop) {
             this.propType = prop.type;
             this.propFlip = !!prop.flip;
-            if (ANIMATED_PROPS[prop.type]?.opens) this.propScrap = chestScrapAmount(prop);
+            if (ANIMATED_PROPS[prop.type]?.opens) { this.propScrap = chestScrapAmount(prop); this.propEncounter = prop.encounter || ""; }
             if (prop.type === "anvil") this.propRecipes = [...anvilRecipes(prop)];
             this._setTool("prop");
             return;
@@ -789,6 +791,7 @@ export class MapEditorApp {
         $("paint-kind").addEventListener("change", (e) => { this.paintKind = e.target.value; this._syncUI(); });
         $("show-kinds").addEventListener("change", (e) => { this.showKinds = e.target.checked; });
         $("prop-flip").addEventListener("change", (e) => { this.propFlip = e.target.checked; });
+        $("prop-encounter").addEventListener("change", (e) => { this.propEncounter = e.target.value.trim(); });
         $("prop-scrap").addEventListener("change", (e) => {
             this.propScrap = chestScrapAmount({ scrap: Math.round(Number(e.target.value)) });
             e.target.value = this.propScrap;
@@ -936,6 +939,8 @@ export class MapEditorApp {
         this._setVal("paint-kind", this.paintKind);
         $("prop-flip").checked = this.propFlip;
         $("prop-scrap-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
+        $("prop-encounter-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
+        this._setVal("prop-encounter", this.propEncounter);
         this._setVal("prop-scrap", this.propScrap);
         $("prop-recipes-field").hidden = this.propType !== "anvil";
         for (const input of document.querySelectorAll("#prop-recipes [data-recipe]")) input.checked = this.propRecipes.includes(input.dataset.recipe);
@@ -970,7 +975,7 @@ export class MapEditorApp {
         if (door) parts.push(DOOR_TYPES[door.type]?.label || door.type);
         if (prop) {
             const def = ANIMATED_PROPS[prop.type];
-            const extra = def?.opens ? ` (${chestScrapAmount(prop)} de sucata)`
+            const extra = def?.opens ? ` (${chestScrapAmount(prop)} de sucata${prop.encounter ? `, encontro ${prop.encounter}` : ""})`
                 : prop.type === "anvil" ? ` (${anvilRecipes(prop).map(id => t(`forge.${id}`)).join(", ") || "sem receitas"})` : "";
             parts.push((def?.label || prop.type) + extra);
         }

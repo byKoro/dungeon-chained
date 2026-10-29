@@ -28,7 +28,6 @@ export const INTERACTIVES = {
     lever: { label: 'Alavanca + ponte', color: '#a6e88b', symbol: 'L' },
     ropeKey: { label: 'Corda + chave', color: '#ffe083', symbol: 'K' },
     key: { label: 'Chave coletável', color: '#ffe083', symbol: 'K' },
-    // Encontro da gaiola (scripts de sala): não são ativados por interagir.
-    cage: { label: 'Gaiola pendurada', color: '#b49a7a', symbol: 'G', scripted: true },
-    rope: { label: 'Corda da gaiola (estaca)', color: '#d8c39a', symbol: 'C', scripted: true }
+    // Encontro das gaiolas (scripts de sala): não são ativados por interagir.
+    rope: { label: 'Corda com gaiola (estaca)', color: '#d8c39a', symbol: 'C', scripted: true }
 };
