@@ -18,17 +18,33 @@ export class Chain {
 
         this.playerSafeZone = config.playerSafeZone ?? 46;
 
+        this.present = true;
         this.connected = true;
         this.strain = 0;
         this.reconnectCooldown = 0;
     }
 
-    reset() {
-        this.connected = true;
+    // `present: false` = a dupla ainda não tem a serra: sem cabo, sem disco e sem reconexão.
+    reset({ present = this.present } = {}) {
+        this.present = present;
+        this.connected = present;
         this.strain = 0;
         this.reconnectCooldown = 0;
 
         this.weapon.pickup?.();
+    }
+
+    get hasSaw() {
+        return this.present;
+    }
+
+    // A serra aparece largada em (x, y); os dois precisam chegar perto para conectar.
+    spawnSaw(x, y) {
+        this.present = true;
+        this.connected = false;
+        this.strain = 0;
+        this.reconnectCooldown = 0;
+        this.weapon.drop?.(x, y);
     }
 
     get weapon() {
@@ -101,7 +117,7 @@ export class Chain {
     }
 
     forceDrop(p1, p2, resolveDropPoint) {
-        if (!this.connected) return false;
+        if (!this.connected || !this.present) return false;
         this.connected = false;
         this.strain = 0;
         this.reconnectCooldown = this.reconnectDelay;
@@ -115,7 +131,7 @@ export class Chain {
 
     _canReconnect(p1, p2, dist) {
         const w = this.weapon;
-        if (w.thrown) return false;
+        if (!this.present || w.thrown) return false;
         if (!w.dropped) return dist < this.reconnectDistance;
 
         const r = this.pickupRadius;

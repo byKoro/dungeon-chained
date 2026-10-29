@@ -183,6 +183,7 @@ export class ContentTools {
             <label><input type="checkbox" id="test-dash"> Dash liberado</label>
             <label><input type="checkbox" id="test-saw"> Lançar serra liberado</label>
             <label><input type="checkbox" id="test-key"> Chave do boss</label>
+            <label class="field">Serra no início<select id="test-sawstart"><option value="">Conforme o mapa (sem serra se uma bigorna oferece a Serra)</option><option value="yes">Com serra</option><option value="no">Sem serra</option></select></label>
             <label class="field">Câmera para comparar<select id="test-camera"><option value="zoom">Zoom-out</option><option value="fixed">Zoom fixo + indicadores</option><option value="split">Tela dividida</option></select></label>
             <button class="btn btn-primary" id="content-test-map">Testar mapa</button>
             <button class="btn" id="content-main">Definir mapa salvo como principal</button>
@@ -507,6 +508,8 @@ export class ContentTools {
         const errors = validatePlayable(map, { roomKey: isolated ? map.start : null });
         if (errors.length) { alert(errors.join('\n')); return; }
         const progress = { dash: $('test-dash').checked, sawThrow: $('test-saw').checked, bossKey: $('test-key').checked };
+        const sawStart = $('test-sawstart').value;
+        if (sawStart) progress.saw = sawStart === 'yes';
         sessionStorage.setItem(DEMO.sessionKey, JSON.stringify({ map, isolated, progress, camera: $('test-camera').value }));
         a._persistNow();
         location.href = 'index.html?playtest=true&editor2=true';

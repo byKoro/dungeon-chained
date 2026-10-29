@@ -9,6 +9,7 @@ import { ChestSystem } from './systems/ChestSystem.js';
 import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
+import { ForgeState, mapOffersRecipe } from './systems/ForgeState.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
@@ -136,6 +137,7 @@ export class Game {
         });
 
         this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], CHAIN);
+        this.forge = new ForgeState();
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
@@ -401,7 +403,10 @@ export class Game {
 
         this.audio.setLoopLevel("ambience", 0, 1500);
 
-        this.chain.reset();
+        const startsWithSaw = this._startsWithSaw();
+        this.chain.reset({ present: startsWithSaw });
+        this.forge.reset({ items: startsWithSaw ? ["saw"] : [] });
+        this._applySawUpgrades();
 
         this.rooms.enter();
         this.arenaBounds = this.rooms.currentBounds;
@@ -434,6 +439,16 @@ export class Game {
 
         this._activateRoomEnemies();
     }
+
+    // Mapas cuja bigorna oferece a Serra começam sem ela; o teste do editor pode forçar qualquer estado.
+    _startsWithSaw() {
+        if (!this.mapData) return true;
+        const forced = this.mapData.test?.progress?.saw;
+        if (typeof forced === "boolean") return forced;
+        return !mapOffersRecipe(this.mapData.map, "saw");
+    }
+
+    _applySawUpgrades() {}
 
     transitionThroughDoor(door) {
         this.chests?.flushPending();
