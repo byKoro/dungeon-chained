@@ -14,3 +14,11 @@ export const DIALOGUE = Object.freeze({
     headOffset: 46,
     interactKeys: ["e", "shiftright"]
 });
+
+// Roteiro da sala `inicial` (em teste): gatilhos das falas. Steps de 60 Hz, distâncias em tiles.
+export const SCRIPT_LINES = Object.freeze({
+    enabled: true,
+    startDelaySteps: 45,
+    anvilNearTiles: 2.5,
+    bossGateTiles: 3
+});

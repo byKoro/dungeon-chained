@@ -1,5 +1,5 @@
-import { TILE } from '../config/GameConfig.js';
-import { DEMO } from '../config/DemoConfig.js';
+import { TILE, LIGHT_PIXEL_SCALE } from '../config/GameConfig.js';
+import { DEMO, BOSS_GATE_LIGHT } from '../config/DemoConfig.js';
 
 export class DemoDoors {
     constructor({ assets, renderer, rooms }) {
@@ -14,6 +14,18 @@ export class DemoDoors {
 
     draw(ctx) {
         this._draw(ctx, false);
+    }
+
+    renderLights(postProcessor, now = performance.now()) {
+        if (!this.rooms.dungeon.document) return;
+        const h = DEMO.gateHighlight, rect = this.rooms.cellRect();
+        const pulse = 1 + h.pulse * Math.sin((now / h.periodMs) * Math.PI * 2);
+        for (const door of this.rooms.doorsOfCurrent()) {
+            if (door.type !== 'boss' || !door.blocked) continue;
+            const s = this.renderer.worldToScreen(door.x, rect.y + TILE * h.lift);
+            const px = Math.max(2, Math.round((TILE / 16) * s.zoom * LIGHT_PIXEL_SCALE));
+            postProcessor.addLight(s.x, s.y, h.radius * pulse * s.zoom, px, 1, BOSS_GATE_LIGHT);
+        }
     }
 
     _draw(ctx, gates) {

@@ -7,6 +7,7 @@ import { ThrownSaw } from './systems/ThrownSaw.js';
 import { ScrapSystem } from './systems/ScrapSystem.js';
 import { ChestSystem } from './systems/ChestSystem.js';
 import { DialogueSystem } from './systems/DialogueSystem.js';
+import { SCRIPT_LINES } from './config/DialogueConfig.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
 import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
@@ -588,6 +589,10 @@ export class Game {
 
         if (first) {
             this.chain.weapon?.playReconnect?.(SAW_CINEMATIC.firstReconnectScale);
+            if (SCRIPT_LINES.enabled) {
+                this.dialogue?.say(0, "talk.connected.1");
+                this.dialogue?.say(1, "talk.connected.2");
+            }
         } else {
             this.chain.weapon?.playReconnect?.();
         }
@@ -1322,6 +1327,7 @@ export class Game {
 
         this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
         this.roomEvents?.renderLights(renderer, this.postProcessor);
+        this.demoDoors.renderLights(this.postProcessor);
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
