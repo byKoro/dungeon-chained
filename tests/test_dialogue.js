@@ -34,8 +34,10 @@ const shown = d.line.shown;
 assert(shown > 0 && shown < d.line.text.length, `texto entra letra a letra (${shown} letras)`);
 assert(blips.length > 0 && blips.every(b => b.cue === "voiceBlip" && b.rate > 0.85 && b.rate < 1), "blip do Amarelo num tom próprio");
 
+const blipsBeforeSkip = blips.length;
 held.add("shiftright"); steps(1); held.delete("shiftright");
 assert(d.line.typed && d.line.shown === d.line.text.length, "interagir completa o texto");
+assert(blips.length === blipsBeforeSkip, "completar o texto não dispara os blips restantes de uma vez");
 held.add("e"); steps(1); held.delete("e");
 steps(Math.ceil(DIALOGUE.gapSeconds / DT) + 2);
 assert(d.line?.index === 1, "interagir de novo passa para a próxima fala");

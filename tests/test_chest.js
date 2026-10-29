@@ -64,6 +64,16 @@ assert(chestScrapAmount({ scrap: 15 }) === 15 && chestScrapAmount({ scrap: -1 })
 chests.reset();
 assert(!chests.isOpen("1,1", chest1), "reset fecha os baús (nova partida)");
 
+{
+    const s = new ScrapSystem();
+    const cs = new ChestSystem({ rooms, scrap: s, getPlayers: () => [player(c1.x, c1.y)] });
+    cs.update();
+    assert(cs.isOpen("1,1", chest1) && s.pickups.length === 0, "baú abriu e a sucata ainda não saiu");
+    assert(cs.flushPending() === 10 && s.amount === 10, "sair da sala antes da explosão credita a sucata pendente");
+    for (let i = 0; i < CHEST.burstDelaySteps + 2; i++) cs.update();
+    assert(s.pickups.length === 0 && cs.flushPending() === 0, "sem explosão dupla nem crédito duplo");
+}
+
 const r = { cols: 10, rows: 10, props: [] };
 placeProp(r, "chest", 2, 2, false, { scrap: 15 });
 placeProp(r, "flag", 4, 4, false, null);

@@ -61,8 +61,11 @@ export class DialogueSystem {
         const line = this.line;
         line.t += dt;
         if (tapped) {
-            if (!line.typed) line.t = Math.max(line.t, line.text.length / this.cfg.charsPerSecond);
-            else line.doneAt = -Infinity;
+            if (!line.typed) {
+                // Completar o texto não toca os blips que faltavam (todos no mesmo step).
+                line.t = Math.max(line.t, line.text.length / this.cfg.charsPerSecond);
+                line.shown = line.text.length;
+            } else line.doneAt = -Infinity;
         }
         const n = Math.min(line.text.length, Math.floor(line.t * this.cfg.charsPerSecond));
         for (let i = line.shown; i < n; i++) {

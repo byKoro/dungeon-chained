@@ -58,6 +58,18 @@ export class ChestSystem {
         }
     }
 
+    // Saída da sala antes da tampa terminar de abrir: a sucata vai direto para o pote.
+    flushPending() {
+        let credited = 0;
+        for (const state of this.opened.values()) {
+            if (state.burst) continue;
+            state.burst = true;
+            credited += state.amount;
+        }
+        if (credited) this.scrap?.wallet.add(credited);
+        return credited;
+    }
+
     // Quadro da animação de abertura para o RoomProps; null = baú fechado (anima normalmente).
     frameFor(prop, roomKey) {
         const def = this.defs[prop.type];

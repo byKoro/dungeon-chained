@@ -57,6 +57,8 @@ import {
     SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
 } from './config/GameConfig.js';
 
+const feetSortKey = d => d.feetSortY ?? d.footY ?? d.y + HOLE_FALL.footOffset;
+
 export class Game {
     constructor(canvas, opts = {}) {
         this.canvas = canvas;
@@ -174,12 +176,12 @@ export class Game {
             rooms: this.rooms, scrap: this.scrap, getPlayers: () => [this.p1, this.p2], audio: this.audio, particleSystem: this.particleSystem
         }) : null;
 
-        this.dialogue = new DialogueSystem({
+        this.dialogue = this.mapData ? new DialogueSystem({
             getPlayers: () => [this.p1, this.p2], input: this.input, audio: this.audio,
             onLineStart: (i, expr, dur) => this.hud.speak(i, expr, dur),
             onBlip: (i) => this.hud.talkBlip(i)
-        });
-        if (typeof window !== "undefined") window.dialogue = this.dialogue;
+        }) : null;
+        if (this.dialogue && typeof window !== "undefined") window.dialogue = this.dialogue;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -391,7 +393,7 @@ export class Game {
         this.scrap?.reset();
         this.scrapCounter?.reset();
         this.chests?.reset();
-        this.dialogue.clear();
+        this.dialogue?.clear();
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -443,6 +445,7 @@ export class Game {
     }
 
     transitionThroughDoor(door) {
+        this.chests?.flushPending();
         this.scrap?.collectAll();
         this.rooms.transitionTo(door);
         this.arenaBounds = this.rooms.currentBounds;
@@ -925,7 +928,7 @@ export class Game {
         }
 
         this.thrownSaw.update();
-        this.dialogue.update(deltaSeconds);
+        this.dialogue?.update(deltaSeconds);
         this.demoProgress.update(deltaSeconds);
         this.demoEncounter.update();
         this._checkDoorTransition(doors);
@@ -1073,7 +1076,9 @@ export class Game {
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const propDrawables = this.roomProps?.drawables(nowMs) ?? [];
-        const drawables = [...entities, ...occluders, ...propDrawables].sort((a, b) => a.y - b.y);
+        // Com props sólidos a ordem é pelos pés (inimigos têm os pés bem abaixo do centro); sem eles, pelo centro.
+        const sortKey = this.roomProps ? feetSortKey : (d => d.y);
+        const drawables = [...entities, ...occluders, ...propDrawables].sort((a, b) => sortKey(a) - sortKey(b));
 
         const drawEntity = e => (e.falling ? this.holes.drawFalling(ctx, e) : e.draw(ctx));
         drawables.filter(e => e.y <= sawY).forEach(drawEntity);
@@ -1147,7 +1152,7 @@ export class Game {
         const { ctx, canvas } = this;
 
         this.screenGore.draw(ctx);
-        this.dialogue.draw(ctx, this.renderer, canvas);
+        this.dialogue?.draw(ctx, this.renderer, canvas);
 
         if (this.transition) {
             const t = this.transition;

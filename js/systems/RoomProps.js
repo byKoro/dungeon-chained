@@ -23,7 +23,7 @@ export class RoomProps {
             const def = prop.type ? this.defs[prop.type] : null;
             if (!def) continue;
             const box = propBaseBox(prop, def, rect, this.tile);
-            if (box) layout.solid.push({ prop, def, box, sortY: propSortY(box, PLAYER_FOOT) });
+            if (box) layout.solid.push({ prop, def, box, sortY: propSortY(box, PLAYER_FOOT), feetSortY: propSortY(box, 0) });
             else layout.floor.push({ prop, def });
         }
         this._cache.set(room, layout);
@@ -56,6 +56,7 @@ export class RoomProps {
         const key = this.rooms.current?.key;
         return solid.map(s => ({
             y: s.sortY,
+            feetSortY: s.feetSortY,
             draw: ctx => this._drawSolid(ctx, s, rect, key, ms)
         }));
     }
