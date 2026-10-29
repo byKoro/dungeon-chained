@@ -48,6 +48,12 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Hit stop | congelamento de impacto | Per-enemy freeze (`MeleeEnemy.freezeOnHit`, durations in `HIT_FEEL.hitStop`) on each saw hit; players, saw and the rest of the room keep simulating. `GameLoop.triggerHitStop` (global freeze) still exists but `Game` no longer calls it |
 | Stagger / hurt | atordoamento curto | Short interruption + knockback of a surviving enemy after a saw hit (`"hurt"` state) |
 | Poise | poise, postura | Invisible per-enemy buffer for strong enemies (`combat.poise`); breaking it causes a long stun (`"stunned"`) and a vulnerability window |
+| Scrap | sucata | Shared currency of the pair (`ScrapSystem`, one pot). Drops from enemies and chests, rests 0,4 s, then a magnet pulls it to the nearest player within ~2,5 tiles. Editor 2.0 maps only |
+| Vacuum | aspirar, puxar a sucata | `ScrapSystem.vacuum()`: every scrap on the floor flies to the nearest player, any distance (used when a wave is cleared, slice 4) |
+| Chest | baú | Prop `chest`/`mini_chest` that opens once when any player gets within ~2 tiles and bursts its authored scrap (`prop.scrap`) |
+| Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
+| Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
+| i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 
 ## Enemies (editor labels)
 

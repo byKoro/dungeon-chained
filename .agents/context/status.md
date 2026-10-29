@@ -8,6 +8,7 @@ Only branches with commits ahead of `main` contain unmerged work. Check before s
 
 | Branch | Ahead | Author | Content |
 |---|---|---|---|
+| `feat/scrap-chest` | ~10 | Kiro (slice 1 of the Início design) | Scrap, HUD counter, proximity chests, solid props, i18n, speech bubbles. See the Início section below |
 | `origin/inimigos-novos` | 2 | Rodrigo Yamauchi | Two new enemies: cleave demon, frost guardian |
 | `origin/branch-inimigo-novo-skull` | 1 | Rodrigo Yamauchi | `FireSkullEnemy` + SpawnSystem/AssetLoader wiring (very old base, ~90 commits behind) |
 | `origin/sala-trap-teste` | 2 | Rodrigo Yamauchi | Challenge walkway/fall experiments (old base) |
@@ -72,3 +73,9 @@ Audio, UI, editor
 - Ajuste do cultista: preferredDistance aumentado para 440 px; círculo de marcação removido. Alcance de conjuração ajustado para cobrir a faixa de distância desejada.
 
 - Cultista: preferredDistance ajustado de 440 para 300 px.
+
+## Início — fatia 1 `feat/scrap-chest` (2026-10-29)
+Design: `.agents/tasks/2026-10-29-inicio-core-loop/design.md`; task: `.agents/tasks/2026-10-29-scrap-chest/`. Main merged into the branch at `ec14221` (Ghostfire work).
+- Done (Editor 2.0 maps only): shared scrap pot with arc/rest/magnet pickups and enemy drops, top-center counter, chests that open by proximity with the amount authored in the editor, anvil and chests solid at their base and y-sorted, `t()` tables (ADR 0013), speech bubbles (`DialogueSystem.say`, debug global `window.dialogue`). `map/demo/inicial.json` got Baú 1 at (21,26) with 10 scrap. `active.json` still points at `demo_campaign.json` (slice 5).
+- Placeholders: scrap uses the coin sprite at half pixel size; `scrapPickup`, `chestOpen`, `voiceBlip` reuse trailer wavs. Asset requests: scrap floor sprite + HUD icon, speech bubble art, real sounds.
+- Known limits: chests open by straight distance (through walls); scrap flies over walls and holes (only clamped to the arena) and can rest in a walled pocket outside the magnet radius; enemies' navigation ignores solid props; dialogue lines are not wired to events yet (script = slice 5); button icons inside bubbles not done; an interact tap that skips a line also triggers a `DemoProgress` interactive in range; the bubble is misplaced in F6 split mode; restart closes opened chests (death rule = slice 4). Scrap left on the floor, and scrap of a chest still opening, is credited when leaving the room.

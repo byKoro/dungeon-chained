@@ -1,7 +1,35 @@
 # Review — scrap chest
+Verdict: approved after fixes in `7e42414` (was changes-requested); #8 waits for the user
+Range: main..HEAD
 
-Verdict: pending   <!-- approved | changes-requested -->
-Range: ae41338..HEAD
+## Resolution
+- #1 fixed: with `roomProps`, drawables sort by feet (`feetSortY ?? footY ?? y + footOffset`); props expose `feetSortY` = base middle. Classic mode still sorts by `y`.
+- #2 fixed: completing the text sets `shown` before the blip loop; test added.
+- #5 fixed: `ChestSystem.flushPending()` runs before `scrap.collectAll()` in `transitionThroughDoor`; test added.
+- #9 fixed: `DialogueSystem` (and `window.dialogue`) only with `mapData`.
+- #3, #4, #6, #7, #10 accepted and documented as known limits (status.md, ui.md, combat-and-entities.md, room-editor.md).
+- #8 open: the extra changes in `inicial.json` were not intended by this slice; the user decides which version stays.
+- #11 done.
+
+Includes the uncommitted docs in the working tree (`.agents/context/*`, ADR 0013). Review by reading code only. I did not open the game, so nothing below is runtime-observed. `npm test` and `npm run check` fail only on the pre-existing status.md #4 (`corridor_vertical_ns_1.json`) and #5 (`test_modular_grid.js`). Doc drift is clean.
 
 ## Findings
 <!-- severity · file:symbol · issue · suggestion -->
+1. **medium** · `js/systems/RoomProps.js:_layout` / `js/core/PropBodies.js:propSortY` · Solid props are sorted with a key of `base middle − HOLE_FALL.footOffset` (14), and that key is compared against `entity.y`. Enemy feet sit at `y + drawHeight/2` (`MeleeEnemy.footY`), which is 41 px for the demon and 42 for the blood monster. So the front/behind cut-off for enemies sits 27 px lower than the base middle. A demon whose feet are up to 27 px below the chest or anvil base still draws behind the prop. Collision already uses `e.footY`, so collision and sorting disagree (confirmed, by arithmetic). Suggestion: compare by feet, e.g. sort drawables by `d.sortY ?? d.footY ?? d.y + PLAYER_FOOT`, and give props `sortY = base middle`.
+2. **medium** · `js/systems/DialogueSystem.js:update` · A tap while the text is typing jumps `line.t` to the end. The blip loop then runs from `shown` to the full length in a single step, so it emits one `_blip` for every second remaining char. `voiceBlip` cooldown (30 ms) limits the audio to one sound, but `onBlip` → `VtuberHud.talkBlip` → `squash.kick(0.9)` stacks. Skipping a 40-char line early gives about 15 kicks (≈13 velocity) in one frame. The hurt reaction kicks 4.5, so the portrait squash spikes on every skip (confirmed). Suggestion: on skip, set `line.shown` to the full length before the loop, or cap blips to one per step.
+3. **low** · `DialogueSystem._interactTapped` + `DemoProgress.update` · Both read the rising edge of `e` / `shiftright` in the same step. A tap that skips a line near the anvil or the dropped saw also triggers that interaction, and "hold E to drag" also advances lines (likely). Suggestion: let the dialogue consume the tap (e.g. DemoProgress ignores taps on the step the dialogue used one), or record in the design that this is intended.
+4. **low** · `js/Game.js:_renderOverlays` → `DialogueSystem.draw` · In F6 split mode, `DemoCamera.renderSplit` restores the shared camera before the overlays run. The bubble is therefore placed with a camera that matches neither half (confirmed; test maps only). Suggestion: draw the bubble per viewport inside the split callback, or skip it in split mode.
+5. **low** · `js/systems/ChestSystem.js:update` / `Game.transitionThroughDoor` · A chest opened less than `burstDelaySteps` (10) before a door transition starts has not spawned its scrap yet. `scrap.collectAll()` cannot credit it, and the burst only fires if the players come back to that room (confirmed; only matters for chests within 2 tiles of a door). Suggestion: when leaving the room, flush pending bursts into the wallet.
+6. **low** · `Game.newDungeon` → `chests.reset()` · This matches plan step 2, but design §2 ("Morte e progressão") says opened chests stay open after death. Suggestion: list it in status.md so the death/progression slice (ADR 0012) separates run state from world state.
+7. **low** · `js/entities/ScrapPickup.js:update` · Pickups only clamp to `arenaBounds`. Enemy bursts and the magnet carry scrap across wall tiles and over holes. Leaving the room credits it, but in `test.isolated` maps scrap that lands in a wall-enclosed pocket outside the 2.5-tile magnet radius stays there (likely). status.md lists the through-wall limit for chests only. Suggestion: add it to the known limits, or reject landing spots on non-floor tiles.
+8. **low** · `map/demo/inicial.json` (commit 9ef00b1) · The chest commit also re-authors the room. Void cells (`v`) drop from 138 to 1, 152 cells are now floor kind `f` drawn with `BACKGROUND_TILE` 78, the top band moves down one row, and 19 flag/decor props are removed. The pockets look wall-enclosed, but they now count as floor for anything that reads kinds. Suggestion: confirm this is intended and not a save-time conversion by the editor; next time, put map edits in their own commit.
+9. **low** · `js/Game.js` constructor · `DialogueSystem` and `window.dialogue` are built in classic procedural mode too. The system does nothing until `say` is called, but it breaks the "null without mapData" pattern the other slice systems follow, and `window.dialogue.say(...)` works in classic mode. Suggestion: gate it on `mapData`, or keep it and make sure the documented debug global is intended for release builds.
+10. **low** · `js/editor2/MapEditorApp.js:_propExtra` · `#prop-scrap` only applies when a chest is placed. To change an existing chest you must eyedrop it, remove it, edit the field and place it again. Suggestion: when the field changes, update the chest under the eyedropped cell, or note the workflow in room-editor.md.
+11. **low** · task folder · `plan.md` still says `Status: in-progress` with no steps checked, and `verification.md` is still the template. AGENTS workflow step 3 needs the commands run and what was not verified (manual checks in game and editor). Suggestion: fill both before the PR.
+
+## Checked, no issue found
+- Classic mode: `roomProps`, `scrap`, `scrapCounter` and `chests` are `null` without `mapData`, and every call site uses `?.`. Apart from #9, the only classic-mode changes are `enemy.typeKey` and four extra coin images in `AssetLoader`.
+- Trailer: of the touched files it uses only `ui/SpeechBubble.js` (unchanged), `SpawnSystem` (the added `typeKey` is harmless) and `PixelFont` (glyphs added). It does not import `PropSprites`.
+- Editor 2.0: `#prop-scrap` exists in `editor2.html`, and `_setVal` skips the focused input. `MapDocument` normalize and `placeProp` keep `scrap`. The new `PropSprites.drawFrame` flip mirrors around the art centre, same result as before.
+- Pause, game over and roomIntro stop `_updateGameplay`, so scrap, chest and dialogue timers stop with the sim. Scrap and chests count 60 Hz steps, and dialogue uses fixed `SIM_STEP` seconds. `restart` resets `scrap`, `scrapCounter`, `chests` and `dialogue` in that order, so the counter restarts at 0.
+- `CombatSystem.resolveDeaths` passes the enemy to `onKill`, so drops reach `ScrapSystem.dropFromEnemy`.

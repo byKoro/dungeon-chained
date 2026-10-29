@@ -10,14 +10,17 @@ Pixel-art UI in two layers:
 |---|---|
 | `index.html` | static roots `#death-screen` (with `.death-btn`), `#pause-screen > .pause-menu`, `#loading-screen > canvas.ls-bar` |
 | `css/style.css` | `.visible` / `.ls-hidden` toggles, pop-in animations, `--px` scale var, `.pixel-btn:focus-visible`, reduced-motion rules |
-| `js/ui/PixelFont.js` | 5-px bitmap font: `drawText(ctx,text,x,y,color,maxChars)`, `measureText`, `wrapText`, `LINE_HEIGHT`=10; pt-BR accents composed; unknown char → `?` |
+| `js/ui/PixelFont.js` | 5-px bitmap font: `drawText(ctx,text,x,y,color,maxChars)`, `measureText`, `wrapText`, `LINE_HEIGHT`=10; pt-BR accents composed; `[`, `]`, `+` included; unknown char → `?` |
 | `js/ui/PixelButton.js` | `PixelButton` class, `renderPixelButton`, `drawStoneFrame`, `controlSize`, `pixelScale()`, palettes `FRAME`, `FACES` (`red`/`gold`/`stone`) |
 | `js/ui/PixelSlider.js` | `PixelSlider` (volume), `renderPixelSlider` |
 | `js/ui/PauseScreen.js` | RESUME / RESTART / volume slider; focus navigation |
 | `js/ui/DeathScreen.js` | single RESTART button |
 | `js/ui/LoadingScreen.js` | segmented progress bar; `run(text, tasks)` |
 | `js/ui/TrailerOverlay.js` | SKIP (gold, after 3 s) / START (red, at trailer end) over the opening trailer |
-| `js/ui/SpeechBubble.js` | `renderSpeechBubble` (trailer dialogue bubbles) |
+| `js/ui/SpeechBubble.js` | `renderSpeechBubble(text, accent, maxChars)` (trailer and in-game bubbles) |
+| `js/systems/DialogueSystem.js` | in-game speech bubbles: queue, typewriter, voice blip, HUD expression hook |
+| `js/ui/ScrapCounter.js` | top-center scrap counter (Editor 2.0 maps only) |
+| `js/i18n/I18n.js`, `pt-BR.js`, `en.js` | `t(key, vars)`, `setLanguage`, `getLanguage`; tables `PT_BR`, `EN` (ADR 0013) |
 | `js/trailer/` | opening trailer: `TrailerPlayer` (scene list, gate, pause, pad), `TrailerStage`, `scenes/`, `kit/`, `fx/`, `audio/TrailerAudio.js` |
 | `js/ui/VtuberHud.js` | `VtuberHud`, internal `Portrait`, `HeartRow`, `Spring` |
 | `js/ui/UiSound.js` | `playUi(cue)` (see audio.md) |
@@ -37,6 +40,10 @@ Pixel-art UI in two layers:
     - Palettes: `DASH_RAMPS` (P1 = the `FACES.gold` ramp, P2 = a matching blue ramp).
     - Motion: pop-in spring when it appears (chain snaps). Each cell flashes as it lights. When all cells are full the bar pops and a glint sweeps every `DASH_GLINT_PERIOD` (off under reduced motion). Spending the dash shakes the bar.
     - Drawn only while `player.dashEnabled`, otherwise `hide()`.
+
+- `VtuberHud.pixelScale(W, H)` returns the heart scale (`hs`) so other HUD pieces match its pixel size. `speak(i, expr, dur)` plays an expression on portrait `i` (+ hop) and `talkBlip(i)` kicks its squash; both are driven by `DialogueSystem`.
+- `ScrapCounter({ getAmount, frames })`: `draw(ctx, W, H, scale)`, `reset()`. Stone panel at 1 art px (coin icon placeholder + at least 2 digits), drawn at `hud.pixelScale`. The shown number rolls toward the pot; each gain makes the panel hop and lights the digits. `Game` draws it after `hud.draw` and resets it in `newDungeon`.
+- `DialogueSystem({ getPlayers, input, audio, onLineStart, onBlip, cfg = DIALOGUE, translate = t })`: `say(who, key, { vars, expr })` (who = player index 0/1 or the `Player`), `clear()`, `active`, `update(dt)`, `draw(ctx, renderer, canvas)`. One line at a time from a queue; 40 letters/s, then a hold of `holdBase + holdPerChar·len`, fade out, `gapSeconds` until the next. Interact (`e` / `shiftright`, pad button 2 maps to them) completes the text, a second press skips the line; a key already held when the system starts does not count. Blip `voiceBlip` every 2nd non-space letter, rate `DIALOGUE.blipRates[i]` (Amarelo lower, Azul higher). Completing the text does not play the skipped blips. Built only with `mapData` (`game.dialogue` is `null` in the classic mode). The same tap is also seen by `DemoProgress` (an interactive in range activates too). In F6 split mode the bubble uses the shared camera, so it is misplaced. The game does not pause. `DIALOGUE.enabled = false` turns every `say` into a no-op (the script is still being tested). The bubble is drawn in screen space above the speaker's head (`headOffset`), one bubble art px = one game art px (`TILE/16·zoom`), after post-processing so lighting does not dim it. No button icons per device yet.
 
 ## Data flow (driven from `js/Game.js`)
 - Boot (`js/main.js`): `LoadingScreen.run('Loading the dungeon…', [assets.whenReady, roomCatalog.load])` → opening trailer (below) until START/SKIP → `run('Preparing the dungeon…', [new Game, game.audio.whenReady])` → `game.start()`. `#loading-screen` starts visible (no `ls-hidden` in HTML).
