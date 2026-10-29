@@ -159,3 +159,6 @@ Branch from `feat/room-events`. Task: `.agents/tasks/2026-10-29-inicio-map/`.
 
 ## Integrated main and feat/flame-golem (2026-10-29)
 Merged main0368672 and Arauto featureb7272f7 locally, preserving both histories. Combined Ghostfire/forge/scrap/chests/events/double-saw with Arauto physics/effects/audio/cinematics. Resolved7files; final tether solver now respects mainprops/bars and split saw uses actualdiscs for collision/audio/damage. Camera preserves featureverticalmargin and mainzoom multiplier. check39/40test suites; only prior gridassert/unlistedmapfailures. Actual mainGameboot and Arauto phase scene rendered without consoleerrors. Task2026-10-29-merge-flame-golem-main. No remote push performed.
+
+## Arauto visual fixes (2026-10-29)
+Branch codex/arauto-visual-fixes: removed generated silhouette outline and attack debug marks; stronger attack/impact shake and transient world blur, HUD remains crisp. Focused tests pass; full check retains prior grid/map failures. Task 2026-10-29-arauto-visual-fixes.

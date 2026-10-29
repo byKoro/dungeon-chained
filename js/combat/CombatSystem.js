@@ -67,6 +67,7 @@ export class CombatSystem {
                     this.audio.play("enemyAttackVoice");
                 }
             }
+            if (e.justAttacked && e.effectMaterial === 'lavaStone') this.arautoEffects?.attack();
             if (e.justSlammed) {
                 if (e.effectMaterial === 'lavaStone') {
                     this.arautoEffects?.groundHit(e, true);

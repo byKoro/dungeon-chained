@@ -113,3 +113,6 @@ None automated. Verify visually: `python serve.py` → http://localhost:8000 (or
 
 ### Arauto sound pairing (2026-10-29)
 Existing ground/slam VFX now pair with dedicated stratified rock impacts and ambience duck. Dash local trail pairs with motion-only whoosh/floor scrape; saw contact pairs with spin-driven continuous metal/stone texture. See audio.md. No additional visual blast/shake increase in this task; audio is tuned first as approved.
+
+## Arauto visual fixes (2026-10-29)
+Arauto outline disabled via null (zero artPx still rounds to one pixel in MeleeEnemy); debug attack marks disabled. ArautoEffects owns full-world transient camera blur, rendered once after all views and before HUD. Attack start triggers shake/blur, charging sustains moderate shake/blur, ground/slam impacts use stronger presets. Blur decays per render and resets on dungeon reset; tuning in ArautoEffectsConfig.js. No gameplay timing changes.

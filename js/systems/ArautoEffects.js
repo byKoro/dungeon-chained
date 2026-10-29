@@ -10,6 +10,30 @@ export class ArautoEffects {
     reset() {
         this.states = new WeakMap();
         this.masks = new WeakMap();
+        this.blur = 0;
+    }
+
+    attack() {
+        this.renderer.triggerShake(ARAUTO_FX.attackShake);
+        this.blur = Math.max(this.blur, ARAUTO_FX.attackBlur);
+    }
+
+    drawCamera(ctx, canvas) {
+        if (this.blur < ARAUTO_FX.blurCutoff) { this.blur = 0; return; }
+        if (!this.blurCanvas) this.blurCanvas = document.createElement('canvas');
+        const copy = this.blurCanvas;
+        if (copy.width !== canvas.width || copy.height !== canvas.height) {
+            copy.width = canvas.width; copy.height = canvas.height;
+        }
+        const buffer = copy.getContext('2d');
+        buffer.clearRect(0, 0, copy.width, copy.height);
+        buffer.drawImage(canvas, 0, 0);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.filter = `blur(${this.blur}px)`;
+        ctx.drawImage(copy, 0, 0);
+        ctx.restore();
+        this.blur *= ARAUTO_FX.blurDecay;
     }
 
     owns(enemy) { return enemy.effectMaterial === 'lavaStone'; }
@@ -22,6 +46,7 @@ export class ArautoEffects {
 
     groundHit(enemy, slam = false) {
         this.renderer.triggerShake(slam ? ARAUTO_FX.slamShake : ARAUTO_FX.groundShake);
+        this.blur = Math.max(this.blur, slam ? ARAUTO_FX.slamBlur : ARAUTO_FX.groundBlur);
         this.particles.triggerLavaDebris?.(enemy.x, enemy.footY, ARAUTO_FX.impactPieces,
             { groundY: enemy.footY });
         this.particles.triggerDust?.(enemy.x, enemy.footY, 0, 1, ARAUTO_FX.impactPieces);
@@ -42,6 +67,8 @@ export class ArautoEffects {
             for (const trail of state.trails) trail.life--;
             state.trails = state.trails.filter(trail => trail.life > 0);
             if (enemy.charging && !enemy.isDying) {
+                this.renderer.triggerShake(ARAUTO_FX.dashShake);
+                this.blur = Math.max(this.blur, ARAUTO_FX.dashBlur);
                 state.trails.push({ ...state.previous, life: ARAUTO_FX.trailLife });
                 if (state.trails.length > ARAUTO_FX.trailMax) state.trails.shift();
             }

@@ -58,7 +58,7 @@ export const FLAME_GOLEM = {
     },
     telegraph: {
         // Marcas no chão só para teste: o aviso final é a própria animação do ataque (pose de espera).
-        showMarks: true,
+        showMarks: false,
         // Fração do windup em que a animação avança até a pose de espera; depois ela fica parada nessa pose.
         rampRatio: 0.6,
         color: '#ffad57', secondaryColor: '#80534c', lineWidth: 3,
@@ -67,7 +67,7 @@ export const FLAME_GOLEM = {
     // Sombra oval nos pés (proporções da largura do corpo em px de mundo).
     shadow: { widthRatio: 0.62, heightRatio: 0.34, yOffset: -6, alpha: 0.6, jumpShrink: 0.35 },
     // Contorno escuro de 1 pixel de arte em volta da silhueta.
-    outline: { color: '#140a12', artPx: 0 },
+    outline: null,
     // Luz quente de brasa em volta do golem (raio em px de mundo).
     light: { radius: 190, windupBoost: 0.35, slamBoost: 0.6, pulse: 0.08, corpseStrength: 0.25 },
     // Brasas subindo dos ombros e da cabeça.

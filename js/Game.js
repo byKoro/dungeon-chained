@@ -1266,6 +1266,7 @@ export class Game {
     _render() {
         if (this.mapData && this.demoCamera.mode === 'split' && !this.arautoScene.active) this.demoCamera.renderSplit(() => this._renderView());
         else this._renderView();
+        this.arautoEffects.drawCamera(this.ctx, this.canvas);
         this._renderOverlays();
         if (this.mapData && !this.arautoScene.active && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
