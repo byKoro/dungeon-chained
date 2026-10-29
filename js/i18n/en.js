@@ -28,5 +28,5 @@ export const EN = Object.freeze({
     "forge.hint": "Space/Enter/A: forge   E/B: leave",
     "forge.prompt": "Anvil: P1 E / P2 Right Shift / pad X",
     "forge.blocked": "Enemies nearby! You can't forge now.",
-    "forge.sawTitle": "SAW"
+    "chest.prompt": "Chest: P1 E / P2 Right Shift / pad X"
 });

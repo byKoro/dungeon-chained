@@ -74,6 +74,11 @@ export class ForgeSystem {
         this.onOpen?.(anvil);
     }
 
+    // Outro sistema usou o aperto de interagir neste step (ex.: abrir um baú).
+    latchInteract() {
+        this._interactHeld = INTERACT_KEYS.map(() => true);
+    }
+
     close({ silent = false } = {}) {
         if (!this.open) return;
         this.open = false;

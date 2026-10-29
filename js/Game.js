@@ -13,7 +13,6 @@ import { ForgeState, mapOffersRecipe, applySawUpgrades } from './systems/ForgeSt
 import { ForgeSystem } from './systems/ForgeSystem.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
-import { TitleBanner } from './ui/TitleBanner.js';
 import { FORGE, SAW_CINEMATIC } from './config/ForgeConfig.js';
 import { t } from './i18n/I18n.js';
 import { PropSprites } from './core/PropSprites.js';
@@ -172,7 +171,13 @@ export class Game {
         this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
         this.scrapCounter = this.scrap ? new ScrapCounter({ getAmount: () => this.scrap.amount, frames: scrapFrames }) : null;
         this.chests = this.scrap ? new ChestSystem({
-            rooms: this.rooms, scrap: this.scrap, getPlayers: () => [this.p1, this.p2], audio: this.audio, particleSystem: this.particleSystem
+            rooms: this.rooms, scrap: this.scrap, getPlayers: () => [this.p1, this.p2], input: this.input,
+            audio: this.audio, particleSystem: this.particleSystem,
+            onOpen: () => {
+                this.forgeSystem?.latchInteract();
+                this.dialogue?.latchInteract();
+                this.demoProgress.held = [true, true];
+            }
         }) : null;
 
         this.dialogue = this.mapData ? new DialogueSystem({
@@ -199,7 +204,6 @@ export class Game {
             renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
             getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
         }) : null;
-        this.titleBanner = new TitleBanner();
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -415,7 +419,6 @@ export class Game {
         this.dialogue?.clear();
         this.forgeSystem?.reset();
         this.sawCinematic?.reset();
-        this.titleBanner.clear();
         this._sawOnAnvil = false;
         this._sawFirstConnect = false;
         this.bloodCanvas.clear();
@@ -513,7 +516,6 @@ export class Game {
 
         if (first) {
             this.chain.weapon?.playReconnect?.(SAW_CINEMATIC.firstReconnectScale);
-            this.titleBanner.show(t("forge.sawTitle"), SAW_CINEMATIC.titleSeconds);
         } else {
             this.chain.weapon?.playReconnect?.();
         }
@@ -1102,9 +1104,9 @@ export class Game {
         if (this.mapData && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const forgePrompt = this.sawCinematic?.active ? null : this.forgeSystem?.prompt;
+            const promptKey = this.sawCinematic?.active ? null : (this.chests?.prompt || this.forgeSystem?.prompt);
             const message = this.demoProgress.messageTime ? this.demoProgress.message
-                : (this.demoProgress.prompt || (forgePrompt ? t(forgePrompt) : ""));
+                : (this.demoProgress.prompt || (promptKey ? t(promptKey) : ""));
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
             if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, 12, 24); }
             ctx.restore();
@@ -1266,7 +1268,6 @@ export class Game {
         this.hud.draw(ctx, canvas.width, canvas.height);
         this.scrapCounter?.draw(ctx, canvas.width, canvas.height, this.hud.pixelScale(canvas.width, canvas.height));
         this.sawCinematic?.drawOverlay(ctx, canvas);
-        this.titleBanner.draw(ctx, canvas);
         this.forgeMenu?.draw(ctx, canvas);
 
     }

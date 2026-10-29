@@ -22,16 +22,20 @@ export const SCRAP = Object.freeze({
     // Placeholder: arte da moeda até chegar o sprite da sucata.
     frames: [1, 2, 3, 4].map(i => `assets/coin/coin_${i}.png`),
     frameSteps: 8,
-    drawSize: 32,
-    shadowRadius: 7,
+    // 16 px de arte × 4 = mesma densidade de pixel do resto do jogo.
+    drawSize: 64,
+    shadowRadius: 12,
+    shadowOffsetY: 20,
     drops: Object.freeze({ demon: 1, bloodMonster: 3, blackKnightB: 5 }),
     chestDefault: 10,
     chestMax: 999
 });
 
-// Baús abrem quando qualquer jogador chega perto; a sucata sai para a frente (sul) em arco.
+// Baú fechado fica parado com um brilho passando; abre quando um jogador bem perto aperta interagir.
+// A sucata sai para a frente (sul) em arco.
 export const CHEST = Object.freeze({
-    openRadius: 2 * TILE,
+    openRadius: 1 * TILE,
+    shineSpeed: 0.03,
     frameSteps: 8,
     burstDelaySteps: 10,
     burstDir: Math.PI / 2,

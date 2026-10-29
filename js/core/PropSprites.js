@@ -45,12 +45,50 @@ export class PropSprites {
         return this.drawFrame(ctx, type, propFrameIndex(def, ms), dx, dy, tilePx, flip);
     }
 
+    // Faixa de brilho que atravessa a arte na diagonal (mesma ideia do brilho da serra largada).
+    // `shine` 0..1 = posição da faixa; a máscara é o próprio quadro, então só a arte acende.
+    _shineCanvas(img, shine) {
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const c = this._shine ??= document.createElement("canvas");
+        if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+        const g = c.getContext("2d");
+        g.imageSmoothingEnabled = false;
+        g.globalCompositeOperation = "source-over";
+        g.clearRect(0, 0, W, H);
+        const S = Math.max(W, H);
+        const travel = -S + shine * 2.2 * S;
+        const grad = g.createLinearGradient(travel - S * 0.5, travel - S * 0.5, travel + S * 0.5, travel + S * 0.5);
+        grad.addColorStop(0, "rgba(255,255,255,0)");
+        grad.addColorStop(0.42, "rgba(255,255,255,0)");
+        grad.addColorStop(0.5, "rgba(255,255,255,0.85)");
+        grad.addColorStop(0.58, "rgba(255,255,255,0)");
+        grad.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = grad;
+        g.fillRect(0, 0, W, H);
+        g.globalCompositeOperation = "destination-in";
+        g.drawImage(img, 0, 0);
+        g.globalCompositeOperation = "source-over";
+        return c;
+    }
+
     // `sx`/`sy` escalam a arte a partir do meio da borda de baixo (squash/stretch).
-    drawFrame(ctx, type, index, dx, dy, tilePx, flip = false, sx = 1, sy = 1) {
+    drawFrame(ctx, type, index, dx, dy, tilePx, flip = false, sx = 1, sy = 1, shine = null) {
         const def = this.defs[type];
         const img = this.frameAt(type, index);
         if (!def || !img) return false;
         const r = propArtRect(def, dx, dy, tilePx);
+        if (shine !== null && typeof document !== "undefined") {
+            const plain = this._drawImage(ctx, img, r, flip, sx, sy);
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            this._drawImage(ctx, this._shineCanvas(img, shine), r, flip, sx, sy);
+            ctx.restore();
+            return plain;
+        }
+        return this._drawImage(ctx, img, r, flip, sx, sy);
+    }
+
+    _drawImage(ctx, img, r, flip, sx, sy) {
         const plain = sx === 1 && sy === 1 && !flip;
         if (plain) {
             ctx.drawImage(img, r.x, r.y, r.w, r.h);

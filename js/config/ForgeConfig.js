@@ -40,8 +40,7 @@ export const SAW_CINEMATIC = Object.freeze({
     landFlash: 14,
     sawLift: 18,
     firstReconnectScale: 1.1,
-    firstReconnectShake: 9,
-    titleSeconds: 1.8
+    firstReconnectShake: 9
 });
 
 // Sem `recipes` autorado, a bigorna oferece o catálogo padrão; uma lista vazia não oferece nada.

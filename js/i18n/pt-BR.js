@@ -28,5 +28,5 @@ export const PT_BR = Object.freeze({
     "forge.hint": "Espaço/Enter/A: forjar   E/B: sair",
     "forge.prompt": "Bigorna: P1 E / P2 Shift direito / controle X",
     "forge.blocked": "Inimigos por perto! Não dá para forjar.",
-    "forge.sawTitle": "SERRA"
+    "chest.prompt": "Baú: P1 E / P2 Shift direito / controle X"
 });

@@ -65,7 +65,7 @@ export class RoomProps {
         const { prop } = s;
         const dx = rect.x + prop.col * this.tile, dy = rect.y + prop.row * this.tile;
         const over = this.getFrame?.(prop, roomKey);
-        if (over) this.sprites.drawFrame(ctx, over.type, over.frame, dx, dy, this.tile, !!prop.flip, over.sx ?? 1, over.sy ?? 1);
+        if (over) this.sprites.drawFrame(ctx, over.type, over.frame, dx, dy, this.tile, !!prop.flip, over.sx ?? 1, over.sy ?? 1, over.shine ?? null);
         else this.sprites.draw(ctx, prop.type, dx, dy, this.tile, ms, !!prop.flip);
     }
 }

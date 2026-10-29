@@ -87,7 +87,7 @@ export class ScrapPickup {
         const r = Math.max(3, this.cfg.shadowRadius - this.z * 0.12);
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.beginPath();
-        ctx.ellipse(Math.round(this.x), Math.round(this.y + 8), r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(Math.round(this.x), Math.round(this.y + this.cfg.shadowOffsetY), r, r * 0.5, 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
