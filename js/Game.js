@@ -1062,7 +1062,7 @@ export class Game {
         const enemies = rooms.current.enemies;
 
         enemies.forEach(e => { if (!e.isHidden) renderer.drawRoundShadow(e.x, e.y, 13, 0); });
-        this.scrap?.draw(ctx);
+        this.scrap?.drawShadows(ctx);
 
         this.chain.drawChain(ctx, this.p1, this.p2);
 
@@ -1131,8 +1131,9 @@ export class Game {
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
-        if (hearts.length || this.particleSystem.hasDamageNumbers) {
+        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length) {
             renderer.beginOverlayWorld();
+            this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
             this.particleSystem.drawDamageNumbers(ctx);
             renderer.endOverlayWorld();

@@ -82,9 +82,13 @@ export class ScrapSystem {
         this.audio.play("scrapPickup", { rateMultiplier: 1 + this._streak * this.cfg.pickupRateStep });
     }
 
-    draw(ctx) {
-        if (!this.pickups.length) return;
+    drawShadows(ctx) {
         for (const p of this.pickups) p.drawShadow(ctx);
+    }
+
+    // Desenhada acima da escuridão (como os corações), para a sucata não sumir longe da luz dos jogadores.
+    drawOverlay(ctx) {
+        if (!this.pickups.length) return;
         const sorted = this.pickups.slice().sort((a, b) => a.y - b.y);
         for (const p of sorted) p.draw(ctx, this.frames);
     }
