@@ -230,8 +230,9 @@ export class Player extends Entity {
         if (hasInput) {
             this.lastMoveX = moveX;
             this.lastMoveY = moveY;
-            this.vx = this.vx * 0.76 + moveX * this.speed * 0.24;
-            this.vy = this.vy * 0.76 + moveY * this.speed * 0.24;
+            const speed = this.speed * (this.speedScale ?? 1);
+            this.vx = this.vx * 0.76 + moveX * speed * 0.24;
+            this.vy = this.vy * 0.76 + moveY * speed * 0.24;
             this.slideTimer = 0;
         } else {
 
@@ -265,7 +266,9 @@ export class Player extends Entity {
         return true;
     }
 
-    update(input, bounds, { canDash = false, feetInHole = false } = {}) {
+    // `speedScale` < 1 deixa o jogador mais lento (ex.: arrastando a serra).
+    update(input, bounds, { canDash = false, feetInHole = false, speedScale = 1 } = {}) {
+        this.speedScale = speedScale;
         this.justDashed = false;
         this.justEndedDash = false;
         this.dashEnabled = canDash;

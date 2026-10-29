@@ -33,6 +33,31 @@ export const AUDIO_CONFIG = {
             volume: 0.6, rate: 1, rateVariance: 0.03, pitchShift: true,
             cooldownMs: 50, maxVoices: 2, enabled: true
         },
+        ghostfireRoar: {
+            description: "Rugido do Ghostfire do trailer",
+            files: ["assets/audio/trailer/roar.wav"],
+            volume: 0.8, rate: 0.72, rateVariance: 0, enabled: true
+        },
+        ghostfireCharge: {
+            description: "Carga do raio do Ghostfire",
+            files: ["assets/audio/trailer/beam-charge.wav"],
+            volume: 0.75, rate: 1, rateVariance: 0, enabled: true
+        },
+        ghostfireBeam: {
+            description: "Disparo do raio do Ghostfire",
+            files: ["assets/audio/trailer/beam-fire.wav"],
+            volume: 0.85, rate: 1, rateVariance: 0, enabled: true
+        },
+        ghostfireSummon: {
+            description: "Chamas da invocação do Ghostfire",
+            files: [1, 2].map(i => `assets/audio/trailer/flame-0${i}.wav`),
+            volume: 0.7, rate: 0.85, rateVariance: 0.03, enabled: true
+        },
+        ghostfireDeath: {
+            description: "Explosão final do Ghostfire",
+            files: [1, 2, 3].map(i => `assets/audio/trailer/boom-0${i}.wav`),
+            volume: 0.9, rate: 0.6, rateVariance: 0.03, enabled: true
+        },
         playerHurt: {
             description: "Dano sofrido pelos jogadores ao colidir com inimigos",
             files: [1, 2, 3].map(i => `assets/audio/player-hit-0${i}.wav`),
@@ -285,6 +310,58 @@ export const AUDIO_CONFIG = {
             files: ["assets/audio/button-release.wav"],
             volume: 0.3,
             rate: 1.0,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 80,
+            enabled: true
+        },
+        scrapPickup: {
+            description: "Coleta de sucata (placeholder: pop do trailer; tom sobe em coletas seguidas)",
+            files: [1, 2, 3].map(i => `assets/audio/trailer/pop-0${i}.wav`),
+            volume: 0.32,
+            rate: 1.0,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 35,
+            maxVoices: 4,
+            enabled: true
+        },
+        chestOpen: {
+            description: "Tampa do baú abrindo (placeholder: thunk do trailer)",
+            files: [1, 2].map(i => `assets/audio/trailer/thunk-0${i}.wav`),
+            volume: 0.55,
+            rate: 1.1,
+            rateVariance: 0.05,
+            pitchShift: true,
+            cooldownMs: 120,
+            enabled: true
+        },
+        voiceBlip: {
+            description: "Blip de voz do balão de fala (placeholder: blip do trailer; o tom muda por jogador)",
+            files: [1, 2].map(i => `assets/audio/trailer/blip-0${i}.wav`),
+            volume: 0.22,
+            rate: 1.0,
+            rateVariance: 0,
+            pitchShift: true,
+            cooldownMs: 30,
+            maxVoices: 2,
+            enabled: true
+        },
+        forgeBuy: {
+            description: "Compra na bigorna (placeholder: sting do trailer)",
+            files: ["assets/audio/trailer/sting.wav"],
+            volume: 0.5,
+            rate: 1.2,
+            rateVariance: 0.03,
+            pitchShift: true,
+            cooldownMs: 120,
+            enabled: true
+        },
+        forgeHammer: {
+            description: "Martelada na bigorna durante a cinemática da serra (placeholder: impacto do trailer)",
+            files: [1, 2, 3].map(i => `assets/audio/trailer/impact-0${i}.wav`),
+            volume: 0.6,
+            rate: 1.25,
             rateVariance: 0.05,
             pitchShift: true,
             cooldownMs: 80,

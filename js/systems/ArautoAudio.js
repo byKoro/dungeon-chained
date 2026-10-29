@@ -39,13 +39,13 @@ export class ArautoAudio {
 
     _discContact(weapon, players, enemies) {
         if (weapon.dropped || !players?.[0] || !players[1]) return false;
-        const disc = weapon.getSawPositions?.(players[0], players[1])?.[0];
+        const discs = weapon.getSawPositions?.(players[0], players[1]) ?? [];
         const radius = weapon.discRadius;
-        if (!disc || !(radius > 0)) return false;
+        if (!discs.length || !(radius > 0)) return false;
         const tolerance = ARAUTO_AUDIO.contactTolerance;
-        return enemies.some(enemy => this._solid(enemy) && enemy.collisionBodies?.some(body => Math.hypot(
+        return discs.some(disc => enemies.some(enemy => this._solid(enemy) && enemy.collisionBodies?.some(body => Math.hypot(
             (disc.x - enemy.x - body.x) / (body.radiusX + radius + tolerance),
-            (disc.y - enemy.y - body.y) / (body.radiusY + radius + tolerance)) <= 1));
+            (disc.y - enemy.y - body.y) / (body.radiusY + radius + tolerance)) <= 1)));
     }
 
     update(weapon, enemies, { active = true, connected = true, players = [], timeScale = 1 } = {}) {

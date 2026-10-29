@@ -8,6 +8,8 @@ Only branches with commits ahead of `main` contain unmerged work. Check before s
 
 | Branch | Ahead | Author | Content |
 |---|---|---|---|
+| `feat/anvil-forge` | ~9 on top of `feat/scrap-chest` | Kiro (slice 2) | Start without saw, anvil menu, Size/Elasticity/Double saw, saw cinematic, cable tuning in config. See the Início section below |
+| `feat/scrap-chest` | ~10 | Kiro (slice 1 of the Início design) | Scrap, HUD counter, proximity chests, solid props, i18n, speech bubbles. See the Início section below |
 | `origin/inimigos-novos` | 2 | Rodrigo Yamauchi | Two new enemies: cleave demon, frost guardian |
 | `origin/branch-inimigo-novo-skull` | 1 | Rodrigo Yamauchi | `FireSkullEnemy` + SpawnSystem/AssetLoader wiring (very old base, ~90 commits behind) |
 | `origin/sala-trap-teste` | 2 | Rodrigo Yamauchi | Challenge walkway/fall experiments (old base) |
@@ -21,6 +23,14 @@ Merged into `main` (fast-forward, 2026-10-26) from `feat/player-dash`, two commi
 - Individual dash while the chain is snapped. See `systems/players-and-chain.md` → Dash. The `playerDash` sound is a placeholder (pitched `arrow-fire`).
 
 ## Backlog
+
+Integration prepared for `main` and `boss` (2026-10-28): merged current main with Ghostfire size/pacing adjustments. Kept cultist/FireSkull spawning and combat hit feedback; Ghostfire implements `takeHit` and local hit stop, and its effects/lights exclude other boss types. Focused regression coverage is in `test_ghostfire.js`. Pre-existing local edits remain outside this merge.
+
+Adjusted on branch `boss` (2026-10-28): Ghostfire's beam attack is slightly slower: wait 108, charge 30, warning 33, recovery 54 ticks. Charge plus warning now takes 1.05s (previously 0.83s). Active beam duration remains 30 ticks. Gameplay feel has not been verified in a browser.
+
+Adjusted on branch `boss` (2026-10-28): Ghostfire now shares the trailer's integer 21× sprite scale (previously 8× in gameplay); its beam width follows that scale at 63 world pixels, and hit radius scales proportionally to 115.5 pixels. Browser appearance has not been verified.
+
+Implemented on branch `boss` (2026-10-27): Ghostfire now reuses the opening trailer sprite geometry, pixel-art beam and audio, with staggered summons, charge/locked warning, alternating sides and full death animation. Weapon hits respect its health/cooldown. See `systems/combat-and-entities.md` and task `2026-10-27-ghostfire-trailer`. Existing unrelated working edits were preserved outside the focused boss commit. All 12 local test files pass; the isolated commit has 10/11 passing with baseline issue #5 still present. Map validation still fails on known issue #4. `graphify` is unavailable (`npm run doctor`).
 - `.agents/backlog/prop-shadow.md` — dynamic prop silhouette shadows (design approved, not implemented).
 
 ## Known bugs / gotchas (verified 2026-10-25)
@@ -38,7 +48,7 @@ Combat & entities
 8. `MeleeEnemy.setNavigationFloor` ignores its `walls` argument → BFS paths through wall blocks; `findSafeFloorCell` ignores custom walls (enemies may spawn inside walls).
 9. Enemy hit plays both `playerHurt` (CombatSystem) and `playerHit` (Game) — same wav set, doubled.
 10. Dead code: `MeleeEnemy` "dead" state, `Chain.applyToEnemies`, `Chain.cycleWeapon`, `Weapon.hitsTarget`, `HAZARDS.spike.*Frames`, `ParticleSystem.triggerExplosion`, `BloodCanvas.stampGib`, `PostProcessor.addAreaLight`, `TORCHES.minPerWall/...`. (`preloadUi` is used again by the trailer.)
-11. Lives cap 3 hard-coded in `Game._updateHearts` / `Player` (ignores `HEART_DROP.maxLives`). Chain tuning hard-coded in `Game` constructor.
+11. Lives cap 3 hard-coded in `Game._updateHearts` / `Player` (ignores `HEART_DROP.maxLives`). ~~Chain tuning hard-coded in `Game` constructor~~ moved to `js/config/ChainConfig.js` on `feat/anvil-forge`.
 12. Cable hit uses the straight p1→p2 segment, not the drawn sagging cable; a still saw also kills.
 
 Audio, UI, editor
@@ -89,30 +99,63 @@ Three configurable abilities and two HP phases implemented on feat/flame-golem. 
 - Corrigido por script: investida curta quando havia jogador no trajeto (`ignoresEntityCollisions`) e golem pendurado sobre buraco ao sul/fora da sala (`_standsOnFloor` com os pés). Testes novos em `test_flame_golem_abilities.js`. Detalhes em `systems/combat-and-entities.md`.
 - Não visto no jogo. `npm test` 21/22 (só `test_modular_grid`, item antigo #4).
 
-## Arauto solid contact � 2026-10-29
+## Arauto solid contact � 2026-10-29
 - Fixed pass-through caused by immovable excluding the golem from collisions. Players are blocked/displaced by torso, walking and animated arms; cannot push boss, including with saw contact. Airborne slam remains passable.
 - Regression tests pass, including charge distance and melee from four sides. Full check retains only #4/#5; graphify unavailable. Game feel/visual alignment not observed. Task: 2026-10-29-golem-solid-body.
 
-## Arauto saw/cable resistance � 2026-10-29
+## Arauto saw/cable resistance � 2026-10-29
 - Saw disc and curved cable now resist grounded golem body/arms, holding player advancement and loading the motor; surface damage remains. Thrown saw rebounds. Infeasible wall pinching disconnects to a safe drop.
 - Script tests pass (23/24 total; only old grid test fails). Check also retains old unlisted-map error. Graph refreshed using escalated environment. Gameplay feel and visual alignment not verified. Task: 2026-10-29-golem-chain-resistance.
 
-## Arauto lower hitbox � 2026-10-29
+## Arauto lower hitbox � 2026-10-29
 - Lowered torso blocker from y=-16 to +32 and reduced its vertical radius42?30; arms radius24?16 and lift38?12. Passing behind upper sprite remains clear; feet region stays solid.
 - Before/after diagram visually inspected: _local/golem-hitbox-comparison.png. Tests pass except existing grid failure; map check retains existing unlisted piece. No live gameplay observed. Task: 2026-10-29-golem-hitbox-lower.
 
-## Softer saw resistance � 2026-10-29
+## Softer saw resistance � 2026-10-29
 - Implemented approved plan:3% friction, gradual inward resistance,8px compression,2px shared soft correction budget; preserve solid limit and wall pinch handling.
 - Removed collision spin loss. Active saw maintains70% minimum spin during cutting; idle contact does not start it. Ordinary enemy hits also sustain motor.
 - Tests23/24, only old grid/map check failures. Live co-op feel not observed. Task:2026-10-29-softer-saw-resistance.
 
-## Arauto VFX � 2026-10-29
+## Arauto VFX � 2026-10-29
 Approved grilling scope implemented: impact/player shake, local dash trail, blood-free boss debris/embers, phase2 masked flowing lava/drips, safe ~3s cinematic phase transition with bars/zoom/frozen combat/HUD reactions, corrected arms-up hold for attack2 and repeated slam preparations.
 Actual hidden Electron Game run verified rendering/state with zero console errors; captures in _local/arauto-*.png. Tests24/25 with only existing grid failure; map check retains unlisted corridor piece. Human co-op feel/performance tuning pending. Task2026-10-29-arauto-vfx.
 
-## Arauto audio � 2026-10-29
+## Arauto audio � 2026-10-29
 Approved grind/whoosh/ground/slam design implemented with11remixed existing-source WAVs and Game-owned ArautoAudio. Ground sounds synchronized even on miss; slam no longer plays player fall, boss saw no longer plays flesh hit, duplicate player damage layer removed for boss. Loop lifecycle tested and realGame output recorded via stream tap. Final mix check in task2026-10-29-arauto-audio; subjective listening pending. Known grid/map failures unchanged; user camera/map edits preserved.
 
 Arauto audio follow-up: strengthened faint grinding by~9.1dB at .7spin and opened its filter. Lifecycle unchanged; tests pass apart from old grid/map failures, re-recorded Game output with no saturated samples observed. Task2026-10-29-arauto-audio.
 
 Arauto timbre revision: removed flame-like contact/dash textures. Contact now dry repeated snaps; dash thick continuous filtered wind. Controllers unchanged, tests and Game recording verified; subjective listening pending. Details task2026-10-29-arauto-audio and audio.md.
+## Início — fatia 1 `feat/scrap-chest` (2026-10-29)
+Design: `.agents/tasks/2026-10-29-inicio-core-loop/design.md`; task: `.agents/tasks/2026-10-29-scrap-chest/`. Main merged into the branch at `ec14221` (Ghostfire work).
+- Done (Editor 2.0 maps only): shared scrap pot with arc/rest/magnet pickups and enemy drops, top-center counter, chests that open by proximity with the amount authored in the editor, anvil and chests solid at their base and y-sorted, `t()` tables (ADR 0013), speech bubbles (`DialogueSystem.say`, debug global `window.dialogue`). `map/demo/inicial.json` got Baú 1 at (21,26) with 10 scrap. `active.json` pointed at `demo_campaign.json` until slice 5.
+- Placeholders: scrap uses the coin sprite at half pixel size; `scrapPickup`, `chestOpen`, `voiceBlip` reuse trailer wavs. Asset requests: scrap floor sprite + HUD icon, speech bubble art, real sounds.
+- Known limits: chests open with interact within 1 tile (straight distance, walls not checked); scrap flies over walls and holes (only clamped to the arena) and can rest in a walled pocket outside the magnet radius; enemies' navigation ignores solid props; dialogue lines wired in slice 5; button icons inside bubbles not done; an interact tap that skips a line also triggers a `DemoProgress` interactive in range; the bubble is misplaced in F6 split mode; restart closes opened chests (death rule = slice 4). Scrap left on the floor, and scrap of a chest still opening, is credited when leaving the room.
+
+## Início — fatia 2 `feat/anvil-forge` (2026-10-29)
+Branch from `feat/scrap-chest` (needs the scrap pot). Task: `.agents/tasks/2026-10-29-anvil-forge/`.
+- Done (Editor 2.0 maps): runs start without cable/saw when an anvil offers the Serra (`demo_campaign.json` has no anvil and keeps the saw); anvil menu with shared cursor and frozen game; recipes per anvil in the editor; Serra (10), Tamanho, Elasticidade, Serra dupla; saw cinematic, saw on the anvil, bigger first reconnect + "SERRA" title; `CHAIN` config (#11, cable part).
+- Out of this slice: Peso and saw drag (slice 3), boots and the Boots-room anvil, zones (the menu is blocked by live enemies in the room, not by a zone), the death rule that keeps items (restart clears purchases).
+- Known limits: Serra dupla lives in the 204–240 px band, above the strain distance. Fixed on `feat/inicio-map` (user choice): while split the strain no longer rises, so only the break distance snaps the cable. The saw drawn during the cinematic jump is under the darkness. Menu icons and hammer art are missing (text rows, sparks only). `forgeBuy`/`forgeHammer` are trailer placeholders.
+- Observed on `demo_campaign.json` (main map, `?skipTrailer`): the pair spawns ~470 px apart and the cable snaps on the first frame. Spawn code was not touched by this slice; not confirmed on `main`.
+
+## Início — fatia 3 `feat/saw-drag` (2026-10-29)
+Branch from `feat/anvil-forge`. Task: `.agents/tasks/2026-10-29-saw-drag/`. `feat/scrap-chest` and `feat/anvil-forge` pushed to origin; no PR opened yet (no `gh` CLI on this machine). `feat/room-fog` was discarded at the user's request (last commit `782f9e8`, plus a stash `backup room-fog working tree before discard`).
+- Done: drag the dropped saw (hold interact, short cable, slower walk, no dash, snaps after the drag distance, partner arriving reconnects) and the Peso upgrade (2 → 3 → 4 tiles, 40% → 55% → 70%). See `systems/weapons.md` → Dragging the saw.
+- Known limits: the short cable art is a placeholder (stroked curves, almost hidden at 46 px); the dragged saw stops at holes/walls instead of sliding around them; holding interact near the anvil or a chest also triggers their tap on the first frame.
+
+## Início — fatia 4 `feat/room-events` (2026-10-29)
+Branch from `feat/saw-drag`. Task: `.agents/tasks/2026-10-29-room-events/`. ADRs 0011 (room events) and 0012 (run progression).
+- Done: editor zones, bars, encounters, cage/rope interactives; `RoomEvents` + `CageEncounter` + `InicialRoomScript`; Salão encounter in `inicial.json` (zones bigorna/salao/topo, 4 waves per the design, ropes with cages at 16,15 auto / 3,10 / 4,16 / 27,10 (redesign: one cage per vertical rope, no central cage), bars at row 18 cols 15–17 and row 9 cols 23–25, Baú 2 with 15 at 14,12, `encounter: "salao"`). The map commit also carries Baú 1 at (22,27), moved by the user.
+- Deviations from the design: the north corridor is cols 23–25 in the current map (design said 21–24); loose enemies placed in a room still spawn on entry.
+- Known limits: cage, ropes, stakes and debris have hand-made pixel art (`assets/cage/`); the bars are still a procedural placeholder; enemy navigation ignores bars; a room script is keyed by the room name.
+- Game feel pass (2026-10-29): cut only by the saw disc on the stake (highlighted with ring + warm light, stays after the cut); warn → fall → impact with hit stop, shake, zoom punch, flash, dust and a push on the players; enemies jump out of the debris onto reachable floor tiles (BFS on `kinds 'f'`, never across bars, which fixes enemies landing behind walls); the encounter chest falls next to the last cut stake when the last wave dies; ropes/cages drawn under the lighting; Editor 2.0 camera 20% closer (`DEMO.cameraZoom` 1.2). Verified with stepped Electron captures; not play-tested by hand, sounds reuse existing cues (`sawSnap`, `sawLand`, `forgeHammer`, `enemySpawn`, `enemyStep`) and were not listened to.
+
+## Início — fatia 5 `feat/inicio-map` (2026-10-29)
+Branch from `feat/room-events`. Task: `.agents/tasks/2026-10-29-inicio-map/`.
+- Done: `map/demo/active.json` → `inicial.json` (normal boot plays the Início); placeholder rooms `0,1` botas (left door), `2,1` penhasco (right door), `1,0` boss (behind the gate, `requires: "bossKey"`, so it stays locked); `connections` added so the map passes `validatePlayable`; locked boss gate highlighted with a pulsing red light; dialogue script of design §6 wired (`InicialRoomScript`, `Game._onSawReconnect`), each line once per run.
+- Known limits: the placeholder rooms are empty 14×9 rooms (content out of scope); only the boss gate is locked, the Botas and Penhasco doors stay open (user decision); button icons per device in the bubbles are still literal "[E]"; after a run death before the first connection the `talk.connected.*` lines no longer play; `demo_campaign.json` is no longer the boot map (still reachable from Editor 2.0).
+- Verified with a stepped Electron run on `http://localhost:8000/index.html?skipTrailer` (served by `serve.py`); not checked in the packaged `app://` build.
+
+## Integrated main and feat/flame-golem (2026-10-29)
+Merged main0368672 and Arauto featureb7272f7 locally, preserving both histories. Combined Ghostfire/forge/scrap/chests/events/double-saw with Arauto physics/effects/audio/cinematics. Resolved7files; final tether solver now respects mainprops/bars and split saw uses actualdiscs for collision/audio/damage. Camera preserves featureverticalmargin and mainzoom multiplier. check39/40test suites; only prior gridassert/unlistedmapfailures. Actual mainGameboot and Arauto phase scene rendered without consoleerrors. Task2026-10-29-merge-flame-golem-main. No remote push performed.

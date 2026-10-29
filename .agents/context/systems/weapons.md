@@ -42,7 +42,23 @@ The only weapon is a saw disc riding the midpoint of the cable that chains P1 an
 6. Render: `chain.drawChain` before entities; `chain.draw` between entities with `y <= sawY` and `y > sawY` (depth sort around the disc); `chain.drawDropped`.
 
 ## Config knobs
-SawWeapon module constants (top of `SawWeapon.js`); Chain options in `Game` constructor; `PLAYER_SAFE_ZONE`, `HIT_SLOWMO` in `GameConfig.js`; motor constants at top of `SawMotorAudio.js`; cues `sawHit`, `sawSnap`, `sawLand`, `sawPickup`, `sawMotor` (loop, `volume 0.38`) in `js/config/AudioConfig.js`.
+SawWeapon module constants (top of `SawWeapon.js`); Chain options in `js/config/ChainConfig.js` (`CHAIN`); forge upgrades in `js/config/ForgeConfig.js`; `PLAYER_SAFE_ZONE`, `HIT_SLOWMO` in `GameConfig.js`; motor constants at top of `SawMotorAudio.js`; cues `sawHit`, `sawSnap`, `sawLand`, `sawPickup`, `sawMotor` (loop, `volume 0.38`) in `js/config/AudioConfig.js`.
+
+## Forge upgrades (Editor 2.0 maps, `feat/anvil-forge`)
+`applySawUpgrades(forge, chain, weapon, CHAIN)` (`js/systems/ForgeState.js`) turns bought levels into parameters; `Game._applySawUpgrades` calls it after each purchase and in `newDungeon`.
+- **Tamanho** (3 levels, 8/14/22): `weapon.sizeScale = 1 + 0.2·level`. `discRadius` (disc hits), `collisionRadius` and the drawn size (connected, dropped, `drawAt`) scale with it. The cable hit width (`hitThreshold` 14) does not.
+- **Elasticidade** (3 levels, 8/14/22): `strainDistance` and `breakDistance` × `1 + 0.15·level`.
+- **Serra dupla** (1 level, 30): `weapon.doubleSaw`. `Chain.update` feeds `weapon.setStretch(dist / breakDistance)`. At `splitAt` (0,85) the target becomes split, at `mergeAt` (0,7) whole again (hysteresis); `split` eases 0→1 over `splitSteps` (12). While split, `getSawPositions` returns two discs at t = 0,5 ∓ k/6 of the cable (1/3 and 2/3 when fully split). One-frame flags `justSplit`/`justMerged` → `Game._sawSplitFeedback` (pitched `sawLand`, shake 3, spark bursts). A dropped saw is never split. 85% of 240 = 204 px is above `strainDistance` 165, so while the saw is split (`weapon.split > 0`) `Chain.update` does not raise `strain` (it is held, not reset); only `breakDistance` snaps the cable in that band.
+- `CombatSystem.resolveWeaponHits` and the saw collision in `Game._updateGameplay` loop over every saw position; the drop point (`Chain._sawCenter`) and the render split use the mean of the discs; sparks, blood pickup and the light still use `[0]`. While the saw is absent `Chain.update` returns early with `spin = 0`, so the motor stays silent; `pickup()` clears the split.
+- `playReconnect(scale = 0.5)`: the first reconnect after the forge uses `SAW_CINEMATIC.firstReconnectScale` (1,1). `drawAt(ctx, x, y, { rotation, sx, sy, glow })` draws a loose disc for the cinematic.
+
+## Dragging the saw (`SawDrag`, Editor 2.0 maps, `feat/saw-drag`)
+- Only with the saw present, the cable snapped, the saw dropped and not thrown, and not while the fresh saw sits on the anvil / the forge menu or cinematic is up (`canDrag`).
+- A player within `SAW_DRAG.grabRadius` (70 px) holds their interact key for `grabSteps` (14) → attached. A tap does nothing (taps belong to chests/forge/dialogue). The prompt bar shows `drag.prompt` while someone is in range.
+- While attached: that player walks at `dragSpeed[level]` (`Player.update({ speedScale })`) and cannot dash; the saw is pulled to stay within `ropeLength` (46 px, less than `CHAIN.pickupRadius` 60, so the partner arriving reconnects normally through `Chain._canReconnect`). `dropSpin = 0` (no spin; a dropped saw never cuts). The saw does not enter holes or wall boxes (`Game._sawDragBlocked`) and is clamped to the arena; stretched more than `ropeSlack` past the rope, the short cable snaps.
+- `traveled` (path of the saw) reaching `dragTiles[level]` tiles snaps the short cable: `sawSnap` at 1,35 rate, shake, sparks, `regrabSteps` cooldown, and the player must release the key before grabbing again. Releasing the key lets go without a snap.
+- **Peso** (`FORGE.recipes.weight`, 2 levels, 10/18): drag distance 2 → 3 → 4 tiles, dragger speed 40% → 55% → 70% (`sawDragStats(forge, TILE)`). Offered by default anvils.
+- Short cable drawn by `SawDrag.drawRope` right after `chain.drawChain` (placeholder: two stroked curves).
 
 ## Invariants & gotchas
 - Code assumes `getSawPositions(...)[0]` exists whenever the method exists (Game render and FX index `[0]` without checks).
@@ -69,3 +85,6 @@ Regression: `tests/test_chain_obstacles.js`. Game feel/visual alignment not obse
 This supersedes the initial rigid resistance/motor load tuning: `CHAIN_COLLISION` now uses friction .03, inwardResistance .25, compression8, correctionStrength .25 and correctionPerStep2. Soft correction budget resets in beginStep and is shared by all resolve calls in a simulation step. Penetration beyond compression still receives hard correction to prevent crossing. Velocity reduction/friction applies once per enemy/step; lateral slide remains. Compression within tolerance is successful and cannot cause a pinch drop by itself.
 `ChainObstacleSystem` no longer modifies spin. `SAW_CONTACT` in `SawWeaponConfig.js` defines minimumSpin .7, activationSpin .35, holdSteps8. SawWeapon sustains an already active motor from physical obstacle contacts or accepted enemy hits, including ordinary enemies. Drop/pickup clear hold; an idle motor never starts from contact alone. Natural deceleration resumes after contact grace ends. Thrown-saw bounce remains unchanged.
 Tests: test_chain_obstacles.js. Gameplay feel not observed.
+
+### Arauto and double-saw integration (2026-10-29)
+ChainObstacleSystem samples cable separately from actual getSawPositions discs, so split mode has no phantom midpoint disc. Both real discs can resist the boss; CombatSystem preserves either-disc hits and material surface contacts. Game final boss/tether constraints reapply room props, event bars, walls and roomclamps to prevent pushing players into main's solids. Regression test_arauto_double_saw.js.

@@ -59,6 +59,8 @@ Web Audio graph: `loop gain → _duckNode → _preNode → _masterNode → desti
 - `buttonPress` (×1.12 when all pressed), `buttonRelease` `Game._buttonFeedback`; `arrowFire` `Game._arrowTrapFeedback` (distance attenuation 160..640 px → ×1..×0.35)
 - `playerStep` also at dash landing (`Game._dashLandFeedback`, rate × `PLAYER_DASH.landStepRate`).
 - `playerDash` `Game._dashFeedback` on `player.justDashed`. PLACEHOLDER: reuses the `arrow-fire-0N.wav` files at `rate` 1.45 until a real whoosh exists.
+- `scrapPickup` `ScrapSystem._playPickup` (streak: +3% rate per pickup within 900 ms, up to 10); `chestOpen` `ChestSystem.update`; `voiceBlip` `DialogueSystem._blip` (rate 0.92 Amarelo / 1.18 Azul, ±5%). PLACEHOLDERS: all three reuse trailer files (`assets/audio/trailer/pop-0N`, `thunk-0N`, `blip-0N`) until real assets exist.
+- `forgeBuy` `ForgeSystem.buy` (placeholder `trailer/sting.wav`); `forgeHammer` `SawForgeCinematic.update`, rate +6% per hit (placeholder `trailer/impact-0N`). `sawLand` also on the cinematic landing and, pitched up, on Serra dupla split/merge (`Game._sawSplitFeedback`).
 - `uiMove`, `uiConfirm` `PixelButton`/`PixelSlider`; `uiOpen`/`uiClose`/`uiConfirm` `Game.setPaused`, `_pollMenuPad`, `_bindButtons`
 - Loops: `ambience` (`setLoopLevel` −12 dB paused, −10 dB game over, 0 on resume/new dungeon), `sawMotor` (LoopVoice)
 - Ducks: sawHit −7, sawSnap −9, playerFall −8, playerHit −6, sawPickup −4 dB.
@@ -104,3 +106,6 @@ Saw/stone cue gain is .78 (was .35); spin exponent .5 (was1.2); cutoff4500..1400
 
 ### Current contact/dash timbres (2026-10-29)
 This supersedes the initial grinding/wind-floor-scrape palette. Contactloop now comprises10irregular short dry crack/stone-click transients with audible gaps, responding to contact/spin through the unchanged controller. Dash uses deterministic filtered wind (55..1300Hz plus lowbody) rather than the earlier whoosh/stone material; 0.2slaunch variants and0.6scontinuousloop, runtime cutoff3kHz and loopgain .45. Cue description/source table updated. Rebuild via scripts/build-arauto-audio.mjs; ground/slam layers unchanged. New waveform checks distinguish percussive contact from continuous wind. ActualGame recording has no saturated samples/errors; subjective listening pending. Isolated demos _local/arauto-contact-estalos.wav and _local/arauto-dash-vento.wav.
+
+### Double-saw merge compatibility (2026-10-29)
+ArautoAudio tests all actual getSawPositions discs for rockcontact, supporting the forge's Serra dupla. Cue/volume/timbre unchanged by merge. Game activity gate combines hasSaw, forge/sawcinematic and Arauto scene states. Regression test_arauto_double_saw.js.

@@ -44,6 +44,16 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `holes` | HoleEffects | js/systems/HoleEffects.js | dust/crumbs inside holes, falling-player clip + darken |
 | `lighting` | LightingRenderer | js/systems/LightingRenderer.js | pushes lights into postProcessor |
 | `gameLoop` | GameLoop | js/core/GameLoop.js | fixed-step loop, pause, hit slow-mo |
+| `roomProps` | RoomProps | js/systems/RoomProps.js | Editor 2.0 animated props: floor layer, solid props (base collision + y-sort). `null` without `mapData` |
+| `scrap` | ScrapSystem (+ ScrapWallet, ScrapPickup) | js/systems/ScrapSystem.js | shared scrap pot, pickups (arc, rest, magnet, vacuum). `null` without `mapData` |
+| `scrapCounter` | ScrapCounter | js/ui/ScrapCounter.js | top-center HUD counter. `null` without `scrap` |
+| `chests` | ChestSystem | js/systems/ChestSystem.js | proximity chests, open-once state, scrap burst. `null` without `scrap` |
+| `forge` | ForgeState | js/systems/ForgeState.js | bought recipes/levels this run (reset in `newDungeon`) |
+| `forgeSystem` / `forgeMenu` | ForgeSystem / ForgeMenu | js/systems/ForgeSystem.js, js/ui/ForgeMenu.js | anvil proximity, open/close, shared cursor, purchase; canvas menu. `null` without `scrap` |
+| `sawDrag` | SawDrag | js/systems/SawDrag.js | drag the dropped saw with a short cable (hold interact), Peso stats. Updated after the players, before `chain.update`. `null` without `mapData` |
+| `roomEvents` | RoomEvents (+ CageEncounter, roomScripts/*) | js/systems/RoomEvents.js | per-room scripts (ADR 0011): zones, encounters, bars (collision + y-sorted draw), completed events; updated after `chests.update`. `null` without `mapData` |
+| `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | ~3,8 s craft cutscene (letterbox, camera focus, hammer hits, saw jump). `null` without `scrap` |
+| `dialogue` | DialogueSystem | js/systems/DialogueSystem.js | speech bubbles queue, typewriter, voice blips (`window.dialogue` debug global). `null` without `mapData` |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
 
 Also global singletons: `MasterVolume` (js/core/MasterVolume.js, localStorage key `dungeonChained.masterVolume`, `gain = v²`), `UiSound` (`setUiAudio`/`playUi`). `HeartPickup.sheet` is a static set in the Game constructor.
@@ -57,6 +67,8 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 ## `Game._step(dt)` state dispatch
 
 - `gameOver` → no simulation (render continues).
+- `sawCinematic.active` → `_updateSawCinematic`: cinematic timeline, players held still, particles, camera (DemoCamera `focus`). Nothing else simulates.
+- `forgeSystem.open` → only the camera updates; the menu reads input per frame in `_pollMenuPad` (`forgeSystem.handleInput(menuPad hit)`), Esc and Start close it instead of pausing.
 - `transition` (door fade `{phase:"out"|"in", t}`, `t += TRANSITION_SPEED` per step) → `_updateTransition`; at `out` end calls `transitionThroughDoor(door)`.
 - `roomIntro` (`{phase:"zoomIn"|"hold"|"zoomOut"}`) → `_updateRoomIntro`: players frozen, intro zoom, enemies spawned frozen with staggered `beginFrozenSpawn`, flame bursts.
 - else `_updateGameplay`.
@@ -69,35 +81,37 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 5. `enforceSeparationLimit()` (hard cap `MAX_PLAYER_SEPARATION` while connected).
 6. `room.challenge.update` + button/arrow-trap audio feedback.
 7. `combat.updateEnemies`.
-8. 3 iterations: `Physics.resolveEntityCollisions` + saw disc as circle obstacle; then `Physics.resolveBoxCollisions` vs `room.wallBoxes`; `enemy.ensureOnWalkableTile`.
+8. 3 iterations: `Physics.resolveEntityCollisions` + saw disc as circle obstacle; then `Physics.resolveBoxCollisions` vs `room.wallBoxes`; `roomProps.resolveCollisions` (feet vs solid prop bases); `enemy.ensureOnWalkableTile`.
 9. `rooms.clampEnemy` / `rooms.clampPlayer` (door openings passable only when unlocked; the passable width is `door.passHalfWidth`, narrower than the door for the boss gate, `DEMO.gatePassHalfWidth`).
 10. `tiles.checkHoleFalls`; first frame of fall → audio + `_dropSawOnFall` (forced chain drop); then `holes.update([p1, p2])` (also called with no players during the room intro).
 11. `combat.resolveWeaponHits` (hit → slow-mo), `combat.resolveDeaths` (gibs, screen gore).
-12. `_updateHearts` (pickup if `lives < 3`), gibs update, `effects.update`, damage detection via `p._livesSeen`, `screenGore.update`.
+12. `resolveDeaths` also calls `scrap.dropFromEnemy(enemy)`. `_updateHearts` (pickup if `lives < 3`), `chests.update`, `scrap.update`, gibs update, `effects.update`, damage detection via `p._livesSeen`, `screenGore.update`.
 13. `rooms.tryClearCurrent()` → door flash, zoom punch, `hud.onRoomCleared`.
 14. `particleSystem.update`, `wind.update`.
-15. Death check: `p1.lives <= 0 || p2.lives <= 0` → `gameOver`, `deathScreen.show()`.
-16. `_checkDoorTransition` (both players aligned and inside door depth; disabled in playtest) → `_updateCameraToCurrentRoom`.
+15. Death check: `p1.lives <= 0 || p2.lives <= 0` → on maps with an anvil `_respawnRun()` (ADR 0012), otherwise `gameOver`, `deathScreen.show()`.
+16. `thrownSaw.update`, `dialogue.update`, `demoProgress.update`, `demoEncounter.update`.
+17. `_checkDoorTransition` (both players aligned and inside door depth; disabled in playtest) → `_updateCameraToCurrentRoom`. `transitionThroughDoor` first credits chests still opening (`chests.flushPending`) and leftover floor scrap (`scrap.collectAll`).
 
 ## `Game._render()` order (verified)
 
 World pass (inside `renderer.beginFrame()` camera transform, clipped to room rect + `DOOR_STUB_TILES`):
 1. `drawBackground(BACKGROUND_TILE)` (before clip, fills view).
-2. `drawRoom` (floor incl. auto-tiled holes, walls, props, torches, closed door tiles).
+2. `drawRoom` (floor incl. auto-tiled holes, walls, static tile props, torches, closed door tiles), then `roomProps.drawFloor` (animated props without `base`) and `demoProgress.draw`.
 3. If open: `drawDoorStubs`, `drawDoorGradients`. Then `demoDoors.drawGates` (boss gate sprite, under the entities so players walk in front of it).
 4. `holes.draw` (motes clipped to hole tiles) → `challenge.drawFloorLayer` → `particleSystem.drawFloor` (blood canvas; masked by `tiles.darkHoleRects()`) → `effects.draw` (footprints) → `challenge.drawButtons` → `particleSystem.drawSmoke`.
-5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce; skipped while falling) and visible enemies (r 13).
+5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce; skipped while falling) and visible enemies (r 13), `scrap.drawShadows`.
 6. `chain.drawChain` (cable).
-7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders]` sorted by `y`; a falling player goes through `holes.drawFalling`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.
+7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders, ...roomProps.drawables]` sorted by `y`; a falling player goes through `holes.drawFalling`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.
+7b. `sawCinematic.drawWorld` → `roomEvents.drawAir` (ropes, falling cages and chest; lit by the ambient).
 8. `particleSystem.drawFlames` → `challenge.drawWallLayer` → `renderer.drawFrontWall` (bottom row redrawn over entities) → `demoDoors.draw` (closed normal door tiles of authored maps) → gibs → `challenge.drawAirLayer` → `particleSystem.drawAir` → wind if `WIND.layer === "world"`.
 9. `ctx.restore()`, `renderer.endFrame()`.
 
 Screen passes:
-10. `lighting.render({...})` (queues lights into postProcessor in screen space).
+10. `lighting.render({...})` (queues lights into postProcessor in screen space), then `ghostfire.renderLights` and `roomEvents.renderLights` (stake lights from the room script's `lights()`).
 11. `postProcessor.setVignetteBreath(chain strain)`, `postProcessor.draw()` (light map + vignette).
-12. Hearts overlay (`beginOverlayWorld` → `heart.drawOverlay`), drawn above darkness.
+12. Overlay world pass (`beginOverlayWorld`), above darkness: `scrap.drawOverlay`, `heart.drawOverlay`, damage numbers.
 13. Wind if `WIND.layer === "screen"`.
-14. `_renderOverlays`: `screenGore.draw` → door transition black fade → `hud.draw`.
+14. `_renderOverlays`: `screenGore.draw` → `dialogue.draw` (speech bubble) → door transition black fade → `hud.draw` → `scrapCounter.draw`.
 
 DOM overlays above canvas: `#death-screen` (z 40), `#pause-screen` (z 45), `#loading-screen` (z 100).
 
@@ -113,7 +127,12 @@ Global keys (`Game._bindButtons`): `Esc` pause toggle, `T` cycle tileset variant
 - `EntityConfig.js`: `playerConfigs(assets)`, enemy sprite configs, `ENEMY_TYPES`, `ENEMY_TYPE_BY_KEY`.
 - `TinyRpgEnemies.js`: data for extra enemy sprite sheets (used by AssetLoader + EntityConfig).
 - `AudioConfig.js`: clips, loops, mix.
-- Not in config (hardcoded): Chain params in `Game` constructor; player speed/lives/invuln in `Player`; Renderer camera lerp factors.
+- `ScrapConfig.js`: `SCRAP` (rest, magnet, burst arcs, drops per enemy type, chest default/max, placeholder frames), `CHEST` (open radius, burst, squash), `chestScrapAmount(prop)`.
+- `DialogueConfig.js`: `DIALOGUE` (typing speed, hold time, blip rates per player, default HUD expression, `enabled` switch).
+- `PropConfig.js`: `ANIMATED_PROPS` (+ `base` footprint for solid props, `opens` for chests), `PROP_COLLISION`.
+- Game text: `js/i18n/pt-BR.js` / `en.js`, read with `t(key)` (ADR 0013).
+- `ChainConfig.js`: `CHAIN` (cable tuning). `ForgeConfig.js`: `FORGE` (catalog: costs, per-level effects, open radius, default recipes), `anvilRecipes(prop)`, `SAW_CINEMATIC` (timeline).
+- Not in config (hardcoded): player speed/lives/invuln in `Player`; Renderer camera lerp factors.
 
 ## Module dependency rules observed
 

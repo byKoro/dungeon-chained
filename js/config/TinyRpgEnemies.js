@@ -661,7 +661,7 @@ export const TINY_RPG_ENEMIES = [
     FLAME_GOLEM_SPRITE,
     {
         "key": "ghostfire",
-        "label": "Fogo Fantasma (Voador)",
+        "label": "Ghostfire (Boss do trailer)",
         "src": "assets/enemies/ghostfire.png",
         "cellSize": 100,
         "cropX": 33,

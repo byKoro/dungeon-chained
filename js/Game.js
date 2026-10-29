@@ -4,7 +4,23 @@ import { DemoProgress } from './systems/DemoProgress.js';
 import { DemoCamera } from './systems/DemoCamera.js';
 import { DemoDoors } from './systems/DemoDoors.js';
 import { ThrownSaw } from './systems/ThrownSaw.js';
+import { ScrapSystem } from './systems/ScrapSystem.js';
+import { ChestSystem } from './systems/ChestSystem.js';
+import { DialogueSystem } from './systems/DialogueSystem.js';
+import { SCRIPT_LINES } from './config/DialogueConfig.js';
+import { SCRAP } from './config/ScrapConfig.js';
+import { CHAIN } from './config/ChainConfig.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
+import { SawDrag } from './systems/SawDrag.js';
+import { RoomEvents } from './systems/RoomEvents.js';
+import { RUN_DEATH } from './config/EventsConfig.js';
+import { ForgeSystem } from './systems/ForgeSystem.js';
+import { ForgeMenu } from './ui/ForgeMenu.js';
+import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
+import { FORGE, SAW_CINEMATIC } from './config/ForgeConfig.js';
+import { t } from './i18n/I18n.js';
 import { PropSprites } from './core/PropSprites.js';
+import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
 import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
@@ -28,6 +44,7 @@ import { BloodCanvas } from './particles/BloodCanvas.js';
 
 import { PlayerFactory } from './entities/PlayerFactory.js';
 import { SpawnSystem } from './systems/SpawnSystem.js';
+import { GhostfireSystem } from './systems/GhostfireSystem.js';
 import { ParticleEffects } from './systems/ParticleEffects.js';
 import { CombatSystem } from './combat/CombatSystem.js';
 import { RoomManager } from './rooms/RoomManager.js';
@@ -40,6 +57,7 @@ import { LightingRenderer } from './systems/LightingRenderer.js';
 import { HoleEffects } from './systems/HoleEffects.js';
 import { VtuberHud } from './ui/VtuberHud.js';
 import { BossHealthBar } from './ui/BossHealthBar.js';
+import { ScrapCounter } from './ui/ScrapCounter.js';
 import { DeathScreen } from './ui/DeathScreen.js';
 import { PauseScreen } from './ui/PauseScreen.js';
 import { setUiAudio, playUi } from './ui/UiSound.js';
@@ -53,8 +71,10 @@ import {
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
-    SIM_STEP, PLAYER_SAFE_ZONE, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
+    SIM_STEP, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
 } from './config/GameConfig.js';
+
+const feetSortKey = d => d.feetSortY ?? d.footY ?? d.y + HOLE_FALL.footOffset;
 
 export class Game {
     constructor(canvas, opts = {}) {
@@ -134,20 +154,12 @@ export class Game {
         });
 
         this.chainObstacles = new ChainObstacleSystem();
-        this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], {
-            rest: 130,
-            stiffness: 0.02,
-            breakDistance: 240,
-            strainDistance: 165,
-            strainLimit: 30,
-            reconnectDistance: 110,
-            pickupRadius: 60,
-            snapImpulse: 12,
-            playerSafeZone: PLAYER_SAFE_ZONE
-        });
+        this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], CHAIN);
+        this.forge = new ForgeState();
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
         this.spawnSystem = new SpawnSystem({ assets: this.assets, bloodCanvas: this.bloodCanvas });
+        this.ghostfire = new GhostfireSystem({ spawnSystem: this.spawnSystem, particleSystem: this.particleSystem, renderer: this.renderer, audio: this.audio });
         this.arautoEffects = new ArautoEffects({ renderer: this.renderer, particleSystem: this.particleSystem });
         this.arautoAudio = new ArautoAudio({ audio: this.audio });
         this.arautoScene = new ArautoPhaseScene({ renderer: this.renderer, hud: this.hud,
@@ -172,6 +184,69 @@ export class Game {
             this.gameOver = true; this._gameOverAt = performance.now(); this.demoVictory.show();
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
+        this.roomProps = this.animatedProps ? new RoomProps({
+            rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this.chests?.frameFor(prop, key),
+            isHidden: (prop, key) => !!this.chests?.isHidden(key, prop)
+        }) : null;
+        const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
+        this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
+        this.scrapCounter = this.scrap ? new ScrapCounter({ getAmount: () => this.scrap.amount, frames: scrapFrames }) : null;
+        this.chests = this.scrap ? new ChestSystem({
+            rooms: this.rooms, scrap: this.scrap, getPlayers: () => [this.p1, this.p2], input: this.input,
+            audio: this.audio, particleSystem: this.particleSystem,
+            onOpen: () => {
+                this.forgeSystem?.latchInteract();
+                this.dialogue?.latchInteract();
+                this.demoProgress.held = [true, true];
+            }
+        }) : null;
+
+        this.dialogue = this.mapData ? new DialogueSystem({
+            getPlayers: () => [this.p1, this.p2], input: this.input, audio: this.audio,
+            onLineStart: (i, expr, dur) => this.hud.speak(i, expr, dur),
+            onBlip: (i) => this.hud.talkBlip(i)
+        }) : null;
+        if (this.dialogue && typeof window !== "undefined") window.dialogue = this.dialogue;
+
+        this.roomEvents = this.mapData ? new RoomEvents({
+            rooms: this.rooms, spawnSystem: this.spawnSystem, getPlayers: () => [this.p1, this.p2], chain: this.chain,
+            scrap: this.scrap, chests: this.chests, dialogue: this.dialogue, audio: this.audio,
+            particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets,
+            hooks: {
+                hitStop: s => this.gameLoop?.triggerHitStop(s),
+                propsChanged: room => this.roomProps?.invalidate(room),
+                drawPropFrame: (ctx, type, frame, dx, dy, sx, sy) => this.animatedProps?.drawFrame(ctx, type, frame, dx, dy, TILE, false, sx, sy)
+            }
+        }) : null;
+        // Mapas com bigorna seguem a regra de morte da run (ADR 0012): renascer no início em vez de game over.
+        this._runRules = !!this.mapData && Object.values(this.mapData.map.rooms).some(r => (r.props || []).some(p => p.type === "anvil"));
+        this._respawnFadeAt = -Infinity;
+
+        this.forgeSystem = this.scrap ? new ForgeSystem({
+            rooms: this.rooms, getPlayers: () => [this.p1, this.p2], input: this.input,
+            forge: this.forge, scrap: this.scrap, audio: this.audio,
+            canOpen: () => !this.transition && !this.gameOver && !this.rooms.current.enemies.some(e => e.state !== "dying"),
+            onOpen: () => {
+                for (const p of this.players) { p.vx = 0; p.vy = 0; p.cancelDash(); }
+                this.dialogue?.latchInteract();
+                this.demoProgress.held = [true, true];
+            },
+            onClose: () => { for (const p of this.players) p.latchDashKey(); },
+            onBuy: (id, result, anvil) => this._onForgeBuy(id, anvil)
+        }) : null;
+        this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
+        this.sawDrag = this.mapData ? new SawDrag({
+            chain: this.chain, getPlayers: () => [this.p1, this.p2], input: this.input,
+            getStats: () => sawDragStats(this.forge, TILE),
+            isBlocked: (x, y) => this._sawDragBlocked(x, y),
+            getBounds: () => this.arenaBounds,
+            canDrag: () => !this._sawOnAnvil && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
+        }) : null;
+        this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
+            renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
+            getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
+        }) : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
@@ -310,7 +385,7 @@ export class Game {
         window.addEventListener("keydown", (e) => {
             if (e.repeat) return;
             const k = e.key.toLowerCase();
-            if (k === "escape") this.togglePause();
+            if (k === "escape") { if (!this.forgeSystem?.open) this.togglePause(); }
             else if (k === "t") this.cycleTileset();
             else if (k === "r") this.restart();
 
@@ -385,6 +460,7 @@ export class Game {
             }
             return;
         }
+        if (this.forgeSystem?.open && !this.gameLoop.paused) { this.forgeSystem.handleInput(hit); return; }
         if (hit.start) { this.togglePause(); return; }
         if (!this.gameLoop.paused) return;
         if (hit.up) this.pauseScreen.move(-1);
@@ -411,6 +487,17 @@ export class Game {
         this.demoDoors.opened.clear();
         this.demoVictory.hide();
         this.demoEncounter.reset();
+        this.scrap?.reset();
+        this.scrapCounter?.reset();
+        this.chests?.reset();
+        this.dialogue?.clear();
+        this.forgeSystem?.reset();
+        this.sawDrag?.reset();
+        this.roomEvents?.reset();
+        this._respawnFadeAt = -Infinity;
+        this.sawCinematic?.reset();
+        this._sawOnAnvil = false;
+        this._sawFirstConnect = false;
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -429,7 +516,10 @@ export class Game {
 
         this.audio.setLoopLevel("ambience", 0, 1500);
 
-        this.chain.reset();
+        const startsWithSaw = this._startsWithSaw();
+        this.chain.reset({ present: startsWithSaw });
+        this.forge.reset({ items: startsWithSaw ? ["saw"] : [] });
+        this._applySawUpgrades();
 
         this.rooms.enter();
         this.arenaBounds = this.rooms.currentBounds;
@@ -463,8 +553,121 @@ export class Game {
         this._activateRoomEnemies();
     }
 
+    // Mapas cuja bigorna oferece a Serra começam sem ela; o teste do editor pode forçar qualquer estado.
+    _startsWithSaw() {
+        if (!this.mapData) return true;
+        const forced = this.mapData.test?.progress?.saw;
+        if (typeof forced === "boolean") return forced;
+        return !mapOffersRecipe(this.mapData.map, "saw");
+    }
+
+    _applySawUpgrades() {
+        applySawUpgrades(this.forge, this.chain, this.chain.weapon, CHAIN);
+    }
+
+    _onForgeBuy(id, anvil) {
+        this._applySawUpgrades();
+        if (id !== "saw") return;
+        this.forgeSystem.close({ silent: true });
+        this.sawCinematic.start(anvil);
+    }
+
+    // Fim da cinemática: a serra fica em cima da bigorna até os dois chegarem perto.
+    _onSawForged(anvil) {
+        const top = this.sawCinematic.anvilTop;
+        this.chain.spawnSaw(top.x, top.y);
+        this.chain.weapon.dropT = 1;
+        this._sawOnAnvil = true;
+        this._sawAnvilSortY = this.roomProps?.solid.find(s => s.prop === anvil.prop)?.feetSortY ?? top.y;
+        this._sawFirstConnect = true;
+        this.dialogue?.say(1, "talk.sawReady");
+    }
+
+    // Regra de morte da run (ADR 0012): a dupla volta ao spawn da sala inicial com as vidas cheias. A sucata zera;
+    // itens, melhorias, baús abertos e eventos concluídos ficam; o encontro interrompido recomeça.
+    _respawnRun() {
+        this.roomEvents?.onDeath();
+        this.scrap?.reset();
+        this.sawDrag?.reset();
+        this.dialogue?.clear();
+        this.forgeSystem?.close({ silent: true });
+        this.gibs = [];
+        this.particleSystem.clear();
+        const start = this.rooms.dungeon.graph.start;
+        if (this.rooms.dungeon.current !== start) {
+            this.rooms.transitionTo({ gx: start.gx, gy: start.gy });
+            this.bloodCanvas.clear();
+        }
+        this.arenaBounds = this.rooms.currentBounds;
+        const spawns = this.rooms.dungeon.spawnPositions();
+        for (const [p, s] of [[this.p1, spawns.p1], [this.p2, spawns.p2]]) {
+            p.lives = 3;
+            p.respawnAt(s.x, s.y, RUN_DEATH.invulnSteps);
+            p._livesSeen = p.lives;
+            p._fallSeen = false;
+        }
+        this._sawOnAnvil = false;
+        this._sawFirstConnect = false;
+        this.chain.reset({ present: this.forge.has("saw") });
+        this._rememberEntrySpawns();
+        this.renderer.camX = (spawns.p1.x + spawns.p2.x) / 2;
+        this.renderer.camY = (spawns.p1.y + spawns.p2.y) / 2;
+        this.renderer.resetSway();
+        this._respawnFadeAt = performance.now();
+        this.screenGore.triggerFlash();
+        this.audio.play("playerFall", { rateMultiplier: 0.8 });
+    }
+
+    // A serra arrastada não entra em buraco nem em parede (o disco tem o raio de colisão da serra).
+    _sawDragBlocked(x, y) {
+        if (this.tiles.isHoleAtWorld(x, y)) return true;
+        const r = this.chain.weapon?.collisionRadius ?? 16;
+        return [...(this.rooms.current?.wallBoxes || []), ...(this.roomEvents?.solidBoxes() ?? [])].some(b =>
+            Math.hypot(x - Math.max(b.x, Math.min(x, b.x + b.w)), y - Math.max(b.y, Math.min(y, b.y + b.h))) < r);
+    }
+
+    _onSawReconnect() {
+        const first = this._sawFirstConnect;
+        this._sawFirstConnect = false;
+        this._sawOnAnvil = false;
+        this.renderer.triggerShake(first ? SAW_CINEMATIC.firstReconnectShake : 4);
+
+        this.audio.play("sawPickup");
+        this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
+        this._sawLandPending = false;
+
+        if (first) {
+            this.chain.weapon?.playReconnect?.(SAW_CINEMATIC.firstReconnectScale);
+            if (SCRIPT_LINES.enabled) {
+                this.dialogue?.say(0, "talk.connected.1");
+                this.dialogue?.say(1, "talk.connected.2");
+            }
+        } else {
+            this.chain.weapon?.playReconnect?.();
+        }
+    }
+
+    _updateSawCinematic(dt) {
+        this.sawCinematic.update(dt);
+        for (const p of this.players) { p.vx = 0; p.vy = 0; }
+        this.particleSystem.update([this.p1, this.p2], this.arenaBounds);
+        this._updateCameraToCurrentRoom(dt);
+    }
+
+    _sawSplitFeedback(weapon) {
+        if (!this.chain.isConnected || (!weapon?.justSplit && !weapon?.justMerged)) return;
+        const fx = FORGE.splitFeedback;
+        this.audio.play("sawLand", { rateMultiplier: weapon.justSplit ? fx.splitRate : fx.mergeRate });
+        this.renderer.triggerShake(fx.shake);
+        for (const s of weapon.getSawPositions(this.p1, this.p2)) {
+            this.particleSystem.triggerSparkBurst(s.x, s.y, weapon.discRadius, fx.sparks, fx.power);
+        }
+    }
+
     transitionThroughDoor(door) {
         this.bossBar.reset();
+        this.chests?.flushPending();
+        this.scrap?.collectAll();
         this.rooms.transitionTo(door);
         this.arenaBounds = this.rooms.currentBounds;
 
@@ -479,7 +682,12 @@ export class Game {
         this.p2.cancelDash();
         this._rememberEntrySpawns();
 
+        // Saindo com a serra ainda na bigorna, a troca de sala reconecta: toca a primeira conexão aqui.
+        const firstPickup = this._sawFirstConnect && this.chain.hasSaw && !this.chain.isConnected;
         if (!this.chain.isConnected) this.chain.reset();
+        this.sawDrag?.reset();
+        if (firstPickup) this._onSawReconnect();
+        this._sawOnAnvil = false;
 
         this.particleSystem.damageNumbers = [];
 
@@ -583,7 +791,8 @@ export class Game {
         if (!w) return;
         const state = {
             connected: this.chain.isConnected,
-            active: !this.gameOver && !this.transition && !this.roomIntro && !this.arautoScene.active && !this.gameLoop.paused,
+            active: this.chain.hasSaw && !this.gameOver && !this.transition && !this.roomIntro
+                && !this.arautoScene.active && !this.gameLoop.paused && !this.forgeSystem?.open && !this.sawCinematic?.active,
             timeScale: this.gameLoop.timeScale
         };
         this.sawMotor?.update(w.spinSpeed ?? 0, state);
@@ -634,7 +843,11 @@ export class Game {
 
     _step(deltaSeconds) {
         if (this.gameOver) return;
-        if (this.transition) {
+        if (this.sawCinematic?.active) {
+            this._updateSawCinematic(deltaSeconds);
+        } else if (this.forgeSystem?.open) {
+            this._updateCameraToCurrentRoom(deltaSeconds);
+        } else if (this.transition) {
             this._updateTransition();
         } else if (this.roomIntro) {
             this._updateRoomIntro(deltaSeconds);
@@ -747,8 +960,9 @@ export class Game {
         this.playerAI.update();
 
         const canDash = !this.chain.isConnected && (!this.mapData || this.demoProgress.state.dash);
-        p1.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p1) });
-        p2.update(this.input, this.arenaBounds, { canDash, feetInHole: this.tiles.feetInHole(p2) });
+        const drag = this.sawDrag;
+        p1.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(0), feetInHole: this.tiles.feetInHole(p1), speedScale: drag?.speedScaleFor(0) ?? 1 });
+        p2.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(1), feetInHole: this.tiles.feetInHole(p2), speedScale: drag?.speedScaleFor(1) ?? 1 });
         this._dashFeedback(p1);
         this._dashFeedback(p2);
 
@@ -758,6 +972,7 @@ export class Game {
         this.effects.processPlayer(p1);
         this.effects.processPlayer(p2);
 
+        this.sawDrag?.update();
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {
@@ -776,21 +991,14 @@ export class Game {
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
-            onReconnect: () => {
-                this.renderer.triggerShake(4);
-
-                this.audio.play("sawPickup");
-                this.audio.duck(-4, { attackMs: 20, holdMs: 120, releaseMs: 600 });
-                this._sawLandPending = false;
-
-                this.chain.weapon?.playReconnect?.();
-            },
+            onReconnect: () => this._onSawReconnect(),
 
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });
         this._updateSawLanding();
 
         const weapon = this.chain.weapon;
+        this._sawSplitFeedback(weapon);
         if (this.chain.isConnected && weapon?.isHighSpeed) {
             this.renderer.triggerShake(1.6);
         }
@@ -847,8 +1055,9 @@ export class Game {
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
         this.arautoEffects.update(enemies);
+        this.ghostfire.update(room, [p1, p2]);
 
-        const liveEnemies = enemies.filter(e => e.state !== "dying");
+        const liveEnemies = enemies.filter(e => e.state !== 'dying' && !e.isHidden && !e.airborne);
         const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies.filter(e => !e.ignoresEntityCollisions));
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
@@ -857,10 +1066,8 @@ export class Game {
             Physics.resolveEntityCollisions(allEntities);
             this.chainObstacles.resolve(this.chain, p1, p2, liveEnemies);
             if (sawR > 0) {
-
-                const sc = weapon.getSawPositions(p1, p2)[0];
-                for (const e of allEntities) {
-                    Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
+                for (const sc of weapon.getSawPositions(p1, p2)) {
+                    for (const e of allEntities) Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
                 }
             }
         }
@@ -870,6 +1077,9 @@ export class Game {
                 Physics.resolveBoxCollisions(entity, room.wallBoxes);
             }
         }
+        this.roomProps?.resolveCollisions([p1, p2, ...room.enemies]);
+        const barBoxes = this.roomEvents?.solidBoxes() ?? [];
+        if (barBoxes.length) for (const entity of [p1, p2, ...liveEnemies]) Physics.resolveBoxCollisions(entity, barBoxes);
 
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
 
@@ -880,10 +1090,7 @@ export class Game {
         rooms.clampPlayer(p2, this.arenaBounds, doors, canPass);
 
         const tetherClear = this.chainObstacles.resolve(this.chain, p1, p2, liveEnemies, () => {
-            for (const player of [p1, p2]) {
-                if (room.wallBoxes?.length) Physics.resolveBoxCollisions(player, room.wallBoxes);
-                rooms.clampPlayer(player, this.arenaBounds, doors, canPass);
-            }
+            this._constrainTetherPlayers(room, barBoxes, doors, canPass);
         });
         if (!tetherClear) this._dropSawSafely();
 
@@ -910,9 +1117,13 @@ export class Game {
         );
         this.combat.resolveDeaths(room, this.gibs, enemy => {
             if (!this.arautoEffects.owns(enemy)) this.screenGore.trigger();
+            this.scrap?.dropFromEnemy(enemy);
         }, [p1, p2]);
 
         this._updateHearts(room);
+        this.chests?.update();
+        this.roomEvents?.update();
+        this.scrap?.update([p1, p2], this.arenaBounds);
 
         for (let i = this.gibs.length - 1; i >= 0; i--) {
             this.gibs[i].update(this.arenaBounds);
@@ -956,7 +1167,9 @@ export class Game {
         this.particleSystem.update([p1, p2], this.arenaBounds);
         this.wind.update(this.arenaBounds);
 
-        if (p1.lives <= 0 || p2.lives <= 0) {
+        if ((p1.lives <= 0 || p2.lives <= 0) && this._runRules) {
+            this._respawnRun();
+        } else if (p1.lives <= 0 || p2.lives <= 0) {
             this.gameOver = true;
             this._gameOverAt = performance.now();
             this.deathScreen.show();
@@ -965,10 +1178,23 @@ export class Game {
         }
 
         this.thrownSaw.update();
+        // Antes das falas e dos interativos: abrir a bigorna consome o aperto de interagir.
+        this.forgeSystem?.update();
+        this.dialogue?.update(deltaSeconds);
         this.demoProgress.update(deltaSeconds);
         this.demoEncounter.update();
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
+    }
+
+    _constrainTetherPlayers(room, barBoxes, doors, canPass) {
+        const players = [this.p1, this.p2];
+        this.roomProps?.resolveCollisions(players);
+        for (const player of players) {
+            if (room.wallBoxes?.length) Physics.resolveBoxCollisions(player, room.wallBoxes);
+            if (barBoxes?.length) Physics.resolveBoxCollisions(player, barBoxes);
+            this.rooms.clampPlayer(player, this.arenaBounds, doors, canPass);
+        }
     }
 
     _updateHearts(room) {
@@ -1022,7 +1248,7 @@ export class Game {
     _checkDoorTransition(doors) {
 
         if (this.mapData ? this.mapData.test?.isolated : this.playtest) return;
-        if (this.rooms.isLocked() || this.transition) return;
+        if (this.rooms.isLocked() || this.transition || this.forgeSystem?.open) return;
         const { p1, p2, rooms } = this;
         for (const door of doors) {
             if (door.blocked) continue;
@@ -1041,12 +1267,14 @@ export class Game {
         if (this.mapData && this.demoCamera.mode === 'split' && !this.arautoScene.active) this.demoCamera.renderSplit(() => this._renderView());
         else this._renderView();
         this._renderOverlays();
-        if (this.mapData && !this.arautoScene.active) {
+        if (this.mapData && !this.arautoScene.active && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const message = this.demoProgress.messageTime ? this.demoProgress.message : this.demoProgress.prompt;
+            const promptKey = this.sawCinematic?.active ? null : (this.chests?.prompt || this.forgeSystem?.prompt || this.sawDrag?.prompt);
+            const message = this.demoProgress.messageTime ? this.demoProgress.message
+                : (this.demoProgress.prompt || (promptKey ? t(promptKey) : ""));
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
-            if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, this.canvas.width / 2, 24); }
+            if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, 12, 24); }
             ctx.restore();
         }
     }
@@ -1070,9 +1298,8 @@ export class Game {
 
         renderer.drawRoom(rect, this.arenaBounds, tiles, TILE, open, doors, doorHalf);
 
-        if (this.animatedProps) for (const p of tiles.props) {
-            if (p.type) this.animatedProps.draw(ctx, p.type, rect.x + p.col * TILE, rect.y + p.row * TILE, TILE, performance.now(), !!p.flip);
-        }
+        const nowMs = performance.now();
+        this.roomProps?.drawFloor(ctx, nowMs);
         this.demoProgress.draw(ctx);
         if (open) {
             renderer.drawDoorStubs(rect, doors, TILE, doorHalf, DOOR_STUB_TILES);
@@ -1087,6 +1314,8 @@ export class Game {
 
         this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
         this.effects.draw(ctx);
+        this.roomEvents?.drawFloor(ctx);
+        this.ghostfire.drawFloor(ctx, rooms.current);
         for (const enemy of rooms.current.enemies) enemy.drawAttackEffect?.(ctx);
 
         if (challenge) challenge.drawButtons(ctx);
@@ -1103,18 +1332,27 @@ export class Game {
         enemies.forEach(e => {
             if (e.isHidden) return;
             if (e.drawShadow) e.drawShadow(ctx);
-            else renderer.drawRoundShadow(e.x, e.y, 13, 0);
+            else if (!e.airborne) renderer.drawRoundShadow(e.x, e.y, 13, 0);
         });
+        this.scrap?.drawShadows(ctx);
 
         this.chain.drawChain(ctx, this.p1, this.p2);
+        this.sawDrag?.drawRope(ctx);
 
-        const sawY = this.chain.weapon?.getSawPositions
-            ? this.chain.weapon.getSawPositions(this.p1, this.p2)[0].y
-            : (this.p1.y + this.p2.y) / 2;
+        const saws = this.chain.weapon?.getSawPositions?.(this.p1, this.p2) ?? [];
+        const sawY = saws.length ? saws.reduce((s, p) => s + p.y, 0) / saws.length : (this.p1.y + this.p2.y) / 2;
         const entities = [this.p1, this.p2, ...enemies];
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
-        const drawables = [...entities, ...(rooms.current.corpses ?? []), ...occluders].sort((a, b) => a.y - b.y);
+        const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? [])];
+        // Recém-forjada, a serra fica em cima da bigorna: ordenada logo depois do prop.
+        if (this._sawOnAnvil) {
+            const k = this._sawAnvilSortY + 0.5;
+            propDrawables.push({ y: k - HOLE_FALL.footOffset, feetSortY: k, draw: c => this.chain.drawDropped(c) });
+        }
+        // Com props sólidos a ordem é pelos pés (inimigos têm os pés bem abaixo do centro); sem eles, pelo centro.
+        const sortKey = this.roomProps ? feetSortKey : (d => d.y);
+        const drawables = [...entities, ...(rooms.current.corpses ?? []), ...occluders, ...propDrawables].sort((a, b) => sortKey(a) - sortKey(b));
 
         const drawEntity = e => {
             if (e.falling) { this.holes.drawFalling(ctx, e); return; }
@@ -1122,17 +1360,22 @@ export class Game {
             e.draw(ctx);
             this.arautoEffects.drawLava(ctx, e);
         };
-        drawables.filter(e => e.y <= sawY).forEach(drawEntity);
+        drawables.filter(e => sortKey(e) <= sawY).forEach(drawEntity);
 
         this.chain.draw(ctx, this.p1, this.p2);
 
-        this.chain.drawDropped(ctx);
+        // Recém-forjada, a serra fica em cima da bigorna: desenhada depois do prop.
+        if (!this._sawOnAnvil) this.chain.drawDropped(ctx);
 
         this.particleSystem.drawSparks(ctx);
 
-        drawables.filter(e => e.y > sawY).forEach(drawEntity);
+        drawables.filter(e => sortKey(e) > sawY).forEach(drawEntity);
+        this.sawCinematic?.drawWorld(ctx);
+        // Cordas e gaiolas caindo: no passe do mundo, para a luz do ambiente atuar nelas.
+        this.roomEvents?.drawAir(ctx);
 
         this.particleSystem.drawFlames(ctx);
+        this.ghostfire.drawAir(ctx, rooms.current);
 
         if (challenge) challenge.drawWallLayer(ctx);
 
@@ -1174,11 +1417,16 @@ export class Game {
             ? (this.chain.weapon.strain ?? 0) : 0;
         this.postProcessor.setVignetteBreath(strain);
 
+        this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
+        this.roomEvents?.renderLights(renderer, this.postProcessor);
+        this.demoDoors.renderLights(this.postProcessor);
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
-        if (hearts.length || this.particleSystem.hasDamageNumbers) {
+        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length) {
             renderer.beginOverlayWorld();
+
+            this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
             this.particleSystem.drawDamageNumbers(ctx);
             renderer.endOverlayWorld();
@@ -1192,6 +1440,7 @@ export class Game {
         const { ctx, canvas } = this;
 
         this.screenGore.draw(ctx);
+        this.dialogue?.draw(ctx, this.renderer, canvas);
 
         if (this.transition) {
             const t = this.transition;
@@ -1199,9 +1448,17 @@ export class Game {
             ctx.fillStyle = `rgba(8, 7, 14, ${Math.max(0, Math.min(1, a))})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+        const fade = 1 - (performance.now() - this._respawnFadeAt) / (RUN_DEATH.fadeSeconds * 1000);
+        if (fade > 0) {
+            ctx.fillStyle = `rgba(8, 7, 14, ${Math.min(1, fade)})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
 
         this.arautoScene.draw(ctx, canvas.width, canvas.height);
         this.hud.draw(ctx, canvas.width, canvas.height);
+        this.scrapCounter?.draw(ctx, canvas.width, canvas.height, this.hud.pixelScale(canvas.width, canvas.height));
+        this.sawCinematic?.drawOverlay(ctx, canvas);
+        this.forgeMenu?.draw(ctx, canvas);
 
         const now = performance.now();
         const dt = this._bossBarAt === null ? 0 : Math.min(0.05, (now - this._bossBarAt) / 1000);

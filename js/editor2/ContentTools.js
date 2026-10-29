@@ -8,6 +8,7 @@ import { occupiedCells } from '../rooms/MapOccupancy.js';
 import { torchPlacement, isMirroredTorch } from '../rooms/TorchLayout.js';
 import { arrowFireDir, arrowMountOffset, fitSpikeRow, wallSideForTile, SPIKE_ROW_WAVE } from '../rooms/HazardLayout.js';
 import { HAZARDS, TILE } from '../config/GameConfig.js';
+import { parseWaves, formatWaves, zoneFromCorners, setZone, setEncounter, toggleBar } from '../rooms/RoomEventsData.js';
 
 const $ = id => document.getElementById(id);
 
@@ -21,7 +22,8 @@ const TORCHES = [
 const TOOL_LABELS = {
     paint: 'Tile', hole: 'Buraco', void: 'Vazio', collision: 'Colisão', door: 'Porta', prop: 'Prop animado', erase: 'Borracha', wall: 'Parede',
     spawn1: 'Spawn P1', spawn2: 'Spawn P2', enemy: 'Inimigo', torch: 'Tocha', hazard: 'Armadilha', interactive: 'Interativo',
-    bridge: 'Ponte da alavanca', staticProp: 'Decoração (tile como prop)', eraseContent: 'Remover conteúdo'
+    bridge: 'Ponte da alavanca', staticProp: 'Decoração (tile como prop)', eraseContent: 'Remover conteúdo',
+    zone: 'Zona', bars: 'Grade'
 };
 
 export class ContentTools {
@@ -138,6 +140,7 @@ export class ContentTools {
         </div></div>`;
         // Depois dos cards existentes: no mapa, "Mapa" continua no topo.
         $('sidebar-left').querySelector('.tab-panel-container').append(panel);
+        this._buildEvents(panel);
         this._buildChoiceList('content-enemies', 'enemy', this._enemyItems(), 'enemyType');
         this._buildChoiceList('content-torches', 'torch', this._torchItems(), 'torchType');
         this._buildChoiceList('content-interactives', 'interactive', this._interactiveItems(), 'interactiveType');
@@ -184,6 +187,7 @@ export class ContentTools {
             <label><input type="checkbox" id="test-saw"> Lançar serra liberado</label>
             <label><input type="checkbox" id="test-key"> Chave do boss</label>
             <label><input type="checkbox" id="test-infinite-lives"> Vida infinita (ambos os jogadores)</label>
+            <label class="field">Serra no início<select id="test-sawstart"><option value="">Conforme o mapa (sem serra se uma bigorna oferece a Serra)</option><option value="yes">Com serra</option><option value="no">Sem serra</option></select></label>
             <label class="field">Câmera para comparar<select id="test-camera"><option value="zoom">Zoom-out</option><option value="fixed">Zoom fixo + indicadores</option><option value="split">Tela dividida</option></select></label>
             <button class="btn btn-primary" id="content-test-map">Testar mapa</button>
             <button class="btn" id="content-main">Definir mapa salvo como principal</button>
@@ -227,6 +231,8 @@ export class ContentTools {
 
     sync() {
         this._syncSelection();
+        if (this.app.tool !== 'zone') this.zoneStart = null;
+        this._syncEvents();
         const room = this.app.room;
         if (room) {
             $('content-lock').value = room.lock || 'none';
@@ -258,6 +264,20 @@ export class ContentTools {
             } else placeDoor(r, col, row, a.doorType, Number($('content-door-width').value));
             return true;
         }
+        if (type === 'zone') {
+            if (a.stroke.mode) return true;
+            a.stroke.mode = 'done';
+            if (!this.zoneStart) { this.zoneStart = cell; this._hint('Agora clique no canto oposto da zona.'); return true; }
+            const id = $('content-zone-id').value.trim() || 'zona';
+            setZone(r, zoneFromCorners(id, this.zoneStart, cell));
+            this.zoneStart = null;
+            this._hint(`Zona "${id}" salva.`);
+            return true;
+        }
+        if (type === 'bars') {
+            if (onFloor) toggleBar(r, col, row);
+            return true;
+        }
         if (type === 'spawn1' || type === 'spawn2') {
             if (!onFloor || col === 0 || row === 0 || col === r.cols - 1 || row === r.rows - 1) return true;
             r.spawns ||= safeSpawnPair(r) || {};
@@ -278,6 +298,7 @@ export class ContentTools {
             if (!onFloor) return true;
             const object = { ...cell, type: this.interactiveType, id: `object_${Date.now()}_${col}_${row}` };
             if (object.type === 'lever') { object.tiles = []; this.bridgeId = object.id; }
+            if (object.type === 'rope' && $('content-rope-auto').checked) object.auto = true;
             this._toggle(r, 'interactives', object);
         } else if (type === 'bridge') {
             const lever = (r.interactives || []).find(o => o.id === this.bridgeId);
@@ -285,7 +306,7 @@ export class ContentTools {
             const i = lever.tiles.findIndex(p => p.col === col && p.row === row);
             if (i >= 0) lever.tiles.splice(i, 1); else lever.tiles.push(cell);
         } else if (type === 'eraseContent') {
-            for (const field of ['enemies', 'props', 'torches', 'interactives']) r[field] = (r[field] || []).filter(o => o.col !== col || o.row !== row);
+            for (const field of ['enemies', 'props', 'torches', 'interactives', 'bars']) r[field] = (r[field] || []).filter(o => o.col !== col || o.row !== row);
             // Fileira de espinhos ocupa vários tiles: clicar em qualquer um remove a fileira toda.
             r.hazards = (r.hazards || []).filter(h => !occupiedCells(h).some(p => p.col === col && p.row === row));
         } else return false;
@@ -293,6 +314,55 @@ export class ContentTools {
     }
 
     _hint(text) { $('content-hint').textContent = text; }
+
+    // Zonas, grades e encontros. Os eventos em si ficam no script da sala (código).
+    _buildEvents(panel) {
+        const events = document.createElement('section');
+        events.className = 'tool-group expanded';
+        events.dataset.view = 'room';
+        events.innerHTML = `<h2 class="group-title">Eventos da sala</h2><div class="group-body"><div class="tab-panel">
+            <label class="field">Id da zona<input id="content-zone-id" value="zona"></label>
+            <button class="btn" data-content="zone">Desenhar zona (clique em dois cantos)</button>
+            <div id="content-zones"></div>
+            <button class="btn" data-content="bars">Grade (clique nos tiles do acesso)</button>
+            <label><input type="checkbox" id="content-rope-auto"> Corda arrebenta sozinha</label>
+            <div class="panel-title">Encontros</div>
+            <label class="field">Id do encontro<input id="content-encounter-id" value="encontro"></label>
+            <label class="field">Levas (uma por linha, tipo:quantidade)<textarea id="content-encounter-waves" rows="4" placeholder="demon:3&#10;bloodMonster:1, demon:3"></textarea></label>
+            <button class="btn" id="content-encounter-save">Salvar encontro</button>
+            <div id="content-encounters"></div>
+            <p class="hint">O script da sala usa os ids. Tipos: demon, bloodMonster, blackKnightB…</p>
+        </div></div>`;
+        panel.after(events);
+        $('content-encounter-save').onclick = () => {
+            const id = $('content-encounter-id').value.trim();
+            if (!id || !this.app.room) return;
+            this.app._commit(() => setEncounter(this.app.room, { id, waves: parseWaves($('content-encounter-waves').value) }));
+        };
+    }
+
+    _syncEvents() {
+        const room = this.app.room;
+        const zones = $('content-zones'), encounters = $('content-encounters');
+        zones.replaceChildren(); encounters.replaceChildren();
+        if (!room) return;
+        for (const z of room.zones || []) {
+            const b = document.createElement('button'); b.className = 'btn connection-entry';
+            b.textContent = `Zona ${z.id} (${z.col},${z.row} ${z.w}×${z.h}) ×`;
+            b.title = 'Remover zona'; b.onclick = () => this.app._commit(() => { room.zones = room.zones.filter(o => o !== z); });
+            zones.append(b);
+        }
+        for (const e of room.encounters || []) {
+            const row = document.createElement('div'); row.className = 'content-actions';
+            const edit = document.createElement('button'); edit.className = 'btn';
+            edit.textContent = `${e.id}: ${e.waves.length} leva(s)`;
+            edit.onclick = () => { $('content-encounter-id').value = e.id; $('content-encounter-waves').value = formatWaves(e.waves); };
+            const del = document.createElement('button'); del.className = 'btn btn-danger'; del.textContent = '×'; del.title = 'Remover encontro';
+            del.onclick = () => this.app._commit(() => { room.encounters = room.encounters.filter(o => o !== e); });
+            row.append(edit, del); encounters.append(row);
+        }
+        if (this.zoneStart) this._hint('Agora clique no canto oposto da zona.');
+    }
 
     // Armadilhas: flecha só em parede (encaixa na mais próxima se o clique foi no chão), espinhos só no chão.
     _applyHazard(r, cell, onFloor) {
@@ -438,6 +508,22 @@ export class ContentTools {
             for (const t of o.tiles || []) { ctx.strokeStyle = '#a6e88b'; ctx.lineWidth = 3; ctx.strokeRect(ox + t.col * tile + 3, oy + t.row * tile + 3, tile - 6, tile - 6); }
         }
         for (const [name, p] of Object.entries(room.spawns || {})) marker(p, name === 'p1' ? '#ffd166' : '#6bb4db', name.toUpperCase());
+        for (const b of room.bars || []) {
+            ctx.fillStyle = 'rgba(160, 168, 184, 0.85)';
+            for (let i = 1; i < 4; i++) ctx.fillRect(ox + b.col * tile + i * tile / 4 - 1, oy + b.row * tile + 2, 2, tile - 4);
+        }
+        for (const o of room.interactives || []) if (o.type === 'rope' && o.auto) {
+            ctx.strokeStyle = '#ff5c5c'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2);
+        }
+        for (const z of room.zones || []) {
+            ctx.strokeStyle = 'rgba(127, 219, 255, 0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+            ctx.strokeRect(ox + z.col * tile + 1, oy + z.row * tile + 1, z.w * tile - 2, z.h * tile - 2);
+            ctx.setLineDash([]); ctx.fillStyle = 'rgba(127, 219, 255, 0.9)'; ctx.font = `bold ${Math.max(10, tile * 0.3)}px sans-serif`;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(z.id, ox + z.col * tile + 4, oy + z.row * tile + 4);
+        }
+        if (this.zoneStart && this.app.tool === 'zone') {
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(ox + this.zoneStart.col * tile, oy + this.zoneStart.row * tile, tile, tile);
+        }
         ctx.restore();
     }
 
@@ -508,6 +594,8 @@ export class ContentTools {
         const errors = validatePlayable(map, { roomKey: isolated ? map.start : null });
         if (errors.length) { alert(errors.join('\n')); return; }
         const progress = { dash: $('test-dash').checked, sawThrow: $('test-saw').checked, bossKey: $('test-key').checked };
+        const sawStart = $('test-sawstart').value;
+        if (sawStart) progress.saw = sawStart === 'yes';
         sessionStorage.setItem(DEMO.sessionKey, JSON.stringify({ map, isolated, progress, camera: $('test-camera').value, infiniteLives: $('test-infinite-lives').checked }));
         a._persistNow();
         location.href = 'index.html?playtest=true&editor2=true';

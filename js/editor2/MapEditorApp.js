@@ -4,6 +4,9 @@ import { Tileset } from '../core/Tileset.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, EMPTY_FLOOR_COLOR, holeTileFor } from '../config/GameConfig.js';
 import { TILE_KINDS, DOOR_TYPES, DEFAULT_DOOR_TYPE, MAP_LIMITS } from '../config/MapEditorConfig.js';
 import { ANIMATED_PROPS, ANIMATED_PROP_KEYS } from '../config/PropConfig.js';
+import { SCRAP, chestScrapAmount } from '../config/ScrapConfig.js';
+import { FORGE, FORGE_RECIPE_IDS, anvilRecipes } from '../config/ForgeConfig.js';
+import { t } from '../i18n/I18n.js';
 import * as M from './MapModel.js';
 import { TilePalette } from './TilePalette.js';
 import { PropSprites } from './PropSprites.js';
@@ -37,6 +40,9 @@ export class MapEditorApp {
         this.doorType = DEFAULT_DOOR_TYPE;
         this.propType = ANIMATED_PROP_KEYS[0];
         this.propFlip = false;
+        this.propScrap = SCRAP.chestDefault;
+        this.propEncounter = "";
+        this.propRecipes = [...FORGE.defaultRecipes];
         this.showKinds = true;
         this.showGrid = true;
 
@@ -77,6 +83,7 @@ export class MapEditorApp {
         this._loadFromStorage();
         this._buildDoorTypes();
         this._buildPropGrid();
+        this._buildRecipeChecks();
         this.contentTools = new ContentTools(this);
         this._bindUI();
         this._bindCanvas();
@@ -485,7 +492,7 @@ export class MapEditorApp {
             case "prop":
                 if (!stroke.mode) stroke.mode = M.propAt(room, col, row) ? "remove" : "add";
                 if (stroke.mode === "remove") M.removePropAt(room, col, row);
-                else M.placeProp(room, this.propType, col, row, this.propFlip);
+                else M.placeProp(room, this.propType, col, row, this.propFlip, this._propExtra());
                 break;
             case "wall":
                 if (!stroke.mode) stroke.mode = M.getKind(room, col, row) === "w" ? "remove" : "add";
@@ -497,6 +504,29 @@ export class MapEditorApp {
         }
     }
 
+    // Baús guardam a sucata que soltam; outros props não recebem campos extras.
+    _propExtra() {
+        if (this.propType === "anvil") return { recipes: [...this.propRecipes] };
+        if (!ANIMATED_PROPS[this.propType]?.opens) return null;
+        return this.propEncounter ? { scrap: this.propScrap, encounter: this.propEncounter } : { scrap: this.propScrap };
+    }
+
+    _buildRecipeChecks() {
+        const box = $("prop-recipes");
+        box.innerHTML = "";
+        for (const id of FORGE_RECIPE_IDS) {
+            const label = document.createElement("label");
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.dataset.recipe = id;
+            input.addEventListener("change", () => {
+                this.propRecipes = FORGE_RECIPE_IDS.filter(r => box.querySelector(`[data-recipe="${r}"]`).checked);
+            });
+            label.append(input, ` ${t(`forge.${id}`)}`);
+            box.append(label);
+        }
+    }
+
     _eyedrop(col, row) {
         const room = this.room;
         if (!room || !M.inBounds(room, col, row)) return;
@@ -504,6 +534,8 @@ export class MapEditorApp {
         if (prop) {
             this.propType = prop.type;
             this.propFlip = !!prop.flip;
+            if (ANIMATED_PROPS[prop.type]?.opens) { this.propScrap = chestScrapAmount(prop); this.propEncounter = prop.encounter || ""; }
+            if (prop.type === "anvil") this.propRecipes = [...anvilRecipes(prop)];
             this._setTool("prop");
             return;
         }
@@ -759,6 +791,11 @@ export class MapEditorApp {
         $("paint-kind").addEventListener("change", (e) => { this.paintKind = e.target.value; this._syncUI(); });
         $("show-kinds").addEventListener("change", (e) => { this.showKinds = e.target.checked; });
         $("prop-flip").addEventListener("change", (e) => { this.propFlip = e.target.checked; });
+        $("prop-encounter").addEventListener("change", (e) => { this.propEncounter = e.target.value.trim(); });
+        $("prop-scrap").addEventListener("change", (e) => {
+            this.propScrap = chestScrapAmount({ scrap: Math.round(Number(e.target.value)) });
+            e.target.value = this.propScrap;
+        });
 
         $("btn-zoom-in").addEventListener("click", () => this._zoomAt(1.25, this.canvas.width / 2, this.canvas.height / 2));
         $("btn-zoom-out").addEventListener("click", () => this._zoomAt(0.8, this.canvas.width / 2, this.canvas.height / 2));
@@ -901,6 +938,12 @@ export class MapEditorApp {
         $("door-type-field").hidden = this.tool !== "door";
         this._setVal("paint-kind", this.paintKind);
         $("prop-flip").checked = this.propFlip;
+        $("prop-scrap-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
+        $("prop-encounter-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
+        this._setVal("prop-encounter", this.propEncounter);
+        this._setVal("prop-scrap", this.propScrap);
+        $("prop-recipes-field").hidden = this.propType !== "anvil";
+        for (const input of document.querySelectorAll("#prop-recipes [data-recipe]")) input.checked = this.propRecipes.includes(input.dataset.recipe);
         for (const btn of document.querySelectorAll("#prop-grid [data-prop]")) btn.classList.toggle("active", this.tool === "prop" && btn.dataset.prop === this.propType);
 
         const s = this.palette.selection;
@@ -930,7 +973,12 @@ export class MapEditorApp {
         const prop = M.propAt(room, h.col, h.row);
         const parts = [`Tile ${h.col},${h.row}`, tile >= 0 ? `índice ${tile}` : null, TILE_KINDS[kind]?.label];
         if (door) parts.push(DOOR_TYPES[door.type]?.label || door.type);
-        if (prop) parts.push(ANIMATED_PROPS[prop.type]?.label || prop.type);
+        if (prop) {
+            const def = ANIMATED_PROPS[prop.type];
+            const extra = def?.opens ? ` (${chestScrapAmount(prop)} de sucata${prop.encounter ? `, encontro ${prop.encounter}` : ""})`
+                : prop.type === "anvil" ? ` (${anvilRecipes(prop).map(id => t(`forge.${id}`)).join(", ") || "sem receitas"})` : "";
+            parts.push((def?.label || prop.type) + extra);
+        }
         $("status-coords").textContent = parts.filter(Boolean).join(" · ");
     }
 

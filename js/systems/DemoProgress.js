@@ -27,6 +27,7 @@ export class DemoProgress {
         this.held = pressed;
         this.prompt = '';
         for (const o of room.cell.authored.interactives || []) {
+            if (!INTERACTIVES[o.type] || INTERACTIVES[o.type].scripted) continue;
             const id = `${room.key}/${o.id}`;
             if (this.activated.has(id)) continue;
             const x = rect.x + (o.col + 0.5) * TILE, y = rect.y + (o.row + 0.5) * TILE;
@@ -69,7 +70,7 @@ export class DemoProgress {
         ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold 22px sans-serif';
         for (const o of room.cell.authored.interactives || []) {
             const id = `${room.key}/${o.id}`, def = INTERACTIVES[o.type];
-            if (!def) continue;
+            if (!def || def.scripted) continue;
             const active = this.activated.has(id);
             if (active && ['key', 'ropeKey'].includes(o.type)) continue;
             const x = rect.x + (o.col + 0.5) * TILE, y = rect.y + (o.row + 0.5) * TILE;

@@ -29,7 +29,7 @@ Draw the current room in crisp pixel art on a full-window 2D canvas: tiled floor
 ## Camera (`Renderer`)
 
 - `updateCamera({x, y, zoom, bounds?})`: lerp position 0.12/step toward target + drone sway; lerp zoom 0.08 toward `zoom * introZoomFactor`; optional bounds clamp (not used by Game).
-- Game calls `_updateCameraToCurrentRoom` each step: target = room center, `fitZoom = min(canvas.w / (rect.w + 2*CAM_MARGIN), canvas.h / (rect.h + 2*CAM_MARGIN))` — the whole room always fits; no follow camera.
+- Game calls `_updateCameraToCurrentRoom` each step: target = room center, `fitZoom = min(canvas.w / (rect.w + 2*CAM_MARGIN), canvas.h / (rect.h + 2*CAM_MARGIN))` — the whole room always fits; no follow camera. Editor 2.0 maps use `DemoCamera.update` instead: zoom = `referenceZoom()` (room-fit zoom × `DEMO.cameraZoom`, 1.2 = 20% closer), in `zoom` mode lowered so both players fit with `DEMO.cameraMargin`; target = the pair's midpoint, no clamp to the map edge (the camera stays centered on the players and shows the background past the border); `focus = {x, y, zoom}` overrides the target during cinematics.
 - `applyDroneSway` spring offset from average player velocity (`CAMERA_DRONE`).
 - `triggerShake(amount)` (max-merge, decays ×0.88/frame, random offset), `triggerZoomPunch(amount)` (decays ×0.82/frame; negative = zoom out), `setIntroZoomFactor` (room intro).
 - `_quantizeZoom`: rounds zoom so one tile is an integer number of screen px (`round(TILE*zoom)/TILE`). Translations are `Math.round`ed. This keeps pixel art seam-free.
@@ -37,6 +37,10 @@ Draw the current room in crisp pixel art on a full-window 2D canvas: tiled floor
 - `worldToScreen(x, y)` → `{x, y, zoom}` (quantized, no shake) — use for all screen-space effects (lights, screen wind). `screenToWorld` uses unquantized zoom.
 
 ## Pixel-art rules
+
+Ghostfire's damage/collision radius also follows the sprite scale (`5.5 * scale`, currently 115.5 world px), preserving its previous proportions when resized.
+
+Ghostfire uses `GhostfireRenderer`: full 100px source cells at integer 21× scale shared with `BossWallShot` through `GHOSTFIRE.sprite.scale`, matching the trailer anchors (52.5px normally, 39.5px for extended beam poses, Y=42px). The firing animation preserves the mouth/flame launch through source X=66, then repeats the hot strip (X=66..89, Y=41, H=3) and caps it with the original tail. Warning/fade use the final source column. The beam is extended to the opposite arena edge, flipped by side, and centered on its 63px collision width (3 source pixels × 21). Rows: idle/arrival 1, summon 2, charge/warning/fire/fade/recovery 3, death 4. Boss and beam lights are queued before `PostProcessor.draw`; health, glow, reveal and teleport stretch are drawn with the boss.
 
 - `ctx.imageSmoothingEnabled = false` set in `Game` constructor and again after every resize (`_bindResize` sets canvas to `window.innerWidth/innerHeight`; resizing resets context state).
 - CSS `image-rendering: pixelated; crisp-edges` on `#gameCanvas` and UI canvases.
@@ -50,7 +54,11 @@ See `../architecture.md` → "`Game._render()` order" (authoritative list). Summ
 
 ## Depth sorting
 
-Only within one pass: `drawables = [p1, p2, ...enemies, ...challenge.buttonOccluders(entities)]` sorted ascending by `y`. Saw is inserted at `sawY = weapon.getSawPositions(p1, p2)[0].y`: entities with `y <= sawY` draw behind it. Particles, gibs, hearts, walls are fixed layers, not sorted. Anything that should overlap characters by depth must be added to `drawables` and expose `y` + `draw(ctx)`.
+Only within one pass: `drawables = [p1, p2, ...enemies, ...challenge.buttonOccluders(entities), ...roomProps.drawables(ms)]` sorted ascending by `y`.
+
+Solid props (Editor 2.0 maps): an `ANIMATED_PROPS` entry with `base: {x, y, w, h}` (art px from the drawn sprite's top-left; mirrored when `flip`) leaves the floor layer. `RoomProps` turns it into a drawable with `feetSortY` = base middle (and `y` = that − `HOLE_FALL.footOffset`). When `roomProps` exists (Editor 2.0 maps), `_renderView` sorts every drawable by feet: `feetSortY ?? footY ?? y + footOffset` (enemies have their feet at `footY`, far below their center). So anyone with feet above the middle of the base draws behind the prop and anyone with feet below draws in front. The classic mode still sorts by `y`; the split around the saw still uses `y`. The same box is the only collision (`pushFeetOutOfBox`, foot circle `PROP_COLLISION.footRadius` 10 at `y + footOffset` for players, `footY` for enemies), so nobody stands on the art. Today: anvil (base 16×6 of its 24×24 art), chests. Helpers in `js/core/PropBodies.js` (`propArtRect`, `propBaseBox`, `propSortY`). Props without `base` are still drawn on the floor by `roomProps.drawFloor`. `PropSprites.drawFrame(ctx, type, index, dx, dy, tilePx, flip, sx, sy)` draws a given frame, scaled from the bottom center (chest squash).
+
+Scrap pickups are not sorted: shadows are drawn with the entity shadows and the sprites in the overlay world pass above the light map (like hearts), so they stay readable in the dark. The coin art is a placeholder drawn at the game's pixel size (16 art px × 4 = `SCRAP.drawSize` 64). Saw is inserted at `sawY = weapon.getSawPositions(p1, p2)[0].y`: entities with `y <= sawY` draw behind it. Particles, gibs, hearts, walls are fixed layers, not sorted. Anything that should overlap characters by depth must be added to `drawables` and expose `y` + `draw(ctx)`.
 
 ## Shadows
 

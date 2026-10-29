@@ -50,15 +50,19 @@ export class ChainObstacleSystem {
     _findContact(weapon, p1, p2, enemies) {
         const cfg = this.config;
         let deepest = null;
+        const points = [];
+        for (let i = 1; i < cfg.samples; i++) {
+            points.push({ ...weapon.cablePoint(p1, p2, i / cfg.samples), radius: cfg.cableRadius, kind: 'chain' });
+        }
+        for (const disc of weapon.getSawPositions?.(p1, p2) ?? []) {
+            points.push({ ...disc, radius: weapon.discRadius, kind: 'disc' });
+        }
         for (const enemy of enemies) {
             if (!enemy.immovable || enemy.ignoresEntityCollisions || enemy.state === 'dying') continue;
             for (const body of enemy.collisionBodies ?? []) {
                 const cx = enemy.x + body.x, cy = enemy.y + body.y;
-                for (let i = 1; i < cfg.samples; i++) {
-                    const t = i / cfg.samples;
-                    const point = weapon.cablePoint(p1, p2, t);
-                    const disc = i === cfg.samples / 2;
-                    const radius = disc ? weapon.discRadius : cfg.cableRadius;
+                for (const point of points) {
+                    const radius = point.radius;
                     const rx = body.radiusX + radius, ry = body.radiusY + radius;
                     let dx = point.x - cx, dy = point.y - cy;
                     let distance = Math.hypot(dx / rx, dy / ry);
@@ -72,7 +76,7 @@ export class ChainObstacleSystem {
                     const sx = dx / distance - dx, sy = dy / distance - dy;
                     const depth = Math.hypot(sx, sy);
                     if (!deepest || depth > deepest.depth) {
-                        deepest = { enemy, x: point.x, y: point.y, sx, sy, depth, kind: disc ? 'disc' : 'chain' };
+                        deepest = { enemy, x: point.x, y: point.y, sx, sy, depth, kind: point.kind };
                     }
                 }
             }

@@ -9,7 +9,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Player 1 / P1 | Amarelo | Yellow player, keyboard WASD or gamepad 0 |
 | Player 2 / P2 | Azul | Blue player, arrow keys or gamepad 1 |
 | Chain / cable | corrente, cabo | Elastic tether between P1 and P2 that carries the saw (asset `rope.png`, key `cable`) |
-| Saw | serra | The only weapon: disc at the cable midpoint; kills any enemy it or the cable touches |
+| Saw | serra | The only weapon: disc at the cable midpoint; kills ordinary enemies on contact and damages bosses through their hit/cooldown interface |
 | Snap | arrebentar, ruptura | Cable breaks from over-stretch or a hole fall; saw is dropped |
 | Dropped saw / blade | lâmina largada | Saw lying on the floor until both players reach it |
 | Reconnect | reconectar | Both players pick the saw back up |
@@ -25,6 +25,8 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Variant | variação | Another piece with the same signature and type |
 | Start room | câmara inicial, hub | `type: "start"` piece; run begins here |
 | Boss room | sala do chefe | `type: "boss"` (no pieces authored yet) |
+| Ghostfire | Ghostfire, boss do trailer | Giant floating fire skull (`type: "ghostfire"`), with staggered minion summons and a horizontal beam; alternates arena sides |
+| Beam warning | aviso do raio | Locked, harmless line before Ghostfire fires; gives players time to dodge vertically |
 | Challenge room/corridor | desafio, sala-trap | Room with hazards; solved by holding ≥2 pressure buttons |
 | Lock rule | trancamento | How a room keeps doors closed: `auto`, `none`, `enemies`, `buttons` |
 | Hazard / trap | perigo, armadilha, trap | `spike`, `spikeRow`, `arrow`, `button` |
@@ -46,6 +48,23 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Hit stop | congelamento de impacto | Per-enemy freeze (`MeleeEnemy.freezeOnHit`, durations in `HIT_FEEL.hitStop`) on each saw hit; players, saw and the rest of the room keep simulating. `GameLoop.triggerHitStop` (global freeze) still exists but `Game` no longer calls it |
 | Stagger / hurt | atordoamento curto | Short interruption + knockback of a surviving enemy after a saw hit (`"hurt"` state) |
 | Poise | poise, postura | Invisible per-enemy buffer for strong enemies (`combat.poise`); breaking it causes a long stun (`"stunned"`) and a vulnerability window |
+| Scrap | sucata | Shared currency of the pair (`ScrapSystem`, one pot). Drops from enemies and chests, rests 0,4 s, then a magnet pulls it to the nearest player within ~2,5 tiles. Editor 2.0 maps only |
+| Vacuum | aspirar, puxar a sucata | `ScrapSystem.vacuum()`: every scrap on the floor flies to the nearest player, any distance (used when a wave is cleared, slice 4) |
+| Chest | baú | Prop `chest`/`mini_chest` that sits still with a sweeping shine while closed; a player right next to it (1 tile) presses interact to open it once, and it bursts its authored scrap (`prop.scrap`) |
+| Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
+| Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
+| Anvil / forge | bigorna / forja | Prop `anvil`; interact opens the forge menu (`ForgeSystem`), which sells the recipes the anvil offers (`prop.recipes`) for scrap |
+| Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`, `elasticity`, `doubleSaw`), with a cost per level |
+| Upgrade | melhoria | Tamanho (+20% disc), Elasticidade (+15% cable), Serra dupla; Peso comes in slice 3 |
+| Double saw | serra dupla | Upgrade: near the break distance the disc splits into two at 1/3 and 2/3 of the cable and merges back when the pair closes in |
+| Drag the saw | arrastar a serra | With the cable snapped, one player holds interact near the dropped saw and pulls it on a short cable, slower; the Peso upgrade extends distance and speed |
+| Zone | zona | Named rectangle of a room (`room.zones`); "enter the zone" means both players inside |
+| Encounter / wave | encontro / leva | Named list of waves (`room.encounters`); the room script decides when each wave drops |
+| Bars | grade | Bar tiles at a zone's accesses; closed (solid) while an encounter runs |
+| Cage / rope / stake | gaiola / corda / estaca | The Salão set piece: vertical ropes tied to stakes, each holding a hidden cage above; cutting a rope drops its cage, which shatters and releases a wave |
+| Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
+| Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
+| i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 
 ## Enemies (editor labels)
 

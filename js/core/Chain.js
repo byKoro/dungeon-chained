@@ -18,17 +18,33 @@ export class Chain {
 
         this.playerSafeZone = config.playerSafeZone ?? 46;
 
+        this.present = true;
         this.connected = true;
         this.strain = 0;
         this.reconnectCooldown = 0;
     }
 
-    reset() {
-        this.connected = true;
+    // `present: false` = a dupla ainda não tem a serra: sem cabo, sem disco e sem reconexão.
+    reset({ present = this.present } = {}) {
+        this.present = present;
+        this.connected = present;
         this.strain = 0;
         this.reconnectCooldown = 0;
 
         this.weapon.pickup?.();
+    }
+
+    get hasSaw() {
+        return this.present;
+    }
+
+    // A serra aparece largada em (x, y); os dois precisam chegar perto para conectar.
+    spawnSaw(x, y) {
+        this.present = true;
+        this.connected = false;
+        this.strain = 0;
+        this.reconnectCooldown = 0;
+        this.weapon.drop?.(x, y);
     }
 
     get weapon() {
@@ -50,13 +66,19 @@ export class Chain {
 
     update(p1, p2, events = {}) {
         if (this.reconnectCooldown > 0) this.reconnectCooldown--;
+        if (!this.present) {
+            this.weapon.spin = 0;
+            return;
+        }
         const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
 
         if (this.connected) {
 
             Physics.applyChainConstraint(p1, p2, this.rest, this.stiffness);
 
-            if (dist > this.strainDistance) this.strain++;
+            // Serra dupla aberta: a tensão não sobe (só a ruptura por distância vale), para a dupla poder usar a faixa.
+            const split = (this.weapon.split ?? 0) > 0;
+            if (dist > this.strainDistance) { if (!split) this.strain++; }
             else this.strain = Math.max(0, this.strain - 2);
 
             if (dist > this.breakDistance || this.strain >= this.strainLimit) {
@@ -70,7 +92,7 @@ export class Chain {
                 this.strain = 0;
                 this.reconnectCooldown = this.reconnectDelay;
 
-                const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
+                const sp = this._sawCenter(p1, p2);
                 const rawX = sp ? sp.x : (p1.x + p2.x) / 2;
                 const rawY = sp ? sp.y : (p1.y + p2.y) / 2;
 
@@ -95,17 +117,18 @@ export class Chain {
         }
 
         this.weapon.setStrain?.(strainLevel);
+        this.weapon.setStretch?.(this.connected ? dist / this.breakDistance : 0);
         this.weapon.update(p1, p2);
 
         if (!this.connected) this.weapon.updateDropped?.();
     }
 
     forceDrop(p1, p2, resolveDropPoint) {
-        if (!this.connected) return false;
+        if (!this.connected || !this.present) return false;
         this.connected = false;
         this.strain = 0;
         this.reconnectCooldown = this.reconnectDelay;
-        const sp = this.weapon.getSawPositions?.(p1, p2)?.[0];
+        const sp = this._sawCenter(p1, p2);
         const rawX = sp ? sp.x : (p1.x + p2.x) / 2;
         const rawY = sp ? sp.y : (p1.y + p2.y) / 2;
         const fixed = resolveDropPoint?.(rawX, rawY) ?? { x: rawX, y: rawY };
@@ -113,9 +136,16 @@ export class Chain {
         return true;
     }
 
+    // Com a Serra dupla há dois discos: a serra cai no meio deles.
+    _sawCenter(p1, p2) {
+        const all = this.weapon.getSawPositions?.(p1, p2);
+        if (!all?.length) return null;
+        return { x: all.reduce((s, p) => s + p.x, 0) / all.length, y: all.reduce((s, p) => s + p.y, 0) / all.length };
+    }
+
     _canReconnect(p1, p2, dist) {
         const w = this.weapon;
-        if (w.thrown) return false;
+        if (!this.present || w.thrown) return false;
         if (!w.dropped) return dist < this.reconnectDistance;
 
         const r = this.pickupRadius;

@@ -2,9 +2,10 @@ import { RushShot, dressRoom, handheld } from '../../kit/rushKit.js';
 import { lerp, clamp01, easeIn, easeOut, easeInOut } from '../../anim.js';
 import { SawIris } from '../../fx/SawIris.js';
 import { FxParticles } from '../../fx/FxParticles.js';
+import { GHOSTFIRE } from '../../../config/GhostfireConfig.js';
 
 const COLS = 72, ROWS = 14;
-const BS = 21;
+const BS = GHOSTFIRE.sprite.scale;
 const ANCHOR_Y = 42;
 const SKULL_HALF = 6.5;
 const BEAM_EXT = 150;
