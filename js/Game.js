@@ -1089,7 +1089,7 @@ export class Game {
         if (this.mapData) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const forgePrompt = this.forgeSystem?.prompt;
+            const forgePrompt = this.sawCinematic?.active ? null : this.forgeSystem?.prompt;
             const message = this.demoProgress.messageTime ? this.demoProgress.message
                 : (this.demoProgress.prompt || (forgePrompt ? t(forgePrompt) : ""));
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
