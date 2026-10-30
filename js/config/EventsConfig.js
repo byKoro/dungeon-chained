@@ -62,15 +62,21 @@ export const STAKE_LIGHT = Object.freeze({
 });
 
 // Grades nos acessos da zona enquanto um encontro está ativo.
-// Sprites em assets/bars (scripts/gen-bars-sprites.py); a grade cai de `dropHeight` acima e bate no chão.
+// Grade levadiça: sprites em assets/bars (scripts/gen-bars-sprites.py). A treliça mora dentro da verga de pedra e
+// despenca dela. Steps de 60 Hz; `art` em pixels de arte (1 = TILE/16 px de mundo).
 export const BARS = Object.freeze({
-    dropSteps: 14,
-    height: 1.25 * TILE,
-    dropHeight: 1.25 * TILE,
+    art: Object.freeze({ frameH: 20, gateH: 15, lintel: 5, travel: 13 }),
+    anticSteps: 12,
+    dropSteps: 10,
+    bounceSteps: 8,
+    bouncePx: 2,
+    raiseSteps: 48,
     solidAt: 0.7,
-    shake: 6,
+    shake: 7,
+    hitStop: 0.04,
+    sparks: 3,
     landDust: 3,
-    shadow: "rgba(0, 0, 0, 0.35)"
+    shadow: "#25131a"
 });
 
 // Mapas com bigorna: perder todas as vidas faz a dupla renascer no início, sem game over.
