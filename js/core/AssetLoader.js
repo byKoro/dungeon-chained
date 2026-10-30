@@ -37,7 +37,7 @@ export class AssetLoader {
 
         this.load("tileset", "assets/tileset/tileset.png");
         this._tilesetVariantKeys = ["tileset"];
-        for (let n = 1; n <= 6; n++) {
+        for (let n = 1; n <= 1; n++) {
             const key = `tileset_${n}`;
             this.load(key, `assets/tileset/tileset_${n}.png`);
             this._tilesetVariantKeys.push(key);
