@@ -117,3 +117,5 @@ Existing ground/slam VFX now pair with dedicated stratified rock impacts and amb
 
 ## Arauto visual fixes (2026-10-29)
 Arauto outline disabled via null (zero artPx still rounds to one pixel in MeleeEnemy); debug attack marks disabled. ArautoEffects owns full-world transient camera blur, rendered once after all views and before HUD. Attack start triggers shake/blur, charging sustains moderate shake/blur, ground/slam impacts use stronger presets. Blur decays per render and resets on dungeon reset; tuning in ArautoEffectsConfig.js. No gameplay timing changes.
+
+Arrowtrap wall hits emit a small spark burst (HAZARDS.arrow.wallSpark: radius 5, count 3, power 0.35). Game consumes the one-step ChallengeCorridor.arrowImpacts list; no shake or added sound.

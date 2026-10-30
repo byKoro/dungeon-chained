@@ -446,6 +446,7 @@ export const HAZARDS = {
         indicatorWarnColor: "#ff5470"
     },
     arrow: {
+        wallSpark: { radius: 5, amount: 3, power: 0.35 },
         speed: 4.5,
         length: 26,
         width: 5,

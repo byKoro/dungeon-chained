@@ -1,4 +1,5 @@
 import { DemoEncounter } from './systems/DemoEncounter.js';
+import { HAZARDS } from './config/GameConfig.js';
 import { DemoVictory } from './ui/DemoVictory.js';
 import { DemoProgress } from './systems/DemoProgress.js';
 import { DemoCamera } from './systems/DemoCamera.js';
@@ -397,6 +398,10 @@ export class Game {
     }
 
     _arrowTrapFeedback(challenge) {
+        const spark = HAZARDS.arrow.wallSpark;
+        for (const impact of challenge.arrowImpacts || []) {
+            this.particleSystem.triggerSparkBurst(impact.x, impact.y, spark.radius, spark.amount, spark.power);
+        }
         for (const t of challenge.arrowTraps) {
             if (!t.justFired) continue;
             const d = Math.min(

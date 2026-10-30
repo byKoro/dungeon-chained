@@ -197,3 +197,6 @@ Combat receives optional Game-owned ArautoAudio. Normal/AoE justGroundHit and sl
 - `FlameGolemEnemy.introPose = { row, frame, glow }` só muda desenho: linha/quadro do sprite, luz × `glow`, sem brasas com `glow < 1`.
 - Expressões: a cena define `hud.onBossTransformation(nome)` e `p.expression` (desconfiado → espantado → assustado → raiva) e restaura no fim. `PlayerFactory` agora carrega `sprite.expressions` (mesmo formato do trailer), então `p.expression` aparece no boneco em campo; `ArautoPhaseScene` também passou a definir `p.expression`.
 - No modo clássico (sem mapa da demo) `demoCamera.focus` não é lido: a cena toca com a câmera parada.
+
+## Arrow wall impacts (2026-10-30)
+Room.populate supplies ChallengeCorridor with full tile boxes for authored internal walls/void and solid perimeter cells (door openings excluded). Arrow.update sweeps its hit radius along the movement segment through firstWallImpact; the nearest wall stops/deletes it before endpoint player damage, and the mounting wall containing its launch is ignored while exiting. ChallengeCorridor.arrowImpacts is cleared each step and records impact points before removing dead arrows. Game._arrowTrapFeedback emits HAZARDS.arrow.wallSpark via ParticleSystem; entities do not trigger FX.

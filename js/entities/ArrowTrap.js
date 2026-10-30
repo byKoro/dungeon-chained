@@ -1,4 +1,5 @@
 import { HAZARDS, TILE } from '../config/GameConfig.js';
+import { firstWallImpact } from '../core/ProjectileCollision.js';
 
 export class Arrow {
     constructor(x, y, dirX, dirY, sprite = null) {
@@ -12,14 +13,26 @@ export class Arrow {
         this.hitRadius = cfg.hitRadius;
         this.life = cfg.maxLifeFrames;
         this.dead = false;
+        this.wallImpact = null;
         this.sprite = sprite;
         this.lifeSeconds = cfg.maxLifeFrames / 60;
     }
 
-    update(players, bounds, deltaSeconds = 1 / 60) {
+    update(players, bounds, deltaSeconds = 1 / 60, walls = []) {
+        this.wallImpact = null;
+        if (this.dead) return null;
         const frameScale = Math.max(0, deltaSeconds) * 60;
-        this.x += this.dx * frameScale;
-        this.y += this.dy * frameScale;
+        const nextX = this.x + this.dx * frameScale, nextY = this.y + this.dy * frameScale;
+        const impact = firstWallImpact(this.x, this.y, nextX, nextY, walls, this.hitRadius);
+        if (impact) {
+            this.x = impact.x;
+            this.y = impact.y;
+            this.wallImpact = { x: impact.surfaceX, y: impact.surfaceY };
+            this.dead = true;
+            return null;
+        }
+        this.x = nextX;
+        this.y = nextY;
         this.lifeSeconds -= Math.max(0, deltaSeconds);
         if (this.lifeSeconds <= 0) { this.dead = true; return null; }
 

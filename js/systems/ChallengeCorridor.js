@@ -6,7 +6,9 @@ import { arrowFireDir, arrowMountOffset, spikeRowPhase } from '../rooms/HazardLa
 
 export class ChallengeCorridor {
 
-    constructor(layout, bounds, doors, assets) {
+    constructor(layout, bounds, doors, assets, { walls = [] } = {}) {
+        this.walls = walls;
+        this.arrowImpacts = [];
         this.layout = layout;
         this.bounds = bounds;
         this.name = layout.name;
@@ -139,13 +141,15 @@ export class ChallengeCorridor {
     }
 
     update(players, deltaSeconds = 1 / 60) {
+        this.arrowImpacts.length = 0;
 
         for (const s of this.spikes) s.update(players, deltaSeconds);
 
         const onFire = (arrow) => this.arrows.push(arrow);
         for (const t of this.arrowTraps) t.update(onFire, deltaSeconds);
         for (let i = this.arrows.length - 1; i >= 0; i--) {
-            this.arrows[i].update(players, this.bounds, deltaSeconds);
+            this.arrows[i].update(players, this.bounds, deltaSeconds, this.walls);
+            if (this.arrows[i].wallImpact) this.arrowImpacts.push(this.arrows[i].wallImpact);
             if (this.arrows[i].dead) this.arrows.splice(i, 1);
         }
 

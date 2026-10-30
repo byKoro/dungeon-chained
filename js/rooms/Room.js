@@ -95,7 +95,17 @@ export class Room {
 
         if (this.cell.customHazards && this.cell.customHazards.length > 0) {
             const layout = { name: this.cell.customName || "Desafio Custom", elements: this.cell.customHazards };
-            this.challenge = new ChallengeCorridor(layout, this.bounds, this.cell.doors, assets);
+            const walls = this.tiles.walls.map(w => ({
+                x: this.bounds.minX + (w.col - 1) * TILE,
+                y: this.bounds.minY + (w.row - 1) * TILE, w: TILE, h: TILE
+            }));
+            const openings = new Set(this.tiles.doorCells.map(p => `${p.col},${p.row}`));
+            for (let row = 0; row < this.tiles.rows; row++) for (let col = 0; col < this.tiles.cols; col++) {
+                if (col !== 0 && row !== 0 && col !== this.tiles.cols - 1 && row !== this.tiles.rows - 1) continue;
+                const solid = this.cell.authored ? ['w', 'v'].includes(this.cell.authored.kinds[row][col]) : !openings.has(`${col},${row}`);
+                if (solid) walls.push({ x: this.bounds.minX + (col - 1) * TILE, y: this.bounds.minY + (row - 1) * TILE, w: TILE, h: TILE });
+            }
+            this.challenge = new ChallengeCorridor(layout, this.bounds, this.cell.doors, assets, { walls });
         }
 
         const heartCount = Number.isInteger(this.cell.heartCount) ? this.cell.heartCount : 0;

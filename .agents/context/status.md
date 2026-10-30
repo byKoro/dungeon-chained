@@ -223,3 +223,6 @@ A v2 repintava as duas últimas linhas da sala por cima de tudo e isso escondia 
 Tile 39 and the Escada door choice create interior connection endpoints. Reuses map connections, locks/requirements, fade and safe arrival. Tests pass; browser/game visual behavior not observed. Full check retains prior modular-grid and unlisted-map failures; graphify unavailable.
 
 Stair follow-up: placement on standard border walls supported on N/S/E/W, with approach opening and safe spawn. Four-edge regression and resizing pass. Corners remain excluded. No visual runtime observation.
+
+## Arrow wall impacts (2026-10-30)
+Branch codex/arrow-wall-impact: arrows stop at internal/perimeter walls and emit light configured sparks. Swept collision avoids tunneling; launch-wall exit remains allowed. Regression tests pass; visual runtime verification pending. Full check retains the known modular-grid and unlisted-map failures.
