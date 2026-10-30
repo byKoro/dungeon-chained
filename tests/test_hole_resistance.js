@@ -48,7 +48,7 @@ const runUntilFall = (p, input, maxFrames) => {
     return -1;
 };
 
-// 1) Toque rápido: corre 5 frames para dentro da beirada e solta.
+// 1) Esbarrão: corre 12 frames em direção à borda e solta. A faixa no piso segura.
 {
     const p = makePlayer(HOLE_LEFT - 20);
     const input = makeInput();
@@ -56,46 +56,41 @@ const runUntilFall = (p, input, maxFrames) => {
     for (let f = 0; f < 12; f++) tick(p, input);
     input.held.clear();
     for (let f = 0; f < 90; f++) tick(p, input);
-    assert(!p.falling, "Passar de leve na beirada e soltar não derruba");
-    assert(p.x < HOLE_LEFT, `Soltando, volta ao piso (x=${p.x.toFixed(1)} < ${HOLE_LEFT})`);
+    assert(!p.falling, "Esbarrar na borda e soltar não derruba");
+    assert(p.x < HOLE_LEFT, `Soltando, continua no piso (x=${p.x.toFixed(1)} < ${HOLE_LEFT})`);
 }
 
-// 2) Antigo comportamento: pés 2px dentro do buraco já não derrubam.
+// 2) Pés no tile do buraco: cai no mesmo frame, sem tolerância por dentro.
 {
     const p = makePlayer(HOLE_LEFT + 2);
-    const input = makeInput();
-    for (let f = 0; f < 60; f++) tick(p, input);
-    assert(!p.falling, "Pés 2px dentro do buraco, parado, não cai");
-    assert(p.x <= HOLE_LEFT + 0.01, "Parado na beirada, é empurrado de volta ao piso");
+    assert(runUntilFall(p, makeInput(), 1) === 1, "Pés 2px dentro do buraco caem na hora");
 }
 
-// 3) Insistir para dentro: cai, mas depois de um tempo (não no 1º frame).
+// 3) Insistir para dentro: a faixa no piso freia, mas acaba caindo.
 {
-    const p = makePlayer(HOLE_LEFT - 10);
+    const p = makePlayer(HOLE_LEFT - 30);
     const input = makeInput();
     input.held.add('right');
     const frames = runUntilFall(p, input, 240);
     assert(frames > 0, "Insistindo para dentro do buraco, acaba caindo");
-    assert(frames >= 15, `A queda exige insistência (${frames} frames, mínimo 15)`);
+    assert(frames >= 12, `A queda exige insistência (${frames} frames, mínimo 12)`);
 }
 
-// 4) Knockback (força do takeDamage = 16) vindo do PISO, perto da beirada:
-//    a resistência segura; já na beirada, o mesmo golpe derruba.
+// 4) Empurrão leve na faixa é segurado; knockback forte (takeDamage = 16) derruba.
 {
     const p = makePlayer(HOLE_LEFT - 10);
-    p.vx = 16;
-    const frames = runUntilFall(p, makeInput(), 120);
-    assert(frames < 0, "Knockback a partir do piso, perto da beirada, não derruba");
+    p.vx = 4;
+    assert(runUntilFall(p, makeInput(), 120) < 0, "Empurrão leve perto da borda não derruba");
+    assert(p.x < HOLE_LEFT - 10, "A faixa empurra de volta para o piso");
 
-    const q = makePlayer(HOLE_LEFT + 12);
+    const q = makePlayer(HOLE_LEFT - 10);
     q.vx = 16;
-    const framesQ = runUntilFall(q, makeInput(), 120);
-    assert(framesQ > 0, `Knockback a partir da beirada derruba (${framesQ} frames)`);
+    assert(runUntilFall(q, makeInput(), 120) > 0, "Knockback forte perto da borda derruba");
 }
 
-// 5) Andar AO LONGO da beirada não é freado (só a componente para dentro).
+// 5) Andar AO LONGO da borda, dentro da faixa, não é freado (só a componente para dentro).
 {
-    const p = makePlayer(HOLE_LEFT + 4);
+    const p = makePlayer(HOLE_LEFT - 4);
     p.y = 1 * TILE + TILE / 2;
     p.vx = 0; p.vy = 3;
     const vy0 = p.vy;
@@ -103,8 +98,8 @@ const runUntilFall = (p, input, maxFrames) => {
     assert(Math.abs(p.vy - vy0) < 1e-9, "Velocidade paralela à beirada não é freada");
 }
 
-// 5b) A queda é medida nos PÉS: com o centro ainda acima do buraco (só os pés
-//     dentro), o jogador já está na beirada; insistindo para baixo, cai.
+// 5b) A queda é medida nos PÉS: com o centro acima do buraco e os pés na faixa, sofre o
+//     empurrão; com os pés no tile do buraco, cai.
 {
     const vFloor = [
         [W, W, W, W, W],
@@ -120,10 +115,14 @@ const runUntilFall = (p, input, maxFrames) => {
     };
     const vQuery = new DungeonTileQuery({ rooms: vRooms });
     const holeTop = 3 * TILE;
-    const p = new Player(2 * TILE + TILE / 2, holeTop - 2, '#f00', ['up', 'down', 'left', 'right'], null, 'P');
+    const p = new Player(2 * TILE + TILE / 2, holeTop - 2 - 14 - 4, '#f00', ['up', 'down', 'left', 'right'], null, 'P');
     const yBefore = p.y;
     vQuery.checkHoleFalls([p]);
-    assert(p.y < yBefore, "Centro acima do buraco mas pés dentro: já sofre o empurrão da beirada");
+    assert(!p.falling && p.y < yBefore, "Pés 4px antes da borda norte: empurrado para trás, não cai");
+
+    const q = new Player(2 * TILE + TILE / 2, holeTop - 14 + 1, '#f00', ['up', 'down', 'left', 'right'], null, 'P');
+    vQuery.checkHoleFalls([q]);
+    assert(q.falling, "Centro acima do buraco mas pés dentro: cai");
 
     const input = makeInput();
     input.held.add('down');

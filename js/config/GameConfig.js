@@ -61,6 +61,10 @@ export const ROOM_INTRO = {
 export const DOOR_STUB_TILES = 2;
 export const DOOR_ENTER_DEPTH = 70;
 
+// Folga para o player subir um pouco "para dentro" das paredes superiores (salas do Editor 2.0),
+// dando a sensação de encostar/sobrepor a parede de cima. 20% de um tile.
+export const TOP_WALL_CLIMB = TILE * 0.2;
+
 export const PLAYER_DOOR_SPAWN_TILES = {
     N: {
         p1: { col: 6, row: 1 },
@@ -116,12 +120,12 @@ export const BACKGROUND_TILE = 78;
 
 export const HOLE_TILE = -1;
 
+// Pés no tile do buraco = queda imediata. A resistência fica no piso: faixa de `edgeMargin` px antes da borda.
 export const HOLE_FALL = Object.freeze({
-    edgeMargin: 8,
+    edgeMargin: 20,
     footOffset: 14,
     inwardDamping: 0.7,
     pushBack: 0.9,
-    graceFrames: 18,
 
     livesLost: 1,
     respawnInvulnFrames: 90

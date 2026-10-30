@@ -34,11 +34,11 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
 ## Dash (individual, only while the chain is snapped)
 
 - Key = `controls[4]` (P1 `" "`, P2 `"enter"`); gamepad A (0) / RB (5) mapped to it (`InputHandler.dashButtons`). Edge-triggered inside `Player` (`_dashHeld`), no buffer. A key already held when the chain snaps does not fire.
-- Starts only if `canDash && !feetInHole && dashCooldown === 0 && hurtTimer === 0` and not `falling`. `feetInHole` (`tiles.feetInHole(p)`, feet over a hole tile) blocks starting from inside the edge, which would add up to `edgeMargin` of reach and cross a 2-tile gap.
+- Starts only if `canDash && !feetInHole && dashCooldown === 0 && hurtTimer === 0` and not `falling`. `feetInHole` (`tiles.feetInHole(p)`, feet over a hole tile) blocks it; in practice those feet fall that same step.
 - `Game.setPaused(false)` calls `latchDashKey()` on both players, so the Enter / pad A that closed the menu does not fire a dash. Game-over restart via Space/Enter/pad A/Start waits `GAME_OVER_INPUT_DELAY_MS` (400 ms, same as the death-button focus delay) because those are dash keys too. Direction = current 8-dir input, else `lastMoveX/Y`. No steering while `dashing`.
 - `PLAYER_DASH` (GameConfig): `speed` 12 × `durationSteps` 9 (~108 px), then velocity = `exitSpeed` 4.2 along `dashDir*`. `cooldownSteps` 60, counted from the end of the dash (`dashCharge` 0..1 getter, 0 while dashing).
-- While `dashing`: `takeDamage` returns false (separate from `invulnerableTimer`, no blink); `Game` leaves the player out of `resolveEntityCollisions` (walls still apply); `checkHoleFalls` skips the player (no pushback, no grace); no footsteps.
-- End of dash (`justEndedDash`): if the feet are beyond `HOLE_FALL.edgeMargin` inside a hole, the player falls that step (no grace). A 1-tile gap is crossable, 2 tiles never.
+- While `dashing`: `takeDamage` returns false (separate from `invulnerableTimer`, no blink); `Game` leaves the player out of `resolveEntityCollisions` (walls still apply); `checkHoleFalls` skips the player (no pushback, no fall); no footsteps.
+- End of dash: if the feet are on a hole tile, the player falls on the next step. A 1-tile gap is crossable, 2 tiles never.
 - Flags: `justDashed` (Game plays `playerDash` + `triggerDust`), `justEndedDash`, `dashEnabled` (last `canDash`, read by the HUD bar). `afterimages` (tinted ghosts, drawn in `Player.draw`).
 - Resets: `respawnAt` (death-respawn) and `restart` (new Player) refill the charge. `cancelDash()` (door transition, `newDungeon`) cuts a dash in progress but keeps the cooldown running. Reconnecting mid-dash lets the dash finish.
 - `PlayerAI` never dashes (legacy bot).
@@ -67,7 +67,7 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
    - `weapon.setStrain(0..1)` (max of strain ratio and distance ratio), `weapon.update`, `weapon.updateDropped` when loose.
 5. `Game.enforceSeparationLimit()`: hard positional cap at `MAX_PLAYER_SEPARATION` (620) while connected (larger than `breakDistance`, so normally unreachable).
 6. Collisions: players + live enemies as ellipses (`resolveEntityCollisions`), saw disc as a solid circle (`collisionRadius`) when connected, wall boxes, room clamping.
-7. Holes: `tiles.checkHoleFalls` → after `HOLE_FALL.graceFrames` beyond the edge, `startFalling`. First fall step: `_dropSawOnFall` → `chain.forceDrop` with `tiles.safeDropPoint` (seeded from non-falling players / entry spawns, avoids hole-adjacent tiles).
+7. Holes: `tiles.checkHoleFalls` → feet (`y + footOffset`) on a hole tile = `startFalling` that step. Resistance is outside the hole: within `HOLE_FALL.edgeMargin` (20 px) of a neighbouring hole tile, the inward velocity loses `1 - inwardDamping` per step and the player is pushed back up to `pushBack` px; parallel motion is untouched. A light push is held, insisting (~16 steps) or a full knockback (16) falls. First fall step: `_dropSawOnFall` → `chain.forceDrop` with `tiles.safeDropPoint` (seeded from non-falling players / entry spawns, avoids hole-adjacent tiles).
 8. `_resolveFall` when `fallComplete`: `lives -= HOLE_FALL.livesLost`; if still alive, `respawnAt(entry spawn, HOLE_FALL.respawnInvulnFrames)` + `tiles.ensureSafeSpawn`.
 9. Hearts: `_updateHearts` gives +1 life (cap 3 hardcoded) if `dist <= heart.radius + player.hitRadius`.
 10. Game over when either player hits 0 lives.
@@ -93,7 +93,7 @@ Disabled by default; toggled with `I` (own keydown listener) or `window.playerAI
 
 - `js/config/ChainConfig.js` `CHAIN` (was hard-coded in the `Game` constructor until `feat/anvil-forge`): `rest 130`, `stiffness 0.02`, `breakDistance 240`, `strainDistance 165`, `strainLimit 30`, `reconnectDistance 110`, `pickupRadius 60`, `snapImpulse 12`, `playerSafeZone: PLAYER_SAFE_ZONE`. `reconnectDelay` default 20 (Chain.js). The Elasticidade upgrade rewrites `chain.strainDistance`/`breakDistance` from these bases (`applySawUpgrades`).
 - Saw absent (Editor 2.0 maps whose anvil offers the Serra recipe): `chain.reset({ present: false })` → `hasSaw` false, not connected, `_canReconnect` and `forceDrop` refuse, nothing is drawn. `reset()` without arguments keeps the current `present` (door transition). `chain.spawnSaw(x, y)` makes it present and dropped at a point; both players must then come within `pickupRadius`. While absent, players walk free and dash only if `demoProgress.state.dash`.
-- `js/config/GameConfig.js`: `PLAYER_DASH`, `MAX_PLAYER_SEPARATION`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `graceFrames`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
+- `js/config/GameConfig.js`: `PLAYER_DASH`, `MAX_PLAYER_SEPARATION`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
 - `js/config/EntityConfig.js`: `playerConfigs` (color, controls, name, sprite crops, `drawHeight`, hurt/scared sheets).
 - `Player.js` (hardcoded): `speed`, `lives`, invuln 65, knockback 16, `hurtDuration`, `scaredDuration`, `fallDuration`, `slideDuration`.
 

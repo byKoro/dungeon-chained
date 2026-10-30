@@ -298,7 +298,7 @@ export class Player extends Entity {
         } else {
             if (this.dashCooldown > 0) this.dashCooldown--;
             this.handleInput(input);
-            // Sair de dentro da beirada somaria até edgeMargin ao alcance e cruzaria vão de 2 tiles.
+            // Com os pés sobre o buraco não há dash: a queda vence.
             const ready = canDash && !feetInHole && this.dashCooldown === 0 && this.hurtTimer === 0;
             if (dashPressed && ready) this._startDash();
         }

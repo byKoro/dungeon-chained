@@ -12,6 +12,8 @@ import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
 import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
 import { SawDrag } from './systems/SawDrag.js';
+import { DroppedSawPush } from './systems/DroppedSawPush.js';
+import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
@@ -256,6 +258,13 @@ export class Game {
             canDrag: () => !this._sawOnAnvil && !this.forgeSystem?.open && !this.sawCinematic?.active,
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         }) : null;
+        this.sawPush = new DroppedSawPush({
+            chain: this.chain, getPlayers: () => [this.p1, this.p2],
+            isBlocked: (x, y) => this._sawDragBlocked(x, y),
+            getBounds: () => this.arenaBounds,
+            canPush: () => !this._sawOnAnvil && !this.sawDrag?.active && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
+        });
         this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
             renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
             getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
@@ -524,6 +533,7 @@ export class Game {
         this.dialogue?.clear();
         this.forgeSystem?.reset();
         this.sawDrag?.reset();
+        this.sawPush?.reset();
         this.roomEvents?.reset();
         this._respawnFadeAt = -Infinity;
         this.sawCinematic?.reset();
@@ -627,6 +637,7 @@ export class Game {
         this.roomEvents?.onDeath();
         this.scrap?.reset();
         this.sawDrag?.reset();
+        this.sawPush?.reset();
         this.dialogue?.clear();
         this.forgeSystem?.close({ silent: true });
         this.gibs = [];
@@ -656,12 +667,14 @@ export class Game {
         this.audio.play("playerFall", { rateMultiplier: 0.8 });
     }
 
-    // A serra arrastada não entra em buraco nem em parede (o disco tem o raio de colisão da serra).
+    // A serra largada (arrastada ou empurrada) não entra em buraco, parede, grade, estaca nem prop sólido.
     _sawDragBlocked(x, y) {
         if (this.tiles.isHoleAtWorld(x, y)) return true;
         const r = this.chain.weapon?.collisionRadius ?? 16;
-        return [...(this.rooms.current?.wallBoxes || []), ...(this.roomEvents?.solidBoxes() ?? [])].some(b =>
-            Math.hypot(x - Math.max(b.x, Math.min(x, b.x + b.w)), y - Math.max(b.y, Math.min(y, b.y + b.h))) < r);
+        const boxes = [...(this.rooms.current?.wallBoxes || []), ...(this.roomEvents?.solidBoxes() ?? []),
+            ...(this.roomProps?.solid.map(s => s.box) ?? [])];
+        if (boxes.some(b => Math.hypot(x - Math.max(b.x, Math.min(x, b.x + b.w)), y - Math.max(b.y, Math.min(y, b.y + b.h))) < r)) return true;
+        return (this.roomEvents?.solidCircles() ?? []).some(c => Math.hypot(x - c.x, y - c.y) < r + c.r);
     }
 
     _onSawReconnect() {
@@ -724,6 +737,7 @@ export class Game {
         const firstPickup = this._sawFirstConnect && this.chain.hasSaw && !this.chain.isConnected;
         if (!this.chain.isConnected) this.chain.reset();
         this.sawDrag?.reset();
+        this.sawPush?.reset();
         if (firstPickup) this._onSawReconnect();
         this._sawOnAnvil = false;
 
@@ -1138,12 +1152,15 @@ export class Game {
             }
         }
 
+        this.sawPush.update();
+
         if (room.wallBoxes?.length) {
             for (const entity of [p1, p2, ...room.enemies.filter(e => !e.airborne)]) {
                 Physics.resolveBoxCollisions(entity, room.wallBoxes);
             }
         }
         this.roomProps?.resolveCollisions([p1, p2, ...room.enemies]);
+        this.roomEvents?.resolveCollisions([p1, p2, ...liveEnemies], HOLE_FALL.footOffset, PROP_COLLISION.footRadius);
         const barBoxes = this.roomEvents?.solidBoxes() ?? [];
         if (barBoxes.length) for (const entity of [p1, p2, ...liveEnemies]) Physics.resolveBoxCollisions(entity, barBoxes);
 
@@ -1257,6 +1274,7 @@ export class Game {
     _constrainTetherPlayers(room, barBoxes, doors, canPass) {
         const players = [this.p1, this.p2];
         this.roomProps?.resolveCollisions(players);
+        this.roomEvents?.resolveCollisions(players, HOLE_FALL.footOffset, PROP_COLLISION.footRadius);
         for (const player of players) {
             if (room.wallBoxes?.length) Physics.resolveBoxCollisions(player, room.wallBoxes);
             if (barBoxes?.length) Physics.resolveBoxCollisions(player, barBoxes);
@@ -1413,7 +1431,8 @@ export class Game {
         const entities = [this.p1, this.p2, ...enemies];
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
-        const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? [])];
+        const wallDrawables = this.roomProps ? renderer.wallDrawables(rect, rooms.current.frontWalls, tiles, TILE, HOLE_FALL.footOffset) : [];
+        const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? []), ...wallDrawables];
         // Recém-forjada, a serra fica em cima da bigorna: ordenada logo depois do prop.
         if (this._sawOnAnvil) {
             const k = this._sawAnvilSortY + 0.5;

@@ -317,6 +317,30 @@ export class Renderer {
         }
     }
 
+    // Paredes com piso logo acima, para a ordenação por y: a chave é o meio do tile, então quem encosta pelo norte
+    // fica atrás e quem passa pelo sul fica na frente. Repinta também a decoração do tileset daquela célula.
+    wallDrawables(rect, walls, tiles, tile, footOffset) {
+        if (!walls?.length || !this.tileset?.ready) return [];
+        const decor = new Map((tiles?.props || []).filter(p => !p.type).map(p => [`${p.col},${p.row}`, p]));
+        return walls.map(w => {
+            const x = rect.x + w.col * tile, y = rect.y + w.row * tile, feet = y + tile / 2;
+            const p = decor.get(`${w.col},${w.row}`);
+            return {
+                y: feet - footOffset, feetSortY: feet,
+                draw: ctx => {
+                    this.tileset.draw(ctx, w.tile, x, y, tile, tile);
+                    if (!p) return;
+                    if (!p.flip) { this.tileset.draw(ctx, p.index, x, y, tile, tile); return; }
+                    ctx.save();
+                    ctx.translate(x + tile, y);
+                    ctx.scale(-1, 1);
+                    this.tileset.draw(ctx, p.index, 0, 0, tile, tile);
+                    ctx.restore();
+                }
+            };
+        });
+    }
+
     drawFrontWall(rect, tiles, tile, doorsOpen, doors = [], doorHalf = 64, stubTiles = 0) {
         if (!this.tileset || !this.tileset.ready || !tiles) return;
         const r = tiles.rows - 1;

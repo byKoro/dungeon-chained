@@ -359,7 +359,7 @@ export class CageEncounter {
     drawFloor(ctx) {
         if (!this.valid) return;
         const A = this.cfg.art, s = this.cfg.sprite, col = this.cfg.colors;
-        const stake = this._img("ropeStake"), broken = this._img("cageBroken");
+        const broken = this._img("cageBroken");
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         for (const r of this.ropes) {
@@ -372,7 +372,6 @@ export class CageEncounter {
                 ctx.globalAlpha = 1;
             }
             if (!r.cut && this.phase !== "idle") this._ring(ctx, r);
-            if (stake) this._drawStake(ctx, r, stake);
         }
         for (const k of this.jumpers) {
             if (k.t < 0 || k.landed) continue;
@@ -388,6 +387,32 @@ export class CageEncounter {
             this._shadow(ctx, d.x, d.ground, this._fallK(d, this.cfg.chest.warnSteps, this.cfg.chest.fallSteps));
         }
         ctx.restore();
+    }
+
+    // Corpos sólidos das estacas (ficam mesmo depois do corte).
+    solidCircles() {
+        if (!this.valid) return [];
+        const b = this.cfg.stakeBody, foot = this.cfg.sprite.stakeFoot;
+        return this.ropes.map(r => ({ x: r.x, y: r.y + foot - b.bodyY, r: b.radius }));
+    }
+
+    // Estacas ordenadas por y com as entidades: quem está atrás da estaca é desenhado antes dela (antes ficavam na
+    // camada de chão e o player passava por cima como um "tapete"). Sem colisão: a serra ainda é o único jeito de cortar.
+    drawables() {
+        if (!this.valid) return [];
+        const stake = this._img("ropeStake");
+        if (!stake) return [];
+        const base = r => r.y + this.cfg.sprite.stakeFoot;
+        return this.ropes.map(r => ({
+            y: base(r) - this.cfg.sprite.stakeH * this.cfg.art,
+            feetSortY: base(r),
+            draw: ctx => {
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                this._drawStake(ctx, r, stake);
+                ctx.restore();
+            }
+        }));
     }
 
     // Anel pontilhado no chão em volta da estaca: "passe a serra aqui". Fica mais forte com a serra perto.
