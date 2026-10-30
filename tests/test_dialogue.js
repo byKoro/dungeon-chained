@@ -10,6 +10,9 @@ function assert(condition, message) {
 
 console.log("=== TESTE DAS FALAS ===");
 
+// As falas estão desligadas no jogo (DIALOGUE.enabled = false); o teste liga só para exercitar o sistema.
+const TALKING = { ...DIALOGUE, enabled: true };
+
 const DT = 1 / 60;
 const held = new Set();
 const input = { isDown: k => held.has(k) };
@@ -18,7 +21,7 @@ const starts = [];
 const audio = { play: (cue, opts) => blips.push({ cue, rate: opts.rateMultiplier }) };
 const p1 = { x: 0, y: 0 }, p2 = { x: 0, y: 0 };
 const d = new DialogueSystem({
-    getPlayers: () => [p1, p2], input, audio,
+    getPlayers: () => [p1, p2], input, audio, cfg: TALKING,
     onLineStart: (i, expr, dur) => starts.push({ i, expr, dur }),
     translate: key => ({ a: "Que lugar é esse?", b: "Tem algo ali." })[key] ?? key
 });
@@ -49,7 +52,7 @@ steps(60 * 10);
 assert(!d.active && starts.length === 2, "falas acabam sozinhas pelo tempo");
 
 held.add("e");
-const d2 = new DialogueSystem({ getPlayers: () => [p1, p2], input, translate: k => k });
+const d2 = new DialogueSystem({ getPlayers: () => [p1, p2], input, cfg: TALKING, translate: k => k });
 d2.say(0, "uma fala longa para testar");
 for (let i = 0; i < 5; i++) d2.update(DT);
 assert(!d2.line.typed, "tecla já segurada no início não pula a fala");
