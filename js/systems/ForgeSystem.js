@@ -1,5 +1,6 @@
 import { FORGE, anvilRecipes } from '../config/ForgeConfig.js';
 import { TILE } from '../config/GameConfig.js';
+import { propTargetId } from './InteractPrompt.js';
 
 const INTERACT_KEYS = ["e", "shiftright"];
 // Navegação e compra só pelo teclado de verdade: o controle chega pelo MenuPad (senão o analógico, que o
@@ -23,12 +24,20 @@ export class ForgeSystem {
         this.open = false;
         this.anvil = null;
         this.nearby = null;
+        this.promptTargets = [];
         this.blocked = false;
         this.cursor = 0;
         this.recipes = [];
         this.denyT = 0;
+        this._shinePhase = 0;
         this._interactHeld = INTERACT_KEYS.map(() => true);
         this._navHeld = {};
+    }
+
+    // Quadro para o RoomProps: a bigorna fica parada com a faixa de brilho passando, como o baú fechado.
+    frameFor(prop) {
+        if (prop.type !== "anvil") return null;
+        return { type: prop.type, frame: 0, shine: (Math.sin(this._shinePhase) + 1) / 2 };
     }
 
     _anvils() {
@@ -38,12 +47,14 @@ export class ForgeSystem {
         return (room.tiles.props || []).filter(p => p.type === "anvil").map(prop => ({
             prop, roomKey: room.key,
             x: rect.x + (prop.col + 1) * this.tile,
-            y: rect.y + (prop.row + 0.5) * this.tile
+            y: rect.y + (prop.row + 0.5) * this.tile,
+            topY: rect.y + prop.row * this.tile
         }));
     }
 
     // Por step, com a simulação rodando: proximidade, dica e abertura.
     update() {
+        this._shinePhase += this.cfg.shineSpeed;
         const players = (this.getPlayers() || []).filter(p => p && !p.falling && p.lives > 0);
         const tapped = INTERACT_KEYS.map((k, i) => {
             const down = !!this.input.isDown(k);
@@ -52,12 +63,14 @@ export class ForgeSystem {
             return tap;
         });
         this.nearby = null;
+        this.promptTargets = [];
         for (const a of this._anvils()) {
             const users = players.filter(p => Math.hypot(p.x - a.x, p.y - a.y) <= this.cfg.openRadius);
             if (!users.length) continue;
             this.nearby = a;
             this.blocked = !this.canOpen();
             const all = this.getPlayers() || [];
+            this.promptTargets.push({ id: propTargetId(a.roomKey, a.prop), x: a.x, topY: a.topY, users: users.map(p => all.indexOf(p)), blocked: this.blocked });
             if (!this.blocked && users.some(p => tapped[all.indexOf(p)])) this.openAt(a);
             break;
         }
@@ -136,10 +149,5 @@ export class ForgeSystem {
         this.audio?.play("forgeBuy");
         this.onBuy?.(id, result, this.anvil);
         return result;
-    }
-
-    get prompt() {
-        if (this.open || !this.nearby) return null;
-        return this.blocked ? "forge.blocked" : "forge.prompt";
     }
 }

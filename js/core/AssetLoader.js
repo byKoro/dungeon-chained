@@ -1,5 +1,6 @@
 import { TINY_RPG_ENEMIES } from '../config/TinyRpgEnemies.js';
 import { SCRAP } from '../config/ScrapConfig.js';
+import { INTERACT_PROMPT } from '../config/InteractPromptConfig.js';
 
 export const PLAYER_EXPRESSIONS = [
     'neutro', 'assustado', 'espantado', 'raiva', 'furia', 'preocupado',
@@ -48,6 +49,7 @@ export class AssetLoader {
         for (const [key, file] of [['cageHang', 'cage_hang'], ['cageOpen', 'cage_open'], ['cageBroken', 'cage_broken'], ['ropeStake', 'rope_stake'], ['cageRope', 'rope'], ['cageRopeEnd', 'rope_end']]) {
             this.load(key, `assets/cage/${file}.png`);
         }
+        this.load("interactPrompt", INTERACT_PROMPT.sheet);
         this.load("saw", "assets/saw/saw.png");
 
         this.load("cable", "assets/saw/rope.png");

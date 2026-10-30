@@ -28,8 +28,5 @@ export const EN = Object.freeze({
     "forge.poor": "Not enough scrap.",
     "forge.empty": "Nothing to forge here.",
     "forge.hint": "Space/Enter/A: forge   E/B: leave",
-    "forge.prompt": "Anvil: P1 E / P2 Right Shift / pad X",
-    "forge.blocked": "Enemies nearby! You can't forge now.",
     "drag.prompt": "Saw: hold E / Right Shift / pad X to drag",
-    "chest.prompt": "Chest: P1 E / P2 Right Shift / pad X"
 });

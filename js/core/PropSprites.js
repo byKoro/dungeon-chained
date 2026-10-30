@@ -71,12 +71,41 @@ export class PropSprites {
         return c;
     }
 
+    // Borda de 1 pixel de arte em volta da silhueta: a arte deslocada nos 4 lados, pintada, menos a própria arte.
+    // Só composição (sem getImageData), então funciona mesmo com a imagem vinda de outra origem.
+    _outlineCanvas(img, color) {
+        const cache = this._outlines ??= new WeakMap();
+        const hit = cache.get(img);
+        if (hit?.color === color) return hit.canvas;
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const c = document.createElement("canvas");
+        c.width = W + 2; c.height = H + 2;
+        const g = c.getContext("2d");
+        g.imageSmoothingEnabled = false;
+        for (const [ox, oy] of [[0, 1], [2, 1], [1, 0], [1, 2]]) g.drawImage(img, ox, oy);
+        g.globalCompositeOperation = "source-in";
+        g.fillStyle = color;
+        g.fillRect(0, 0, c.width, c.height);
+        g.globalCompositeOperation = "destination-out";
+        g.drawImage(img, 1, 1);
+        cache.set(img, { color, canvas: c });
+        return c;
+    }
+
     // `sx`/`sy` escalam a arte a partir do meio da borda de baixo (squash/stretch).
-    drawFrame(ctx, type, index, dx, dy, tilePx, flip = false, sx = 1, sy = 1, shine = null) {
+    // `outline` = { alpha, color }: borda em volta da arte (objeto interagível no alcance).
+    drawFrame(ctx, type, index, dx, dy, tilePx, flip = false, sx = 1, sy = 1, shine = null, outline = null) {
         const def = this.defs[type];
         const img = this.frameAt(type, index);
         if (!def || !img) return false;
         const r = propArtRect(def, dx, dy, tilePx);
+        if (outline?.alpha > 0 && typeof document !== "undefined") {
+            const p = r.w / img.naturalWidth;
+            ctx.save();
+            ctx.globalAlpha *= outline.alpha;
+            this._drawImage(ctx, this._outlineCanvas(img, outline.color), { x: r.x - p, y: r.y - p, w: r.w + 2 * p, h: r.h + 2 * p }, flip, sx, sy);
+            ctx.restore();
+        }
         if (shine !== null && typeof document !== "undefined") {
             const plain = this._drawImage(ctx, img, r, flip, sx, sy);
             ctx.save();

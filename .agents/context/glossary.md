@@ -52,6 +52,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Vacuum | aspirar, puxar a sucata | `ScrapSystem.vacuum()`: every scrap on the floor flies to the nearest player, any distance (used when a wave is cleared, slice 4) |
 | Chest | baú | Prop `chest`/`mini_chest` that sits still with a sweeping shine while closed; a player right next to it (1 tile) presses interact to open it once, and it bursts its authored scrap (`prop.scrap`) |
 | Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
+| Interact icon | indicador de interagir | Round icon floating above a chest or anvil while a player is in range, one per player in their colour with the button of the device they used last (`InteractPrompt`, `assets/ui/interact_prompt.png`). The prop also gets a white 1 art px outline (borda branca) while someone is in range |
 | Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
 | Anvil / forge | bigorna / forja | Prop `anvil`; interact opens the forge menu (`ForgeSystem`), which sells the recipes the anvil offers (`prop.recipes`) for scrap |
 | Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`, `elasticity`, `doubleSaw`), with a cost per level |

@@ -35,9 +35,9 @@ export class InicialRoomScript {
     _lines() {
         const api = this.api, cfg = this.cfg;
         if (this._steps >= cfg.startDelaySteps) this._once("talk:start", [[0, "talk.start.1"], [1, "talk.start.2"]]);
-        if ((api.chests?.justOpened || []).some(o => o.roomKey === api.room.key && !o.prop.encounter)) {
-            this._once("talk:chest1", [[1, "talk.chest1"]]);
-        }
+        const opened = (api.chests?.justOpened || []).filter(o => o.roomKey === api.room.key);
+        if (opened.some(o => !o.prop.encounter)) this._once("talk:chest1", [[1, "talk.chest1"]]);
+        if (opened.some(o => o.prop.encounter)) this._once("talk:chest2", [[0, "talk.chest2"]]);
         if (this.anvil) {
             const def = ANIMATED_PROPS.anvil, c = api.tileCenter(this.anvil.col, this.anvil.row);
             const x = c.x + (def.w - 1) * api.tile / 2, y = c.y + (def.h - 1) * api.tile / 2;

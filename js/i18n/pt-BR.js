@@ -28,8 +28,5 @@ export const PT_BR = Object.freeze({
     "forge.poor": "Falta sucata.",
     "forge.empty": "Nada para forjar aqui.",
     "forge.hint": "Espaço/Enter/A: forjar   E/B: sair",
-    "forge.prompt": "Bigorna: P1 E / P2 Shift direito / controle X",
-    "forge.blocked": "Inimigos por perto! Não dá para forjar.",
     "drag.prompt": "Serra: segure E / Shift direito / controle X para arrastar",
-    "chest.prompt": "Baú: P1 E / P2 Shift direito / controle X"
 });

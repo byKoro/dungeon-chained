@@ -81,6 +81,11 @@ cage.update();
 assert(cage.phase === "idle" && !enemiesOf().length, "fora da zona: nada acontece");
 
 inZone = true;
+chain.isConnected = false;
+cage.update();
+assert(cage.phase === "idle" && !log.bars.length, "na zona mas sem a serra conectada: as grades não descem");
+
+chain.isConnected = true;
 cage.update();
 const auto = cage.ropes[0];
 assert(cage.phase === "active" && log.bars[0] === true && auto.cut && auto.cage?.phase === "warn" && log.hitStops === 1, "corda automática: grades descem, aviso antes da queda, hit stop no corte");
@@ -122,10 +127,11 @@ const c = CAGE.chest;
 steps(c.delay + c.warnSteps + c.fallSteps + 2);
 assert(cage.drop.phase === "landed" && !log.opened.length, "o baú bateu no chão; ainda não abriu");
 steps(c.squashSteps + c.openDelay + 1);
-assert(cage.phase === "done" && log.opened.length === 1 && log.bars.at(-1) === false, "depois do impacto o baú abre e as grades sobem");
-assert(log.said.includes("talk.chest2"), "fala do baú 2");
+assert(cage.phase === "done" && log.bars.at(-1) === false, "depois do impacto as grades sobem");
+assert(!log.opened.length && log.hidden.get(`${chestProp.col},${chestProp.row}`) === false, "o baú aparece fechado: só abre quando os jogadores interagirem");
+const landedAt = [chestProp.col, chestProp.row];
 cage.onDeath();
-assert(cage.phase === "done" && chestProp.col === log.opened[0].col, "morte depois de concluído não desfaz nem devolve o baú");
+assert(cage.phase === "done" && chestProp.col === landedAt[0] && chestProp.row === landedAt[1], "morte depois de concluído não desfaz nem devolve o baú");
 
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

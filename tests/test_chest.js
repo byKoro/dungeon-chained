@@ -36,7 +36,7 @@ p1.x = c1.x - CHEST.openRadius - 5; p1.y = c1.y;
 p2.x = c1.x + 400; p2.y = c1.y;
 chests.update();
 for (let i = 0; i < 120; i++) chests.update();
-assert(!chests.isOpen("1,1", chest1) && chests.prompt === null, "fechado e sem dica longe do baú");
+assert(!chests.isOpen("1,1", chest1) && chests.promptTargets.length === 0, "fechado e sem indicador longe do baú");
 assert(chests.frameFor(chest1, "1,1")?.frame === 0 && chests.frameFor(chest1, "1,1").type === "chest", "fechado fica parado no primeiro quadro");
 const s1 = chests.frameFor(chest1, "1,1").shine;
 chests.update();
@@ -47,7 +47,7 @@ assert(!chests.isOpen("1,1", chest1), "longe, apertar interagir não abre");
 
 p1.x = c1.x - CHEST.openRadius + 5;
 chests.update();
-assert(chests.prompt === "chest.prompt" && !chests.isOpen("1,1", chest1), "bem perto: mostra a dica, mas não abre sozinho");
+assert(chests.promptTargets.length === 1 && chests.promptTargets[0].users.join() === "0" && chests.promptTargets[0].topY === chest1.row * TILE && !chests.isOpen("1,1", chest1), "bem perto: indicador para o P1, mas não abre sozinho");
 press("shiftright");
 assert(!chests.isOpen("1,1", chest1), "o botão do outro jogador (longe) não abre");
 press("e");

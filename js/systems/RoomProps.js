@@ -5,7 +5,8 @@ import { propBaseBox, propSortY, pushFeetOutOfBox } from '../core/PropBodies.js'
 const PLAYER_FOOT = HOLE_FALL.footOffset ?? 14;
 
 // Props animados das salas do Editor 2.0. Os que têm `base` colidem pelos pés e são ordenados por y com as entidades;
-// os outros ficam na camada do chão. `getFrame(prop, roomKey)` permite a outro sistema (baús) trocar o quadro.
+// os outros ficam na camada do chão. `getFrame(prop, roomKey)` permite a outros sistemas (baús, bigorna, indicador de
+// interagir) trocar o quadro e pedir brilho ou borda.
 export class RoomProps {
     constructor({ rooms, sprites, getFrame = null, isHidden = null, defs = ANIMATED_PROPS, tile = TILE }) {
         Object.assign(this, { rooms, sprites, getFrame, isHidden, defs, tile });
@@ -75,7 +76,7 @@ export class RoomProps {
         const { prop } = s;
         const dx = rect.x + prop.col * this.tile, dy = rect.y + prop.row * this.tile;
         const over = this.getFrame?.(prop, roomKey);
-        if (over) this.sprites.drawFrame(ctx, over.type, over.frame, dx, dy, this.tile, !!prop.flip, over.sx ?? 1, over.sy ?? 1, over.shine ?? null);
+        if (over) this.sprites.drawFrame(ctx, over.type, over.frame, dx, dy, this.tile, !!prop.flip, over.sx ?? 1, over.sy ?? 1, over.shine ?? null, over.outline ?? null);
         else this.sprites.draw(ctx, prop.type, dx, dy, this.tile, ms, !!prop.flip);
     }
 }

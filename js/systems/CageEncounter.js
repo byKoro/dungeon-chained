@@ -70,7 +70,7 @@ export class CageEncounter {
         if (this.phase === "reward") { this._updateChestDrop(); return; }
 
         if (this.phase === "idle") {
-            if (!this.api.bothInZone(this.zoneId)) return;
+            if (!this.api.chain.isConnected || !this.api.bothInZone(this.zoneId)) return;
             this._start();
         }
         this._checkCuts();
@@ -305,9 +305,6 @@ export class CageEncounter {
     _win() {
         this.phase = "done";
         this.api.setBars(false);
-        if (this.chest && this.api.chests?.forceOpen(this.api.room.key, this.chest)) {
-            this.api.dialogue?.say(0, "talk.chest2");
-        }
     }
 
     onDeath() {

@@ -1,6 +1,7 @@
 import { ANIMATED_PROPS } from '../config/PropConfig.js';
 import { CHEST, chestScrapAmount } from '../config/ScrapConfig.js';
 import { TILE } from '../config/GameConfig.js';
+import { propTargetId } from './InteractPrompt.js';
 
 // Tecla de interagir de cada jogador (o X do controle chega como a tecla do jogador dele).
 const INTERACT_KEYS = ["e", "shiftright"];
@@ -17,12 +18,13 @@ export class ChestSystem {
         this.hidden = new Set();
         this.justOpened = [];
         this.nearby = false;
+        this.promptTargets = [];
         this._held = INTERACT_KEYS.map(() => true);
         this._shinePhase = 0;
     }
 
     _id(roomKey, prop) {
-        return `${roomKey}/${prop.col},${prop.row}`;
+        return propTargetId(roomKey, prop);
     }
 
     isOpen(roomKey, prop) {
@@ -75,6 +77,7 @@ export class ChestSystem {
     update() {
         this.justOpened = [];
         this.nearby = false;
+        this.promptTargets = [];
         this._shinePhase += this.cfg.shineSpeed;
         const taps = this._taps();
         const room = this.rooms.current;
@@ -101,18 +104,16 @@ export class ChestSystem {
             const close = players.map(p => !!p && !p.falling && p.lives > 0 && Math.hypot(p.x - c.x, p.y - c.y) <= this.cfg.openRadius);
             if (!close.some(Boolean)) continue;
             this.nearby = true;
+            this.promptTargets.push({ id, x: c.x, topY: rect.y + prop.row * this.tile, users: close.flatMap((ok, i) => ok ? [i] : []), blocked: false });
             if (used || !close.some((ok, i) => ok && taps[i])) continue;
             used = true;
+            this.promptTargets.pop();
             const amount = chestScrapAmount(prop);
             this.opened.set(id, { t: 0, burst: false, amount });
             this.justOpened.push({ prop, roomKey: room.key, amount });
             this.audio?.play("chestOpen");
         }
         if (used) this.onOpen?.();
-    }
-
-    get prompt() {
-        return this.nearby ? "chest.prompt" : null;
     }
 
     // Saída da sala antes da tampa terminar de abrir: a sucata vai direto para o pote.

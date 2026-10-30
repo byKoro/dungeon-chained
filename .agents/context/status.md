@@ -168,3 +168,14 @@ Branch codex/arauto-visual-fixes: removed generated silhouette outline and attac
 ## Arauto das Brasas — apresentação refeita (2026-10-29, `.agents/tasks/2026-10-29-arauto-intro/`)
 - Cena nova (golem remonta com a morte ao contrário, ergue os braços e bate no chão) substitui a do Codex (`2026-10-29-arauto-entrance-scene`, código removido). Segurar E pula. Faixas no estilo da forja também na fase 2. Expressões no boneco em campo.
 - Testado por script (`test_arauto_intro.js`); não visto no jogo. Pendente: avaliar o som provisório `arautoAssemble` e a transição morte→attack2. WAVs `arauto-intro-*` sem uso.
+
+## Início — balões off e grades só com a serra (2026-10-29)
+- `DIALOGUE.enabled` and `SCRIPT_LINES.enabled` are `false`: no speech bubbles in the Início (system, script and i18n keys kept; flip the flags to bring them back). `tests/test_dialogue.js` forces `enabled: true` through `cfg`.
+- `CageEncounter` starts (bars down, auto rope snaps) only when both players are in the `salao` zone **and** the saw is connected (`chain.isConnected`). After a run death the saw must be picked up again before the bars can drop.
+
+## Início — indicador de interagir (2026-10-29)
+- `InteractPrompt` + `assets/ui/interact_prompt.png` (script `scripts/gen-interact-prompt.py`): icon above chests and anvil, per player and per device (keyboard `E`/`⇧`, Xbox `X`, DualShock `□`). Bottom text bars for chest/anvil removed. See `systems/ui.md`.
+- Baú 2 (cage reward) no longer opens by itself: it lands closed, the bars rise, and the players open it with interact. `talk.chest2` now plays from `InicialRoomScript` on that open.
+- Not verified: I could not open the game, so the icon placement, pop-in and device switch were not seen running; only unit tests (`test_interact_prompt`, `test_chest`, `test_forge_menu`, `test_room_events`, `test_inicial_script`) and the asset contact sheet. Pad detection by `gamepad.id` was only tested with sample id strings.
+- Known limits: `SawDrag` still shows its text bar (the feature is being removed); `DemoProgress` interactives (key, lever) still use the text bar.
+- White outline on in-range chests/anvil (fade in 6 steps, out 9) and the chest's shine band on the anvil. Not seen in the game: the outline was checked with a PIL reproduction of the same 4-way dilation on the real chest and anvil sprites, not in the browser; how the room lighting darkens it is not verified. While the chest lid opens, the fading outline uses the bottom-centre pivot of the bigger outline rect, so it can drift by 1 world px during the squash.

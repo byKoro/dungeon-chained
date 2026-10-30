@@ -45,6 +45,8 @@ assert(said.length === 2, "falas do início tocam uma vez só");
 chests.justOpened = [{ prop: encounterChest, roomKey: "1,1" }];
 steps(1);
 assert(!said.includes("1:talk.chest1"), "baú do encontro não dispara a fala do baú 1");
+assert(said.at(-1) === "0:talk.chest2", "baú do encontro aberto pelos jogadores: Amarelo fala do baú 2");
+chests.justOpened = [];
 chests.justOpened = [{ prop: chest1, roomKey: "1,1" }];
 steps(1);
 chests.justOpened = [];

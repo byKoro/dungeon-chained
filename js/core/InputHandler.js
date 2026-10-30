@@ -1,5 +1,19 @@
+// Teclas de cada jogador (e.key e e.code em minúsculas), para saber quem usou o teclado.
+const KEYBOARD_OWNER = [
+    new Set(["w", "a", "s", "d", " ", "e", "keyw", "keya", "keys", "keyd", "space", "keye"]),
+    new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "enter", "shiftright"])
+];
+
+// Ícone do botão: PlayStation pelo fabricante Sony (054c) ou pelo nome; qualquer outro controle cai no Xbox.
+export function padKind(id = "") {
+    return /054c|playstation|dualshock|dualsense|wireless controller/i.test(id) ? "playstation" : "xbox";
+}
+
 export class InputHandler {
     constructor() {
+
+        // Último dispositivo que cada jogador apertou: "keyboard", "xbox" ou "playstation".
+        this.devices = ["keyboard", "keyboard"];
 
         this.keys = new Set();
 
@@ -18,6 +32,7 @@ export class InputHandler {
             this.keyboardKeys.add(e.code.toLowerCase());
 
             const k = e.key.toLowerCase();
+            KEYBOARD_OWNER.forEach((keys, i) => { if (keys.has(k) || keys.has(e.code.toLowerCase())) this.devices[i] = "keyboard"; });
             if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) {
                 e.preventDefault();
             }
@@ -54,6 +69,7 @@ export class InputHandler {
             if (!pad) continue;
 
             const map = this.gamepadControls[i];
+            this.notePadActivity(i, pad);
             if (this.isButtonPressed(pad, 2)) this.keys.add(i === 0 ? "e" : "shiftright");
 
             const ax = pad.axes[0] || 0;
@@ -69,6 +85,17 @@ export class InputHandler {
             if (this.isButtonPressed(pad, 15)) this.keys.add(map.right);
             if (this.dashButtons.some(b => this.isButtonPressed(pad, b))) this.keys.add(map.dash);
         }
+    }
+
+    // Qualquer botão ou analógico passado da zona morta troca o ícone daquele jogador para o do controle.
+    notePadActivity(index, pad) {
+        const active = (pad.buttons || []).some((_, b) => this.isButtonPressed(pad, b))
+            || (pad.axes || []).slice(0, 2).some(v => Math.abs(v) > this.deadZone);
+        if (active) this.devices[index] = padKind(pad.id);
+    }
+
+    deviceFor(index) {
+        return this.devices[index] ?? "keyboard";
     }
 
     isButtonPressed(pad, index) {

@@ -38,18 +38,22 @@ const fs = new ForgeSystem({
 });
 
 fs.update();
+const shine0 = fs.frameFor(anvil)?.shine;
+fs.update();
+assert(fs.frameFor(anvil)?.type === "anvil" && fs.frameFor(anvil).frame === 0 && shine0 !== fs.frameFor(anvil).shine, "a bigorna tem a faixa de brilho andando, como o baú");
+assert(fs.frameFor({ type: "chest", col: 1, row: 1 }) === null, "o brilho da forja só vale para a bigorna");
 tap(fs, "e");
-assert(!fs.open && fs.prompt === null, "longe da bigorna: sem dica e não abre");
+assert(!fs.open && fs.promptTargets.length === 0, "longe da bigorna: sem indicador e não abre");
 
 p2.x = ax + 60;
 fs.update();
-assert(fs.prompt === "forge.prompt", "perto: mostra a dica");
+assert(fs.promptTargets.length === 1 && fs.promptTargets[0].users.join() === "1" && !fs.promptTargets[0].blocked, "perto: indicador para o P2");
 tap(fs, "e");
 assert(!fs.open, "P1 longe apertando E não abre (só quem está perto)");
 
 enemiesAlive = true;
 tap(fs, "shiftright");
-assert(!fs.open && fs.prompt === "forge.blocked", "com inimigos vivos não abre");
+assert(!fs.open && fs.promptTargets[0]?.blocked === true, "com inimigos vivos não abre e o indicador marca bloqueado");
 enemiesAlive = false;
 
 tap(fs, "shiftright");

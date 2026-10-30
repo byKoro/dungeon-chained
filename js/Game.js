@@ -15,6 +15,7 @@ import { SawDrag } from './systems/SawDrag.js';
 import { RoomEvents } from './systems/RoomEvents.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
+import { InteractPrompt, propTargetId } from './systems/InteractPrompt.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
 import { FORGE, SAW_CINEMATIC } from './config/ForgeConfig.js';
@@ -197,7 +198,7 @@ export class Game {
         } });
         this.animatedProps = this.mapData ? new PropSprites() : null;
         this.roomProps = this.animatedProps ? new RoomProps({
-            rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this.chests?.frameFor(prop, key),
+            rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this._propFrame(prop, key),
             isHidden: (prop, key) => !!this.chests?.isHidden(key, prop)
         }) : null;
         const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
@@ -258,6 +259,13 @@ export class Game {
         this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
             renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
             getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
+        }) : null;
+
+        this.interactPrompt = this.chests && this.forgeSystem ? new InteractPrompt({
+            sources: [() => this.chests.promptTargets, () => this.forgeSystem.promptTargets],
+            getDevice: i => this.input.deviceFor(i),
+            sheet: this.assets.get("interactPrompt"),
+            isVisible: () => !this.forgeSystem.open && !this.sawCinematic?.active && !this.transition && !this.gameOver
         }) : null;
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
@@ -512,6 +520,7 @@ export class Game {
         this.scrap?.reset();
         this.scrapCounter?.reset();
         this.chests?.reset();
+        this.interactPrompt?.reset();
         this.dialogue?.clear();
         this.forgeSystem?.reset();
         this.sawDrag?.reset();
@@ -573,6 +582,13 @@ export class Game {
         this.renderer.resetSway();
 
         this._activateRoomEnemies();
+    }
+
+    // Quadro de um prop sólido: baú ou bigorna (brilho), mais a borda branca quando alguém está no alcance.
+    _propFrame(prop, roomKey) {
+        const over = this.chests?.frameFor(prop, roomKey) ?? this.forgeSystem?.frameFor(prop);
+        const outline = over && this.interactPrompt?.outlineFor(propTargetId(roomKey, prop));
+        return outline ? { ...over, outline } : over;
     }
 
     // Mapas cuja bigorna oferece a Serra começam sem ela; o teste do editor pode forçar qualquer estado.
@@ -1230,6 +1246,7 @@ export class Game {
         this.thrownSaw.update();
         // Antes das falas e dos interativos: abrir a bigorna consome o aperto de interagir.
         this.forgeSystem?.update();
+        this.interactPrompt?.update(performance.now());
         this.dialogue?.update(deltaSeconds);
         this.demoProgress.update(deltaSeconds);
         this.demoEncounter.update();
@@ -1322,7 +1339,7 @@ export class Game {
         if (this.mapData && !cinematic && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
             const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const promptKey = this.sawCinematic?.active ? null : (this.chests?.prompt || this.forgeSystem?.prompt || this.sawDrag?.prompt);
+            const promptKey = this.sawCinematic?.active ? null : this.sawDrag?.prompt;
             const message = this.demoProgress.messageTime ? this.demoProgress.message
                 : (this.demoProgress.prompt || (promptKey ? t(promptKey) : ""));
             if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
@@ -1425,6 +1442,7 @@ export class Game {
         this.sawCinematic?.drawWorld(ctx);
         // Cordas e gaiolas caindo: no passe do mundo, para a luz do ambiente atuar nelas.
         this.roomEvents?.drawAir(ctx);
+        this.interactPrompt?.draw(ctx, nowMs);
 
         this.particleSystem.drawFlames(ctx);
         this.ghostfire.drawAir(ctx, rooms.current);

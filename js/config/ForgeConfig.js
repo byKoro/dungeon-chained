@@ -15,6 +15,8 @@ export const FORGE = Object.freeze({
     defaultRecipes: Object.freeze(["saw", "size", "elasticity", "weight", "doubleSaw"]),
     denySteps: 12,
     denyRate: 0.6,
+    // Faixa de brilho na bigorna, no mesmo ritmo do baú fechado (CHEST.shineSpeed).
+    shineSpeed: 0.03,
     splitFeedback: Object.freeze({ shake: 3, sparks: 6, power: 0.8, splitRate: 1.35, mergeRate: 1.15 })
 });
 
