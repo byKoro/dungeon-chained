@@ -46,7 +46,7 @@ export const HIT_FEEL = Object.freeze({
 export const DAMAGE_NUMBER = Object.freeze({
     max: 24,
     // Tamanho de um pixel da fonte em px de mundo (arte 16 px por tile = 4 px de mundo).
-    pixel: 4,
+    pixel: 2,
     popScale: 1.5,
     popSteps: 5,
     riseSpeed: 1.8,
@@ -75,7 +75,7 @@ export const DAMAGE_COMBO = Object.freeze({
     // Acima do ponto onde nascem os números individuais (eles sobem ~26 px até parar).
     offsetY: 34,
     // 1,5x o pixel do número individual.
-    pixel: 6,
+    pixel: 4,
     popScale: 1.45,
     popSteps: 6,
     outline: '#1a0d14',
