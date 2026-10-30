@@ -2,8 +2,9 @@ import { TILE, HOLE_TILE, HOLE_FALL } from '../config/GameConfig.js';
 
 export class DungeonTileQuery {
 
-    constructor({ rooms }) {
+    constructor({ rooms, holeFall = HOLE_FALL }) {
         this.rooms = rooms;
+        this.holeFall = holeFall;
     }
 
     _floor() {
@@ -53,63 +54,50 @@ export class DungeonTileQuery {
         const tiles = this._floor();
         if (!tiles) return;
         const rect = this.rooms.cellRect();
-        const wallSet = new Set((tiles.walls || []).map(w => `${w.col},${w.row}`));
-        const { edgeMargin, inwardDamping, pushBack, graceFrames, footOffset = 0 } = HOLE_FALL;
+        const { edgeMargin, inwardDamping, pushBack, footOffset = 0 } = this.holeFall;
 
         for (const player of players) {
-            if (player.falling) continue;
-            if (player.dashing) { player.holeGrace = 0; continue; }
-            const hole = this._holeDepth(tiles, rect, wallSet, player.x, player.y + footOffset);
-            if (!hole) { player.holeGrace = 0; continue; }
-
-            const { depth, nx, ny, col, row } = hole;
-            const beyondEdge = depth > edgeMargin;
-            player.holeGrace = beyondEdge ? (player.holeGrace ?? 0) + 1 : 0;
-
-            // Dash que termina dentro do buraco não ganha a tolerância da beirada.
-            if (beyondEdge && (player.holeGrace >= graceFrames || player.justEndedDash)) {
-                player.holeGrace = 0;
-
+            if (player.falling || player.dashing) continue;
+            const fx = player.x, fy = player.y + footOffset;
+            const { col, row } = this._toTile(fx, fy, rect);
+            // Pés no tile do buraco: cai na hora.
+            if (this._tileValue(tiles, col, row) === HOLE_TILE) {
                 player.startFalling(rect.x + (col + 0.5) * TILE, rect.y + (row + 0.5) * TILE);
                 continue;
             }
 
-            if (nx === 0 && ny === 0) continue;
-
+            // Faixa de resistência no piso, antes da borda: freia o passo para dentro e empurra de volta.
+            const edge = this._holeEdge(tiles, rect, col, row, fx, fy);
+            if (!edge || edge.dist >= edgeMargin) continue;
+            const { nx, ny } = edge;
             const inward = -(player.vx * nx + player.vy * ny);
             if (inward > 0) {
                 const cut = inward * (1 - inwardDamping);
                 player.vx += nx * cut;
                 player.vy += ny * cut;
             }
-
-            const k = Math.max(0.35, Math.min(1, depth / edgeMargin));
-            const push = Math.min(depth + 0.5, pushBack * k);
+            const push = pushBack * Math.max(0.35, 1 - edge.dist / edgeMargin);
             player.x += nx * push;
             player.y += ny * push;
         }
     }
 
-    _holeDepth(tiles, rect, wallSet, x, y) {
-        const { col, row } = this._toTile(x, y, rect);
-        if (this._tileValue(tiles, col, row) !== HOLE_TILE) return null;
-
-        let best = Infinity, bx = 0, by = 0;
+    // Distância dos pés até o tile de buraco vizinho mais perto e a direção para longe dele.
+    _holeEdge(tiles, rect, col, row, x, y) {
+        let best = null;
         for (let dr = -1; dr <= 1; dr++) {
             for (let dc = -1; dc <= 1; dc++) {
-                const c = col + dc, r = row + dr;
-                if (!this._isWalkable(tiles, c, r, wallSet)) continue;
-
-                const left = rect.x + c * TILE, top = rect.y + r * TILE;
+                if ((!dr && !dc) || this._tileValue(tiles, col + dc, row + dr) !== HOLE_TILE) continue;
+                const left = rect.x + (col + dc) * TILE, top = rect.y + (row + dr) * TILE;
                 const px = Math.max(left, Math.min(left + TILE, x));
                 const py = Math.max(top, Math.min(top + TILE, y));
-                const d = Math.hypot(px - x, py - y);
-                if (d < best) { best = d; bx = px - x; by = py - y; }
+                const dist = Math.hypot(x - px, y - py);
+                if (!best || dist < best.dist) best = { dist, nx: dist ? (x - px) / dist : -dc, ny: dist ? (y - py) / dist : -dr };
             }
         }
-        if (best === Infinity) return { depth: Infinity, nx: 0, ny: 0, col, row };
-        const len = best || 1;
-        return { depth: best, nx: bx / len, ny: by / len, col, row };
+        if (!best) return null;
+        const len = Math.hypot(best.nx, best.ny) || 1;
+        return { dist: best.dist, nx: best.nx / len, ny: best.ny / len };
     }
 
     _isWalkable(tiles, c, r, wallSet) {

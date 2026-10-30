@@ -179,3 +179,40 @@ Branch codex/arauto-visual-fixes: removed generated silhouette outline and attac
 - Not verified: I could not open the game, so the icon placement, pop-in and device switch were not seen running; only unit tests (`test_interact_prompt`, `test_chest`, `test_forge_menu`, `test_room_events`, `test_inicial_script`) and the asset contact sheet. Pad detection by `gamepad.id` was only tested with sample id strings.
 - Known limits: `SawDrag` still shows its text bar (the feature is being removed); `DemoProgress` interactives (key, lever) still use the text bar.
 - White outline on in-range chests/anvil (fade in 6 steps, out 9) and the chest's shine band on the anvil. Not seen in the game: the outline was checked with a PIL reproduction of the same 4-way dilation on the real chest and anvil sprites, not in the browser; how the room lighting darkens it is not verified. While the chest lid opens, the fading outline uses the bottom-centre pivot of the bigger outline rect, so it can drift by 1 world px during the squash.
+
+## Ordem de render de paredes/props — 2026-10-30 (`.agents/tasks/2026-10-30-wall-render-order/`)
+- Salas do Editor 2.0: (1) paredes frontais/baixas (tile `41..44`, fora da borda) agora são repintadas em `Renderer.drawFrontWall` no passe da frente — o player fica atrás delas (oclusão total), antes passava por cima; (2) player pode subir `TOP_WALL_CLIMB` (`TILE*0.2` = 12.8 px) a mais encostado nas paredes superiores — `clampPlayer` relaxa `minY` (sem porta N) e `Room` encolhe as `wallBoxes` da linha de topo por cima; (3) os seis props sólidos sem `base` (`box_1/2`, `mini_box_1/2`, `flamethrower_v/h`) ganharam `base` em `PropConfig.js` e entram na ordenação por y, corrigindo o "tapete" (player andava por cima). Bases dos boxes/lança-chamas são ponto de partida, a afinar no playtest.
+- Arquivos: `js/config/GameConfig.js` (`TOP_WALL_CLIMB`), `js/config/PropConfig.js`, `js/rooms/Room.js`, `js/core/Renderer.js`, `js/rooms/RoomManager.js`. Doc: `systems/rendering.md`.
+- Como a chave de "parede frontal" é o tile `41..44` (não o `side`, que é sempre `'top'` nos mapas do Editor 2.0): se um mapa usar outro tile para parede de baixo, ela não irá para o passe da frente. Não visto no jogo rodando — verificado por `npm test` (42/43, só falha o pré-existente #5 `test_modular_grid`) e `npm run validate:map` (falha só no pré-existente #4 `corridor_vertical_ns_1.json`). Nenhuma falha nova.
+
+## Ordem de render de paredes/props — correção v2 (2026-10-30, mesma task)
+A primeira tentativa (acima) não funcionou no jogo: as premissas estavam erradas. Fatos reais (via context-gatherer + `inicial.json`):
+- A parede inferior por onde o player passava é a **borda inferior** da sala (tiles `42/44/45` nas 2 últimas linhas), **fora** do `arenaBounds` — nunca virava `wallBox` nem passe da frente. O range `41..44` é só a face frontal de arestas internas; o tile `42` é `top` por default (tabela `wallSideForTile`: top=1..4/50..55, bottom/front=41..44, left=5/15/25/35/45, right=0/10/20/30/40).
+- A "estaca" é o interactive `rope` → `CageEncounter`, desenhada em `drawFloor` (antes das entidades) e **sem colisão de player** por design (só a serra corta).
+- O climb de 20% usava `isTop = menor row global` — só uma linha de parede ganhava a folga.
+- Bug colateral: `AuthoredDungeon` tratava `'v'` (void) como parede sólida → parede invisível sobre tiles vazios.
+
+Correções v2:
+- `Renderer.drawFrontWall`: agora repinta as **2 últimas linhas** da sala (moldura de borda inferior) + as arestas internas `41..44`, por cima do player (oclusão total).
+- `Room.js`: climb de `TOP_WALL_CLIMB` em **toda** parede com topo exposto (sem parede na célula logo acima), não só na menor row. Removidos os flags `front`/`top` não lidos.
+- `AuthoredDungeon.js`: só `'w'` vira parede; `'v'` deixou de colidir.
+- `CageEncounter.drawables()` + `InicialRoomScript.drawables()` + `RoomEvents.drawables()`: a estaca entra na ordenação por y (oclui o player quando ele está atrás), **sem** colisão (sombra/anel/destroços seguem no `drawFloor`). Confirmado Q2 = só visual.
+- Arquivos: `js/core/Renderer.js`, `js/rooms/Room.js`, `js/rooms/AuthoredDungeon.js`, `js/systems/CageEncounter.js`, `js/systems/RoomEvents.js`, `js/systems/roomScripts/InicialRoomScript.js`. Doc: `systems/rendering.md`.
+- Verificação: `npm test` 42/43 (`test_inicial_script` e `test_room_events` passam), `validate:map` só no erro pré-existente #4. Nenhuma falha nova. **Não visto no jogo rodando** — precisa de playtest para confirmar visual das 3 correções e afinar `TOP_WALL_CLIMB`/bordas.
+
+## Ordem de render de paredes/props — v3, conferida no Electron (2026-10-30)
+A v2 repintava as duas últimas linhas da sala por cima de tudo e isso escondia os jogadores atrás de tiles de piso; também tinha tirado a colisão do void. As duas mudanças foram revertidas.
+- Paredes internas com piso logo acima (`Room.frontWalls`) entram na ordenação por y (`Renderer.wallDrawables`, chave no meio do tile). Paredes internas com piso logo abaixo têm a `wallBox` encurtada por baixo em `TOP_WALL_CLIMB` (12,8 px). O void volta a colidir.
+- Visto no Electron (`_local/verify-walls.cjs`, capturas em `_local/verify-walls/v3/`, `inicial.json`, jogadores posicionados por script): os dois ficam atrás da faixa inferior da linha 18 e da borda sul; sobem até y 10,05 tiles diante da parede superior (antes 10,25); a estaca cobre quem está ao norte dela; uma `box_1` e um `flamethrower_v` injetados ordenam pelos pés. Console sem erros.
+- Não visto: inimigos encostando nas paredes (a chave deles é `footY`), jogo com controle real, modo split F6, mapas clássicos (o caminho novo só roda com `roomProps`).
+
+## Buraco: queda imediata, resistência fora (2026-10-30)
+- `DungeonTileQuery.checkHoleFalls`: pés no tile do buraco (inclusive o lábio iluminado da arte) caem no mesmo step; `graceFrames` saiu. A resistência virou uma faixa de `HOLE_FALL.edgeMargin` (8 → 20 px) no piso antes da borda: freia o passo para dentro e empurra de volta. Esbarrão segura; insistir derruba em ~16 steps (antes ~18).
+- Mudança de jogo: knockback cheio (16) a 10 px da borda agora derruba (antes a tolerância interna segurava). `test_hole_resistance.js` reescrito para o comportamento novo.
+- Visto no Electron (`_local/verify-hole.cjs`, `inicial.json`, buraco 26–28 × 15–16): parados na faixa não caem e são empurrados para o piso; pés 2 px dentro do tile caem na hora. Inimigos não usam este código (não verificado se têm regra própria).
+
+## Estaca sólida e serra largada empurrável (2026-10-30)
+- Estacas do encontro da gaiola bloqueiam os pés de jogadores e inimigos (`CageEncounter.solidCircles`, `RoomEvents.resolveCollisions`) e a serra largada. Continuam cortáveis pela serra.
+- Serra largada vira corpo leve (`DroppedSawPush`, `SAW_PUSH`): o jogador esbarra e ela desliza devagar, rola no sprite parado, sem dano; dash/knockback chuta mais longe. Esbarrão tem som baixo (`sawLand` agudo), faíscas, pop de escala e giro. O `_sawDragBlocked` agora também considera estacas e props sólidos (vale para o arrasto).
+- Visto no Electron (`_local/verify-saw-push.cjs`, tecla `D` real via `sendInputEvent`, `inicial.json`): P1 subindo contra a estaca (3,10) para em y 10,84 tiles; segurando `D` 1,5 s a serra anda ~0,95 tile e gira ~2,2 rad, sem dano nem reconexão com o P2 longe; esbarrão de 10 px/step leva a serra ~0,55 tile. Som do esbarrão não ouvido.
+- Não visto: inimigos encostando na estaca, os dois empurrando ao mesmo tempo, serra empurrada contra parede/buraco no jogo (só a função de bloqueio foi consultada).

@@ -14,6 +14,8 @@ export const CAGE = Object.freeze({
     // A serra (disco) passando pela estaca corta a corda.
     stakeRadius: 0.3 * TILE,
     stakeHitY: -10,
+    // Corpo sólido da estaca: círculo no chão, `bodyY` px acima da base do sprite; bloqueia os pés e a serra largada.
+    stakeBody: Object.freeze({ radius: 14, bodyY: 8 }),
     nearRadius: 2 * TILE,
     ropeUp: 6 * TILE,
     ropeFade: 0.45,

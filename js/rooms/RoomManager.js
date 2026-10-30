@@ -3,7 +3,7 @@ import { Dungeon } from '../core/Dungeon.js';
 import { Room } from './Room.js';
 import {
     TILE, ROOM_COLS, ROOM_ROWS, GRID_COLS, GRID_ROWS, ROOM_COUNT,
-    DOOR_ENTER_DEPTH, scatterPropsOnFloor
+    DOOR_ENTER_DEPTH, TOP_WALL_CLIMB, scatterPropsOnFloor
 } from '../config/GameConfig.js';
 
 export class RoomManager {
@@ -249,7 +249,7 @@ export class RoomManager {
         const maxX = has.E ? bounds.maxX + DOOR_ENTER_DEPTH : bounds.maxX - r;
         player.x = Math.max(minX, Math.min(maxX, player.x));
 
-        const minY = has.N ? bounds.minY - DOOR_ENTER_DEPTH : bounds.minY + r;
+        const minY = has.N ? bounds.minY - DOOR_ENTER_DEPTH : bounds.minY + r - TOP_WALL_CLIMB;
         const maxY = has.S ? bounds.maxY + DOOR_ENTER_DEPTH : bounds.maxY - r;
         player.y = Math.max(minY, Math.min(maxY, player.y));
 

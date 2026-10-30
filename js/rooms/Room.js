@@ -1,5 +1,5 @@
 import { RoomTiles } from '../core/RoomTiles.js';
-import { ROOM_COLS, ROOM_ROWS, TILE } from '../config/GameConfig.js';
+import { ROOM_COLS, ROOM_ROWS, TILE, TOP_WALL_CLIMB } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
 import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
 import { HeartPickup } from '../entities/HeartPickup.js';
@@ -36,7 +36,17 @@ export class Room {
 
         if (cell.authored) this.tiles.doorCells = [];
         this.tiles.walls = Array.isArray(cell.customWalls) ? cell.customWalls : [];
-        this.wallBoxes = this.tiles.walls.map(wall => ({ x: bounds.minX - TILE + wall.col * TILE, y: bounds.minY - TILE + wall.row * TILE, w: TILE, h: TILE }));
+        const kinds = cell.authored?.kinds;
+        const wallAt = new Set(this.tiles.walls.map(w => `${w.col},${w.row}`));
+        const walkable = (c, r) => kinds ? ["f", "h"].includes(kinds[r]?.[c]) : !wallAt.has(`${c},${r}`);
+        // Parede superior (piso logo abaixo): a caixa encolhe por baixo, o player sobe TOP_WALL_CLIMB na frente dela.
+        const solidWall = w => !kinds || kinds[w.row]?.[w.col] === "w";
+        this.wallBoxes = this.tiles.walls.map(wall => {
+            const climb = solidWall(wall) && walkable(wall.col, wall.row + 1) ? TOP_WALL_CLIMB : 0;
+            return { x: bounds.minX - TILE + wall.col * TILE, y: bounds.minY - TILE + wall.row * TILE, w: TILE, h: TILE - climb };
+        });
+        // Parede inferior (piso logo acima): ordenada por y com as entidades, quem está ao norte fica atrás dela.
+        this.frontWalls = this.tiles.walls.filter(w => solidWall(w) && walkable(w.col, w.row - 1));
 
         if (Array.isArray(cell.customTorches)) this.tiles.torches = cell.customTorches;
         if (Array.isArray(cell.customProps)) this.tiles.props = cell.customProps;

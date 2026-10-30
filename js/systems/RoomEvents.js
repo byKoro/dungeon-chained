@@ -230,6 +230,28 @@ export class RoomEvents {
         return (room.cell.authored?.bars || []).map(b => ({ x: r.x + b.col * this.tile, y: r.y + b.row * this.tile, w: this.tile, h: this.tile }));
     }
 
+    // Círculos sólidos no chão pedidos pelo script (estacas).
+    solidCircles() {
+        return this._script()?.solidCircles?.() ?? [];
+    }
+
+    // Empurra os pés (`footY`, ou y + `footOffset`) para fora dos círculos sólidos.
+    resolveCollisions(entities, footOffset, footRadius) {
+        const circles = this.solidCircles();
+        if (!circles.length) return;
+        for (const e of entities) {
+            if (!e || e.falling || e.airborne || e.state === "dying") continue;
+            const foot = e.footY !== undefined ? e.footY - e.y : footOffset;
+            for (const c of circles) {
+                const dx = e.x - c.x, dy = e.y + foot - c.y, d = Math.hypot(dx, dy), R = c.r + footRadius;
+                if (d >= R) continue;
+                const nx = d ? dx / d : 0, ny = d ? dy / d : 1;
+                e.x = c.x + nx * R;
+                e.y = c.y + ny * R - foot;
+            }
+        }
+    }
+
     drawFloor(ctx) {
         this._script()?.drawFloor?.(ctx);
     }
@@ -247,12 +269,14 @@ export class RoomEvents {
         const list = room.cell.authored?.bars || [];
         const at = new Set(list.map(b => `${b.col},${b.row}`));
         // A moldura (verga + ombreiras) faz parte da parede: fica sempre; a treliça só aparece descendo.
-        return list.map(b => {
+        const bars = list.map(b => {
             const x = r.x + b.col * this.tile, base = r.y + (b.row + 1) * this.tile;
             const left = !at.has(`${b.col - 1},${b.row}`), right = !at.has(`${b.col + 1},${b.row}`);
             const key = left && right ? "barsFrameSingle" : left ? "barsFrameLeft" : right ? "barsFrameRight" : "barsFrameMid";
             return { y: base - 14, feetSortY: base, draw: ctx => this._drawBar(ctx, key, x, base, lowered) };
         });
+        // Estacas e outros drawables ordenados por y pedidos pelo script da sala (ex.: CageEncounter).
+        return [...bars, ...(this._script(room)?.drawables?.() ?? [])];
     }
 
     // Fresta no chão → treliça recortada abaixo da verga → moldura por cima.
