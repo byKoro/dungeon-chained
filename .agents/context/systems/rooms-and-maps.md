@@ -98,3 +98,8 @@ Door openings (2 tiles each, `midC=7`, `midR=4`): N `row0 col6–7`, S `row8 col
 
 ## Related docs
 `.agents/context/systems/room-editor.md` · `.agents/playbooks/add-room-piece.md` · `.agents/playbooks/add-trap.md` · `.agents/context/systems/combat-and-entities.md` · `.agents/context/architecture.md` · `map/README.md`
+
+### Stairs (2026-10-30)
+Editor 2.0 doors may have type stairs: one interior floor cell, rendered with STAIR_INDEX (39). AuthoredDungeon exposes its cell centre and existing connection target/requirement state. RoomManager recognizes both players within STAIR_ENTRY_RADIUS tiles; the usual Game transition handles travel and safeSpawnPair places the pair without immediate re-entry. Stairs have no border opening, corridor stub or door gradient.
+
+Border stairs use the inward adjacent floor for safe arrivals. Their south-edge floor is excluded from the late front-wall redraw so the staircase remains visible.

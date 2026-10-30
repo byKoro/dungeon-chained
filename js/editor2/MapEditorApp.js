@@ -2,7 +2,8 @@ import { ContentTools } from './ContentTools.js';
 import { identifyDoors, validatePlayable, doorCells } from '../rooms/MapConnections.js';
 import { Tileset } from '../core/Tileset.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, EMPTY_FLOOR_COLOR, holeTileFor } from '../config/GameConfig.js';
-import { TILE_KINDS, DOOR_TYPES, DEFAULT_DOOR_TYPE, MAP_LIMITS } from '../config/MapEditorConfig.js';
+import { TILE_KINDS, DOOR_TYPES, DEFAULT_DOOR_TYPE, MAP_LIMITS, STAIR_INDEX } from '../config/MapEditorConfig.js';
+import { placeDoor } from '../rooms/MapContent.js';
 import { ANIMATED_PROPS, ANIMATED_PROP_KEYS } from '../config/PropConfig.js';
 import { SCRAP, chestScrapAmount } from '../config/ScrapConfig.js';
 import { FORGE, FORGE_RECIPE_IDS, anvilRecipes } from '../config/ForgeConfig.js';
@@ -466,6 +467,10 @@ export class MapEditorApp {
                         const idx = stamp[dy][dx];
                         const kind = this.paintKind === "auto" ? M.defaultKindForTile(idx) : this.paintKind;
                         const c = col + dx, r = row + dy;
+                        if (idx === STAIR_INDEX) {
+                            placeDoor(room, c, r, 'stairs', 1);
+                            continue;
+                        }
                         if (this.paintKind === "auto" && kind === "f" && this.palette.hasTransparency(idx)) {
                             if (!M.inBounds(room, c, r)) continue;
                             const existing = M.propAt(room, c, r);
@@ -552,6 +557,12 @@ export class MapEditorApp {
             if (ANIMATED_PROPS[prop.type]?.opens) { this.propScrap = chestScrapAmount(prop); this.propEncounter = prop.encounter || ""; }
             if (prop.type === "anvil") this.propRecipes = [...anvilRecipes(prop)];
             this._setTool("prop");
+            return;
+        }
+        if (M.doorAt(room, col, row)?.type === 'stairs') {
+            this.palette.selectIndex(STAIR_INDEX);
+            this.paintKind = 'auto';
+            this._setTool('paint');
             return;
         }
         const kind = room.kinds[row][col];
@@ -1040,6 +1051,7 @@ export class MapEditorApp {
 
     _drawDoors(ctx, room, ox, oy, T, detailed) {
         for (const door of room.doors) for (const d of doorCells(room, door).map(p => ({ ...door, ...p }))) {
+            if (d.type === 'stairs') this.tileset.draw(ctx, STAIR_INDEX, ox + d.col * T, oy + d.row * T, T, T);
             const def = DOOR_TYPES[d.type] || DOOR_TYPES[DEFAULT_DOOR_TYPE];
             const x = ox + d.col * T, y = oy + d.row * T;
             ctx.save();
@@ -1249,7 +1261,9 @@ export class MapEditorApp {
                 break;
             }
             case "door": {
-                const ok = !!M.doorSide(room, h.col, h.row);
+                const ok = this.doorType === 'stairs'
+                    ? !!M.doorSide(room, h.col, h.row) || (h.col > 0 && h.row > 0 && h.col < room.cols - 1 && h.row < room.rows - 1 && M.getKind(room, h.col, h.row) === 'f')
+                    : !!M.doorSide(room, h.col, h.row);
                 box(h.col, h.row, 1, 1, ok ? (DOOR_TYPES[this.doorType]?.color || "#2cb67d") : "#ef4565");
                 break;
             }

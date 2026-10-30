@@ -38,6 +38,8 @@ export const TILE_KINDS = Object.freeze({
 export const HOLE_INDEX = HOLE_TILE;
 export const VOID_INDEX = EMPTY_FLOOR_TILE;
 export const FLOOR_INDEX = 16;
+export const STAIR_INDEX = 39;
+export const STAIR_ENTRY_RADIUS = 0.8;
 
 // Índices do tileset que, no modo automático, são pintados como parede (mesma lista da paleta do editor antigo).
 export const WALL_TILE_INDICES = Object.freeze([
@@ -49,6 +51,7 @@ export const WALL_TILE_INDICES = Object.freeze([
 
 // `sprite` fica null até existir o asset próprio (ex.: portão do boss).
 export const DOOR_TYPES = Object.freeze({
+    stairs: { label: "Escada", color: "#ffd166", sprite: null },
     normal: { label: "Porta", color: "#2cb67d", sprite: null },
     boss: { label: "Portão do boss", color: "#e53170", sprite: null }
 });

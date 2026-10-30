@@ -232,6 +232,13 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
 
     // Portas seguem para a borda nova mantendo id (as conexões apontam para ele) e largura.
     for (const d of room.doors) {
+        if (d.type === 'stairs') {
+            const side = doorSide(room, d.col, d.row);
+            const c = side === 'E' ? next.cols - 1 : d.col;
+            const r = side === 'S' ? next.rows - 1 : d.row;
+            placeDoor(next, c, r, d.type, 1, d.id);
+            continue;
+        }
         const side = doorSide(room, d.col, d.row);
         let c = d.col, r = d.row;
         if (side === "N") r = 0;
@@ -461,7 +468,8 @@ export function validateMap(map) {
         const seenDoors = new Set();
         for (const d of room.doors) {
             const k = `${d.col},${d.row}`;
-            if (!doorSide(room, d.col, d.row)) errors.push(`${label}: porta em ${k} não está na borda (ou está num canto).`);
+            if (!inBounds(room, d.col, d.row)) { errors.push(`${label}: passagem fora da sala em ${k}.`); continue; }
+            if (d.type !== 'stairs' && !doorSide(room, d.col, d.row)) errors.push(`${label}: porta em ${k} não está na borda (ou está num canto).`);
             else if (room.kinds[d.row][d.col] !== FLOOR) errors.push(`${label}: porta em ${k} sobre tile que não é piso.`);
             if (!DOOR_TYPES[d.type]) errors.push(`${label}: porta em ${k} com tipo desconhecido "${d.type}".`);
             if (seenDoors.has(k)) errors.push(`${label}: porta duplicada em ${k}.`);

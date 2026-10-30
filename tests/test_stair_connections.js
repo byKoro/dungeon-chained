@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import { createMap, createRoom, normalizeMap, resizeRoom, validateMap } from '../js/rooms/MapDocument.js';
+import { placeDoor } from '../js/rooms/MapContent.js';
+import { connectDoors, validatePlayable } from '../js/rooms/MapConnections.js';
+import { AuthoredDungeon } from '../js/rooms/AuthoredDungeon.js';
+import { RoomManager } from '../js/rooms/RoomManager.js';
+
+const map = createMap();
+map.rooms = { '0,0': createRoom(10, 10), '1,0': createRoom(10, 10) };
+map.start = '0,0';
+for (const room of Object.values(map.rooms)) {
+    assert.equal(placeDoor(room, 4, 4, 'stairs'), true);
+    assert.equal(placeDoor(room, 4, 4, 'stairs'), false);
+}
+assert.equal(connectDoors(map, { room: '0,0', door: 'door_0' }, { room: '1,0', door: 'door_0' }), true);
+assert.deepEqual(validatePlayable(map), []);
+assert.deepEqual(validateMap(map).errors, []);
+const restored = normalizeMap(JSON.parse(JSON.stringify(map)));
+assert.equal(restored.rooms['0,0'].doors[0].type, 'stairs');
+assert.equal(resizeRoom(restored.rooms['0,0'], 12, 12).doors[0].type, 'stairs');
+const dungeon = new AuthoredDungeon(restored);
+const door = dungeon.doorsOf(0, 0)[0];
+assert.equal(door.x, 4.5 * dungeon.tile);
+assert.equal(door.y, 4.5 * dungeon.tile);
+assert.equal(door.blocked, false);
+assert.equal(door.gx, 1);
+dungeon.document.connections[0].requires = 'bossKey';
+assert.equal(dungeon.doorsOf(0, 0)[0].blocked, true);
+dungeon.progress.bossKey = true;
+assert.equal(dungeon.doorsOf(0, 0)[0].blocked, false);
+dungeon.document.connections[0].oneWay = true;
+assert.equal(dungeon.doorsOf(1, 0)[0].blocked, true);
+const manager = Object.create(RoomManager.prototype);
+manager.dungeon = dungeon;
+assert.equal(manager.playerAlignedToDoor({ x: door.x, y: door.y }, door), true);
+assert.equal(manager.playerAlignedToDoor({ x: door.x + dungeon.tile, y: door.y }, door), false);
+dungeon.moveTo(1, 0);
+const spawn = dungeon.spawnPositions('door_0');
+const arrival = dungeon.doorsOf(1, 0)[0];
+assert.equal([spawn.p1, spawn.p2].every(p => manager.playerAlignedToDoor(p, arrival)), false, 'arrival must not immediately return');
+console.log('Stair connections: placement, persistence, validation, resizing, destination and arrival pass.');
+for (const [col, row, innerCol, innerRow] of [[4, 0, 4, 1], [4, 9, 4, 8], [0, 4, 1, 4], [9, 4, 8, 4]]) {
+    const room = createRoom(10, 10);
+    assert.equal(placeDoor(room, col, row, 'stairs'), true, 'stairs can replace border walls');
+    assert.equal(room.kinds[row][col], 'f');
+    assert.equal(room.kinds[innerRow][innerCol], 'f', 'inner approach is opened');
+    const edgeMap = createMap();
+    edgeMap.rooms = { '0,0': room };
+    edgeMap.start = '0,0';
+    edgeMap.connections = [];
+    assert.deepEqual(validateMap(edgeMap).errors, []);
+    const edgeDungeon = new AuthoredDungeon(edgeMap);
+    const arrival = edgeDungeon.spawnPositions('door_0');
+    assert.ok(arrival.p1 && arrival.p2, 'edge stairs have safe arrival');
+    const resized = resizeRoom(room, 12, 12);
+    assert.equal(resized.doors.length, 1);
+    if (col === 9) assert.equal(resized.doors[0].col, 11);
+    if (row === 9) assert.equal(resized.doors[0].row, 11);
+}
+assert.equal(placeDoor(createRoom(10, 10), 0, 0, 'stairs'), false, 'corner remains closed');

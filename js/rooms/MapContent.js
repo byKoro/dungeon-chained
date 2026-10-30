@@ -1,6 +1,7 @@
 import { DEMO } from '../config/DemoConfig.js';
 import { doorCells, sideOf } from './MapConnections.js';
 import { occupiedCells } from './MapOccupancy.js';
+import { STAIR_INDEX } from '../config/MapEditorConfig.js';
 
 export function randomizeFloor(room, tiles = DEMO.floorTiles, rng = Math.random) {
     const pool = tiles.filter(n => Number.isInteger(n) && n >= 0);
@@ -26,6 +27,27 @@ export function scatterProps(room, density, rng = Math.random) {
 }
 
 export function placeDoor(room, col, row, type, width = 2, id = null) {
+    if (type === 'stairs') {
+        if (col < 0 || row < 0 || col >= room.cols || row >= room.rows) return false;
+        const side = sideOf(room, { col, row });
+        const corner = (col === 0 || col === room.cols - 1) && (row === 0 || row === room.rows - 1);
+        if (corner || (!side && room.kinds[row][col] !== 'f')) return false;
+        if (room.doors.some(d => doorCells(room, d).some(p => p.col === col && p.row === row))) return false;
+        let i = 0;
+        while (room.doors.some(d => d.id === `door_${i}`)) i++;
+        room.doors.push({ col, row, type, width: 1, id: id || `door_${i}` });
+        if (side) {
+            const dc = side === 'W' ? 1 : side === 'E' ? -1 : 0;
+            const dr = side === 'N' ? 1 : side === 'S' ? -1 : 0;
+            for (let inset = 0; inset < 2; inset++) {
+                const c = col + dc * inset, r = row + dr * inset;
+                room.tiles[r][c] = 16;
+                room.kinds[r] = room.kinds[r].slice(0, c) + 'f' + room.kinds[r].slice(c + 1);
+            }
+        }
+        room.props = room.props.filter(p => !(p.index === STAIR_INDEX && p.col === col && p.row === row));
+        return true;
+    }
     const door = { col, row, type, width: type === 'boss' ? 2 : Math.max(1, Math.min(6, Math.round(width))) };
     const side = sideOf(room, door);
     if (!side || (type === 'boss' && side !== 'N')) return false;

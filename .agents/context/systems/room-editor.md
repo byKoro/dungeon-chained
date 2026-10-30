@@ -125,3 +125,8 @@ Card "Teste e demo": checkbox `#test-infinite-lives` ("Vida infinita (ambos os j
 
 ### Tileset transparency (2026-10-30)
 Editor 2.0 automatic painting keeps non-wall tiles with source alpha in room.props as static index decorations, preserving the existing floor. TilePalette caches transparency from the original image, before the palette background is drawn. Opaque tiles, walls and explicit kinds still replace cells. Repainting replaces the static decoration; animated props are preserved. Eraser removes static decorations through removePropAt. Existing maps are not migrated; repaint affected tiles after restoring their floor.
+
+### Stair connections (2026-10-30)
+Painting Tileset index 39 creates a width-one stairs endpoint on interior floor, preserving the floor. The door tool also offers Escada. Connect it in the map connection panel exactly like a door (including door destinations, requirements and one-way links). Stair endpoints survive normalization and resizing; erasing removes the endpoint. Existing decorative stair props must be repainted to become endpoints.
+
+Stairs now also replace standard walls on all four room edges (corners excluded, like doors). Placement opens the edge cell and its inner approach. The preview accepts border placement, and resizing keeps east/south stairs anchored to the new edge.

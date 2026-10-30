@@ -1,5 +1,6 @@
 import { TILE, LIGHT_PIXEL_SCALE } from '../config/GameConfig.js';
 import { DEMO, BOSS_GATE_LIGHT } from '../config/DemoConfig.js';
+import { STAIR_INDEX } from '../config/MapEditorConfig.js';
 
 export class DemoDoors {
     constructor({ assets, renderer, rooms }) {
@@ -32,7 +33,11 @@ export class DemoDoors {
         if (!this.rooms.dungeon.document) return;
         const rect = this.rooms.cellRect(), locked = this.rooms.isLocked(), now = performance.now();
         for (const door of this.rooms.doorsOfCurrent()) {
-            if ((door.type === 'boss') !== gates) continue;
+            if ((door.type === 'boss' || door.type === 'stairs') !== gates) continue;
+            if (door.type === 'stairs') {
+                this.renderer.tileset.draw(ctx, STAIR_INDEX, door.x - TILE / 2, door.y - TILE / 2, TILE, TILE);
+                continue;
+            }
             const closed = door.blocked || locked;
             const key = `${this.rooms.currentKey}/${door.id}`;
             if (closed) this.opened.delete(key); else if (!this.opened.has(key)) this.opened.set(key, now);

@@ -218,3 +218,8 @@ A v2 repintava as duas últimas linhas da sala por cima de tudo e isso escondia 
 - Serra largada vira corpo leve (`DroppedSawPush`, `SAW_PUSH`): o jogador esbarra e ela desliza devagar, rola no sprite parado, sem dano; dash/knockback chuta mais longe. Esbarrão tem som baixo (`sawLand` agudo), faíscas, pop de escala e giro. O `_sawDragBlocked` agora também considera estacas e props sólidos (vale para o arrasto).
 - Visto no Electron (`_local/verify-saw-push.cjs`, tecla `D` real via `sendInputEvent`, `inicial.json`): P1 subindo contra a estaca (3,10) para em y 10,84 tiles; segurando `D` 1,5 s a serra anda ~0,95 tile e gira ~2,2 rad, sem dano nem reconexão com o P2 longe; esbarrão de 10 px/step leva a serra ~0,55 tile. Som do esbarrão não ouvido.
 - Não visto: inimigos encostando na estaca, os dois empurrando ao mesmo tempo, serra empurrada contra parede/buraco no jogo (só a função de bloqueio foi consultada).
+
+## Stair connections (2026-10-30)
+Tile 39 and the Escada door choice create interior connection endpoints. Reuses map connections, locks/requirements, fade and safe arrival. Tests pass; browser/game visual behavior not observed. Full check retains prior modular-grid and unlisted-map failures; graphify unavailable.
+
+Stair follow-up: placement on standard border walls supported on N/S/E/W, with approach opening and safe spawn. Four-edge regression and resizing pass. Corners remain excluded. No visual runtime observation.

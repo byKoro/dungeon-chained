@@ -1,4 +1,5 @@
 import { AuthoredDungeon } from './AuthoredDungeon.js';
+import { STAIR_ENTRY_RADIUS } from '../config/MapEditorConfig.js';
 import { Dungeon } from '../core/Dungeon.js';
 import { Room } from './Room.js';
 import {
@@ -269,12 +270,14 @@ export class RoomManager {
     }
 
     playerAlignedToDoor(player, door) {
+        if (door.type === 'stairs') return Math.hypot(player.x - door.x, player.y - door.y) < this.dungeon.tile * STAIR_ENTRY_RADIUS;
         const doorHalf = (door.passHalfWidth ?? door.halfWidth ?? this.doorHalfWidth) - player.hitRadius;
         if (door.dir === "N" || door.dir === "S") return Math.abs(player.x - door.x) < doorHalf;
         return Math.abs(player.y - door.y) < doorHalf;
     }
 
     doorEntryDepth(player, door, bounds) {
+        if (door.type === 'stairs') return this.playerAlignedToDoor(player, door) ? Infinity : -Infinity;
         if (door.dir === "N") return bounds.minY - player.y;
         if (door.dir === "S") return player.y - bounds.maxY;
         if (door.dir === "W") return bounds.minX - player.x;

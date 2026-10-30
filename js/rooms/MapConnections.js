@@ -65,7 +65,7 @@ export function safeSpawnPair(room, door = null) {
     const side = door && sideOf(room, door);
     let reachable = null;
     if (door) {
-        const inward = { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] }[side];
+        const inward = door.type === 'stairs' && !side ? [0, 0] : { N: [0, 1], S: [0, -1], E: [-1, 0], W: [1, 0] }[side];
         if (!inward) return null;
         const queue = doorCells(room, door).map(p => ({ col: p.col + inward[0], row: p.row + inward[1] })).filter(valid);
         reachable = new Set(queue.map(p => `${p.col},${p.row}`));
@@ -104,7 +104,7 @@ export function validatePlayable(map, { roomKey = null } = {}) {
         const ids = new Set();
         for (const d of room.doors) {
             const side = sideOf(room, d);
-            if (!side || !Number.isInteger(d.width || 1) || (d.width || 1) < 1) { errors.push(`${room.name}: porta inválida.`); continue; }
+            if ((!side && d.type !== 'stairs') || !Number.isInteger(d.width || 1) || (d.width || 1) < 1) { errors.push(`${room.name}: porta inválida.`); continue; }
             if (ids.has(d.id)) errors.push(`${room.name}: identificador de porta duplicado.`);
             ids.add(d.id);
             if (d.type === 'boss' && (side !== 'N' || d.width !== 2)) errors.push(`${room.name}: portão do boss exige parede norte e largura 2.`);

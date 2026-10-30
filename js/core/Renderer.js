@@ -292,7 +292,7 @@ export class Renderer {
         if (!this.tileset || !this.tileset.ready) return;
         const ctx = this.ctx;
         for (const d of doors) {
-            if (d.blocked) continue;
+            if (d.blocked || d.type === 'stairs') continue;
             doorHalf = d.halfWidth ?? doorHalf;
             const across = Math.round((doorHalf * 2) / tile);
             for (let s = 1; s <= stubTiles; s++) {
@@ -346,6 +346,11 @@ export class Renderer {
         const r = tiles.rows - 1;
 
         const southDoorCols = new Set();
+        for (const door of doors) {
+            if (door.type === 'stairs') for (const cell of door.cells || []) {
+                if (cell.row === r) southDoorCols.add(cell.col);
+            }
+        }
         if (doorsOpen && tiles.doorCells) {
             for (const d of tiles.doorCells) {
                 if (d.row === r) southDoorCols.add(d.col);
@@ -383,7 +388,7 @@ export class Renderer {
 
         const depth = wallDepth * 2.5 + stubTiles * wallDepth;
         for (const d of doors) {
-            if (d.blocked) continue;
+            if (d.blocked || d.type === 'stairs') continue;
             doorHalf = d.halfWidth ?? doorHalf;
             c.save();
             let grad;
