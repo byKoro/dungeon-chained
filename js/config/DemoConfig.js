@@ -26,6 +26,19 @@ export const DEMO = {
     sweepStep: 8
 };
 
+// Distância máxima entre os jogadores = enquadramento normal da câmera (sem afastar o zoom), por eixo.
+// O freio começa quando um jogador sairia da margem da câmera (`softMargin`) e vira parede a `hardMargin` da borda
+// da tela (meio corpo). Px de mundo; `resistance` = quanto da velocidade de afastar some por step no limite duro.
+export const PLAYER_LEASH = Object.freeze({
+    enabled: true,
+    softMargin: DEMO.cameraMargin,
+    hardMargin: 40,
+    resistance: 0.45,
+    // Deslocamento num step acima disso é teletransporte (porta, renascer): o limite só passa a valer dali.
+    teleportStep: 96,
+    dust: Object.freeze({ minSpeed: 1.2, count: 3, cooldownSteps: 14 })
+});
+
 export const INTERACTIVES = {
     altarDash: { label: 'Altar: Dash', color: '#68dbff', symbol: 'D' },
     altarSaw: { label: 'Altar: Lançar serra', color: '#e9a55e', symbol: 'S' },
@@ -33,7 +46,9 @@ export const INTERACTIVES = {
     ropeKey: { label: 'Corda + chave', color: '#ffe083', symbol: 'K' },
     key: { label: 'Chave coletável', color: '#ffe083', symbol: 'K' },
     // Encontro das gaiolas (scripts de sala): não são ativados por interagir.
-    rope: { label: 'Corda com gaiola (estaca)', color: '#d8c39a', symbol: 'C', scripted: true }
+    rope: { label: 'Corda com gaiola (estaca)', color: '#d8c39a', symbol: 'C', scripted: true },
+    // Corda com baú: o baú com `rope` = id desta estaca cai quando a serra corta a corda.
+    chestRope: { label: 'Corda com baú (estaca)', color: '#f0b85a', symbol: 'B', scripted: true }
 };
 
 export const BOSS_GATE_LIGHT = Object.freeze({

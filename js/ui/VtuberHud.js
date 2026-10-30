@@ -318,19 +318,33 @@ class HeartRow {
         this.reset(MAX_LIVES);
     }
 
-    reset(lives) {
+    _slot(full) {
+        return { full, scale: new Spring(1, 380, 14), shake: 0 };
+    }
+
+    reset(lives, max = MAX_LIVES) {
         this.t = Math.random() * 10;
-        this.slots = Array.from({ length: MAX_LIVES }, (_, i) => ({
-            full: i < lives,
-            scale: new Spring(1, 380, 14),
-            shake: 0
-        }));
+        this.max = max;
+        this.slots = Array.from({ length: max }, (_, i) => this._slot(i < lives));
         this.debris = [];
-        this.lives = lives;
+        this.lives = Math.min(lives, max);
+    }
+
+    // Coração comprado na bigorna: abre um espaço vazio, que o setLives enche com o pulo de cura.
+    setMax(max) {
+        while (this.slots.length < max) {
+            const sl = this._slot(false);
+            sl.scale.set(0.2);
+            sl.scale.kick(12);
+            this.slots.push(sl);
+        }
+        this.slots.length = max;
+        this.max = max;
+        this.lives = Math.min(this.lives, max);
     }
 
     setLives(lives) {
-        lives = clamp(lives, 0, MAX_LIVES);
+        lives = clamp(lives, 0, this.max);
         if (lives < this.lives) {
             for (let i = this.lives - 1; i >= lives; i--) this._break(i, this.slotPos(i));
             for (let i = 0; i < lives; i++) this.slots[i].shake = 0.4;
@@ -621,7 +635,7 @@ export class VtuberHud {
             e.player = p || null;
             e.seen = p ? p.lives : MAX_LIVES;
             e.portrait.reset();
-            e.hearts.reset(e.seen);
+            e.hearts.reset(e.seen, p?.maxLives ?? MAX_LIVES);
             e.dash.reset();
         });
     }
@@ -667,7 +681,7 @@ export class VtuberHud {
     // topo da área do HUD. Usada pela barra de chefe para não sobrepor o HUD.
     freeSpan(W, H) {
         const { S, hs, margin } = this._layout(W, H);
-        const cluster = (e) => e.portrait.sprite.cropW * S + 2 * S + MAX_LIVES * HEART_ART * hs * 1.4;
+        const cluster = (e) => e.portrait.sprite.cropW * S + 2 * S + e.hearts.max * HEART_ART * hs * 1.4;
         return {
             left: margin + cluster(this.entries[0]),
             right: W - margin - cluster(this.entries[1]),
@@ -689,14 +703,16 @@ export class VtuberHud {
                 e.player = p || null;
                 e.seen = p ? p.lives : MAX_LIVES;
                 e.portrait.reset();
-                e.hearts.reset(e.seen);
+                e.hearts.reset(e.seen, p?.maxLives ?? MAX_LIVES);
                 e.dash.reset();
             }
         });
         this.entries.forEach((e, i) => {
             const p = e.player;
             if (!p) return;
-            const lives = clamp(p.lives, 0, MAX_LIVES);
+            const max = p.maxLives ?? MAX_LIVES;
+            if (max !== e.hearts.max) e.hearts.setMax(max);
+            const lives = clamp(p.lives, 0, max);
             if (lives !== e.seen) {
                 if (lives < e.seen) {
                     e.portrait.hurt();

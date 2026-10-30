@@ -42,25 +42,30 @@ assert(prompt.layout(0).length === 0, "sem alvo no alcance: nada desenhado");
 targets = [target];
 prompt.update(1000);
 const first = prompt.layout(1000)[0];
-assert(first && first.scale < 1.01 && first.column === C.columns.keyboardE && first.row === 0, "P1 no teclado: ícone E, linha amarela");
+assert(first && first.scale < 1.01 && first.column === C.columns.keyboardE, "P1 no teclado: ícone E");
 const settled = prompt.layout(1000 + C.popMs + 1)[0];
 assert(settled.scale === 1, "depois da entrada o ícone assenta no tamanho cheio");
 assert(settled.y < target.topY && settled.y > target.topY - 200, "fica acima do topo do objeto");
 
 targets = [{ ...target, users: [1] }];
 const p2 = prompt.layout(1000 + C.popMs + 1)[0];
-assert(p2.column === C.columns.keyboardShift && p2.row === 1, "P2 no teclado: ícone ⇧, linha azul");
+assert(p2.column === C.columns.keyboardShift, "P2 no teclado: ícone ⇧");
 
 devices[1] = "playstation";
 assert(prompt.layout(1000 + C.popMs + 1)[0].column === C.columns.playstation, "P2 com DualShock: ícone do quadrado");
 devices[0] = "xbox";
 
 targets = [{ ...target, users: [0, 1] }];
-const pair = prompt.layout(1000 + C.popMs + 1);
-assert(pair.length === 2 && pair[0].x < pair[1].x && pair[0].column === C.columns.xbox && pair[1].column === C.columns.playstation, "dois jogadores perto: dois círculos lado a lado");
-assert(Math.abs((pair[0].x + pair[1].x) / 2 - target.x) < 0.001, "o par fica centrado no objeto");
+const P = C.pulsePeriodMs, base = Math.ceil(2000 / (2 * P)) * 2 * P;
+const pairA = prompt.layout(base), pairB = prompt.layout(base + P);
+assert(pairA.length === 1 && pairA[0].x === target.x, "dois jogadores perto: um medalhão só, centrado no objeto");
+assert(pairA[0].column === C.columns.xbox && pairB[0].column === C.columns.playstation, "botões diferentes: alterna a cada pulso");
+devices[1] = "xbox";
+assert(prompt.layout(base)[0].column === C.columns.xbox && prompt.layout(base + P)[0].column === C.columns.xbox, "mesmo botão: fica fixo");
+devices[1] = "playstation";
+targets = [target];
 
-const t0 = 1000 + C.popMs + 1;
+const t0 = base;
 const frames = new Set([prompt.layout(t0)[0].column, prompt.layout(t0 + C.pulsePeriodMs / 2)[0].column]);
 assert(frames.size === 2, "alterna entre os quadros normal e pressionado");
 

@@ -36,17 +36,21 @@ export class DungeonTileQuery {
         return this.isHoleAtWorld(player.x, player.y + (HOLE_FALL.footOffset ?? 0));
     }
 
-    darkHoleRects() {
+    // Células que o sangue não pinta: buracos e paredes (inclusive vazio), cada uma uma vez.
+    unstainableRects() {
         const tiles = this._floor();
         if (!tiles) return null;
         const rect = this.rooms.cellRect();
+        const seen = new Set();
         const rects = [];
-        tiles.floor.forEach((line, r) => {
-            line.forEach((value, c) => {
-                if (value !== HOLE_TILE) return;
-                rects.push({ x: rect.x + c * TILE, y: rect.y + r * TILE, w: TILE, h: TILE });
-            });
-        });
+        const add = (c, r) => {
+            const key = `${c},${r}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            rects.push({ x: rect.x + c * TILE, y: rect.y + r * TILE, w: TILE, h: TILE });
+        };
+        tiles.floor.forEach((line, r) => line.forEach((value, c) => { if (value === HOLE_TILE) add(c, r); }));
+        for (const w of tiles.walls || []) add(w.col, w.row);
         return rects.length ? rects : null;
     }
 

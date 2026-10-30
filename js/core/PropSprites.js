@@ -39,10 +39,27 @@ export class PropSprites {
     }
 
     // Desenha o prop ocupando w×h tiles a partir de (dx, dy); com `art`, no tamanho nativo e centrado.
-    draw(ctx, type, dx, dy, tilePx, ms, flip = false) {
+    draw(ctx, type, dx, dy, tilePx, ms, flip = false, stain = null) {
         const def = this.defs[type];
         if (!def) return false;
-        return this.drawFrame(ctx, type, propFrameIndex(def, ms), dx, dy, tilePx, flip);
+        return this.drawFrame(ctx, type, propFrameIndex(def, ms), dx, dy, tilePx, flip, 1, 1, null, null, stain);
+    }
+
+    // Sangue do chão por cima da arte, só onde há arte: o trecho do BloodCanvas sob o prop, recortado pela silhueta.
+    _stainCanvas(img, r, flip, blood) {
+        const W = Math.ceil(r.w), H = Math.ceil(r.h);
+        const c = this._stain ??= document.createElement("canvas");
+        if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+        const g = c.getContext("2d");
+        g.imageSmoothingEnabled = false;
+        g.globalCompositeOperation = "source-over";
+        g.clearRect(0, 0, W, H);
+        g.drawImage(blood.canvas, r.x, r.y, r.w, r.h, 0, 0, W, H);
+        g.globalCompositeOperation = "destination-in";
+        if (flip) { g.save(); g.translate(W, 0); g.scale(-1, 1); g.drawImage(img, 0, 0, W, H); g.restore(); }
+        else g.drawImage(img, 0, 0, W, H);
+        g.globalCompositeOperation = "source-over";
+        return c;
     }
 
     // Faixa de brilho que atravessa a arte na diagonal (mesma ideia do brilho da serra largada).
@@ -94,7 +111,21 @@ export class PropSprites {
 
     // `sx`/`sy` escalam a arte a partir do meio da borda de baixo (squash/stretch).
     // `outline` = { alpha, color }: borda em volta da arte (objeto interagível no alcance).
-    drawFrame(ctx, type, index, dx, dy, tilePx, flip = false, sx = 1, sy = 1, shine = null, outline = null) {
+    // `stain` = BloodCanvas: o sangue do chão sob o prop também fica na arte.
+    drawFrame(ctx, type, index, dx, dy, tilePx, flip = false, sx = 1, sy = 1, shine = null, outline = null, stain = null) {
+        const drawn = this._drawFrame(ctx, type, index, dx, dy, tilePx, flip, sx, sy, shine, outline);
+        const img = drawn && stain && typeof document !== "undefined" ? this.frameAt(type, index) : null;
+        if (!img) return drawn;
+        const r = propArtRect(this.defs[type], dx, dy, tilePx);
+        ctx.save();
+        ctx.globalCompositeOperation = stain.blendMode;
+        ctx.globalAlpha *= stain.drawAlpha;
+        this._drawImage(ctx, this._stainCanvas(img, r, flip, stain), r, false, sx, sy);
+        ctx.restore();
+        return drawn;
+    }
+
+    _drawFrame(ctx, type, index, dx, dy, tilePx, flip, sx, sy, shine, outline) {
         const def = this.defs[type];
         const img = this.frameAt(type, index);
         if (!def || !img) return false;

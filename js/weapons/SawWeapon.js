@@ -1,5 +1,6 @@
 import { Weapon } from './Weapon.js';
 import { SAW_CONTACT } from '../config/SawWeaponConfig.js';
+import { FORGE } from '../config/ForgeConfig.js';
 
 const SAW_FRAME = { size: 16, cols: 4 };
 const ROW_INERTIA_CLEAN = 0;
@@ -61,6 +62,8 @@ export class SawWeapon extends Weapon {
         this.dragY = 0;
 
         this.dropped = false;
+        this.inertiaSteps = 0;
+        this.inertiaLeft = 0;
         this.dropX = 0;
         this.dropY = 0;
         this.dropPhase = 0;
@@ -112,7 +115,8 @@ export class SawWeapon extends Weapon {
         return osc * Math.pow(1 - t, 1.5);
     }
 
-    drop(x, y) {
+    // `inertia: false` = serra posta no lugar (bigorna), que nunca sai girando.
+    drop(x, y, { inertia = true } = {}) {
         this._cuttingSteps = 0;
         this.dropped = true;
         this.dropX = x;
@@ -121,10 +125,18 @@ export class SawWeapon extends Weapon {
         this.sweepPhase = 0;
         this.dropT = 0;
 
+        this.inertiaLeft = inertia ? this.inertiaSteps : 0;
+        if (this.inertiaLeft > 0) this.spin = Math.max(this.spin, FORGE.inertia.minSpin);
         this.dropSpin = this.spin;
     }
 
+    // Melhoria Inércia: solta, a serra segue girando (e cortando) por `inertiaLeft` steps.
+    get spinningLoose() {
+        return this.dropped && !this.thrown && this.inertiaLeft > 0;
+    }
+
     pickup() {
+        this.inertiaLeft = 0;
         this._cuttingSteps = 0;
         this.obstacleContacts?.clear();
         this.thrown = false;
@@ -138,8 +150,14 @@ export class SawWeapon extends Weapon {
         if (!this.dropped) return;
         this.dropPhase += 0.07;
         this.sweepPhase += 0.03;
-        this.dropSpin *= 0.94;
-        this.rotation += this.dropSpin * 0.25;
+        if (this.inertiaLeft > 0) {
+            // Girando por inércia; quando acaba, o giro que sobrou desacelera como numa serra largada comum.
+            this.dropSpin = this.spin;
+            this.rotation += this.spin * FORGE.inertia.spinToRotation;
+        } else {
+            this.dropSpin *= 0.94;
+            this.rotation += this.dropSpin * 0.25;
+        }
         if (this.dropT < 1) this.dropT = Math.min(1, this.dropT + 0.06);
         this.dropHover = (Math.sin(this.dropPhase) + 1) / 2;
     }
@@ -150,8 +168,8 @@ export class SawWeapon extends Weapon {
         else if (this.bloodTimer > 0) this.bloodTimer--;
 
         if (this.dropped) {
-
-            this.spin += (0 - this.spin) * SPIN_DECEL;
+            if (this.inertiaLeft > 0) this.inertiaLeft--;
+            else this.spin += (0 - this.spin) * SPIN_DECEL;
             this.split = 0;
             this._splitTarget = 0;
             this.justSplit = this.justMerged = false;

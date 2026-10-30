@@ -50,8 +50,8 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `chests` | ChestSystem | js/systems/ChestSystem.js | proximity chests, open-once state, scrap burst. `null` without `scrap` |
 | `forge` | ForgeState | js/systems/ForgeState.js | bought recipes/levels this run (reset in `newDungeon`) |
 | `forgeSystem` / `forgeMenu` | ForgeSystem / ForgeMenu | js/systems/ForgeSystem.js, js/ui/ForgeMenu.js | anvil proximity, open/close, shared cursor, purchase; canvas menu. `null` without `scrap` |
-| `sawDrag` | SawDrag | js/systems/SawDrag.js | drag the dropped saw with a short cable (hold interact), Peso stats. Updated after the players, before `chain.update`. `null` without `mapData` |
-| `roomEvents` | RoomEvents (+ CageEncounter, roomScripts/*) | js/systems/RoomEvents.js | per-room scripts (ADR 0011): zones, encounters, bars (collision + y-sorted draw), completed events; updated after `chests.update`. `null` without `mapData` |
+| `sawDrag` | SawDrag | js/systems/SawDrag.js | drag the dropped saw with a short cable (hold interact), fixed `SAW_DRAG` stats. Updated after the players, before `chain.update`. `null` without `mapData` |
+| `roomEvents` | RoomEvents (+ CageEncounter, RopeChests, StakeRope, roomScripts/*) | js/systems/RoomEvents.js | per-room scripts (ADR 0011) plus per-room rope chests (any room): zones, encounters, bars (collision + y-sorted draw), completed events; updated after `chests.update`. `null` without `mapData` |
 | `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | ~3,8 s craft cutscene (letterbox, camera focus, hammer hits, saw jump). `null` without `scrap` |
 | `dialogue` | DialogueSystem | js/systems/DialogueSystem.js | speech bubbles queue, typewriter, voice blips (`window.dialogue` debug global). `null` without `mapData` |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
@@ -78,7 +78,7 @@ Per animation frame: `onFrameStart` (= `input.pollGamepads()`, `_pollMenuPad()`,
 2. `_resolveFall` per player (life loss, respawn at entry spawn).
 3. `effects.processPlayer`.
 4. `chain.update(p1, p2, {onSnap, onReconnect, resolveDropPoint})` → `_updateSawLanding`; saw sparks / blood pickup FX.
-5. `enforceSeparationLimit()` (hard cap `MAX_PLAYER_SEPARATION` while connected).
+5. `playerLeash?.update()` (Editor 2.0 maps: distance between players capped to the camera framing, see `players-and-chain.md`).
 6. `room.challenge.update` + button/arrow-trap audio feedback.
 7. `combat.updateEnemies`.
 8. 3 iterations: `Physics.resolveEntityCollisions` + saw disc as circle obstacle; then `Physics.resolveBoxCollisions` vs `room.wallBoxes`; `roomProps.resolveCollisions` (feet vs solid prop bases); `enemy.ensureOnWalkableTile`.
@@ -98,7 +98,7 @@ World pass (inside `renderer.beginFrame()` camera transform, clipped to room rec
 1. `drawBackground(BACKGROUND_TILE)` (before clip, fills view).
 2. `drawRoom` (floor incl. auto-tiled holes, walls, static tile props, torches, closed door tiles), then `roomProps.drawFloor` (animated props without `base`) and `demoProgress.draw`.
 3. If open: `drawDoorStubs`, `drawDoorGradients`. Then `demoDoors.drawGates` (boss gate sprite, under the entities so players walk in front of it).
-4. `holes.draw` (motes clipped to hole tiles) → `challenge.drawFloorLayer` → `particleSystem.drawFloor` (blood canvas; masked by `tiles.darkHoleRects()`) → `effects.draw` (footprints) → `challenge.drawButtons` → `particleSystem.drawSmoke`.
+4. `holes.draw` (motes clipped to hole tiles) → `challenge.drawFloorLayer` → `particleSystem.drawFloor` (blood canvas; masked by `tiles.unstainableRects()`: hole and wall cells) → `effects.draw` (footprints) → `challenge.drawButtons` → `particleSystem.drawSmoke`.
 5. Shadows: heart shadows, `drawRoundShadow` for p1/p2 (r 14, walk bounce; skipped while falling) and visible enemies (r 13), `scrap.drawShadows`.
 6. `chain.drawChain` (cable).
 7. Depth-sorted drawables (`[p1, p2, ...enemies, ...challenge.buttonOccluders, ...roomProps.drawables]` sorted by `y`; a falling player goes through `holes.drawFalling`): those with `y <= sawY` → `chain.draw` (saw) → `chain.drawDropped` → `particleSystem.drawSparks` → those with `y > sawY`.

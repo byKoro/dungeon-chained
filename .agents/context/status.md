@@ -218,3 +218,34 @@ A v2 repintava as duas últimas linhas da sala por cima de tudo e isso escondia 
 - Serra largada vira corpo leve (`DroppedSawPush`, `SAW_PUSH`): o jogador esbarra e ela desliza devagar, rola no sprite parado, sem dano; dash/knockback chuta mais longe. Esbarrão tem som baixo (`sawLand` agudo), faíscas, pop de escala e giro. O `_sawDragBlocked` agora também considera estacas e props sólidos (vale para o arrasto).
 - Visto no Electron (`_local/verify-saw-push.cjs`, tecla `D` real via `sendInputEvent`, `inicial.json`): P1 subindo contra a estaca (3,10) para em y 10,84 tiles; segurando `D` 1,5 s a serra anda ~0,95 tile e gira ~2,2 rad, sem dano nem reconexão com o P2 longe; esbarrão de 10 px/step leva a serra ~0,55 tile. Som do esbarrão não ouvido.
 - Não visto: inimigos encostando na estaca, os dois empurrando ao mesmo tempo, serra empurrada contra parede/buraco no jogo (só a função de bloqueio foi consultada).
+
+## Indicador único e limite de distância (2026-10-30)
+- Indicador de interagir: um medalhão neutro por alvo (sem ponta, sem cor de jogador; folha 144×16 regenerada por `gen-interact-prompt.py`). Um jogador no alcance = botão dele; os dois com botões diferentes = alterna a cada 900 ms; mesmo botão = fixo.
+- `PlayerLeash` (Editor 2.0): distância por eixo limitada ao enquadramento normal da câmera, freio a partir da margem da câmera, parede a 40 px da borda; só quem se afasta é freado; câmera não afasta mais o zoom (`DemoCamera.lockZoom`). Saiu `MAX_PLAYER_SEPARATION`.
+- Visto no Electron (`_local/verify-leash.cjs`, janela 1600×900, teclas reais): limites 658/818 px (x) e 265/425 px (y); dx parou em 818 e dy em 423 com os dois segurando direções opostas; zoom ficou 1,782 do começo ao fim; P2 parado não se moveu com o P1 forçando. Indicador com os dois no Baú 1 alternou E ↔ ⇧ num medalhão só.
+- Não visto: controles reais (só o ícone de teclado), poeira no limite (não conferida na captura), F6 split/fixed, dash contra o limite.
+
+## Sangue só no chão e nos props (2026-10-30)
+- A camada de sangue é recortada nas células de buraco e de parede interna (`DungeonTileQuery.unstainableRects`, troca o `darkHoleRects`). O sangue continua carimbado no `BloodCanvas`, só não aparece ali.
+- Props sólidos (baú, bigorna, caixas, lança-chamas) são desenhados depois do chão, então ganharam o sangue de baixo deles por cima da arte, recortado pela silhueta (`PropSprites.drawFrame(..., stain)`, `RoomProps` recebe `blood`).
+- Visto no Electron (`_local/verify-blood.cjs`, poças injetadas em `inicial.json`): poças sobre a parede da linha 25 param na borda do piso e o tile da parede fica limpo; Baú 1 dentro de uma poça fica manchado. Não visto: poça sob a bigorna e com o baú abrindo (squash), custo do recorte por frame com muitos props.
+
+## Menu da bigorna enxuto (2026-10-30)
+- Forja vende só Serra e Tamanho; saíram Elasticidade, Peso e Serra dupla (catálogo, i18n, testes). Cabo fica na tensão/ruptura base; arrasto fixo em 2 tiles a 40% (`SAW_DRAG`); a mecânica da serra dupla ficou no `SawWeapon` sem nada que a ligue. Bigornas com essas receitas gravadas no mapa simplesmente não as mostram.
+- Menu: valor e depois a moeda (cabeçalho e linhas); linha de botões removida (`forge.hint` saiu).
+- Visto no Electron (`_local/verify-forge-ui.cjs`). Preço de Tamanho ainda 8/14/22: falta o usuário dizer o que "aumentar o valor" significa.
+
+## Forja: preços, Inércia, Coração e "moedas" (2026-10-30)
+- Tamanho 15/30/50 e +12% por nível. Novas receitas: Inércia (20/35/55; serra solta gira e corta por 1,5/2,5/4 s) e Coração (80/140; +1 coração máximo para os dois por nível, sem precisar da Serra). Bigorna padrão oferece as quatro. Bug #11 (3 vidas fixas) resolvido: tudo segue `player.maxLives`.
+- Texto para o jogador e o editor: "sucata" virou "moedas"; o código continua `scrap`. Fonte de pixel ganhou `%` (antes saía `?`).
+- Visto no Electron (`_local/verify-forge-v2.cjs`): menu com as quatro receitas e moeda depois do número; com Coração 2 os dois HUDs mostram 5 corações cheios; com Inércia 3 a serra solta manteve spin 1 por 240 steps, girou, matou um demônio encostado e depois desacelerou. Não visto: som do motor durante a inércia, Inércia + serra arremessada, mapas antigos com `recipes` autorados (só mostram o que existe no catálogo).
+
+## Forja: Estalo e Reconexão rápida (2026-10-30)
+- Estalo (25/45): o cabo arrebentando sozinho solta uma onda de 1,6 / 2,4 tiles em volta da serra que acerta os inimigos (anel de pixels `ShockRing`, faíscas, tremor, `sawLand` grave). Não dispara em quedas nem no corte forçado.
+- Reconexão rápida (15/30): raio de pegar e distância de reconexão ×1,4 / ×1,8, espera depois do arrebentar 20 → 12 / 6 steps.
+- Visto no Electron (`_local/verify-snap.cjs`, teclas reais para arrebentar): com Estalo 2, três demônios a 77–123 px morreram e o de 352 px ficou; o anel aparece. Com Reconexão 2, a 95 px de cada lado da serra largada os dois reconectaram. Som da onda não ouvido.
+## Corda com baú (2026-10-30)
+- Novo interativo `chestRope` ("Corda com baú (estaca)", símbolo B), em qualquer sala do Editor 2.0. Um baú com `rope` = id da estaca (campo "Corda com baú" no prop) fica escondido; a corda sobe da estaca até o alto, acima do baú. Disco girando na estaca (preso ao cabo, lançado ou solto por Inércia) corta: aviso com poeira e sombra, queda, impacto (tremor, faíscas, empurrão) e o baú fica fechado no próprio tile. Jogador sozinho não corta; a estaca é sólida e fica.
+- Corte salvo em `RoomEvents.completed` (`rope:<id>`): sobrevive à morte da run; morte no meio da queda termina a queda. O editor dá ids curtos (`corda1`, `corda2`…), mostra o id embaixo da estaca e uma linha tracejada até o baú ligado.
+- Código: `RopeChests` (por sala, ao lado do script da sala em `RoomEvents._handlers`), `StakeRope` (desenho da estaca/corda, `sawGap`, `impactBurst`, `drawChestDrop`) compartilhado com `CageEncounter`; `ROPE_CHEST` em `EventsConfig`. Efeito colateral: `sawGap` agora conta a serra solta por Inércia, então ela também corta as cordas das gaiolas.
+- Visto no Electron (`_local/verify-rope-chest.cjs`, estaca injetada em 25,23 e o baú de 22,27 ligado): andando com teclas reais o disco cortou, o baú ficou escondido na queda, caiu no tile 22,27 e apareceu fechado. Não visto: abrir esse baú depois, o editor com a ferramenta nova (só o código), sons.

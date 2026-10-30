@@ -55,14 +55,16 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Interact icon | indicador de interagir | Round icon floating above a chest or anvil while a player is in range, one per player in their colour with the button of the device they used last (`InteractPrompt`, `assets/ui/interact_prompt.png`). The prop also gets a white 1 art px outline (borda branca) while someone is in range |
 | Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
 | Anvil / forge | bigorna / forja | Prop `anvil`; interact opens the forge menu (`ForgeSystem`), which sells the recipes the anvil offers (`prop.recipes`) for scrap |
-| Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`, `elasticity`, `doubleSaw`), with a cost per level |
-| Upgrade | melhoria | Tamanho (+20% disc), Elasticidade (+15% cable), Serra dupla; Peso comes in slice 3 |
-| Double saw | serra dupla | Upgrade: near the break distance the disc splits into two at 1/3 and 2/3 of the cable and merges back when the pair closes in |
-| Drag the saw | arrastar a serra | With the cable snapped, one player holds interact near the dropped saw and pulls it on a short cable, slower; the Peso upgrade extends distance and speed |
+| Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`), with a cost per level |
+| Upgrade | melhoria | Tamanho (+12% disc), Inércia (loose saw keeps spinning and cutting), Estalo (`snapWave`: the snapping cable sends a cutting wave), Reconexão rápida (`quickLink`: reconnect from farther and sooner), Coração (+1 max heart for both). Elasticidade, Peso and Serra dupla were removed on 2026-10-30 |
+| Coins | moedas | Player-facing name of the shared currency since 2026-10-30; code and config still call it `scrap` (`ScrapSystem`, `SCRAP`) |
+| Double saw | serra dupla | Removed from the forge (2026-10-30), mechanic kept dormant: near the break distance the disc splits into two at 1/3 and 2/3 of the cable and merges back when the pair closes in |
+| Drag the saw | arrastar a serra | With the cable snapped, one player holds interact near the dropped saw and pulls it on a short cable, slower (fixed 2 tiles, 40% speed) |
 | Zone | zona | Named rectangle of a room (`room.zones`); "enter the zone" means both players inside |
 | Encounter / wave | encontro / leva | Named list of waves (`room.encounters`); the room script decides when each wave drops |
 | Bars | grade | Bar tiles at a zone's accesses; closed (solid) while an encounter runs |
 | Cage / rope / stake | gaiola / corda / estaca | The Salão set piece: vertical ropes tied to stakes, each holding a hidden cage above; cutting a rope drops its cage, which shatters and releases a wave |
+| Rope chest | corda com baú | Stake (`chestRope`) whose rope holds a chest above; a spinning saw disc cuts it and the chest marked `rope: <id>` falls on its own tile (`RopeChests`) |
 | Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |

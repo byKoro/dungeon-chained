@@ -8,8 +8,9 @@ const PLAYER_FOOT = HOLE_FALL.footOffset ?? 14;
 // os outros ficam na camada do chão. `getFrame(prop, roomKey)` permite a outros sistemas (baús, bigorna, indicador de
 // interagir) trocar o quadro e pedir brilho ou borda.
 export class RoomProps {
-    constructor({ rooms, sprites, getFrame = null, isHidden = null, defs = ANIMATED_PROPS, tile = TILE }) {
-        Object.assign(this, { rooms, sprites, getFrame, isHidden, defs, tile });
+    // `blood` (BloodCanvas): sangue do chão também nos props sólidos, que são desenhados depois da camada do chão.
+    constructor({ rooms, sprites, getFrame = null, isHidden = null, blood = null, defs = ANIMATED_PROPS, tile = TILE }) {
+        Object.assign(this, { rooms, sprites, getFrame, isHidden, blood, defs, tile });
         this._cache = new WeakMap();
     }
 
@@ -76,7 +77,7 @@ export class RoomProps {
         const { prop } = s;
         const dx = rect.x + prop.col * this.tile, dy = rect.y + prop.row * this.tile;
         const over = this.getFrame?.(prop, roomKey);
-        if (over) this.sprites.drawFrame(ctx, over.type, over.frame, dx, dy, this.tile, !!prop.flip, over.sx ?? 1, over.sy ?? 1, over.shine ?? null, over.outline ?? null);
-        else this.sprites.draw(ctx, prop.type, dx, dy, this.tile, ms, !!prop.flip);
+        if (over) this.sprites.drawFrame(ctx, over.type, over.frame, dx, dy, this.tile, !!prop.flip, over.sx ?? 1, over.sy ?? 1, over.shine ?? null, over.outline ?? null, this.blood);
+        else this.sprites.draw(ctx, prop.type, dx, dy, this.tile, ms, !!prop.flip, this.blood);
     }
 }

@@ -6,7 +6,9 @@ const W = 156;
 const ROW_H = 13;
 const PAD = 6;
 const HEAD_H = 18;
-const FOOT_H = 24;
+const FOOT_H = 13;
+const COIN_W = 10;
+const COIN_GAP = 2;
 const COLORS = {
     text: "#efe3c2", dim: "#7a7184", gold: "#ffd166", red: "#e05f5f", ok: "#9fe08b",
     row: "#221d2b", rowSel: "#3b3248", shadow: "#000"
@@ -54,10 +56,11 @@ export class ForgeMenu {
         rect(3, 3, W - 6, H - 6, FRAME.well);
 
         text(t("forge.title"), PAD, 7, COLORS.gold);
+        // Valor e depois a moeda, encostados na direita.
         const amountText = String(amount);
-        const ax = W - PAD - measureText(amountText);
-        text(amountText, ax, 7, COLORS.text);
-        this._coin(g, ax - 12, 4);
+        const coinX = W - PAD - COIN_W;
+        text(amountText, coinX - COIN_GAP - measureText(amountText), 7, COLORS.text);
+        this._coin(g, coinX, 4);
 
         let y = HEAD_H;
         if (!rows.length) text(t("forge.empty"), PAD, y + 3, COLORS.dim);
@@ -72,16 +75,19 @@ export class ForgeMenu {
                 rect(78 + n * 6, y + 4, 4, 4, n < r.level ? COLORS.gold : (usable ? FRAME.stoneDark : "#2b2735"));
             }
             const right = r.status === "maxed" ? t("forge.max") : String(r.cost);
-            const rx = W - PAD - 2 - measureText(right);
-            text(right, rx, y + 3, r.status === "poor" ? COLORS.red : col);
-            if (r.status !== "maxed") this._coin(g, rx - 12, y, r.status !== "ok");
+            const end = W - PAD - 2;
+            if (r.status === "maxed") text(right, end - measureText(right), y + 3, col);
+            else {
+                const coinX = end - COIN_W;
+                text(right, coinX - COIN_GAP - measureText(right), y + 3, r.status === "poor" ? COLORS.red : col);
+                this._coin(g, coinX, y, r.status !== "ok");
+            }
             y += ROW_H;
         });
 
         const sel = rows[fs.cursor];
         const info = !sel ? "" : sel.status === "locked" ? t("forge.locked") : sel.status === "poor" ? t("forge.poor") : t(`forge.desc.${sel.id}`);
         text(info, PAD, y + 3, sel?.status === "locked" || sel?.status === "poor" ? COLORS.red : COLORS.text);
-        text(t("forge.hint"), PAD, y + 14, COLORS.dim);
         return c;
     }
 

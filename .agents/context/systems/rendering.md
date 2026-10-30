@@ -50,7 +50,7 @@ Ghostfire uses `GhostfireRenderer`: full 100px source cells at integer 21× scal
 
 ## Draw order
 
-See `../architecture.md` → "`Game._render()` order" (authoritative list). Summary: background → room tiles (clipped to room + door stubs) → door stubs/gradients → floor layer (challenge floor, blood canvas minus holes, footprints, buttons, smoke) → shadows → cable → depth-sorted drawables split around the saw's Y (saw/dropped saw/sparks drawn in between) → flames → challenge walls → **front wall** (bottom row redrawn over entities; interior walls with floor above are y-sorted in the drawables pass) → gibs → air particles → world wind → lighting + post-process (screen) → heart overlay → screen wind → screen gore → door fade → HUD.
+See `../architecture.md` → "`Game._render()` order" (authoritative list). Summary: background → room tiles (clipped to room + door stubs) → door stubs/gradients → floor layer (challenge floor, blood canvas minus holes and walls, footprints, buttons, smoke) → shadows → cable → depth-sorted drawables split around the saw's Y (saw/dropped saw/sparks drawn in between) → flames → challenge walls → **front wall** (bottom row redrawn over entities; interior walls with floor above are y-sorted in the drawables pass) → gibs → air particles → world wind → lighting + post-process (screen) → heart overlay → screen wind → screen gore → door fade → HUD.
 
 ## Depth sorting
 

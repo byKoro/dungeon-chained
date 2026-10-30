@@ -16,7 +16,7 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
 - `js/core/InputHandler.js` — keyboard + gamepad to a key set.
 - `js/systems/PlayerAI.js` — debug bot for P1.
 - `js/rooms/DungeonTileQuery.js` — hole falls, safe spawn, saw drop points.
-- Orchestration: `js/Game.js` (`_updateGameplay`, `_resolveFall`, `_dropSawOnFall`, `_updateHearts`, `enforceSeparationLimit`, `newDungeon`, `transitionThroughDoor`).
+- Orchestration: `js/Game.js` (`_updateGameplay`, `_resolveFall`, `_dropSawOnFall`, `_updateHearts`, `newDungeon`, `transitionThroughDoor`).
 
 ## Key types & APIs
 
@@ -65,7 +65,7 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
    - Snap when `dist > breakDistance` OR `strain >= strainLimit`: players pushed apart by `snapImpulse`, `connected=false`, cooldown `reconnectDelay`, saw dropped at `resolveDropPoint(midpoint)` (`tiles.reachableDropPoint` → nearest reachable walkable tile), `onSnap` (shake 14, `sawSnap` audio, duck, sparks/flash).
    - Disconnected: reconnect when cooldown over and `_canReconnect`: if saw dropped, BOTH players within `pickupRadius` of drop point; otherwise `dist < reconnectDistance`. Then `weapon.pickup()`, `onReconnect`.
    - `weapon.setStrain(0..1)` (max of strain ratio and distance ratio), `weapon.update`, `weapon.updateDropped` when loose.
-5. `Game.enforceSeparationLimit()`: hard positional cap at `MAX_PLAYER_SEPARATION` (620) while connected (larger than `breakDistance`, so normally unreachable).
+5. `PlayerLeash.update()` (`js/systems/PlayerLeash.js`, config `PLAYER_LEASH` in `DemoConfig.js`, Editor 2.0 maps only, connected or not): per axis, the distance between the players is limited to the normal camera framing (`DemoCamera.viewSize()`, reference zoom; the camera no longer zooms out, `lockZoom`). Past `view − 2·softMargin` (camera margin 120) the velocity component moving each player away from the other loses up to `resistance` (0,45) per step, growing to the hard limit `view − 2·hardMargin` (40, half a body). Beyond the hard limit only the player(s) who moved away this step are put back, and their outward velocity is zeroed; dust at the feet when they hit it at ≥ `dust.minSpeed`. Nobody is pulled by the partner. Off in split mode (F6), with a camera `focus` (cinematics), while a player is falling or out of lives, and on the step of a teleport (> `teleportStep` 96 px: door, respawn). 1600×900 window: soft/hard ≈ 658/818 px horizontally, 265/425 px vertically. Classic maps have no separation cap (the old 620 px cap while connected was unreachable and was removed).
 6. Collisions: players + live enemies as ellipses (`resolveEntityCollisions`), saw disc as a solid circle (`collisionRadius`) when connected, wall boxes, room clamping.
 7. Holes: `tiles.checkHoleFalls` → feet (`y + footOffset`) on a hole tile = `startFalling` that step. Resistance is outside the hole: within `HOLE_FALL.edgeMargin` (20 px) of a neighbouring hole tile, the inward velocity loses `1 - inwardDamping` per step and the player is pushed back up to `pushBack` px; parallel motion is untouched. A light push is held, insisting (~16 steps) or a full knockback (16) falls. First fall step: `_dropSawOnFall` → `chain.forceDrop` with `tiles.safeDropPoint` (seeded from non-falling players / entry spawns, avoids hole-adjacent tiles).
 8. `_resolveFall` when `fallComplete`: `lives -= HOLE_FALL.livesLost`; if still alive, `respawnAt(entry spawn, HOLE_FALL.respawnInvulnFrames)` + `tiles.ensureSafeSpawn`.
@@ -91,9 +91,9 @@ Disabled by default; toggled with `I` (own keydown listener) or `window.playerAI
 
 ## Config knobs
 
-- `js/config/ChainConfig.js` `CHAIN` (was hard-coded in the `Game` constructor until `feat/anvil-forge`): `rest 130`, `stiffness 0.02`, `breakDistance 240`, `strainDistance 165`, `strainLimit 30`, `reconnectDistance 110`, `pickupRadius 60`, `snapImpulse 12`, `playerSafeZone: PLAYER_SAFE_ZONE`. `reconnectDelay` default 20 (Chain.js). The Elasticidade upgrade rewrites `chain.strainDistance`/`breakDistance` from these bases (`applySawUpgrades`).
+- `js/config/ChainConfig.js` `CHAIN` (was hard-coded in the `Game` constructor until `feat/anvil-forge`): `rest 130`, `stiffness 0.02`, `breakDistance 240`, `strainDistance 165`, `strainLimit 30`, `reconnectDistance 110`, `pickupRadius 60`, `snapImpulse 12`, `playerSafeZone: PLAYER_SAFE_ZONE`. `reconnectDelay` default 20 (Chain.js). `applySawUpgrades` resets `chain.strainDistance`/`breakDistance` to these bases (the Elasticidade upgrade was removed).
 - Saw absent (Editor 2.0 maps whose anvil offers the Serra recipe): `chain.reset({ present: false })` → `hasSaw` false, not connected, `_canReconnect` and `forceDrop` refuse, nothing is drawn. `reset()` without arguments keeps the current `present` (door transition). `chain.spawnSaw(x, y)` makes it present and dropped at a point; both players must then come within `pickupRadius`. While absent, players walk free and dash only if `demoProgress.state.dash`.
-- `js/config/GameConfig.js`: `PLAYER_DASH`, `MAX_PLAYER_SEPARATION`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
+- `js/config/GameConfig.js`: `PLAYER_DASH`, `PLAYER_SAFE_ZONE`, `PLAYER_DOOR_SPAWN_TILES`, `getPlayerSpawnPositions`, `HOLE_FALL` (`edgeMargin`, `footOffset`, `inwardDamping`, `pushBack`, `livesLost`, `respawnInvulnFrames`), `HEART_DROP` (`maxLives` 3, not read by `_updateHearts`), `HIT_SLOWMO`.
 - `js/config/EntityConfig.js`: `playerConfigs` (color, controls, name, sprite crops, `drawHeight`, hurt/scared sheets).
 - `Player.js` (hardcoded): `speed`, `lives`, invuln 65, knockback 16, `hurtDuration`, `scaredDuration`, `fallDuration`, `slideDuration`.
 

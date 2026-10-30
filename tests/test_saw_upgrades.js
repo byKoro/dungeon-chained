@@ -2,7 +2,7 @@ import { Chain } from '../js/core/Chain.js';
 import { SawWeapon } from '../js/weapons/SawWeapon.js';
 import { CHAIN } from '../js/config/ChainConfig.js';
 import { FORGE } from '../js/config/ForgeConfig.js';
-import { ForgeState, applySawUpgrades } from '../js/systems/ForgeState.js';
+import { ForgeState, applySawUpgrades, applyHeartUpgrades, snapWaveRadius } from '../js/systems/ForgeState.js';
 import { ScrapWallet } from '../js/systems/ScrapWallet.js';
 import { CombatSystem } from '../js/combat/CombatSystem.js';
 
@@ -32,76 +32,95 @@ const setup = (buys = []) => {
 {
     const base = setup().weapon;
     const lvl2 = setup(["size", "size"]).weapon;
-    assert(near(lvl2.discRadius, base.discRadius * 1.4), `Tamanho 2: raio ${lvl2.discRadius.toFixed(1)} = 1,4 × ${base.discRadius.toFixed(1)}`);
-    assert(near(lvl2.collisionRadius, base.collisionRadius * 1.4), "raio de colisão acompanha");
+    assert(near(lvl2.discRadius, base.discRadius * 1.24), `Tamanho 2: raio ${lvl2.discRadius.toFixed(1)} = 1,24 × ${base.discRadius.toFixed(1)}`);
+    assert(near(lvl2.collisionRadius, base.collisionRadius * 1.24), "raio de colisão acompanha");
 }
 
-// Elasticidade: +15% por nível na tensão (165) e na ruptura (240).
+// Só Serra e Tamanho existem na forja; o cabo fica com os valores-base e a serra nunca divide.
 {
-    const { chain } = setup(["elasticity", "elasticity", "elasticity"]);
-    assert(near(chain.strainDistance, 165 * 1.45) && near(chain.breakDistance, 240 * 1.45), "Elasticidade 3: 239,25 / 348");
-    const p1 = player(0, 0), p2 = player(300, 0);
-    chain.update(p1, p2);
-    assert(chain.isConnected, "a 300 px o cabo elástico não arrebenta");
-    const { chain: plain } = setup();
-    plain.update(player(0, 0), player(300, 0));
-    assert(!plain.isConnected, "sem melhoria, a 300 px arrebenta");
+    assert(Object.keys(FORGE.recipes).join() === "saw,size,inertia,snapWave,quickLink,hearts", "catálogo da forja");
+    const { chain, weapon } = setup(["size"]);
+    assert(near(chain.strainDistance, CHAIN.strainDistance) && near(chain.breakDistance, CHAIN.breakDistance), "cabo com tensão e ruptura base");
+    const p1 = player(0, 0), p2 = player(0.9 * 240, 0);
+    for (let i = 0; i < 30; i++) { p1.x = 0; p2.x = 0.9 * 240; chain.strain = 0; chain.update(p1, p2); }
+    assert(!weapon.doubleSaw && weapon.getSawPositions(p1, p2).length === 1, "sem Serra dupla: uma serra só");
 }
 
-// Serra dupla: divide acima de 85% da ruptura, junta abaixo de 70% (histerese).
+// Inércia: solta, a serra segue girando pelo tempo do nível e depois desacelera; posta na bigorna, não gira.
 {
-    const { chain, weapon } = setup(["doubleSaw"]);
-    const p1 = player(0, 0), p2 = player(100, 0);
-    // Zera a tensão acumulada: aqui só interessa a geometria (acima da tensão o cabo arrebenta em 30 steps).
-    const steps = (n) => { for (let i = 0; i < n; i++) { p1.x = 0; p2.x = d; p1.y = p2.y = 0; chain.strain = 0; chain.update(p1, p2); } };
-    let d = 0.8 * 240;
-    steps(30);
-    assert(weapon.getSawPositions(p1, p2).length === 1, "a 80% da ruptura continua uma serra");
-    d = 0.9 * 240;
-    let splitSeen = false;
-    for (let i = 0; i < 20; i++) { steps(1); splitSeen ||= weapon.justSplit; }
-    const two = weapon.getSawPositions(p1, p2);
-    assert(chain.isConnected && splitSeen && two.length === 2, "acima de 85% divide em duas (com aviso justSplit)");
-    assert(near(two[0].x, d / 3, 2) && near(two[1].x, 2 * d / 3, 2), `discos em 1/3 e 2/3 do cabo (${two[0].x.toFixed(0)}, ${two[1].x.toFixed(0)})`);
-    d = 0.78 * 240;
-    steps(30);
-    assert(weapon.getSawPositions(p1, p2).length === 2, "entre 70% e 85% continua dividida (histerese)");
-    d = 0.6 * 240;
-    let mergedSeen = false;
-    for (let i = 0; i < 30; i++) { steps(1); mergedSeen ||= weapon.justMerged; }
-    assert(mergedSeen && weapon.getSawPositions(p1, p2).length === 1, "abaixo de 70% junta de novo");
+    const { weapon: plain } = setup();
+    plain.spin = 1; plain.drop(0, 0);
+    assert(!plain.spinningLoose, "sem Inércia a serra solta não fica girando");
 
-    const { chain: c2, weapon: w2 } = setup();
-    d = 0.9 * 240;
-    for (let i = 0; i < 30; i++) c2.update(player(0, 0), player(d, 0));
-    assert(w2.getSawPositions(player(0, 0), player(d, 0)).length === 1, "sem a melhoria nunca divide");
+    const { chain, weapon } = setup(["inertia", "inertia"]);
+    const steps = Math.round(FORGE.recipes.inertia.seconds[1] * 60);
+    assert(weapon.inertiaSteps === steps, `Inércia 2: ${steps} steps`);
+    weapon.spin = 0.2;
+    chain.forceDrop(player(0, 0), player(100, 0));
+    assert(weapon.spinningLoose && weapon.spin >= FORGE.inertia.minSpin, "solta parada, a serra ganha o giro mínimo da Inércia");
+    const r0 = weapon.rotation;
+    for (let i = 0; i < steps - 1; i++) { weapon.update(); weapon.updateDropped(); }
+    assert(weapon.spinningLoose && near(weapon.spin, Math.max(0.2, FORGE.inertia.minSpin)) && weapon.rotation !== r0, "gira sem perder velocidade durante o tempo");
+    weapon.update(); weapon.updateDropped();
+    for (let i = 0; i < 120; i++) weapon.update();
+    assert(!weapon.spinningLoose && weapon.spin < FORGE.inertia.minSpin, "acabou o tempo: para de cortar e desacelera");
+
+    chain.spawnSaw(0, 0);
+    assert(!weapon.spinningLoose, "serra posta na bigorna não gira");
 }
 
-// Serra dupla aberta: a tensão não sobe, só a distância de ruptura arrebenta o cabo.
+// Inércia corta inimigos encostados no disco solto.
 {
-    const { chain, weapon } = setup(["doubleSaw"]);
-    const d = 0.9 * 240;
-    const p1 = player(0, 0), p2 = player(d, 0);
-    for (let i = 0; i < 120; i++) { p1.x = 0; p2.x = d; p1.y = p2.y = 0; chain.update(p1, p2); }
-    assert(chain.isConnected && weapon.split === 1, "dividida a 90% da ruptura, 2 s sem arrebentar pela tensão");
-    assert(chain.strain < chain.strainLimit, `tensão parada enquanto dividida (${chain.strain})`);
-    const { chain: plain } = setup();
-    for (let i = 0; i < 120 && plain.isConnected; i++) plain.update(player(0, 0), player(d, 0));
-    assert(!plain.isConnected, "sem a melhoria, a mesma distância arrebenta pela tensão");
-}
-
-// Os dois discos acertam.
-{
-    const { chain, weapon } = setup(["doubleSaw"]);
-    const p1 = player(0, 0), p2 = player(216, 0);
-    for (let i = 0; i < 20; i++) { p1.x = 0; p2.x = 216; chain.strain = 0; chain.update(p1, p2); }
-    const [a, b] = weapon.getSawPositions(p1, p2);
+    const { chain, weapon } = setup(["inertia"]);
+    weapon.spin = 1;
+    chain.forceDrop(player(0, 0), player(100, 0), () => ({ x: 500, y: 500 }));
     const noop = new Proxy({}, { get: () => () => {} });
     const combat = new CombatSystem({ renderer: noop, particleSystem: noop, audio: noop, hitFeedback: true });
-    const enemy = (s) => ({ x: s.x, y: s.y + 40, hitRadius: 18, state: "chase", hits: 0, takeHit() { this.hits++; return { damage: 1, killed: false }; } });
-    const e1 = enemy(a), e2 = enemy(b);
-    combat.resolveWeaponHits(weapon, [e1, e2], p1, p2, true);
-    assert(e1.hits === 1 && e2.hits === 1, "cada disco acerta o inimigo embaixo dele");
+    const enemy = (x) => ({ x, y: 500, hitRadius: 18, state: "chase", hits: 0, takeHit() { this.hits++; return { damage: 1, killed: false }; } });
+    const near1 = enemy(520), far = enemy(700);
+    combat.resolveLooseSawHits(weapon, [near1, far]);
+    assert(near1.hits === 1 && far.hits === 0, "o disco solto girando acerta só quem encosta");
+}
+
+// Estalo: raio por nível; a onda acerta uma vez quem está no raio, e ninguém fora dele.
+{
+    const { forge, weapon } = setup(["snapWave"]);
+    assert(snapWaveRadius(setup().forge) === 0 && near(snapWaveRadius(forge), FORGE.recipes.snapWave.radius[0]), "sem Estalo raio 0; nível 1 = 1,6 tiles");
+    const noop = new Proxy({}, { get: () => () => {} });
+    const combat = new CombatSystem({ renderer: noop, particleSystem: noop, audio: noop, hitFeedback: true });
+    const enemy = (x) => ({ x, y: 0, hitRadius: 18, state: "chase", hits: 0, takeHit() { this.hits++; return { damage: 1, killed: false }; } });
+    const r = snapWaveRadius(forge), inside = enemy(r), outside = enemy(r + 40);
+    combat.resolveSnapWave(weapon, [inside, outside], 0, 0, r);
+    assert(inside.hits === 1 && outside.hits === 0, "a onda acerta quem encosta no raio e mais ninguém");
+}
+
+// Reconexão rápida: raio de pegar e distância de reconexão maiores, espera menor.
+{
+    const { chain } = setup();
+    assert(chain.pickupRadius === CHAIN.pickupRadius && chain.reconnectDelay === 20, "sem a melhoria: 60 px e 20 steps");
+    const { chain: fast } = setup(["quickLink", "quickLink"]);
+    assert(near(fast.pickupRadius, CHAIN.pickupRadius * 1.8) && near(fast.reconnectDistance, CHAIN.reconnectDistance * 1.8) && fast.reconnectDelay === 6, "nível 2: 108 px, 198 px, 6 steps");
+    fast.spawnSaw(0, 0);
+    fast.update(player(-90, 0), player(90, 0));
+    assert(fast.isConnected, "a 90 px da serra largada os dois já reconectam");
+    chain.spawnSaw(0, 0);
+    chain.update(player(-90, 0), player(90, 0));
+    assert(!chain.isConnected, "sem a melhoria, a 90 px não reconecta");
+}
+
+// Coração: +1 máximo por nível para os dois, já cheio; reset volta a 3.
+{
+    const forge = new ForgeState();
+    const wallet = new ScrapWallet(999);
+    const a = { lives: 2, maxLives: 3 }, b = { lives: 3, maxLives: 3 };
+    assert(forge.status("hearts", 999) === "ok", "Coração não precisa da Serra");
+    forge.buy("hearts", wallet); applyHeartUpgrades(forge, [a, b]);
+    forge.buy("hearts", wallet); applyHeartUpgrades(forge, [a, b]);
+    assert(a.maxLives === 5 && b.maxLives === 5 && a.lives === 4 && b.lives === 5, "dois níveis: máximo 5, e cada nível enche um coração");
+    assert(wallet.amount === 999 - 80 - 140 && forge.status("hearts", 999) === "maxed", "Coração custa 80 + 140 e para no nível 2");
+    forge.reset();
+    applyHeartUpgrades(forge, [a, b]);
+    assert(a.maxLives === 3 && a.lives === 3 && b.lives === 3, "nova partida: volta a 3 corações");
 }
 
 console.log(`\n${passed} passaram, ${failed} falharam`);

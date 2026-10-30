@@ -63,7 +63,7 @@ Light profile: `{ color: "r, g, b", flickerBase, flickerSine, flickerNoise, fall
 Sim step (`Game._updateGameplay`/`_updateRoomIntro`): systems call `trigger*`. Then `particleSystem.update`, `effects.update`, `wind.update`, `screenGore.update` (gameplay only).
 Render (`Game._render`, inside `renderer.beginFrame()` world transform + room clip):
 1. background, room, door stubs/gradients, `holes.draw`, challenge floor
-2. `particleSystem.drawFloor` (BloodCanvas + debris, clipped with hole rects via even-odd) → `effects.draw` (footprints) → buttons → `drawSmoke`
+2. `particleSystem.drawFloor` (BloodCanvas + debris, clipped via even-odd with `tiles.unstainableRects()`: hole cells and interior wall/void cells; border walls are already outside `arenaBounds`). Blood is still stamped there, only hidden. Solid props (`base`) draw later in the y-sorted pass, so `RoomProps` re-applies the blood under them over their art: `PropSprites.drawFrame(..., stain)` cuts the BloodCanvas patch under the art rect by the frame's alpha and draws it with the same multiply/alpha. Floor-layer props and tileset decor are drawn before the blood, so it covers them directly. → `effects.draw` (footprints) → buttons → `drawSmoke`
 3. shadows, chain, y-sorted entities split by saw y, saw, `drawSparks` (sparks + additive flashes), entities in front, `drawFlames` (additive)
 4. wall layer, front wall, gibs, air layer, `drawAir` (blood arcs), wind (if `WIND.layer==="world"`)
 5. `renderer.endFrame()` → `lighting.render(...)` → `postProcessor.setVignetteBreath(strain)` → `postProcessor.draw()` (ambient `41,35,53` + additive lights, multiplied over the frame; then vignette)

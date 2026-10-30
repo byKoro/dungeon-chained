@@ -300,6 +300,13 @@ export class ContentTools {
             const object = { ...cell, type: this.interactiveType, id: `object_${Date.now()}_${col}_${row}` };
             if (object.type === 'lever') { object.tiles = []; this.bridgeId = object.id; }
             if (object.type === 'rope' && $('content-rope-auto').checked) object.auto = true;
+            if (object.type === 'chestRope' && !hit) {
+                const used = new Set((r.interactives || []).map(o => o.id));
+                let n = 1;
+                while (used.has(`corda${n}`)) n++;
+                object.id = `corda${n}`;
+                this._hint(`Corda com baú “${object.id}”: num baú, preencha “Corda com baú” com ${object.id}.`);
+            }
             this._toggle(r, 'interactives', object);
         } else if (type === 'bridge') {
             const lever = (r.interactives || []).find(o => o.id === this.bridgeId);
@@ -515,6 +522,17 @@ export class ContentTools {
         }
         for (const o of room.interactives || []) if (o.type === 'rope' && o.auto) {
             ctx.strokeStyle = '#ff5c5c'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2);
+        }
+        // Corda com baú: id embaixo da estaca e linha até o baú ligado a ela.
+        for (const o of room.interactives || []) if (o.type === 'chestRope') {
+            const cx = ox + (o.col + 0.5) * tile, cy = oy + (o.row + 0.5) * tile;
+            for (const p of room.props || []) if (p.rope && p.rope === o.id) {
+                ctx.strokeStyle = INTERACTIVES.chestRope.color; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ox + (p.col + 0.5) * tile, oy + (p.row + 0.5) * tile); ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(9, tile * 0.25)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.fillText(o.id, cx, oy + (o.row + 1) * tile);
         }
         for (const z of room.zones || []) {
             ctx.strokeStyle = 'rgba(127, 219, 255, 0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);

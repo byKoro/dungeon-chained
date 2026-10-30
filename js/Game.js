@@ -10,9 +10,11 @@ import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRIPT_LINES } from './config/DialogueConfig.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
-import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades, applyHeartUpgrades, sawDragStats, snapWaveRadius } from './systems/ForgeState.js';
 import { SawDrag } from './systems/SawDrag.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
+import { PlayerLeash } from './systems/PlayerLeash.js';
+import { PLAYER_LEASH } from './config/DemoConfig.js';
 import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
@@ -73,7 +75,7 @@ import { playerConfigs } from './config/EntityConfig.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
-    MAX_PLAYER_SEPARATION, CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
+    CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
@@ -183,7 +185,14 @@ export class Game {
         this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current,
             safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]),
             onHit: (enemy, info) => { if (this.arautoEffects.owns(enemy)) this.arautoEffects.hit(enemy, info); } });
-        this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(), mode: this.mapData?.test?.camera });
+        this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(),
+            mode: this.mapData?.test?.camera, lockZoom: PLAYER_LEASH.enabled });
+        // Só nos mapas do Editor 2.0, fora da tela dividida (F6) e das cinemáticas com câmera própria.
+        this.playerLeash = this.mapData ? new PlayerLeash({
+            getPlayers: () => [this.p1, this.p2], getView: () => this.demoCamera.viewSize(),
+            isActive: () => this.demoCamera.mode !== 'split' && !this.demoCamera.focus,
+            particleSystem: this.particleSystem
+        }) : null;
         // A câmera da cena usa `demoCamera.focus`, que só vale no mapa da demo; no modo clássico a câmera fica parada.
         this.arautoIntro = new ArautoIntroScene({ camera: this.demoCamera, hud: this.hud, effects: this.arautoEffects,
             arautoAudio: this.arautoAudio, audio: this.audio, particles: this.particleSystem,
@@ -201,7 +210,8 @@ export class Game {
         this.animatedProps = this.mapData ? new PropSprites() : null;
         this.roomProps = this.animatedProps ? new RoomProps({
             rooms: this.rooms, sprites: this.animatedProps, getFrame: (prop, key) => this._propFrame(prop, key),
-            isHidden: (prop, key) => !!this.chests?.isHidden(key, prop)
+            isHidden: (prop, key) => !!this.chests?.isHidden(key, prop),
+            blood: this.bloodCanvas
         }) : null;
         const scrapFrames = SCRAP.frames.map((_, i) => this.assets.get(`scrap${i + 1}`));
         this.scrap = this.mapData ? new ScrapSystem({ audio: this.audio, frames: scrapFrames }) : null;
@@ -252,7 +262,7 @@ export class Game {
         this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
         this.sawDrag = this.mapData ? new SawDrag({
             chain: this.chain, getPlayers: () => [this.p1, this.p2], input: this.input,
-            getStats: () => sawDragStats(this.forge, TILE),
+            getStats: () => sawDragStats(TILE),
             isBlocked: (x, y) => this._sawDragBlocked(x, y),
             getBounds: () => this.arenaBounds,
             canDrag: () => !this._sawOnAnvil && !this.forgeSystem?.open && !this.sawCinematic?.active,
@@ -609,8 +619,23 @@ export class Game {
         return !mapOffersRecipe(this.mapData.map, "saw");
     }
 
+    // Melhoria Estalo: onda em volta da serra quando o cabo arrebenta (não na queda nem no corte forçado).
+    _snapWave(x, y, enemies) {
+        const radius = snapWaveRadius(this.forge);
+        if (radius <= 0) return;
+        const fx = FORGE.snapWave;
+        this.particleSystem.triggerShockRing(x, y, radius, { life: fx.ringLife, color: fx.ringColor });
+        this.particleSystem.triggerSparkBurst(x, y, radius * 0.5, fx.sparks, 1.4);
+        this.renderer.triggerShake(fx.shake);
+        this.audio.play(fx.sound.cue, { rateMultiplier: fx.sound.rate, volumeMultiplier: fx.sound.volume });
+        this.combat.resolveSnapWave(this.chain.weapon, enemies, x, y, radius,
+            () => this.triggerHitSlowmo(),
+            (enemy, info) => enemy.freezeOnHit?.(info.hitStop));
+    }
+
     _applySawUpgrades() {
         applySawUpgrades(this.forge, this.chain, this.chain.weapon, CHAIN);
+        applyHeartUpgrades(this.forge, [this.p1, this.p2]);
     }
 
     _onForgeBuy(id, anvil) {
@@ -650,7 +675,7 @@ export class Game {
         this.arenaBounds = this.rooms.currentBounds;
         const spawns = this.rooms.dungeon.spawnPositions();
         for (const [p, s] of [[this.p1, spawns.p1], [this.p2, spawns.p2]]) {
-            p.lives = 3;
+            p.lives = p.maxLives;
             p.respawnAt(s.x, s.y, RUN_DEATH.invulnSteps);
             p._livesSeen = p.lives;
             p._fallSeen = false;
@@ -882,19 +907,6 @@ export class Game {
         this.gameLoop.triggerHitSlowmo();
     }
 
-    enforceSeparationLimit() {
-
-        if (!this.chain.isConnected) return;
-        const dx = this.p2.x - this.p1.x, dy = this.p2.y - this.p1.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > MAX_PLAYER_SEPARATION) {
-            const over = dist - MAX_PLAYER_SEPARATION;
-            const nx = dx / (dist || 1), ny = dy / (dist || 1);
-            this.p1.x += nx * over / 2; this.p1.y += ny * over / 2;
-            this.p2.x -= nx * over / 2; this.p2.y -= ny * over / 2;
-        }
-    }
-
     _updateCameraToCurrentRoom(dt = SIM_STEP) {
         if (this.mapData) { this.demoCamera.update(); return; }
         const rect = this.rooms.cellRect();
@@ -1070,6 +1082,7 @@ export class Game {
                 const r = this.chain.weapon?.discRadius ?? 24;
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
+                this._snapWave(fx, fy, room.enemies);
             },
             onReconnect: () => this._onSawReconnect(),
 
@@ -1124,7 +1137,7 @@ export class Game {
                 }
             }
         }
-        this.enforceSeparationLimit();
+        this.playerLeash?.update();
 
         if (room.challenge) {
             room.challenge.update([p1, p2], deltaSeconds);
@@ -1198,6 +1211,12 @@ export class Game {
                 if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
             }
         );
+        if (!this.chain.isConnected) this.combat.resolveLooseSawHits(this.chain.weapon, enemies,
+            () => this.triggerHitSlowmo(),
+            (enemy, info) => {
+                enemy.freezeOnHit?.(info.hitStop);
+                if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
+            });
         this.combat.resolveDeaths(room, this.gibs, enemy => {
             if (!this.arautoEffects.owns(enemy)) this.screenGore.trigger();
             this.scrap?.dropFromEnemy(enemy);
@@ -1289,10 +1308,10 @@ export class Game {
             const heart = hearts[i];
             heart.update();
             const collector = [p1, p2].find(player =>
-                player.lives < 3 && Math.hypot(player.x - heart.x, player.y - heart.y) <= heart.radius + player.hitRadius
+                player.lives < player.maxLives && Math.hypot(player.x - heart.x, player.y - heart.y) <= heart.radius + player.hitRadius
             );
             if (collector) {
-                collector.lives = Math.min(3, collector.lives + 1);
+                collector.lives = Math.min(collector.maxLives, collector.lives + 1);
                 this._playHeartPickup();
 
                 this.particleSystem.triggerFlash(heart.x, heart.y, 6, 0.6);
@@ -1399,7 +1418,7 @@ export class Game {
         const challenge = rooms.current.challenge;
         if (challenge) challenge.drawFloorLayer(ctx);
 
-        this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.darkHoleRects());
+        this.particleSystem.drawFloor(ctx, this.arenaBounds, this.tiles.unstainableRects());
         this.effects.draw(ctx);
         this.roomEvents?.drawFloor(ctx);
         this.ghostfire.drawFloor(ctx, rooms.current);

@@ -2,6 +2,7 @@ import { BARS, STAKE_LIGHT } from '../config/EventsConfig.js';
 import { TILE, LIGHT_PIXEL_SCALE } from '../config/GameConfig.js';
 import { findSafeFloorCell } from '../rooms/SafeSpawn.js';
 import { InicialRoomScript } from './roomScripts/InicialRoomScript.js';
+import { RopeChests } from './RopeChests.js';
 
 // Script por sala, escolhido pelo nome da sala do Editor 2.0. Cada script recebe uma API pequena (zonas, encontros,
 // inimigos, grades, baús, falas) e guarda o próprio estado; os eventos concluídos sobrevivem à morte da dupla.
@@ -17,6 +18,7 @@ export class RoomEvents {
     reset() {
         this.completed = new Set();
         this._scripts = new Map();
+        this._ropes = new Map();
         this._bars = new Map();
     }
 
@@ -27,6 +29,20 @@ export class RoomEvents {
         const script = Script ? new Script(this._api(room)) : null;
         this._scripts.set(room.key, script);
         return script;
+    }
+
+    // Cordas com baú da sala (qualquer sala, independente do script).
+    _ropeChests(room) {
+        if (this._ropes.has(room.key)) return this._ropes.get(room.key);
+        const ropes = new RopeChests({ api: this._api(room) });
+        const value = ropes.valid ? ropes : null;
+        this._ropes.set(room.key, value);
+        return value;
+    }
+
+    _handlers(room = this.rooms.current) {
+        if (!room) return [];
+        return [this._script(room), this._ropeChests(room)].filter(Boolean);
     }
 
     _api(room) {
@@ -104,7 +120,7 @@ export class RoomEvents {
 
     // Luzes pedidas pelo script da sala (ex.: estacas), em coordenadas do mundo.
     renderLights(renderer, postProcessor) {
-        for (const l of this._script()?.lights?.() || []) {
+        for (const l of this._handlers().flatMap(h => h.lights?.() || [])) {
             const s = renderer.worldToScreen(l.x, l.y);
             const px = Math.max(2, Math.round((this.tile / 16) * s.zoom * LIGHT_PIXEL_SCALE));
             postProcessor.addLight(s.x, s.y, l.radius * s.zoom, px, 1, STAKE_LIGHT);
@@ -145,7 +161,7 @@ export class RoomEvents {
         const room = this.rooms.current;
         if (!room) return;
         this._updateBars(room, this._barsOf(room));
-        this._script(room)?.update();
+        for (const h of this._handlers(room)) h.update?.();
     }
 
     // Tranco (a grade solta e trepida na verga) → queda com gravidade → baque com quique → parada.
@@ -211,7 +227,7 @@ export class RoomEvents {
 
     // Morte da dupla: encontros interrompidos voltam ao começo; concluídos ficam.
     onDeath() {
-        for (const script of this._scripts.values()) script?.onDeath?.();
+        for (const script of [...this._scripts.values(), ...this._ropes.values()]) script?.onDeath?.();
         for (const [key, bars] of this._bars) {
             if (!bars.down) continue;
             bars.down = false;
@@ -232,7 +248,7 @@ export class RoomEvents {
 
     // Círculos sólidos no chão pedidos pelo script (estacas).
     solidCircles() {
-        return this._script()?.solidCircles?.() ?? [];
+        return this._handlers().flatMap(h => h.solidCircles?.() ?? []);
     }
 
     // Empurra os pés (`footY`, ou y + `footOffset`) para fora dos círculos sólidos.
@@ -253,11 +269,11 @@ export class RoomEvents {
     }
 
     drawFloor(ctx) {
-        this._script()?.drawFloor?.(ctx);
+        for (const h of this._handlers()) h.drawFloor?.(ctx);
     }
 
     drawAir(ctx) {
-        this._script()?.drawAir?.(ctx);
+        for (const h of this._handlers()) h.drawAir?.(ctx);
     }
 
     // Grades ordenadas por y com as entidades (base no pé do tile).
@@ -276,7 +292,7 @@ export class RoomEvents {
             return { y: base - 14, feetSortY: base, draw: ctx => this._drawBar(ctx, key, x, base, lowered) };
         });
         // Estacas e outros drawables ordenados por y pedidos pelo script da sala (ex.: CageEncounter).
-        return [...bars, ...(this._script(room)?.drawables?.() ?? [])];
+        return [...bars, ...this._handlers(room).flatMap(h => h.drawables?.() ?? [])];
     }
 
     // Fresta no chão → treliça recortada abaixo da verga → moldura por cima.

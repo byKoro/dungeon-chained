@@ -1,10 +1,7 @@
 import { CAGE } from '../config/EventsConfig.js';
 import { Physics } from '../core/Physics.js';
 import { ANIMATED_PROPS } from '../config/PropConfig.js';
-
-const easeIn = k => k * k;
-const easeOut = k => 1 - (1 - k) * (1 - k);
-const clamp01 = v => Math.max(0, Math.min(1, v));
+import { StakeRopeArt, sawGap, impactBurst, drawChestDrop, easeIn, easeOut, clamp01 } from './StakeRope.js';
 
 // Estacas no chão, cada uma segurando por uma corda vertical uma gaiola lá no alto (fora da vista).
 // Os dois entram na zona → a corda `auto` arrebenta sozinha e as grades descem. Passar a serra pela estaca corta a
@@ -14,6 +11,7 @@ const clamp01 = v => Math.max(0, Math.min(1, v));
 export class CageEncounter {
     constructor({ api, zoneId, encounterId, rng = Math.random, cfg = CAGE }) {
         Object.assign(this, { api, zoneId, encounterId, rng, cfg });
+        this.art = new StakeRopeArt(cfg, () => api.assets);
         const objs = api.authored.interactives || [];
         this.ropeDefs = objs.filter(o => o.type === "rope").map(o => ({ col: o.col, row: o.row, ...api.tileCenter(o.col, o.row), auto: !!o.auto }));
         if (this.ropeDefs.length && !this.ropeDefs.some(r => r.auto)) this.ropeDefs[0].auto = true;
@@ -91,22 +89,16 @@ export class CageEncounter {
         this.api.dialogue?.say(0, "talk.rope1");
     }
 
-    // Ponto de corte: a estaca (a altura do nó).
     _stakePoint(r) {
-        return { x: r.x, y: r.y + this.cfg.stakeHitY };
+        return this.art.stakePoint(r);
     }
 
-    // Distância entre a serra e a estaca, descontando o raio do disco (≤ 0 = encostando).
     _sawGap(r) {
-        const chain = this.api.chain, [p1, p2] = this.api.getPlayers();
-        const w = chain.weapon, s = this._stakePoint(r), disc = w.discRadius ?? 0;
-        let best = Infinity;
-        if (chain.isConnected) {
-            for (const p of w.getSawPositions?.(p1, p2) || []) best = Math.min(best, Math.hypot(p.x - s.x, p.y - s.y) - disc);
-        } else if (w.thrown) {
-            best = Math.hypot(w.dropX - s.x, w.dropY - s.y) - disc;
-        }
-        return best;
+        return sawGap(this.api.chain, this.api.getPlayers(), this._stakePoint(r));
+    }
+
+    _near(r) {
+        return !r.cut && this.phase !== "idle" ? clamp01(1 - this._sawGap(r) / this.cfg.nearRadius) : 0;
     }
 
     _checkCuts() {
@@ -160,17 +152,7 @@ export class CageEncounter {
     }
 
     _burst(x, y, fx) {
-        const ps = this.api.particleSystem;
-        this.api.renderer?.triggerShake(fx.shake);
-        this.api.renderer?.triggerZoomPunch?.(fx.zoomPunch);
-        this.api.hitStop?.(fx.hitStop);
-        ps?.triggerSparkBurst?.(x, y - 20, 30, fx.sparks, 1.3);
-        ps?.triggerFlash?.(x, y - 20, fx.flash, 1);
-        for (let i = 0; i < fx.dust; i++) {
-            const a = (i / fx.dust) * Math.PI * 2;
-            ps?.triggerDust?.(x + Math.cos(a) * 26, y + Math.sin(a) * 10, Math.cos(a), Math.sin(a) * 0.5, 2);
-        }
-        this.api.pushPlayers?.(x, y, fx.pushRadius, fx.pushForce);
+        impactBurst(this.api, x, y, fx);
     }
 
     // A gaiola bate no chão e estilhaça; os monstros saltam dos destroços.
@@ -322,56 +304,32 @@ export class CageEncounter {
         const out = [];
         for (const r of this.ropes) {
             if (r.cut) continue;
-            const near = this.phase !== "idle" ? clamp01(1 - this._sawGap(r) / this.cfg.nearRadius) : 0;
             const pulse = 0.85 + 0.15 * Math.sin(this._pulse * 0.08 + r.x);
-            out.push({ ...this._stakePoint(r), radius: (L.idleRadius + (L.nearRadius - L.idleRadius) * near) * pulse });
-            const knot = this._knot(r);
+            out.push({ ...this._stakePoint(r), radius: (L.idleRadius + (L.nearRadius - L.idleRadius) * this._near(r)) * pulse });
+            const knot = this.art.knot(r);
             for (const f of L.ropeAt) out.push({ x: r.x, y: knot.y - this.cfg.ropeUp * f, radius: L.ropeRadius });
         }
         return out;
     }
 
-    // ---------- desenho (sprites de assets/cage, 1 pixel de arte = cfg.art px de mundo) ----------
-
-    _img(key) {
-        const img = this.api.assets?.get?.(key);
-        return img?.complete && img.naturalWidth > 0 ? img : null;
-    }
-
-    // Onde a corda sai da estaca (nas voltas de corda do sprite).
-    _knot(r) {
-        const A = this.cfg.art, s = this.cfg.sprite;
-        return { x: r.x, y: r.y + s.stakeFoot - (s.stakeH - s.knotY) * A };
-    }
-
-    _shadow(ctx, x, y, k) {
-        ctx.fillStyle = this.cfg.colors.shadow;
-        ctx.beginPath();
-        ctx.ellipse(x, y, this.cfg.width * (0.12 + k * 0.34), this.cfg.width * (0.05 + k * 0.13), 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    _fallK(cage, warnSteps, fallSteps) {
-        if (cage.phase === "warn") return 0.25 * clamp01(cage.t / warnSteps);
-        return 0.25 + 0.75 * easeIn(clamp01(cage.t / fallSteps));
-    }
+    // ---------- desenho ----------
 
     drawFloor(ctx) {
         if (!this.valid) return;
-        const A = this.cfg.art, s = this.cfg.sprite, col = this.cfg.colors;
-        const broken = this._img("cageBroken");
+        const A = this.cfg.art, col = this.cfg.colors;
+        const broken = this.art.img("cageBroken");
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         for (const r of this.ropes) {
             const g = this._ground(r), cage = r.cage;
-            if (cage && !cage.landed) this._shadow(ctx, g.x, g.y, this._fallK(cage, this.cfg.warnSteps, this.cfg.fallSteps));
+            if (cage && !cage.landed) this.art.shadow(ctx, g.x, g.y, this.art.fallK(cage, this.cfg.warnSteps, this.cfg.fallSteps));
             if (cage?.landed && cage.debrisT > 0 && broken) {
                 ctx.globalAlpha = Math.min(1, cage.debrisT / 60);
                 const w = broken.naturalWidth * A, h = broken.naturalHeight * A;
                 ctx.drawImage(broken, Math.round(g.x - w / 2), Math.round(g.y - h + 8), w, h);
                 ctx.globalAlpha = 1;
             }
-            if (!r.cut && this.phase !== "idle") this._ring(ctx, r);
+            if (!r.cut && this.phase !== "idle") this.art.ring(ctx, r, this._near(r), this._pulse);
         }
         for (const k of this.jumpers) {
             if (k.t < 0 || k.landed) continue;
@@ -384,7 +342,7 @@ export class CageEncounter {
         }
         const d = this.drop;
         if (d && (d.phase === "warn" || d.phase === "fall")) {
-            this._shadow(ctx, d.x, d.ground, this._fallK(d, this.cfg.chest.warnSteps, this.cfg.chest.fallSteps));
+            this.art.shadow(ctx, d.x, d.ground, this.art.fallK(d, this.cfg.chest.warnSteps, this.cfg.chest.fallSteps));
         }
         ctx.restore();
     }
@@ -392,99 +350,25 @@ export class CageEncounter {
     // Corpos sólidos das estacas (ficam mesmo depois do corte).
     solidCircles() {
         if (!this.valid) return [];
-        const b = this.cfg.stakeBody, foot = this.cfg.sprite.stakeFoot;
-        return this.ropes.map(r => ({ x: r.x, y: r.y + foot - b.bodyY, r: b.radius }));
+        return this.ropes.map(r => this.art.solidCircle(r));
     }
 
-    // Estacas ordenadas por y com as entidades: quem está atrás da estaca é desenhado antes dela (antes ficavam na
-    // camada de chão e o player passava por cima como um "tapete"). Sem colisão: a serra ainda é o único jeito de cortar.
+    // Estacas ordenadas por y com as entidades (quem está atrás é desenhado antes).
     drawables() {
         if (!this.valid) return [];
-        const stake = this._img("ropeStake");
-        if (!stake) return [];
-        const base = r => r.y + this.cfg.sprite.stakeFoot;
-        return this.ropes.map(r => ({
-            y: base(r) - this.cfg.sprite.stakeH * this.cfg.art,
-            feetSortY: base(r),
-            draw: ctx => {
-                ctx.save();
-                ctx.imageSmoothingEnabled = false;
-                this._drawStake(ctx, r, stake);
-                ctx.restore();
-            }
-        }));
-    }
-
-    // Anel pontilhado no chão em volta da estaca: "passe a serra aqui". Fica mais forte com a serra perto.
-    _ring(ctx, r) {
-        const near = clamp01(1 - this._sawGap(r) / this.cfg.nearRadius);
-        const pulse = 0.5 + 0.5 * Math.sin(this._pulse * 0.12 + r.x);
-        const alpha = 0.25 + 0.55 * near * (0.6 + 0.4 * pulse);
-        const rx = 30 + 6 * pulse, ry = rx * 0.45, cy = r.y + this.cfg.sprite.stakeFoot - 4, n = 18, P = this.cfg.art;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = this.cfg.colors.ring;
-        for (let i = 0; i < n; i++) {
-            const a = (i / n) * Math.PI * 2 + this._pulse * 0.02;
-            ctx.fillRect(Math.round((r.x + Math.cos(a) * rx) / P) * P - P / 2, Math.round((cy + Math.sin(a) * ry) / P) * P - P / 2, P, P);
-        }
-        ctx.restore();
-    }
-
-    // Estaca: fica no lugar depois do corte. Inteira, brilha (faixa de luz) e pisca branco no golpe.
-    _drawStake(ctx, r, img) {
-        const A = this.cfg.art, s = this.cfg.sprite;
-        const w = s.stakeW * A, h = s.stakeH * A;
-        const sq = r.flash > 0 ? Math.sin((r.flash / this.cfg.cut.stakeFlashSteps) * Math.PI) * this.cfg.cut.squash : 0;
-        const x = r.x, base = r.y + s.stakeFoot;
-        ctx.save();
-        ctx.translate(x, base);
-        ctx.scale(1 + sq * 0.6, 1 - sq);
-        ctx.drawImage(img, -w / 2, -h, w, h);
-        const near = !r.cut && this.phase !== "idle" ? clamp01(1 - this._sawGap(r) / this.cfg.nearRadius) : 0;
-        const glow = r.flash > 0 ? r.flash / this.cfg.cut.stakeFlashSteps : near * (0.35 + 0.25 * Math.sin(this._pulse * 0.2));
-        if (glow > 0.01) {
-            ctx.globalCompositeOperation = "lighter";
-            ctx.globalAlpha = Math.min(1, glow);
-            ctx.drawImage(this._white(img), -w / 2, -h, w, h);
-        }
-        ctx.restore();
-        if (r.cut) this._ropeEnd(ctx, this._knot(r), 0);
-    }
-
-    _white(img) {
-        if (this._whiteImg?.src === img) return this._whiteImg.canvas;
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth; c.height = img.naturalHeight;
-        const g = c.getContext("2d");
-        g.drawImage(img, 0, 0);
-        g.globalCompositeOperation = "source-atop";
-        g.fillStyle = this.cfg.colors.shine;
-        g.fillRect(0, 0, c.width, c.height);
-        this._whiteImg = { src: img, canvas: c };
-        return c;
+        return this.art.drawables(this.ropes, r => this._near(r), this._pulse);
     }
 
     // Cordas subindo para o teto e gaiolas/baú caindo. No passe do mundo: a luz do ambiente atua neles.
     drawAir(ctx) {
         if (!this.valid || this.phase === "done" && !this.drop) return;
         const A = this.cfg.art, s = this.cfg.sprite;
-        const img = this._img("cageHang");
+        const img = this.art.img("cageHang");
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         for (const r of this.ropes) {
-            const knot = this._knot(r);
-            const top = { x: r.x, y: knot.y - this.cfg.ropeUp };
-            if (!r.cut) {
-                const wob = Math.sin(this._pulse * 0.03 + r.x * 0.01) * this.cfg.swayAmp;
-                this._ropeAlong(ctx, knot, top, wob, this.cfg.ropeFade);
-            } else if (r.cutT < 1) {
-                // A parte de cima chicoteia para o alto e some.
-                const end = { x: r.x, y: knot.y - 18 - this.cfg.ropeUp * easeIn(r.cutT) };
-                const fade = Math.max(0, (this.cfg.ropeFade * this.cfg.ropeUp - (knot.y - end.y)) / Math.max(1, end.y - top.y));
-                this._ropeAlong(ctx, end, top, Math.sin(r.cutT * 20) * 6 * (1 - r.cutT), fade);
-                this._ropeEnd(ctx, end, 0);
-            }
+            const knot = this.art.knot(r);
+            this.art.rope(ctx, r, { x: r.x, y: knot.y - this.cfg.ropeUp }, this._pulse);
             if (r.cage?.phase === "fall" && img) {
                 const k = r.cage.t / this.cfg.fallSteps;
                 const g = this._ground(r);
@@ -503,60 +387,6 @@ export class CageEncounter {
     }
 
     _drawChestDrop(ctx) {
-        const d = this.drop, c = this.cfg.chest, T = this.api.tile;
-        if (!d || !this.chest || (d.phase !== "fall" && d.phase !== "landed")) return;
-        if (d.phase === "landed" && d.t >= c.squashSteps) return;
-        let y = 0, sx = 1, sy = 1;
-        if (d.phase === "fall") {
-            const k = d.t / c.fallSteps;
-            y = -c.fallHeight * (1 - easeIn(k));
-            sy = 1 + 0.18 * k; sx = 1 / sy;
-        } else {
-            const k = d.t / c.squashSteps;
-            const wave = Math.sin(k * Math.PI * 2.5) * (1 - k);
-            sy = 1 - 0.38 * wave; sx = 1 + 0.25 * wave;
-        }
-        this.api.drawPropFrame?.(ctx, this.chest.type, 0, d.col * T + this.api.rect().x, d.row * T + this.api.rect().y + y, sx, sy);
-    }
-
-    // Corda texturizada ao longo de uma curva; `wob` desloca o meio na horizontal (balanço).
-    // `fade` (0..1): a partir dessa fração do caminho p→q a corda vai sumindo.
-    _ropeAlong(ctx, p, q, wob, fade = 1) {
-        const tex = this._img("cageRope"), s = this.cfg.sprite;
-        const mx = (p.x + q.x) / 2 + wob, my = (p.y + q.y) / 2;
-        const at = t => ({
-            x: (1 - t) * (1 - t) * p.x + 2 * (1 - t) * t * mx + t * t * q.x,
-            y: (1 - t) * (1 - t) * p.y + 2 * (1 - t) * t * my + t * t * q.y
-        });
-        const N = 24;
-        let prev = at(0), u = 0;
-        for (let i = 1; i <= N; i++) {
-            const cur = at(i / N);
-            const len = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-            ctx.save();
-            const tt = (i - 0.5) / N;
-            if (tt > fade) ctx.globalAlpha *= Math.max(0, 1 - (tt - fade) / (1 - fade));
-            ctx.translate((prev.x + cur.x) / 2, (prev.y + cur.y) / 2);
-            ctx.rotate(Math.atan2(cur.y - prev.y, cur.x - prev.x));
-            if (tex) {
-                const tw = tex.naturalWidth, srcW = Math.max(1, Math.min(tw, Math.round(len / s.ropeThick * tex.naturalHeight)));
-                const sx = Math.floor(u) % Math.max(1, tw - srcW + 1);
-                ctx.drawImage(tex, sx, 0, srcW, tex.naturalHeight, -len / 2 - 0.5, -s.ropeThick / 2, len + 1, s.ropeThick);
-                u += srcW;
-            } else {
-                ctx.fillStyle = this.cfg.colors.rope;
-                ctx.fillRect(-len / 2, -s.ropeThick / 4, len, s.ropeThick / 2);
-            }
-            ctx.restore();
-            prev = cur;
-        }
-    }
-
-    // Ponta desfiada de corda cortada.
-    _ropeEnd(ctx, at, dangling) {
-        const img = this._img("cageRopeEnd"), A = this.cfg.art;
-        if (!img) return;
-        const w = img.naturalWidth * A * 0.75, h = img.naturalHeight * A * 0.75;
-        ctx.drawImage(img, Math.round(at.x - w / 2), Math.round(at.y - h / 2 + dangling * 4), w, h);
+        drawChestDrop(ctx, this.api, this.chest, this.drop, this.cfg.chest);
     }
 }
