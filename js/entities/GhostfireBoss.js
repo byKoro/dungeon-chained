@@ -17,7 +17,6 @@ export class GhostfireBoss extends MeleeEnemy {
         this.beam = null;
         this.hoverTime = 0;
         this.hoverOffset = 0;
-        this.summonWave = 0;
         this.justSummoned = false;
         this.justTeleported = false;
         this.justCharging = false;
@@ -138,9 +137,7 @@ export class GhostfireBoss extends MeleeEnemy {
         }
         if (this.state === "charge") this._trackPlayers(players);
         if (this.state === "summon") {
-            const release = this.animTime - GHOSTFIRE.summonReleaseFrame;
-            this.justSummoned = release >= 0 && release < GHOSTFIRE.summonIntervalFrames * GHOSTFIRE.summonCount &&
-                release % GHOSTFIRE.summonIntervalFrames === 0;
+            this.justSummoned = this.animTime === GHOSTFIRE.summonReleaseFrame;
         }
         if (this.state === "beam" && this.beam) {
             const b = this.beam;

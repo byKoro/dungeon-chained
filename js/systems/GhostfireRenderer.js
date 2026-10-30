@@ -25,7 +25,6 @@ export class GhostfireRenderer {
         ctx.scale(direction * s.scale, s.scale * (1 + vanish * s.teleportStretch));
         ctx.drawImage(img, frame * s.cell, row * s.cell, width, s.cell, -anchorX, -s.anchorY, width, s.cell);
         ctx.restore();
-        if (boss.state !== "dying" && !boss.frozen) this._drawHealth(ctx, boss);
     }
 
     drawBeam(ctx, boss) {
@@ -71,6 +70,34 @@ export class GhostfireRenderer {
         ctx.restore();
     }
 
+    drawSummon(ctx, shot) {
+        const s = GHOSTFIRE.summon;
+        const pixel = s.pixel;
+        const x = Math.round(shot.x / pixel) * pixel;
+        const y = Math.round(shot.y / pixel) * pixel;
+        const pulse = Math.sin(shot.age * s.pulseSpeed) * pixel;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        this._drawGlow(ctx, x, y, s.glowRadius);
+        ctx.translate(x, y);
+        ctx.scale(shot.direction, 1);
+        ctx.fillStyle = s.colors[0];
+        ctx.fillRect(-s.radius - s.tailLength, -s.tailWidth / 2, s.tailLength, s.tailWidth);
+        ctx.fillStyle = s.colors[1];
+        ctx.fillRect(-s.radius - s.tailLength / 2, -pixel, s.tailLength, pixel * 2);
+        for (let row = -s.radius; row < s.radius; row += pixel) {
+            for (let col = -s.radius; col < s.radius; col += pixel) {
+                const distance = Math.hypot(col + pixel / 2, row + pixel / 2);
+                if (distance > s.radius) continue;
+                const heat = Math.max(0, Math.min(s.colors.length - 1,
+                    Math.floor((1 - distance / (s.radius + pulse)) * s.colors.length)));
+                ctx.fillStyle = s.colors[heat];
+                ctx.fillRect(col, row, pixel, pixel);
+            }
+        }
+        ctx.restore();
+    }
+
     _drawGlow(ctx, x, y, radius) {
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
@@ -96,17 +123,6 @@ export class GhostfireRenderer {
         glow.addColorStop(1, `rgba(${s.glowColor}, 0)`);
         ctx.fillStyle = glow;
         ctx.fillRect(0, -height / 2, length, height);
-        ctx.restore();
-    }
-
-    _drawHealth(ctx, boss) {
-        const { width, height, border, offset, background } = GHOSTFIRE.healthBar;
-        const y = boss.y + boss.hoverOffset - boss.drawHeight / 2 - offset;
-        ctx.save();
-        ctx.fillStyle = background;
-        ctx.fillRect(boss.x - width / 2 - border, y - border, width + border * 2, height + border * 2);
-        ctx.fillStyle = GHOSTFIRE.color;
-        ctx.fillRect(boss.x - width / 2, y, width * boss.health / GHOSTFIRE.health, height);
         ctx.restore();
     }
 }

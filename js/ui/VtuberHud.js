@@ -1,5 +1,6 @@
 import { drawText, measureText } from './PixelFont.js';
-import { FRAME } from './PixelButton.js';
+import { FRAME, drawStoneFrame } from './PixelButton.js';
+import { GHOSTFIRE } from '../config/GhostfireConfig.js';
 
 const MAX_LIVES = 3;
 const HEART_FRAME = { FULL: 0, EMPTY: 1, HALF_L: 2, HALF_R: 3 };
@@ -562,12 +563,137 @@ class DashBar {
     }
 }
 
+// Barra de vida do boss: mesma linguagem visual das barras do jogo (moldura de
+// pedra chanfrada, rivets de ferro, poço escuro e células de brasa com brilho em
+// cima e sombra embaixo). Uma célula por ponto de vida do boss.
+const BOSS_SEG_W = 7;
+const BOSS_SEG_H = 7;
+const BOSS_SEG_GAP = 1;
+const BOSS_PAD = 3;          // moldura de pedra (drawStoneFrame usa borda de 3)
+const BOSS_SEG_FLASH = 0.22; // brilho ao perder/ganhar uma célula
+const BOSS_GLINT_PERIOD = 2.2;
+
+// Rampa de brasa: fria (apagada) -> quente (viva). Usada da esquerda (vida baixa)
+// para a direita (vida cheia) para a barra "esquentar" conforme enche.
+const BOSS_EMBER = {
+    base: '#b4381b', light: '#ff7a2e', dark: '#5e170c', spec: '#ffd36b', flash: '#fff2c8',
+    low: { base: '#7e1a12', light: '#c92a1a', dark: '#3d0b07', spec: '#ff6b4a' }
+};
+
+class BossBar {
+    constructor(segments) {
+        this.segments = Math.max(1, segments | 0);
+        this.innerW = this.segments * BOSS_SEG_W + (this.segments - 1) * BOSS_SEG_GAP;
+        this.W = this.innerW + BOSS_PAD * 2;
+        this.H = BOSS_SEG_H + BOSS_PAD * 2;
+        this._buf = document.createElement('canvas');
+        this._buf.width = this.W;
+        this._buf.height = this.H;
+        this._bctx = this._buf.getContext('2d');
+        this.reset();
+    }
+
+    reset() {
+        this.t = 0;
+        this.lit = this.segments;
+        this.litAt = new Array(this.segments).fill(-1e9);
+        this.shake = 0;
+        this.pop = new Spring(1, 360, 14);
+        this.appeared = false;
+    }
+
+    // charge01: 0..1 da vida atual do boss.
+    update(dt, charge01, present) {
+        this.t += dt;
+        const lit = Math.round(clamp(charge01, 0, 1) * this.segments);
+        if (present && !this.appeared) {
+            this.appeared = true;
+            this.lit = lit;
+            this.pop.set(0.4);
+            this.pop.kick(9);
+        }
+        if (lit < this.lit) {
+            this.shake = 0.28;
+            this.pop.set(1.12);
+        } else if (lit > this.lit) {
+            for (let i = this.lit; i < lit; i++) this.litAt[i] = this.t + (i - this.lit) * 0.05;
+        }
+        this.lit = lit;
+        this.charge = clamp(charge01, 0, 1);
+        this.pop.update(dt);
+        if (this.shake > 0) this.shake = Math.max(0, this.shake - dt);
+        if (!present) this.appeared = false;
+    }
+
+    _render() {
+        const g = this._bctx, F = FRAME;
+        const rect = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+        const W = this.W, H = this.H;
+        g.clearRect(0, 0, W, H);
+
+        // Moldura de pedra do jogo (chanfro + costuras + rivets de ferro).
+        drawStoneFrame(g, W, H);
+        // Poço escuro onde as células assentam.
+        rect(BOSS_PAD, BOSS_PAD, this.innerW, BOSS_SEG_H, F.well);
+
+        const ready = this.lit >= this.segments;
+        const glintX = ready && MOTION === 1
+            ? Math.floor(((this.t % BOSS_GLINT_PERIOD) / BOSS_GLINT_PERIOD) * this.innerW)
+            : -1;
+
+        for (let i = 0; i < this.segments; i++) {
+            const x = BOSS_PAD + i * (BOSS_SEG_W + BOSS_SEG_GAP);
+            const y = BOSS_PAD;
+            if (i >= this.lit) continue;
+            // Células da esquerda (poucas restantes) ficam em tom de brasa fria/vermelha.
+            const low = this.lit <= Math.ceil(this.segments * 0.34);
+            const R = low ? BOSS_EMBER.low : BOSS_EMBER;
+            const age = this.t - this.litAt[i];
+            if (age >= 0 && age < BOSS_SEG_FLASH * 0.5) {
+                rect(x, y, BOSS_SEG_W, BOSS_SEG_H, BOSS_EMBER.flash);
+                continue;
+            }
+            const fresh = age >= 0 && age < BOSS_SEG_FLASH;
+            rect(x, y, BOSS_SEG_W, BOSS_SEG_H, fresh ? R.light : R.base);
+            rect(x, y, BOSS_SEG_W, 1, fresh ? (R.spec || BOSS_EMBER.spec) : R.light); // brilho em cima
+            rect(x, y + BOSS_SEG_H - 1, BOSS_SEG_W, 1, R.dark);                        // sombra embaixo
+            g.fillStyle = R.spec || BOSS_EMBER.spec;
+            g.fillRect(x, y, 1, 1);                                                    // specular no canto
+        }
+
+        // Reflexo que corre quando a barra está cheia (mesma ideia da dash).
+        if (glintX >= 0) {
+            const gxp = BOSS_PAD + glintX;
+            rect(gxp, BOSS_PAD, 1, BOSS_SEG_H - 1, BOSS_EMBER.flash);
+        }
+        return this._buf;
+    }
+
+    // Desenha centralizado, com o canto superior-esquerdo em (x, y), escalado por s.
+    draw(ctx, cx, y, s) {
+        const buf = this._render();
+        const w = this.W * s, h = this.H * s;
+        const k = this.shake > 0 ? (this.shake / 0.28) * MOTION : 0;
+        const sx = Math.sin(this.t * 68) * s * k;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.translate(Math.round(cx + sx), Math.round(y + h / 2));
+        ctx.scale(this.pop.x, this.pop.x);
+        ctx.drawImage(buf, -w / 2, -h / 2, w, h);
+        ctx.restore();
+    }
+}
+
 export class VtuberHud {
 
-    constructor({ assets, getPlayers, spriteConfigs, colors }) {
+    constructor({ assets, getPlayers, getBoss, spriteConfigs, colors }) {
         this.assets = assets;
         this.getPlayers = getPlayers;
+        this.getBoss = getBoss || (() => null);
         this.heartImg = assets.get('heart');
+        this._bossNameLabel = this._makeLabel(GHOSTFIRE.name, GHOSTFIRE.healthBar.textColor);
+        this._bossBar = new BossBar(GHOSTFIRE.health);
+        this._bossHealthShown = 0;
 
         const dirs = ['player_01', 'player_02'];
         const sides = ['left', 'right'];
@@ -605,6 +731,8 @@ export class VtuberHud {
 
     reset() {
         const players = this.getPlayers() || [];
+        this._bossHealthShown = 0;
+        this._bossBar?.reset();
         this.entries.forEach((e, i) => {
             const p = players[i];
             e.player = p || null;
@@ -718,6 +846,51 @@ export class VtuberHud {
                 e.dash.hide();
             }
         }
+
+        this._drawBossBar(ctx, W, H, hs, dt);
+        ctx.restore();
+    }
+
+    // Barra de vida do boss: no mesmo estilo das barras do jogo (moldura de pedra,
+    // células de brasa), centralizada no rodapé da tela com o nome por cima.
+    _drawBossBar(ctx, W, H, hs, dt) {
+        const boss = this.getBoss();
+        const present = !!boss;
+        const target = present ? clamp(boss.health / GHOSTFIRE.health, 0, 1) : 0;
+        // Vida suavizada só para decidir quando a barra pode sumir de tela.
+        this._bossHealthShown += (target - this._bossHealthShown) * Math.min(1, dt * 10);
+
+        const bar = this._bossBar;
+        bar.update(dt, present ? target : this._bossHealthShown, present);
+        if (!present && this._bossHealthShown < 0.004) { this._bossHealthShown = 0; return; }
+
+        const cfg = GHOSTFIRE.healthBar;
+        // Escala a barra de pedra para ocupar ~metade da largura da tela, no máximo.
+        const maxBarW = Math.min(W * 0.52, 360);
+        const scale = Math.max(2, Math.round(maxBarW / bar.W));
+        const barW = bar.W * scale, barH = bar.H * scale;
+        const cx = Math.round(W / 2);
+        const barTopY = Math.round(H - cfg.bottomMargin * scale - barH);
+
+        // Nome por cima, centralizado, com sombra de leitura.
+        const label = this._bossNameLabel;
+        const lscale = Math.max(2, Math.round(scale * 0.9));
+        const lw = label.width * lscale, lh = label.height * lscale;
+        const lx = Math.round(cx - lw / 2);
+        const ly = Math.round(barTopY - lh - scale * 2);
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = 1;
+
+        // Faixa escura atrás do nome para leitura sobre qualquer cenário.
+        const padX = 4 * lscale, padY = 2 * lscale;
+        ctx.fillStyle = 'rgba(8,6,12,0.55)';
+        ctx.fillRect(lx - padX, ly - padY, lw + padX * 2, lh + padY * 2);
+        ctx.drawImage(label, lx, ly, lw, lh);
+
+        // A barra desenha centralizada em cx.
+        bar.draw(ctx, cx, barTopY, scale);
         ctx.restore();
     }
 }

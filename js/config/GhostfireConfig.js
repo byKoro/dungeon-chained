@@ -1,13 +1,12 @@
 const SPRITE_SCALE = 21;
 
 export const GHOSTFIRE = Object.freeze({
-    health: 8,
+    health: 12,
     hitCooldown: 45,
     appearFrames: 30,
     roarFrames: 33,
     summonFrames: 45,
     summonReleaseFrame: 18,
-    summonIntervalFrames: 5,
     waitFrames: 108,
     chargeFrames: 30,
     chargeTracking: 0.09,
@@ -21,12 +20,19 @@ export const GHOSTFIRE = Object.freeze({
     sideInset: 120,
     hitRadius: 5.5 * SPRITE_SCALE,
     summonCount: 5,
-    maxMinions: 6,
-    summonSafeDistance: 148,
-    summonBurstRange: 210,
-    summonVerticalSpread: 120,
-    summonSidePadding: 80,
-    summonAttempts: 24,
+    maxMinions: 10,
+    summon: {
+        flightFrames: 36, distance: 220,
+        spacing: 44, spawnRadius: 18, playerPadding: 24, recoverFrames: 24,
+        formation: [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]],
+        radius: 30, pixel: 6, glowRadius: 100, lightRadius: 170,
+        tailLength: 48, tailWidth: 24, pulseSpeed: 0.7,
+        colors: ["#a52716", "#f46421", "#ffbd4a", "#fff1bd"],
+        trailEvery: 1, trail: { amount: 4, rise: 22, width: 18, sizeScale: 0.7 },
+        launch: { amount: 22, rise: 60, width: 60, sizeScale: 1.4 },
+        impact: { amount: 65, rise: 100, width: 120, sizeScale: 1.5 },
+        flashAmount: 12, flashPower: 1.4
+    },
     summonTypes: ["hellbat", "demonessA", "demonessB"],
     color: "#ff702e",
     flameColor: [255, 100, 35],
@@ -50,7 +56,13 @@ export const GHOSTFIRE = Object.freeze({
     indicatorAlpha: 0.22,
     hitAlpha: 0.5,
     hitBlinkFrames: 4,
-    healthBar: { width: 92, height: 6, border: 2, offset: 18, background: "#251222" },
+    name: "O Senhor das Chamas",
+    // Barra do boss fixa no rodapé central da tela (coordenadas de tela). O visual
+    // (moldura de pedra + células de brasa) segue a linguagem das barras do jogo;
+    // aqui ficam só a margem inferior e a cor do nome.
+    healthBar: {
+        bottomMargin: 14, textColor: "#ffd9a8"
+    },
     lightRadius: 260,
     beamLightRadius: 180,
     beamLightSpacing: 60,

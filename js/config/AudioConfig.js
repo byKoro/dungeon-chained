@@ -25,6 +25,11 @@ export const AUDIO_CONFIG = {
             files: [1, 2].map(i => `assets/audio/trailer/flame-0${i}.wav`),
             volume: 0.7, rate: 0.85, rateVariance: 0.03, enabled: true
         },
+        ghostfireSummonImpact: {
+            description: "Impacto da bola de fogo que invoca cinco inimigos",
+            files: ["assets/audio/trailer/boom-01.wav"],
+            volume: 0.6, rate: 1.1, rateVariance: 0, enabled: true
+        },
         ghostfireDeath: {
             description: "Explosão final do Ghostfire",
             files: [1, 2, 3].map(i => `assets/audio/trailer/boom-0${i}.wav`),

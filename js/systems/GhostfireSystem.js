@@ -1,8 +1,7 @@
 import { GHOSTFIRE } from '../config/GhostfireConfig.js';
-import { TILE } from '../config/GameConfig.js';
 import { Physics } from '../core/Physics.js';
-import { isSafeFloorCell } from '../rooms/SafeSpawn.js';
 import { GhostfireRenderer } from './GhostfireRenderer.js';
+import { GhostfireSummon } from './GhostfireSummon.js';
 
 export class GhostfireSystem {
     constructor({ spawnSystem, particleSystem, renderer, audio }) {
@@ -11,10 +10,12 @@ export class GhostfireSystem {
         this.renderer = renderer;
         this.audio = audio;
         this.bossRenderer = new GhostfireRenderer();
+        this.summons = new GhostfireSummon({ spawnSystem, particleSystem, renderer, audio });
         this._deathEffects = new WeakSet();
     }
 
     update(room, players) {
+        this.summons.update(room);
         for (const boss of room.enemies.filter(e => e.isGhostfire && !e.frozen)) {
             if (boss.state === "dying") {
                 if (!this._deathEffects.has(boss)) {
@@ -31,7 +32,7 @@ export class GhostfireSystem {
             if (boss.justArrived) this.renderer.triggerShake(GHOSTFIRE.arrivalShake);
             if (boss.justRoared) this.audio?.play("ghostfireRoar");
             if (boss.justCharging) this.audio?.play("ghostfireCharge");
-            if (boss.justSummoned) this._summon(room, boss, players, 1);
+            if (boss.justSummoned) this.summons.launch(room, boss, players);
             if (boss.justAttacked) {
                 this.audio?.play("ghostfireBeam");
                 this.renderer.triggerShake(GHOSTFIRE.attackShake);
@@ -55,60 +56,6 @@ export class GhostfireSystem {
         }
     }
 
-    _summon(room, boss, players, burstCount = GHOSTFIRE.summonCount) {
-        const active = room.enemies.filter(e => !e.isBoss && e.state !== "dying").length;
-        const count = Math.min(burstCount, GHOSTFIRE.maxMinions - active);
-        const spawnSide = boss.side === "right" ? -1 : 1;
-        const wave = boss.summonWave++;
-        this.audio?.play("ghostfireSummon");
-        this.renderer.triggerShake(GHOSTFIRE.summonShake);
-
-        const makeCandidate = (x, y) => {
-            const col = Math.floor((x - room.bounds.minX) / TILE) + 1;
-            const row = Math.floor((y - room.bounds.minY) / TILE) + 1;
-            if (row <= 0 || row >= room.tiles.floor.length - 1 || col <= 0 || col >= room.tiles.floor[row].length - 1) return false;
-            if (!isSafeFloorCell(room.tiles.floor, col, row, room.tiles.floor[row].length, room.tiles.floor.length)) return false;
-            if (room.tiles.walls.some(w => w.col === col && w.row === row)) return false;
-            if ([...players, ...room.enemies].some(e => Math.hypot(e.x - x, e.y - y) < GHOSTFIRE.summonSafeDistance)) return false;
-            return true;
-        };
-
-        const preferred = [];
-        for (let i = 0; i < GHOSTFIRE.summonAttempts; i++) {
-            const x = boss.x + spawnSide * (GHOSTFIRE.summonSidePadding + Math.random() * GHOSTFIRE.summonBurstRange);
-            const y = boss.y + (Math.random() * 2 - 1) * GHOSTFIRE.summonVerticalSpread;
-            if (makeCandidate(x, y)) preferred.push({ x, y });
-        }
-
-        const fallback = [];
-        for (let row = 1; row < room.tiles.floor.length - 1; row++) {
-            for (let col = 1; col < room.tiles.floor[row].length - 1; col++) {
-                const x = room.bounds.minX + (col - 0.5) * TILE;
-                const y = room.bounds.minY + (row - 0.5) * TILE;
-                if (makeCandidate(x, y)) fallback.push({ x, y });
-            }
-        }
-
-        const forward = fallback.filter(point => spawnSide * (point.x - boss.x) > 0);
-        for (let i = 0; i < count; i++) {
-            const candidates = preferred.length ? preferred : forward.length ? forward : fallback;
-            if (!candidates.length) break;
-            const index = Math.floor(Math.random() * candidates.length);
-            const { x, y } = candidates.splice(index, 1)[0];
-            const type = GHOSTFIRE.summonTypes[(wave + i) % GHOSTFIRE.summonTypes.length];
-            const enemy = this.spawnSystem.createEnemy(x, y, room._spawnFloor, type);
-            enemy.setNavigationFloor(room.tiles.floor, room.bounds, room.tiles.walls);
-            room.enemies.push(enemy);
-            this.particleSystem.triggerFlameBurst(x, y, GHOSTFIRE.flameColor);
-            this.audio?.play("enemySpawn");
-            for (const pool of [preferred, forward, fallback]) {
-                for (let j = pool.length - 1; j >= 0; j--) {
-                    if (Math.hypot(pool[j].x - x, pool[j].y - y) < GHOSTFIRE.summonSafeDistance) pool.splice(j, 1);
-                }
-            }
-        }
-    }
-
     drawFloor(ctx, room) {
         for (const boss of room.enemies) {
             if (!boss.isGhostfire || boss.isHidden || boss.frozen || boss.state !== "indicator" || !boss.beam) continue;
@@ -117,6 +64,7 @@ export class GhostfireSystem {
     }
 
     drawAir(ctx, room) {
+        for (const shot of this.summons.forRoom(room)) this.bossRenderer.drawSummon(ctx, shot);
         for (const boss of room.enemies) {
             if (!boss.isGhostfire || boss.isHidden || boss.frozen || !["beam", "fade"].includes(boss.state) || !boss.beam) continue;
             this.bossRenderer.drawBeam(ctx, boss);
@@ -129,6 +77,7 @@ export class GhostfireSystem {
             const pixel = Math.max(2, Math.round(GHOSTFIRE.sprite.scale * point.zoom));
             postProcessor.addLight(point.x, point.y, radius * point.zoom, pixel, 1, GHOSTFIRE.lightProfile);
         };
+        for (const shot of this.summons.forRoom(room)) addLight(shot.x, shot.y, GHOSTFIRE.summon.lightRadius);
         for (const boss of room.enemies) {
             if (!boss.isGhostfire || boss.isHidden || boss.state === "dying") continue;
             const alpha = boss.state === "teleport" ? boss.stateTimer / GHOSTFIRE.teleportFrames : 1;

@@ -56,9 +56,7 @@ for (let i = 1; i <= GHOSTFIRE.summonFrames; i++) {
     releaseBoss.update([]);
     if (releaseBoss.justSummoned) releaseFrames.push(i);
 }
-assert.equal(releaseFrames.length, GHOSTFIRE.summonCount, 'invocação solta um minion de cada vez');
-assert.equal(releaseFrames[0], GHOSTFIRE.summonReleaseFrame);
-assert.equal(releaseFrames.at(-1) - releaseFrames[0], (GHOSTFIRE.summonCount - 1) * GHOSTFIRE.summonIntervalFrames);
+assert.deepEqual(releaseFrames, [GHOSTFIRE.summonReleaseFrame], 'cuspida lança uma única bola para a onda inteira');
 const player = { x: 350, y: 300, lives: 3, hitRadius: 16, takeDamage() { this.lives--; return true; } };
 const advance = frames => { for (let i = 0; i < frames; i++) foe.update([player]); };
 advance(GHOSTFIRE.appearFrames + GHOSTFIRE.roarFrames + GHOSTFIRE.summonFrames + GHOSTFIRE.waitFrames);
@@ -109,25 +107,6 @@ advance(GHOSTFIRE.deathFrames - 1);
 assert.equal(foe.readyToGib, false, 'animação de morte termina antes dos gibs');
 advance(1);
 assert.equal(foe.readyToGib, true);
-
-const summoner = spawner.createEnemy(700, 280, 1, 'ghostfire');
-summoner.setNavigationFloor(floor, bounds);
-const arena = { enemies: [summoner], bounds, tiles: { floor, walls: [] }, _spawnFloor: 1 };
-const types = [];
-const summons = new GhostfireSystem({
-    spawnSystem: { createEnemy(x, y, level, type) { types.push(type); return { x, y, state: 'chase', setNavigationFloor() {} }; } },
-    particleSystem: { triggerFlameBurst() {} }, renderer: { triggerShake() {} }
-});
-summons._summon(arena, summoner, []);
-assert(types.length > 0 && types.length <= GHOSTFIRE.summonCount);
-assert(types.includes('demonessB'), 'terceiro minion do trailer participa da invocação');
-for (let i = 0; i < arena.enemies.length; i++) {
-    for (let j = i + 1; j < arena.enemies.length; j++) {
-        assert(Math.hypot(arena.enemies[i].x - arena.enemies[j].x, arena.enemies[i].y - arena.enemies[j].y) >= GHOSTFIRE.summonSafeDistance);
-    }
-}
-summons._summon(arena, summoner, []);
-assert(arena.enemies.length - 1 <= GHOSTFIRE.maxMinions, 'invocação respeita limite de minions');
 
 const survivingMinion = { isBoss: false, state: 'chase', startDying() { this.state = 'dying'; } };
 const aftermath = { enemies: [foe, survivingMinion] };

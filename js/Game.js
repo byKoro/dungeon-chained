@@ -67,6 +67,7 @@ export class Game {
         this.hud = new VtuberHud({
             assets: this.assets,
             getPlayers: () => [this.p1, this.p2],
+            getBoss: () => this.rooms?.current?.enemies.find(e => e.isGhostfire && e.state !== "dying" && !e.isHidden && !e.frozen) || null,
             spriteConfigs: cfgs.map(c => c.sprite),
             colors: cfgs.map(c => c.color)
         });
