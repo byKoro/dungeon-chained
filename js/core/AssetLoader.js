@@ -49,6 +49,9 @@ export class AssetLoader {
         for (const [key, file] of [['cageHang', 'cage_hang'], ['cageOpen', 'cage_open'], ['cageBroken', 'cage_broken'], ['ropeStake', 'rope_stake'], ['cageRope', 'rope'], ['cageRopeEnd', 'rope_end']]) {
             this.load(key, `assets/cage/${file}.png`);
         }
+        for (const [key, file] of [['barsMid', 'bars_mid'], ['barsLeft', 'bars_left'], ['barsRight', 'bars_right'], ['barsSingle', 'bars_single']]) {
+            this.load(key, `assets/bars/${file}.png`);
+        }
         this.load("interactPrompt", INTERACT_PROMPT.sheet);
         this.load("saw", "assets/saw/saw.png");
 

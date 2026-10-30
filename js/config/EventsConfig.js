@@ -62,11 +62,15 @@ export const STAKE_LIGHT = Object.freeze({
 });
 
 // Grades nos acessos da zona enquanto um encontro está ativo.
+// Sprites em assets/bars (scripts/gen-bars-sprites.py); a grade cai de `dropHeight` acima e bate no chão.
 export const BARS = Object.freeze({
     dropSteps: 14,
     height: 1.25 * TILE,
+    dropHeight: 1.25 * TILE,
+    solidAt: 0.7,
     shake: 6,
-    colors: Object.freeze({ bar: "#4a4452", light: "#8d8698", dark: "#1f1b26", beam: "#2b2735" })
+    landDust: 3,
+    shadow: "rgba(0, 0, 0, 0.35)"
 });
 
 // Mapas com bigorna: perder todas as vidas faz a dupla renascer no início, sem game over.

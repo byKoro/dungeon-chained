@@ -126,7 +126,7 @@ export class RoomEvents {
 
     _barsOf(room) {
         let bars = this._bars.get(room.key);
-        if (!bars) { bars = { down: false, t: 0 }; this._bars.set(room.key, bars); }
+        if (!bars) { bars = { down: false, t: 0, landed: false }; this._bars.set(room.key, bars); }
         return bars;
     }
 
@@ -134,7 +134,8 @@ export class RoomEvents {
         const bars = this._barsOf(room);
         if (bars.down === down) return;
         bars.down = down;
-        this.renderer?.triggerShake(BARS.shake);
+        bars.landed = false;
+        if (!down) this.renderer?.triggerShake(BARS.shake / 2);
         this.audio?.play(down ? "buttonPress" : "buttonRelease", { rateMultiplier: 0.7 });
     }
 
@@ -144,7 +145,21 @@ export class RoomEvents {
         const bars = this._barsOf(room);
         const step = 1 / BARS.dropSteps;
         bars.t = bars.down ? Math.min(1, bars.t + step) : Math.max(0, bars.t - step);
+        if (bars.down && bars.t >= 1 && !bars.landed) this._landBars(room, bars);
         this._script(room)?.update();
+    }
+
+    // A grade bate no chão: tremor, baque e poeira no pé de cada tile.
+    _landBars(room, bars) {
+        bars.landed = true;
+        this.renderer?.triggerShake(BARS.shake);
+        this.audio?.play("sawLand", { rateMultiplier: 0.6, volumeMultiplier: 0.7 });
+        const r = this.rooms.cellRect();
+        for (const b of room.cell.authored?.bars || []) {
+            const x = r.x + (b.col + 0.5) * this.tile, y = r.y + (b.row + 1) * this.tile - 4;
+            this.particleSystem?.triggerDust?.(x - 16, y, -1, 0.2, BARS.landDust);
+            this.particleSystem?.triggerDust?.(x + 16, y, 1, 0.2, BARS.landDust);
+        }
     }
 
     // Morte da dupla: encontros interrompidos voltam ao começo; concluídos ficam.
@@ -153,15 +168,16 @@ export class RoomEvents {
         for (const [key, bars] of this._bars) {
             if (!bars.down) continue;
             bars.down = false;
+            bars.landed = false;
             bars.t = 0;
             void key;
         }
     }
 
-    // Caixas de colisão das grades descidas (metade da descida já bloqueia).
+    // Caixas de colisão das grades descidas (bloqueiam a partir de `solidAt` da descida).
     solidBoxes() {
         const room = this.rooms.current;
-        if (!room || this._barsOf(room).t < 0.5) return [];
+        if (!room || this._barsOf(room).t < BARS.solidAt) return [];
         const r = this.rooms.cellRect();
         return (room.cell.authored?.bars || []).map(b => ({ x: r.x + b.col * this.tile, y: r.y + b.row * this.tile, w: this.tile, h: this.tile }));
     }
@@ -181,27 +197,29 @@ export class RoomEvents {
         const t = this._barsOf(room).t;
         if (t <= 0) return [];
         const r = this.rooms.cellRect();
-        return (room.cell.authored?.bars || []).map(b => {
+        const list = room.cell.authored?.bars || [];
+        const at = new Set(list.map(b => `${b.col},${b.row}`));
+        return list.map(b => {
             const x = r.x + b.col * this.tile, base = r.y + (b.row + 1) * this.tile;
-            return { y: base - 14, feetSortY: base, draw: ctx => this._drawBar(ctx, x, base, t) };
+            const left = !at.has(`${b.col - 1},${b.row}`), right = !at.has(`${b.col + 1},${b.row}`);
+            const key = left && right ? "barsSingle" : left ? "barsLeft" : right ? "barsRight" : "barsMid";
+            return { y: base - 14, feetSortY: base, draw: ctx => this._drawBar(ctx, key, x, base, t) };
         });
     }
 
-    _drawBar(ctx, x, base, t) {
-        const c = BARS.colors, T = this.tile, px = T / 16;
-        const h = BARS.height * t;
-        const top = base - h;
+    // Cai de cima com aceleração (sobe pelo mesmo caminho); a sombra no chão escurece conforme chega.
+    _drawBar(ctx, key, x, base, t) {
+        const img = this.assets?.get?.(key);
+        if (!img?.complete || !img.naturalWidth) return;
+        const T = this.tile, px = T / 16;
+        const drop = Math.round((1 - t * t) * BARS.dropHeight / px) * px;
         ctx.save();
-        ctx.fillStyle = c.beam;
-        ctx.fillRect(x, top, T, 2 * px);
-        for (let i = 0; i < 4; i++) {
-            const bx = x + (2 + i * 4) * px;
-            ctx.fillStyle = c.dark; ctx.fillRect(bx + px, top, 2 * px, h);
-            ctx.fillStyle = c.bar; ctx.fillRect(bx, top, 2 * px, h);
-            ctx.fillStyle = c.light; ctx.fillRect(bx, top, px, h);
-        }
-        ctx.fillStyle = c.beam;
-        ctx.fillRect(x, top + h * 0.45, T, px);
+        ctx.fillStyle = BARS.shadow;
+        ctx.globalAlpha = t;
+        ctx.fillRect(x, base - 2 * px, T, 2 * px);
+        ctx.globalAlpha = Math.min(1, t * 4);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, x, base - BARS.height - drop, T, BARS.height);
         ctx.restore();
     }
 }
