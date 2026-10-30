@@ -1,5 +1,6 @@
 import { DEMO_ENEMY_STATS } from './DemoCombatConfig.js';
 import { TINY_RPG_ENEMIES } from './TinyRpgEnemies.js';
+import { SUMMONER_SPRITE } from './SummonerConfig.js';
 
 export function demonConfig(assets) {
     return {
@@ -47,7 +48,15 @@ export const ENEMY_TYPES = [
     { key: 'tank', label: 'Tanque', config: assets => ({ ...bloodMonsterConfig(assets), combat: DEMO_ENEMY_STATS.tank }) },
     ...['fireSkull', 'fireSkullBoss'].map(key => ({ key, label: key === 'fireSkullBoss' ? 'Boss Caveira de Fogo' : 'Caveira à distância',
         config: assets => ({ img: assets.get('fireSkull'), cellSize: 16, cropX: 0, cropY: 0, cropW: 16, cropH: 20, rows: { walk: { row: 0 } } }) })),
-    ...TINY_RPG_ENEMIES.map(e => ({ key: e.key, label: e.label, src: e.src, config: tinyRpgConfig(e) }))
+    ...TINY_RPG_ENEMIES.map(e => ({ key: e.key, label: e.label, src: e.src, config: tinyRpgConfig(e) })),
+    // O Invocador reaproveita a folha do Cultista já carregada (key 'cultist').
+    {
+        key: SUMMONER_SPRITE.key, label: SUMMONER_SPRITE.label,
+        config: assets => {
+            const { key, label, src, ...sprite } = SUMMONER_SPRITE;
+            return { img: assets.get ? assets.get('cultist') : assets.cultist, ...sprite };
+        }
+    }
 ];
 
 export const ENEMY_TYPE_BY_KEY = Object.fromEntries(ENEMY_TYPES.map(t => [t.key, t]));

@@ -1,4 +1,5 @@
 import { CultistEnemy } from '../entities/CultistEnemy.js';
+import { SummonerEnemy } from '../entities/SummonerEnemy.js';
 import { FireSkullEnemy } from '../entities/FireSkullEnemy.js';
 import { MeleeEnemy } from '../entities/MeleeEnemy.js';
 import { GhostfireBoss } from '../entities/GhostfireBoss.js';
@@ -21,7 +22,7 @@ export class SpawnSystem {
         if (type === 'fireSkull' || type === 'fireSkullBoss') return new FireSkullEnemy(x, y, this.assets.get('fireSkull'), type === 'fireSkullBoss');
         const factory = (type && ENEMY_TYPE_BY_KEY[type]?.config) || null;
         const cfg = factory ? factory(this.assets) : this.randomMeleeConfig();
-        const EnemyClass = type === "ghostfire" ? GhostfireBoss : type === "cultist" ? CultistEnemy : MeleeEnemy;
+        const EnemyClass = type === "ghostfire" ? GhostfireBoss : type === "cultist" ? CultistEnemy : type === "summoner" ? SummonerEnemy : MeleeEnemy;
         const foe = new EnemyClass(x, y, cfg.img, cfg, floor);
         foe.bloodPalette = this.bloodCanvas.palette;
         foe.gibStainConfig = BLOOD_STAIN_CONFIG.gib;
