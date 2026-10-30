@@ -122,3 +122,6 @@ Flame Golem (2026-10-28): flameGolem added to EDITOR2_ENEMY_KEYS; selectable as 
 ### Vida infinita no teste (editor 2.0)
 
 Card "Teste e demo": checkbox `#test-infinite-lives` ("Vida infinita (ambos os jogadores)", padrão desligado). `ContentTools.playtest` grava `infiniteLives` na sessão (`sessionStorage[DEMO.sessionKey]`); `DemoMapLoader` devolve em `mapData.test` e `Game` aplica aos dois jogadores (`Game.setInfiniteLives`). Dentro do teste há um botão no canto superior direito e a tecla F7 para ligar/desligar sem reabrir o editor (mostra ON/OFF). O jogo normal e o editor antigo nunca ligam a opção. Detalhes de comportamento em `combat-and-entities.md`.
+
+### Tileset transparency (2026-10-30)
+Editor 2.0 automatic painting keeps non-wall tiles with source alpha in room.props as static index decorations, preserving the existing floor. TilePalette caches transparency from the original image, before the palette background is drawn. Opaque tiles, walls and explicit kinds still replace cells. Repainting replaces the static decoration; animated props are preserved. Eraser removes static decorations through removePropAt. Existing maps are not migrated; repaint affected tiles after restoring their floor.

@@ -10,6 +10,7 @@ export class TilePalette {
         this.onChange = onChange;
 
         this.rows = 0;
+        this._transparentTiles = new Set();
         this.selection = { col: 6, row: 1, w: 1, h: 1 };
         this.hover = null;
         this._dragStart = null;
@@ -28,6 +29,25 @@ export class TilePalette {
     _resize() {
         if (!this.ready) return;
         this.rows = Math.floor(this.image.naturalHeight / this.tileSize);
+        const source = document.createElement("canvas");
+        source.width = this.image.naturalWidth;
+        source.height = this.image.naturalHeight;
+        const ctx = source.getContext("2d");
+        ctx.drawImage(this.image, 0, 0);
+        const { data } = ctx.getImageData(0, 0, source.width, source.height);
+        this._transparentTiles.clear();
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                let transparent = false;
+                for (let y = 0; y < this.tileSize && !transparent; y++) {
+                    for (let x = 0; x < this.tileSize; x++) {
+                        const pixel = (r * this.tileSize + y) * source.width + c * this.tileSize + x;
+                        if (data[pixel * 4 + 3] < 255) { transparent = true; break; }
+                    }
+                }
+                if (transparent) this._transparentTiles.add(r * this.cols + c);
+            }
+        }
         this.canvas.width = this.cols * this.tileSize * this.scale;
         this.canvas.height = this.rows * this.tileSize * this.scale;
         this.draw();
@@ -47,6 +67,10 @@ export class TilePalette {
 
     get firstIndex() {
         return this.selection.row * this.cols + this.selection.col;
+    }
+
+    hasTransparency(index) {
+        return this._transparentTiles.has(index);
     }
 
     selectIndex(index) {

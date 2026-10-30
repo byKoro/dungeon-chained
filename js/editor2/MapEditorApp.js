@@ -465,7 +465,16 @@ export class MapEditorApp {
                     for (let dx = 0; dx < stamp[dy].length; dx++) {
                         const idx = stamp[dy][dx];
                         const kind = this.paintKind === "auto" ? M.defaultKindForTile(idx) : this.paintKind;
-                        M.setCell(room, col + dx, row + dy, idx, kind);
+                        const c = col + dx, r = row + dy;
+                        if (this.paintKind === "auto" && kind === "f" && this.palette.hasTransparency(idx)) {
+                            if (!M.inBounds(room, c, r)) continue;
+                            const existing = M.propAt(room, c, r);
+                            if (existing && !Number.isInteger(existing.index)) continue;
+                            if (existing) existing.index = idx;
+                            else room.props.push({ index: idx, col: c, row: r });
+                        } else {
+                            M.setCell(room, c, r, idx, kind);
+                        }
                     }
                 }
                 break;
@@ -532,6 +541,12 @@ export class MapEditorApp {
         if (!room || !M.inBounds(room, col, row)) return;
         const prop = M.propAt(room, col, row);
         if (prop) {
+            if (Number.isInteger(prop.index)) {
+                this.palette.selectIndex(prop.index);
+                this.paintKind = "auto";
+                this._setTool("paint");
+                return;
+            }
             this.propType = prop.type;
             this.propFlip = !!prop.flip;
             if (ANIMATED_PROPS[prop.type]?.opens) { this.propScrap = chestScrapAmount(prop); this.propEncounter = prop.encounter || ""; }

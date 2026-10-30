@@ -1,0 +1,9 @@
+{
+  "format": "dungeon-chained-map",
+  "version": 1,
+  "name": "Mazerunner",
+  "grid": { "cols": 5, "rows": 5 },
+  "roomSize": { "cols": 14, "rows": 9 },
+  "start": null,
+  "rooms": {}
+}
