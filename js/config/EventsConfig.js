@@ -62,10 +62,10 @@ export const STAKE_LIGHT = Object.freeze({
 });
 
 // Grades nos acessos da zona enquanto um encontro está ativo.
-// Grade levadiça: sprites em assets/bars (scripts/gen-bars-sprites.py). A treliça mora dentro da verga de pedra e
-// despenca dela. Steps de 60 Hz; `art` em pixels de arte (1 = TILE/16 px de mundo).
+// Grade levadiça: sprites em assets/bars (scripts/gen-bars-sprites.py), um tile 16x16 com a altura da parede de
+// frente. A treliça some atrás da verga e despenca dela. Steps de 60 Hz; `art` em pixels de arte (1 = TILE/16 px).
 export const BARS = Object.freeze({
-    art: Object.freeze({ frameH: 20, gateH: 15, lintel: 5, travel: 13 }),
+    art: Object.freeze({ frameH: 16, gateH: 10, lintel: 6, travel: 8 }),
     anticSteps: 12,
     dropSteps: 10,
     bounceSteps: 8,
