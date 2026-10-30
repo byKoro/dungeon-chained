@@ -38,7 +38,27 @@ export const ANIMATED_PROPS = Object.freeze({
     flamethrower_v: { label: "Lança-chamas vertical", frames: frames("flamethrower", "flamethrower_1"), w: 1, h: 2, solid: true, base: FLAME_V_BASE },
     flamethrower_h: { label: "Lança-chamas horizontal", frames: frames("flamethrower", "flamethrower_2"), w: 2, h: 1, solid: true, base: FLAME_H_BASE },
     // `art` = tamanho do PNG em pixels de arte; o sprite é desenhado nesse tamanho, centrado no footprint, sem esticar.
-    anvil: { label: "Bigorna", frames: ["assets/anvil/anvil.png"], w: 2, h: 1, solid: true, art: { w: 24, h: 24 }, base: { x: 6, y: 14, w: 16, h: 6 } }
+    anvil: { label: "Bigorna", frames: ["assets/anvil/anvil.png"], w: 2, h: 1, solid: true, art: { w: 24, h: 24 }, base: { x: 6, y: 14, w: 16, h: 6 } },
+    sleipnir: { label: "Sleipnir (16×16)", frames: ["assets/items/sleipnir.png"], w: 1, h: 1, solid: false, art: { w: 16, h: 16 } },
+    sleipnir_concept: { label: "Sleipnir (conceito)", frames: ["assets/items/sleipnir_concept.png"], w: 1, h: 1, solid: false, art: { w: 32, h: 32 } },
+    sleipnir_horseshoe: {
+        label: "Ferradura alada (Sleipnir)",
+        frames: Array.from({ length: 8 }, (_, i) => `assets/items/sleipnir_horseshoe_${i + 1}.png`),
+        w: 1, h: 1, solid: false, art: { w: 16, h: 16 },
+        motion: { type: "float", floatMs: 1200, floatPx: 1.5 }
+    },
+    sleipnir_horseshoe_native: {
+        label: "Ferradura alada (32×32)",
+        frames: Array.from({ length: 8 }, (_, i) => `assets/items/sleipnir_horseshoe_native_${i + 1}.png`),
+        w: 1, h: 1, solid: false, art: { w: 32, h: 32 },
+        motion: { type: "float", floatMs: 1200, floatPx: 1.5 }
+    },
+    sleipnir_horseshoe_redesign: {
+        label: "Ferradura alada redesenhada (16×16)",
+        frames: ["assets/items/sleipnir_horseshoe_16_redesign.png"],
+        w: 1, h: 1, solid: false, art: { w: 16, h: 16 },
+        motion: { type: "float", floatMs: 1200, floatPx: 1.5 }
+    }
 });
 
 export const ANIMATED_PROP_KEYS = Object.freeze(Object.keys(ANIMATED_PROPS));

@@ -42,6 +42,15 @@ export class PropSprites {
     draw(ctx, type, dx, dy, tilePx, ms, flip = false) {
         const def = this.defs[type];
         if (!def) return false;
+        if (def.motion?.type === "float") {
+            const motion = def.motion;
+            const artPx = tilePx / 16;
+            const float = Math.sin(ms / motion.floatMs * Math.PI * 2) * motion.floatPx * artPx;
+            ctx.save();
+            const drawn = this.drawFrame(ctx, type, propFrameIndex(def, ms), dx, dy + float, tilePx, flip);
+            ctx.restore();
+            return drawn;
+        }
         return this.drawFrame(ctx, type, propFrameIndex(def, ms), dx, dy, tilePx, flip);
     }
 

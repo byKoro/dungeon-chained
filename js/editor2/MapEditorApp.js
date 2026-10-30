@@ -1292,7 +1292,7 @@ export class MapEditorApp {
             const def = ANIMATED_PROPS[type];
             ctx.clearRect(0, 0, 32, 32);
             ctx.imageSmoothingEnabled = false;
-            const tilePx = 32 / Math.max(def.w, def.h);
+            const tilePx = 32 / Math.max(def.w, def.h, (def.art?.w || 0) / 16, (def.art?.h || 0) / 16);
             const dx = (32 - def.w * tilePx) / 2, dy = (32 - def.h * tilePx) / 2;
             this.props.draw(ctx, type, dx, dy, tilePx, this.now);
         }
