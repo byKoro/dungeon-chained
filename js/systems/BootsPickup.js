@@ -123,9 +123,9 @@ export class BootsPickup {
         const cel = this.celebrate;
         if (this.collected && !cel) return;
         const B = this.cfg, size = 16 * B.artScale, half = size / 2;
-        const img = this.assets?.get?.(B.assetKey);
         if (!cel) this._drawPixelShadow(ctx, a.x, a.top + B.shadow.offsetY, this._hover());
-        if (!(img?.complete && img.naturalWidth)) return;
+        const img = this._frame();
+        if (!img) return;
 
         const pop = this._popScale(cel);
         ctx.save();
@@ -173,8 +173,35 @@ export class BootsPickup {
         ctx.restore();
     }
 
+    // Quadro atual da bota girando, recortado num canvas 16×16 (um por quadro, criado uma vez). Reflexo, silhueta
+    // e máscara usam esse quadro, então o brilho e a saída da escuridão seguem a forma da bota girando.
+    // Sem a folha carregada, volta para a bota parada.
+    _frame() {
+        const B = this.cfg, s = B.spin;
+        const sheet = s && this.assets?.get?.(s.assetKey);
+        if (sheet?.complete && sheet.naturalWidth) {
+            const i = Math.floor(this._pulse / s.stepsPerFrame) % s.frames;
+            this._frames ??= [];
+            if (this._frameSheet !== sheet) { this._frames.length = 0; this._frameSheet = sheet; }
+            if (!this._frames[i]) {
+                const c = document.createElement("canvas");
+                c.width = c.height = s.cell;
+                const g = c.getContext("2d");
+                g.imageSmoothingEnabled = false;
+                g.drawImage(sheet, (i % s.cols) * s.cell, Math.floor(i / s.cols) * s.cell, s.cell, s.cell, 0, 0, s.cell, s.cell);
+                c.naturalWidth = c.naturalHeight = s.cell;
+                this._frames[i] = c;
+            }
+            return this._frames[i];
+        }
+        const still = this.assets?.get?.(B.assetKey);
+        return still?.complete && still.naturalWidth ? still : null;
+    }
+
     _silhouette(img) {
-        if (this._silhouetteCanvas?.src === img) return this._silhouetteCanvas.canvas;
+        this._silhouettes ??= new Map();
+        const cached = this._silhouettes.get(img);
+        if (cached) return cached;
         const c = document.createElement("canvas");
         c.width = c.height = 16;
         const g = c.getContext("2d");
@@ -183,7 +210,7 @@ export class BootsPickup {
         g.globalCompositeOperation = "source-in";
         g.fillStyle = "#ffffff";
         g.fillRect(0, 0, 16, 16);
-        this._silhouetteCanvas = { src: img, canvas: c };
+        this._silhouettes.set(img, c);
         return c;
     }
 

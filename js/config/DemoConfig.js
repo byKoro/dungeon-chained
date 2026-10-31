@@ -50,6 +50,9 @@ export const DEMO = {
 // Mesmo visual da chave/serra largada. Px de mundo; fases em rad/step de 60 Hz; tempos em steps.
 export const BOOTS = Object.freeze({
     assetKey: "boots",
+    // Bota girando: folha 3×3 de quadros 16×16 (8 usados, linha a linha), mesma escala da bota parada.
+    // Sem a folha carregada, desenha a bota parada (`assetKey`).
+    spin: Object.freeze({ assetKey: "bootsRotating", cell: 16, cols: 3, frames: 8, stepsPerFrame: 9 }),
     artScale: 4,                 // 16 px × 4 = 64 px
     liftTiles: 0.9,              // altura do flutuar acima do topo da bigorna (tiles)
     pickupRadius: DEMO.interactionRadius,   // ~88 px: um jogador perto pega (sem botão)
