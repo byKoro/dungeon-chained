@@ -131,10 +131,12 @@ export const HOLE_FALL = Object.freeze({
     respawnInvulnFrames: 90
 });
 
-// Só com a corrente arrebentada. 9 × 12 px ≈ 108 px: cruza vão de 1 tile, nunca 2.
+// 12 × 12 px = 144 px (2,25 tiles): vão de 1 tile folgado, 2 só saindo colado na borda, 3 nunca.
 export const PLAYER_DASH = Object.freeze({
     speed: 12,
-    durationSteps: 9,
+    durationSteps: 12,
+    // Corrente conectada: o cabo segura o dash nesta distância do parceiro (abaixo da ruptura de CHAIN).
+    connectedMaxDistance: 220,
     exitSpeed: 4.2,
     cooldownSteps: 60,
     afterimages: 4,

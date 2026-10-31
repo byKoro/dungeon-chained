@@ -29,16 +29,18 @@ Two local players ("Amarelo" P1, "Azul" P2) are tethered by an elastic cable car
 - `resolveSprite()` priority: hurt sheet → `expression` sheet → scared sheet → walk sheet. Walk frame 0 = idle, 1..frameCount-1 = walk cycle.
 - `draw(ctx)`: invuln blink (alpha 0.4), fall spin/shrink, hurt jitter, bob + tilt, horizontal flip, sprite scaled to `sprite.drawHeight` (73).
 - Bookkeeping fields set by `Game`: `_livesSeen`, `_fallSeen`, `bloodPalette` (PlayerFactory).
-- `update(input, bounds, { canDash })`: `canDash` comes from `Game` (`!chain.isConnected`). See Dash below.
+- `update(input, bounds, { canDash })`: `canDash` comes from `Game` (`dashUnlocked(!!mapData, demoProgress.state)` and not dragging the saw). See Dash below.
 
-## Dash (individual, only while the chain is snapped)
+## Dash (individual, chain connected or snapped)
 
-- Key = `controls[4]` (P1 `" "`, P2 `"enter"`); gamepad A (0) / RB (5) mapped to it (`InputHandler.dashButtons`). Edge-triggered inside `Player` (`_dashHeld`), no buffer. A key already held when the chain snaps does not fire.
+- Unlock (`dashUnlocked` in `js/systems/DashTether.js`): classic mode always; demo map only after the altar (`demoProgress.state.dash`). The player dragging the saw (`SawDrag.isDragging`) cannot dash. Until 2026-10-29 the dash also required the chain to be snapped.
+- Chain connected (`DashTether`, Game-owned, applied right after both `Player.update`): a dashing player never ends farther than `PLAYER_DASH.connectedMaxDistance` (220, below `CHAIN.breakDistance` 240) from the partner. Excess distance is pulled back along the partner axis, so the dash slides along the radius; outward velocity is removed while braked and on the exit step of a dash that was braked. Both dashing apart split the pull. Dashing toward/sideways keeps the full distance. `Chain.update(..., { holdStrain })` freezes `strain` and skips the snap check while either player is dashing; after the dash normal strain/snap/spring rules apply. The saw yank is plain chain physics (no extra damage/FX).
+- Key = `controls[4]` (P1 `" "`, P2 `"enter"`); gamepad A (0) / RB (5) mapped to it (`InputHandler.dashButtons`). Edge-triggered inside `Player` (`_dashHeld`), no buffer. A key already held when the dash becomes available does not fire.
 - Starts only if `canDash && !feetInHole && dashCooldown === 0 && hurtTimer === 0` and not `falling`. `feetInHole` (`tiles.feetInHole(p)`, feet over a hole tile) blocks it; in practice those feet fall that same step.
 - `Game.setPaused(false)` calls `latchDashKey()` on both players, so the Enter / pad A that closed the menu does not fire a dash. Game-over restart via Space/Enter/pad A/Start waits `GAME_OVER_INPUT_DELAY_MS` (400 ms, same as the death-button focus delay) because those are dash keys too. Direction = current 8-dir input, else `lastMoveX/Y`. No steering while `dashing`.
-- `PLAYER_DASH` (GameConfig): `speed` 12 × `durationSteps` 9 (~108 px), then velocity = `exitSpeed` 4.2 along `dashDir*`. `cooldownSteps` 60, counted from the end of the dash (`dashCharge` 0..1 getter, 0 while dashing).
+- `PLAYER_DASH` (GameConfig): `speed` 12 × `durationSteps` 12 (144 px = 2.25 tiles; was 9 steps / 108 px), then velocity = `exitSpeed` 4.2 along `dashDir*`. `cooldownSteps` 60, counted from the end of the dash (`dashCharge` 0..1 getter, 0 while dashing).
 - While `dashing`: `takeDamage` returns false (separate from `invulnerableTimer`, no blink); `Game` leaves the player out of `resolveEntityCollisions` (walls still apply); `checkHoleFalls` skips the player (no pushback, no fall); no footsteps.
-- End of dash: if the feet are on a hole tile, the player falls on the next step. A 1-tile gap is crossable, 2 tiles never.
+- End of dash: if the feet are on a hole tile, the player falls on the next step. A 1-tile gap is crossable with slack, 2 tiles only starting with the feet within ~16 px of the edge (tested), 3 never. Demo maps with 2-tile gaps that became crossable: `demo_map.json` room `4,3` (1 H, 1 V), `inicial.json` room `1,1` (3 V); review in playtest.
 - Flags: `justDashed` (Game plays `playerDash` + `triggerDust`), `justEndedDash`, `dashEnabled` (last `canDash`, read by the HUD bar). `afterimages` (tinted ghosts, drawn in `Player.draw`).
 - Resets: `respawnAt` (death-respawn) and `restart` (new Player) refill the charge. `cancelDash()` (door transition, `newDungeon`) cuts a dash in progress but keeps the cooldown running. Reconnecting mid-dash lets the dash finish.
 - `PlayerAI` never dashes (legacy bot).

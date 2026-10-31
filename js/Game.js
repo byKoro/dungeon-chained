@@ -13,6 +13,7 @@ import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
 import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
 import { SawDrag } from './systems/SawDrag.js';
+import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
 import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
@@ -162,6 +163,7 @@ export class Game {
 
         this.chainObstacles = new ChainObstacleSystem();
         this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], CHAIN);
+        this.dashTether = new DashTether({ chain: this.chain });
         this.forge = new ForgeState();
 
         this.playerFactory = new PlayerFactory({ assets: this.assets, bloodCanvas: this.bloodCanvas });
@@ -1044,12 +1046,13 @@ export class Game {
 
         this.playerAI.update();
 
-        const canDash = !this.chain.isConnected && (!this.mapData || this.demoProgress.state.dash);
+        const canDash = dashUnlocked(!!this.mapData, this.demoProgress?.state);
         const drag = this.sawDrag;
         p1.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(0), feetInHole: this.tiles.feetInHole(p1), speedScale: drag?.speedScaleFor(0) ?? 1 });
         p2.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(1), feetInHole: this.tiles.feetInHole(p2), speedScale: drag?.speedScaleFor(1) ?? 1 });
         this._dashFeedback(p1);
         this._dashFeedback(p2);
+        this.dashTether.apply(p1, p2);
 
         this._resolveFall(p1);
         this._resolveFall(p2);
@@ -1077,6 +1080,7 @@ export class Game {
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
             },
             onReconnect: () => this._onSawReconnect(),
+            holdStrain: this.dashTether.holdsStrain(p1, p2),
 
             resolveDropPoint: (x, y) => this.tiles.reachableDropPoint(x, y, [p1, p2])
         });

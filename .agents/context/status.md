@@ -226,3 +226,9 @@ Stair follow-up: placement on standard border walls supported on N/S/E/W, with a
 
 ## Arrow wall impacts (2026-10-30)
 Branch codex/arrow-wall-impact: arrows stop at internal/perimeter walls and emit light configured sparks. Swept collision avoids tunneling; launch-wall exit remains allowed. Regression tests pass; visual runtime verification pending. Full check retains the known modular-grid and unlisted-map failures.
+
+## Dash com a corrente conectada — 2026-10-29 (`feat/dash-connected`)
+- Dash liberado também com a corrente conectada (mesmo desbloqueio do altar na demo; quem arrasta a serra continua sem dash). Distância 144 px (2,25 tiles, `durationSteps` 12). Conectado, `DashTether` freia o dash a 220 px do parceiro e `Chain` congela a tensão durante o dash, então o dash não arrebenta o cabo. Detalhes em `systems/players-and-chain.md` → Dash.
+- Vãos de 2 tiles agora atravessáveis saindo colado na borda: `demo_map.json` sala `4,3`, `inicial.json` sala `1,1`. Revisar no playtest.
+- Testes: `test_dash_connected.js` (novo) e `test_player_dash.js` passam. Sensação de jogo não observada (sem playtest real).
+- Achado: `test_arauto_effects.js` falha em `main` desde `7c03a12` porque `FLAME_GOLEM.telegraph.showMarks` está `true` e o teste espera `false` (marcas de debug). Não mexido nesta branch.

@@ -78,10 +78,14 @@ export class Chain {
 
             // Serra dupla aberta: a tensão não sobe (só a ruptura por distância vale), para a dupla poder usar a faixa.
             const split = (this.weapon.split ?? 0) > 0;
-            if (dist > this.strainDistance) { if (!split) this.strain++; }
-            else this.strain = Math.max(0, this.strain - 2);
+            // Durante um dash a tensão fica congelada e o cabo não arrebenta (DashTether limita a distância).
+            const hold = !!events.holdStrain;
+            if (!hold) {
+                if (dist > this.strainDistance) { if (!split) this.strain++; }
+                else this.strain = Math.max(0, this.strain - 2);
+            }
 
-            if (dist > this.breakDistance || this.strain >= this.strainLimit) {
+            if (!hold && (dist > this.breakDistance || this.strain >= this.strainLimit)) {
                 const nx = (p2.x - p1.x) / (dist || 1);
                 const ny = (p2.y - p1.y) / (dist || 1);
                 p1.vx -= nx * this.snapImpulse;

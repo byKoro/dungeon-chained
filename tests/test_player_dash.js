@@ -25,19 +25,19 @@ const press = (p, input, canDash = true) => {
     input.held.delete('dash');
 };
 
-// 1) Bloqueado com a corrente conectada; a tecla segurada não dispara depois.
+// 1) Bloqueado com canDash=false (ex.: sem o altar na demo); a tecla segurada não dispara depois.
 {
     const p = makePlayer();
     const input = makeInput();
     input.held.add('dash');
     step(p, input, false);
-    assert(!p.dashing, "Corrente conectada: dash não acontece");
+    assert(!p.dashing, "canDash=false: dash não acontece");
     step(p, input, true);
-    assert(!p.dashing, "Segurar a tecla não dispara quando a corrente arrebenta (só borda)");
+    assert(!p.dashing, "Segurar a tecla não dispara quando o dash é liberado (só borda)");
     input.held.delete('dash');
     step(p, input);
     press(p, input);
-    assert(p.dashing && p.justDashed, "Nova pressão com a corrente arrebentada: dash começa");
+    assert(p.dashing && p.justDashed, "Nova pressão com o dash liberado: dash começa");
 }
 
 // 2) Distância, duração e velocidade de saída.
@@ -200,14 +200,19 @@ const press = (p, input, canDash = true) => {
         currentTiles: { floor: floor2, cols: 8, rows: 5, walls: [] },
         cellRect: () => ({ x: 0, y: 0, w: 8 * TILE, h: 5 * TILE })
     } });
-    const s = makePlayer(3 * TILE, ROW_Y);
-    const si = makeInput();
-    si.held.add('right'); si.held.add('dash');
-    for (let i = 0; i < 40 && !s.falling; i++) {
-        step(s, si); query2.checkHoleFalls([s]);
-        si.held.clear();
-    }
-    assert(s.falling, "Vão de 2 tiles não é cruzado nem saindo da beirada");
+    const dashAcross = (startX) => {
+        const s = makePlayer(startX, ROW_Y);
+        const si = makeInput();
+        si.held.add('right'); si.held.add('dash');
+        for (let i = 0; i < 40 && !s.falling; i++) {
+            step(s, si); query2.checkHoleFalls([s]);
+            si.held.clear();
+        }
+        return s;
+    };
+    const edge = dashAcross(3 * TILE);
+    assert(!edge.falling && edge.x > 5 * TILE, `Vão de 2 tiles: saindo colado na beirada cruza (x=${edge.x.toFixed(1)})`);
+    assert(dashAcross(3 * TILE - 40).falling, "Vão de 2 tiles: saindo 40px antes da beirada cai");
 
     const u = makePlayer(3 * TILE + HOLE_FALL.edgeMargin, ROW_Y);
     const ui = makeInput();

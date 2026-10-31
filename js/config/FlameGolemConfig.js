@@ -24,7 +24,7 @@ export const FLAME_GOLEM = {
     ],
     attacks: {
         attack: {
-            triggerRange: 110, range: 100, knockback: 16,
+            triggerRange: 110, range: 70, knockback: 16,
             windupTicks: 40, recoverTicks: 36, ticksPerFrame: 5, hitFrame: 6
         },
         attack2: {
@@ -33,7 +33,7 @@ export const FLAME_GOLEM = {
             windupTicks: 35, recoverTicks: 55, ticksPerFrame: 6, hitFrame: 6
         },
         attack3: {
-            triggerRange: 480, speed: 12, durationTicks: 18, hitRadius: 60,
+            triggerRange: 480, speed: 12, durationTicks: 18, hitRadius: 50,
             // 0 fixa a direcao marcada; 1 aponta para o alvo a cada tick.
             knockback: 52, trackingStrength: 0.025,
             windupTicks: 40, recoverTicks: 60, ticksPerFrame: 5, launchFrame: 5,
