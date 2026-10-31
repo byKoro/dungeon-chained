@@ -1,5 +1,5 @@
 import { RoomTiles } from '../core/RoomTiles.js';
-import { ROOM_COLS, ROOM_ROWS, TILE, TOP_WALL_CLIMB } from '../config/GameConfig.js';
+import { ROOM_COLS, ROOM_ROWS, TILE, TOP_WALL_CLIMB, HOLE_TILE } from '../config/GameConfig.js';
 import { ChallengeCorridor } from '../systems/ChallengeCorridor.js';
 import { GlobalRoomVariantCatalog } from './RoomArchetypes.js';
 import { HeartPickup } from '../entities/HeartPickup.js';
@@ -47,6 +47,24 @@ export class Room {
         });
         // Parede inferior (piso logo acima): ordenada por y com as entidades, quem está ao norte fica atrás dela.
         this.frontWalls = this.tiles.walls.filter(w => solidWall(w) && walkable(w.col, w.row - 1));
+
+        const rx = bounds.minX - TILE;
+        const ry = bounds.minY - TILE;
+        const seenUnstainable = new Set();
+        const unstainable = [];
+        const addUnstainable = (c, r) => {
+            const key = `${c},${r}`;
+            if (seenUnstainable.has(key)) return;
+            seenUnstainable.add(key);
+            unstainable.push({ x: rx + c * TILE, y: ry + r * TILE, w: TILE, h: TILE });
+        };
+        if (this.tiles?.floor) {
+            this.tiles.floor.forEach((line, r) => line.forEach((value, c) => {
+                if (value === HOLE_TILE) addUnstainable(c, r);
+            }));
+        }
+        for (const w of this.tiles?.walls || []) addUnstainable(w.col, w.row);
+        this.unstainableRects = unstainable.length ? unstainable : null;
 
         if (Array.isArray(cell.customTorches)) this.tiles.torches = cell.customTorches;
         if (Array.isArray(cell.customProps)) this.tiles.props = cell.customProps;

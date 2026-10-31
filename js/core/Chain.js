@@ -59,11 +59,6 @@ export class Chain {
         return this.connected;
     }
 
-    cycleWeapon() {
-        this.weaponIndex = (this.weaponIndex + 1) % this.weapons.length;
-        return this.weapon;
-    }
-
     update(p1, p2, events = {}) {
         if (this.reconnectCooldown > 0) this.reconnectCooldown--;
         if (!this.present) {
@@ -152,24 +147,6 @@ export class Chain {
         const d1 = Math.hypot(p1.x - w.dropX, p1.y - w.dropY);
         const d2 = Math.hypot(p2.x - w.dropX, p2.y - w.dropY);
         return d1 < r && d2 < r;
-    }
-
-    applyToEnemies(p1, p2, enemies, onHit) {
-        if (!this.connected) return;
-
-        const w = this.weapon;
-        for (let i = enemies.length - 1; i >= 0; i--) {
-            const e = enemies[i];
-            const d = Physics.distToSegment(e.x, e.y, p1.x, p1.y, p2.x, p2.y);
-            const dP1 = Math.hypot(e.x - p1.x, e.y - p1.y);
-            const dP2 = Math.hypot(e.x - p2.x, e.y - p2.y);
-            const nearPlayer = dP1 < this.playerSafeZone || dP2 < this.playerSafeZone;
-
-            if (e.state !== "dying" && !nearPlayer
-                && d < w.hitThreshold + e.hitRadius) {
-                onHit(e);
-            }
-        }
     }
 
     drawChain(ctx, p1, p2) {

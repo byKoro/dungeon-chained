@@ -1,6 +1,5 @@
 import { ActionArena } from '../../kit/ActionArena.js';
 import { TILE } from '../../../config/GameConfig.js';
-import { lerp, clamp01 } from '../../anim.js';
 
 const ROWS = 32;
 

@@ -60,6 +60,9 @@ export class SawWeapon extends Weapon {
         this.textureOffset = 0;
         this.dragX = 0;
         this.dragY = 0;
+        this._sawPosPool = [{ x: 0, y: 0, radius: 14 }, { x: 0, y: 0, radius: 14 }];
+        this._singleSawArray = [this._sawPosPool[0]];
+        this._doubleSawArray = [this._sawPosPool[0], this._sawPosPool[1]];
 
         this.dropped = false;
         this.inertiaSteps = 0;
@@ -289,21 +292,34 @@ export class SawWeapon extends Weapon {
     }
 
     getSawPositions(p1, p2) {
+        if (!this._sawPosPool) {
+            this._sawPosPool = [{ x: 0, y: 0, radius: 14 }, { x: 0, y: 0, radius: 14 }];
+            this._singleSawArray = [this._sawPosPool[0]];
+            this._doubleSawArray = [this._sawPosPool[0], this._sawPosPool[1]];
+        }
         if (this.split > 0) {
             const k = this.split * this.split * (3 - 2 * this.split);
-            return [0.5 - k / 6, 0.5 + k / 6].map(t => {
-                const q = this.cablePoint(p1, p2, t);
-                return { x: q.x, y: q.y, radius: 14 };
-            });
+            const t0 = 0.5 - k / 6;
+            const t1 = 0.5 + k / 6;
+            const b0 = 4 * t0 * (1 - t0);
+            const b1 = 4 * t1 * (1 - t1);
+            const s0 = this._sawPosPool[0];
+            const s1 = this._sawPosPool[1];
+            s0.x = p1.x + (p2.x - p1.x) * t0 + this.dragX * b0;
+            s0.y = p1.y + (p2.y - p1.y) * t0 + this.dragY * b0;
+            s0.radius = 14;
+            s1.x = p1.x + (p2.x - p1.x) * t1 + this.dragX * b1;
+            s1.y = p1.y + (p2.y - p1.y) * t1 + this.dragY * b1;
+            s1.radius = 14;
+            return this._doubleSawArray;
         }
-        const mid = this.cablePoint(p1, p2, 0.5);
-        return [{ x: mid.x, y: mid.y, radius: 14 }];
-    }
-
-    hitsTarget(target, p1, p2) {
-        return this.getSawPositions(p1, p2).some(saw =>
-            Math.hypot(target.x - saw.x, target.y - saw.y) < saw.radius + (target.hitRadius ?? 0)
-        );
+        const t = 0.5;
+        const b = 4 * t * (1 - t);
+        const s0 = this._sawPosPool[0];
+        s0.x = p1.x + (p2.x - p1.x) * t + this.dragX * b;
+        s0.y = p1.y + (p2.y - p1.y) * t + this.dragY * b;
+        s0.radius = 14;
+        return this._singleSawArray;
     }
 
     drawChain(ctx, p1, p2) {
@@ -407,14 +423,19 @@ export class SawWeapon extends Weapon {
         const popScale = (1 + 0.22 * this.spinKick) * this._reconnectScale;
 
         const whiteTint = (sx, sy) => {
+            if (typeof document === "undefined") return null;
             const S = SAW_FRAME.size;
             if (!this._flashCanvas) {
                 this._flashCanvas = document.createElement("canvas");
-                this._flashCanvas.width = S;
-                this._flashCanvas.height = S;
+                if (this._flashCanvas) {
+                    this._flashCanvas.width = S;
+                    this._flashCanvas.height = S;
+                }
             }
             const fc = this._flashCanvas;
+            if (!fc || !fc.getContext) return null;
             const fx = fc.getContext("2d");
+            if (!fx) return null;
             fx.imageSmoothingEnabled = false;
             fx.clearRect(0, 0, S, S);
             fx.globalCompositeOperation = "source-over";
@@ -438,8 +459,11 @@ export class SawWeapon extends Weapon {
             ctx.drawImage(sprite, sx, sy, SAW_FRAME.size, SAW_FRAME.size, -sz / 2, -sz / 2, sz, sz);
 
             if (flash > 0) {
-                ctx.globalAlpha = alpha * flash;
-                ctx.drawImage(whiteTint(sx, sy), -sz / 2, -sz / 2, sz, sz);
+                const wt = whiteTint(sx, sy);
+                if (wt) {
+                    ctx.globalAlpha = alpha * flash;
+                    ctx.drawImage(wt, -sz / 2, -sz / 2, sz, sz);
+                }
             }
             ctx.restore();
         };
@@ -600,17 +624,22 @@ export class SawWeapon extends Weapon {
     }
 
     _buildBeam(sx, sy) {
+        if (typeof document === "undefined") return null;
         const sprite = this.sprite;
         if (!sprite || !sprite.complete || !sprite.naturalWidth) return null;
 
         const S = SAW_FRAME.size;
         if (!this._beamCanvas) {
             this._beamCanvas = document.createElement("canvas");
-            this._beamCanvas.width = S;
-            this._beamCanvas.height = S;
+            if (this._beamCanvas) {
+                this._beamCanvas.width = S;
+                this._beamCanvas.height = S;
+            }
         }
         const bc = this._beamCanvas;
+        if (!bc || !bc.getContext) return null;
         const bx = bc.getContext("2d");
+        if (!bx) return null;
         bx.imageSmoothingEnabled = false;
         bx.clearRect(0, 0, S, S);
 

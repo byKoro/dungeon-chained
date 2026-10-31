@@ -365,11 +365,14 @@ export class Player extends Entity {
     }
 
     _tintedFrame(sp, color, amount) {
+        if (typeof document === 'undefined') return null;
         const cw = sp.cropW, ch = sp.cropH;
         if (!this._tintBuf) this._tintBuf = document.createElement('canvas');
         const buf = this._tintBuf;
+        if (!buf || !buf.getContext) return null;
         if (buf.width !== cw || buf.height !== ch) { buf.width = cw; buf.height = ch; }
         const b = buf.getContext('2d');
+        if (!b) return null;
         b.globalCompositeOperation = 'source-over';
         b.globalAlpha = 1;
         b.clearRect(0, 0, cw, ch);
@@ -464,8 +467,11 @@ export class Player extends Entity {
                     -drawW / 2, -drawH / 2, drawW, drawH
                 );
                 if (this._dashFlashT > 0) {
-                    ctx.globalAlpha *= this._dashFlashT / PLAYER_DASH.flashSteps;
-                    ctx.drawImage(this._tintedFrame(sp, '#ffffff', 1), -drawW / 2, -drawH / 2, drawW, drawH);
+                    const tf = this._tintedFrame(sp, '#ffffff', 1);
+                    if (tf) {
+                        ctx.globalAlpha *= this._dashFlashT / PLAYER_DASH.flashSteps;
+                        ctx.drawImage(tf, -drawW / 2, -drawH / 2, drawW, drawH);
+                    }
                 }
             } else {
 

@@ -36,10 +36,6 @@ export class PostProcessor {
         this._lights.push({ kind: "ellipse", x, y, radius, pixel, flatten, profile });
     }
 
-    addAreaLight(x, y, radiusX, radiusY, pixel = 6, profile = null) {
-        this._lights.push({ kind: "ellipse", x, y, radiusX, radiusY, pixel, profile });
-    }
-
     addWash(rectScreen, dir, profile = null) {
 
         const x = rectScreen.x + rectScreen.w / 2;

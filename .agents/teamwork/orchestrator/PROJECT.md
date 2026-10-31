@@ -45,31 +45,31 @@ The game is partitioned into two distinct layers:
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Git Branch Isolation | Create dedicated feature branch off main, preserve uncommitted 2026-10-30 work, keep main pristine | M1 | Survey 3 / R1 |
-| 2 | Architecture Proposal Document | Comprehensive specification of boundaries, domain models, and migration plan | M1 | Survey 1-3 / R2 |
-| 3 | Asset & Map Sanity Baseline | Register corridor_vertical_ns_1.json, eliminate tileset 404 network spam in AssetLoader | M1 | Survey 3 / R4 |
-| 4 | Pure Vector Math & Geometry | Pure math primitives (Vec2, Rect2D, PhysicsSim) in js/sim/math/ | M2 | Survey 1 / R3 |
-| 5 | Player Domain Model | Pure player state, velocity, dash, hole fall, and lives in PlayerModel.js | M2 | Survey 1 / R3 |
-| 6 | Tether & Cable Dynamics | Pure spring constraints, strain, snap, and reconnection in TetherModel.js | M2 | Survey 1 / R3 |
-| 7 | Saw Weapon Dynamics | Pure spin, drag, inertia, dropped push, and hit radius in SawModel.js | M2 | Survey 1 / R3 |
-| 8 | Combat & Damage Simulation | Pure hitbox overlaps, poise, damage calculations, and hit-stop in CombatSim.js | M2 | Survey 1 / R3 |
-| 9 | Enemy AI & Boss State Machines | Pure state machines for Melee, Golem, Ghostfire, Cultist, and traps in EnemyModel.js | M2 | Survey 1 / R3 |
-| 10 | Dungeon Simulation & Collision | Pure grid, wall bounds, safe drop points, and spatial query in DungeonSim.js | M2 | Survey 1 / R3 |
-| 11 | Simulation Event Queue | Pure event buffer (HitEvent, SnapEvent, FootstepEvent, ShakeEvent) in SimulationEvents.js | M2 | Survey 1 / R3 |
-| 12 | GameSimulation Loop | Deterministic fixed 60Hz step orchestrator in GameSimulation.js | M2 | Survey 1 / R3 |
-| 13 | Input Port & Web Input Adapter | InputSnapshot interface and WebInputAdapter consuming DOM/Gamepad | M3 | Survey 2 / R3 |
-| 14 | Event Dispatch Adapter | Web audio & juice adapter consuming SimulationEvents (audio cues, shake, particles) | M3 | Survey 2 / R3 |
-| 15 | Canvas 2D View Adapter | Decoupled CanvasViewRenderer rendering simulation snapshot with preserved depth sorting | M3 | Survey 2 / R3 |
-| 16 | Game.js Platform Integration | Game.js adapted to orchestrate GameSimulation through adapters | M3 | Survey 2 / R3, R5 |
-| 17 | Static Room UnstainableRects Cache | Cache static floor/hole rects on Room object to eliminate per-frame GC churn | M4 | Survey 3 / R4 |
-| 18 | RenderView Double Filter Elimination | Single-pass sorted drawable loop in Game._renderView | M4 | Survey 3 / R4 |
-| 19 | Saw Position Allocation Elimination | Scalar cache / object reuse for getSawPositions across physics and collision | M4 | Survey 3 / R4 |
-| 20 | Collision Broadphase AABB Optimization | AABB early-out in Physics.resolveBoxCollisions to skip hypot on distant tiles | M4 | Survey 3 / R4 |
-| 21 | Chain Obstacle Allocation Optimization | Inline point testing in ChainObstacleSystem._findContact | M4 | Survey 3 / R4 |
-| 22 | Dead Function & Code Removal | Delete 7 dead methods, unused configs, and 4 unused imports | M4 | Survey 3 / R4 |
-| 23 | Automated Test Suite Verification | Verify 44/45 tests pass with 0 regressions across all refactored systems | M5 | Survey 3 / R5 |
-| 24 | Map Validation Gate | Verify npm run validate:map passes with 0 errors | M5 | Survey 3 / R5 |
-| 25 | Full Definition-of-Done Gate | Verify npm run check and runtime browser playability | M5 | Survey 3 / R5 |
+| 1 | Git Branch Isolation | Create dedicated feature branch off main, preserve uncommitted 2026-10-30 work, keep main pristine | M1 | Survey 3 / R1 [DONE] |
+| 2 | Architecture Proposal Document | Comprehensive specification of boundaries, domain models, and migration plan | M1 | Survey 1-3 / R2 [DONE] |
+| 3 | Asset & Map Sanity Baseline | Register corridor_vertical_ns_1.json, eliminate tileset 404 network spam in AssetLoader | M1 | Survey 3 / R4 [DONE] |
+| 4 | Pure Vector Math & Geometry | Pure math primitives (Vec2, Rect2D, PhysicsSim) in js/sim/math/ | M2 | Survey 1 / R3 [DONE] |
+| 5 | Player Domain Model | Pure player state, velocity, dash, hole fall, and lives in PlayerModel.js | M2 | Survey 1 / R3 [DONE] |
+| 6 | Tether & Cable Dynamics | Pure spring constraints, strain, snap, and reconnection in TetherModel.js | M2 | Survey 1 / R3 [DONE] |
+| 7 | Saw Weapon Dynamics | Pure spin, drag, inertia, dropped push, and hit radius in SawModel.js | M2 | Survey 1 / R3 [DONE] |
+| 8 | Combat & Damage Simulation | Pure hitbox overlaps, poise, damage calculations, and hit-stop in CombatSim.js | M2 | Survey 1 / R3 [DONE] |
+| 9 | Enemy AI & Boss State Machines | Pure state machines for Melee, Golem, Ghostfire, Cultist, and traps in EnemyModel.js | M2 | Survey 1 / R3 [DONE] |
+| 10 | Dungeon Simulation & Collision | Pure grid, wall bounds, safe drop points, and spatial query in DungeonSim.js | M2 | Survey 1 / R3 [DONE] |
+| 11 | Simulation Event Queue | Pure event buffer (HitEvent, SnapEvent, FootstepEvent, ShakeEvent) in SimulationEvents.js | M2 | Survey 1 / R3 [DONE] |
+| 12 | GameSimulation Loop | Deterministic fixed 60Hz step orchestrator in GameSimulation.js | M2 | Survey 1 / R3 [DONE] |
+| 13 | Input Port & Web Input Adapter | InputSnapshot interface and WebInputAdapter consuming DOM/Gamepad | M3 | Survey 2 / R3 [DONE] |
+| 14 | Event Dispatch Adapter | Web audio & juice adapter consuming SimulationEvents (audio cues, shake, particles) | M3 | Survey 2 / R3 [DONE] |
+| 15 | Canvas 2D View Adapter | Decoupled CanvasViewRenderer rendering simulation snapshot with preserved depth sorting | M3 | Survey 2 / R3 [DONE] |
+| 16 | Game.js Platform Integration | Game.js adapted to orchestrate GameSimulation through adapters | M3 | Survey 2 / R3, R5 [DONE] |
+| 17 | Static Room UnstainableRects Cache | Cache static floor/hole rects on Room object to eliminate per-frame GC churn | M4 | Survey 3 / R4 [DONE] |
+| 18 | RenderView Double Filter Elimination | Single-pass sorted drawable loop in Game._renderView | M4 | Survey 3 / R4 [DONE] |
+| 19 | Saw Position Allocation Elimination | Scalar cache / object reuse for getSawPositions across physics and collision | M4 | Survey 3 / R4 [DONE] |
+| 20 | Collision Broadphase AABB Optimization | AABB early-out in Physics.resolveBoxCollisions to skip hypot on distant tiles | M4 | Survey 3 / R4 [DONE] |
+| 21 | Chain Obstacle Allocation Optimization | Inline point testing in ChainObstacleSystem._findContact | M4 | Survey 3 / R4 [DONE] |
+| 22 | Dead Function & Code Removal | Delete 7 dead methods, unused configs, and 4 unused imports | M4 | Survey 3 / R4 [DONE] |
+| 23 | Automated Test Suite Verification | Verify 48/49 tests pass with 0 regressions across all refactored systems | M5 | Survey 3 / R5 [DONE] |
+| 24 | Map Validation Gate | Verify npm run validate:map passes with 0 errors | M5 | Survey 3 / R5 [DONE] |
+| 25 | Full Definition-of-Done Gate | Verify npm run check and runtime browser playability | M5 | Survey 3 / R5 [DONE] |
 
 ---
 
@@ -77,11 +77,11 @@ The game is partitioned into two distinct layers:
 
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Git Branch Isolation & Architecture Proposal | Branch `feat/unity-port-replatform`, commit baseline, create `ARCHITECTURE_PROPOSAL.md`, fix tileset 404 & map index | none | IN_PROGRESS |
-| M2 | Engine-Agnostic Simulation Core | Create `js/sim/` (math, models, combat, enemy AI, dungeon, events, GameSimulation) with zero DOM/Canvas dependencies | M1 | PLANNED |
-| M3 | Ports & Adapters Web Integration | Implement `WebInputAdapter`, `CanvasViewRenderer`, `AudioEventAdapter`, and adapt `Game.js` | M2 | PLANNED |
-| M4 | Performance Optimization & Dead Code Removal | Cache `unstainableRects`, optimize `_renderView`, AABB broadphase, eliminate 7 dead methods & unused imports | M3 | PLANNED |
-| M5 | Regression Gate & Final Verification | Run `npm test`, `npm run validate:map`, `npm run check`, verify clean git status and runtime playability | M4 | PLANNED |
+| M1 | Git Branch Isolation & Architecture Proposal | Branch `feat/unity-port-replatform`, commit baseline, create `ARCHITECTURE_PROPOSAL.md`, fix tileset 404 & map index | none | DONE |
+| M2 | Engine-Agnostic Simulation Core | Create `js/sim/` (math, models, combat, enemy AI, dungeon, events, GameSimulation) with zero DOM/Canvas dependencies | M1 | DONE |
+| M3 | Ports & Adapters Web Integration | Implement `WebInputAdapter`, `CanvasViewRenderer`, `AudioEventAdapter`, and adapt `Game.js` | M2 | DONE |
+| M4 | Performance Optimization & Dead Code Removal | Cache `unstainableRects`, optimize `_renderView`, AABB broadphase, eliminate 7 dead methods & unused imports | M3 | DONE |
+| M5 | Regression Gate & Final Verification | Run `npm test`, `npm run validate:map`, `npm run check`, verify clean git status and runtime playability | M4 | DONE |
 
 ---
 

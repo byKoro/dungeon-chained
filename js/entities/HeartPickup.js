@@ -82,14 +82,19 @@ export class HeartPickup {
     }
 
     _buildBeam(img) {
+        if (typeof document === "undefined") return null;
         const A = HeartPickup.ART;
         if (!HeartPickup._beam) {
             const c = document.createElement("canvas");
-            c.width = A; c.height = A;
-            HeartPickup._beam = c;
+            if (c) {
+                c.width = A; c.height = A;
+                HeartPickup._beam = c;
+            }
         }
         const bc = HeartPickup._beam;
+        if (!bc || !bc.getContext) return null;
         const bx = bc.getContext("2d");
+        if (!bx) return null;
         bx.globalCompositeOperation = "source-over";
         bx.clearRect(0, 0, A, A);
 
@@ -97,25 +102,30 @@ export class HeartPickup {
         const travel = -A + p * (2.2 * A);
         const grad = bx.createLinearGradient(travel - A * 0.5, travel - A * 0.5, travel + A * 0.5, travel + A * 0.5);
         grad.addColorStop(0.0, "rgba(255,255,255,0)");
-        grad.addColorStop(0.4, "rgba(255,255,255,0)");
+        grad.addColorStop(0.42, "rgba(255,255,255,0)");
         grad.addColorStop(0.5, "rgba(255,235,240,0.9)");
         grad.addColorStop(0.6, "rgba(255,255,255,0)");
         grad.addColorStop(1.0, "rgba(255,255,255,0)");
         bx.fillStyle = grad;
         bx.fillRect(0, 0, A, A);
 
+        const mask = this._mask(img);
+        if (!mask) return null;
         bx.globalCompositeOperation = "destination-in";
-        bx.drawImage(this._mask(img), 0, 0);
+        bx.drawImage(mask, 0, 0);
         bx.globalCompositeOperation = "source-over";
         return bc;
     }
 
     _mask(img) {
+        if (typeof document === "undefined") return null;
         if (HeartPickup._maskCanvas) return HeartPickup._maskCanvas;
         const A = HeartPickup.ART;
         const c = document.createElement("canvas");
+        if (!c || !c.getContext) return null;
         c.width = A; c.height = A;
         const g = c.getContext("2d");
+        if (!g) return null;
         g.drawImage(img, 0, 0, A, A, 0, 0, A, A);
         const data = g.getImageData(0, 0, A, A);
         for (let i = 3; i < data.data.length; i += 4) {

@@ -50,21 +50,18 @@ export class ChainObstacleSystem {
     _findContact(weapon, p1, p2, enemies) {
         const cfg = this.config;
         let deepest = null;
-        const points = [];
-        for (let i = 1; i < cfg.samples; i++) {
-            points.push({ ...weapon.cablePoint(p1, p2, i / cfg.samples), radius: cfg.cableRadius, kind: 'chain' });
-        }
-        for (const disc of weapon.getSawPositions?.(p1, p2) ?? []) {
-            points.push({ ...disc, radius: weapon.discRadius, kind: 'disc' });
-        }
-        for (const enemy of enemies) {
-            if (!enemy.immovable || enemy.ignoresEntityCollisions || enemy.state === 'dying') continue;
-            for (const body of enemy.collisionBodies ?? []) {
-                const cx = enemy.x + body.x, cy = enemy.y + body.y;
-                for (const point of points) {
-                    const radius = point.radius;
+
+        const testPoint = (px, py, radius, kind) => {
+            for (let i = 0; i < enemies.length; i++) {
+                const enemy = enemies[i];
+                if (!enemy.immovable || enemy.ignoresEntityCollisions || enemy.state === 'dying') continue;
+                const bodies = enemy.collisionBodies;
+                if (!bodies) continue;
+                for (let b = 0; b < bodies.length; b++) {
+                    const body = bodies[b];
+                    const cx = enemy.x + body.x, cy = enemy.y + body.y;
                     const rx = body.radiusX + radius, ry = body.radiusY + radius;
-                    let dx = point.x - cx, dy = point.y - cy;
+                    let dx = px - cx, dy = py - cy;
                     let distance = Math.hypot(dx / rx, dy / ry);
                     if (distance >= 1) continue;
                     if (distance === 0) {
@@ -76,11 +73,25 @@ export class ChainObstacleSystem {
                     const sx = dx / distance - dx, sy = dy / distance - dy;
                     const depth = Math.hypot(sx, sy);
                     if (!deepest || depth > deepest.depth) {
-                        deepest = { enemy, x: point.x, y: point.y, sx, sy, depth, kind: point.kind };
+                        deepest = { enemy, x: px, y: py, sx, sy, depth, kind };
                     }
                 }
             }
+        };
+
+        // Test cable sample points inline
+        for (let i = 1; i < cfg.samples; i++) {
+            const pt = weapon.cablePoint(p1, p2, i / cfg.samples);
+            testPoint(pt.x, pt.y, cfg.cableRadius, 'chain');
         }
+
+        // Test saw discs inline
+        const discs = weapon.getSawPositions?.(p1, p2) ?? [];
+        for (let i = 0; i < discs.length; i++) {
+            const disc = discs[i];
+            testPoint(disc.x, disc.y, weapon.discRadius, 'disc');
+        }
+
         return deepest;
     }
 }

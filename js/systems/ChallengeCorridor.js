@@ -1,7 +1,7 @@
 import { SpikeTrap } from '../entities/SpikeTrap.js';
 import { ArrowTrap } from '../entities/ArrowTrap.js';
 import { PressureButton } from '../entities/PressureButton.js';
-import { HAZARDS, TILE, ROOM_COLS, ROOM_ROWS } from '../config/GameConfig.js';
+import { HAZARDS, TILE } from '../config/GameConfig.js';
 import { arrowFireDir, arrowMountOffset, spikeRowPhase } from '../rooms/HazardLayout.js';
 
 export class ChallengeCorridor {

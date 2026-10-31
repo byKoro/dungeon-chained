@@ -1,4 +1,4 @@
-# BRIEFING — 2026-10-30T08:06:00Z
+# BRIEFING — 2026-10-30T08:11:30Z
 
 ## Mission
 Establish Git branch isolation, commit baseline state cleanly, deliver architecture/project documentation, fix tileset 404 spam, and resolve map validation bug #4.
@@ -31,24 +31,33 @@ Establish Git branch isolation, commit baseline state cleanly, deliver architect
 - **Code layout**: c:\Users\Usuario\Desktop\dungeon-chained\.agents\teamwork\orchestrator\PROJECT.md § Code Layout
 
 ## Key Decisions Made
-- Initial baseline commit will cleanly capture pre-existing modified/untracked files on `feat/unity-port-replatform`.
-- AssetLoader tileset range will be restricted to existing tilesets `tileset.png` and `tileset_1.png` (or indices 0..1).
+- Initial baseline commit `0241326` cleanly captured pre-existing modified/untracked files on `feat/unity-port-replatform`.
+- AssetLoader tileset range restricted to existing tilesets (loop `1..1`), eliminating 404 errors for `tileset_2..6.png`.
+- Registered `corridor_vertical_ns_1.json` in `map/index.json`, resolving map validation error Bug #4.
+- Committed proposal documents and fixes as commit `1ab6f12`.
 
 ## Artifact Index
 - `.agents/teamwork/worker_m1/DISPATCH.md` — Worker dispatch instructions
 - `.agents/teamwork/worker_m1/BRIEFING.md` — Situational awareness and state
 - `.agents/teamwork/worker_m1/progress.md` — Liveness and step tracking
 - `.agents/teamwork/worker_m1/handoff.md` — Final handoff report
+- `ARCHITECTURE_PROPOSAL.md` — Architectural proposal in project root
+- `PROJECT.md` — Architectural specification and roadmap in project root
 
 ## Change Tracker
-- **Files modified**: None yet
-- **Build status**: Untested
+- **Files modified**:
+  - `ARCHITECTURE_PROPOSAL.md` (new) — Formal architectural proposal
+  - `PROJECT.md` (new) — Project spec and phased execution plan
+  - `js/core/AssetLoader.js` — Restricted tileset variant loop to existing files
+  - `map/index.json` — Added corridor_vertical_ns_1.json
+- **Build status**: Pass (44/45 tests pass, 0 regressions; 0 errors on map validation)
 - **Pending issues**: None
 
 ## Quality Status
-- **Build/test result**: Not yet run
-- **Lint status**: Not yet evaluated
-- **Tests added/modified**: None
+- **Build/test result**: Pass (44/45 tests pass, only pre-existing Bug #5 failing)
+- **Lint status**: Clean
+- **Tests added/modified**: Verified against existing suite
 
 ## Loaded Skills
 - None requested in dispatch
+

@@ -38,9 +38,13 @@ export class DungeonTileQuery {
 
     // Células que o sangue não pinta: buracos e paredes (inclusive vazio), cada uma uma vez.
     unstainableRects() {
+        const currentRoom = this.rooms?.current;
+        if (currentRoom && currentRoom.unstainableRects !== undefined) {
+            return currentRoom.unstainableRects;
+        }
         const tiles = this._floor();
         if (!tiles) return null;
-        const rect = this.rooms.cellRect();
+        const rect = this.rooms?.cellRect ? this.rooms.cellRect() : { x: 0, y: 0 };
         const seen = new Set();
         const rects = [];
         const add = (c, r) => {
@@ -51,7 +55,9 @@ export class DungeonTileQuery {
         };
         tiles.floor.forEach((line, r) => line.forEach((value, c) => { if (value === HOLE_TILE) add(c, r); }));
         for (const w of tiles.walls || []) add(w.col, w.row);
-        return rects.length ? rects : null;
+        const result = rects.length ? rects : null;
+        if (currentRoom) currentRoom.unstainableRects = result;
+        return result;
     }
 
     checkHoleFalls(players) {

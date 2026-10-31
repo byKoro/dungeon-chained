@@ -232,25 +232,6 @@ export class ParticleSystem {
         if (this.bloodCanvas) this.bloodCanvas.stampPool(x, y, scale);
     }
 
-    triggerExplosion(x, y, isSkeleton) {
-        const bloodColors = AIR_BLOOD_COLORS;
-        const boneColors = isSkeleton
-            ? ["#ffffff", "#e5e5e5", "#b8b8b8", "#595959"]
-            : ["#48cae4", "#0096c7", "#023e8a", "#e0fbfc"];
-
-        const bloodCount = 22 + Math.floor(Math.random() * 10);
-        for (let i = 0; i < bloodCount; i++) {
-            const c = bloodColors[Math.floor(Math.random() * bloodColors.length)];
-            this.airParticles.push(new AirParticle(x, y, c, true));
-        }
-
-        const pieceCount = 14 + Math.floor(Math.random() * 8);
-        for (let i = 0; i < pieceCount; i++) {
-            const c = boneColors[Math.floor(Math.random() * boneColors.length)];
-            this.airParticles.push(new AirParticle(x, y, c, false));
-        }
-    }
-
     update(players, bounds) {
         updateAndCompact(this.lavaFragments);
 

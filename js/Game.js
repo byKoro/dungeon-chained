@@ -43,6 +43,11 @@ import { Tileset } from './core/Tileset.js';
 import { AssetLoader } from './core/AssetLoader.js';
 import { AudioManager } from './core/AudioManager.js';
 import { GameLoop } from './core/GameLoop.js';
+import { WebInputAdapter } from './adapters/WebInputAdapter.js';
+import { AudioEventAdapter } from './adapters/AudioEventAdapter.js';
+import { JuiceEventAdapter } from './adapters/JuiceEventAdapter.js';
+import { CanvasViewRenderer } from './adapters/CanvasViewRenderer.js';
+import { GameSimulation } from './sim/GameSimulation.js';
 
 import { SawWeapon } from './weapons/SawWeapon.js';
 import { SawMotorAudio } from './weapons/SawMotorAudio.js';
@@ -149,6 +154,20 @@ export class Game {
         }
 
         this.input = new InputHandler();
+
+        // Platform Ports & Adapters (Hexagonal Architecture)
+        this.webInput = new WebInputAdapter({ inputHandler: this.input, menuPad: this.menuPad });
+        this.audioAdapter = new AudioEventAdapter({ audio: this.audio });
+        this.juiceAdapter = new JuiceEventAdapter({
+            renderer: this.renderer,
+            particleSystem: this.particleSystem,
+            screenGore: this.screenGore
+        });
+        this.viewRenderer = new CanvasViewRenderer({
+            assets: this.assets,
+            renderer: this.renderer
+        });
+        this.simulation = null;
 
         this.playerAI = new PlayerAI({
             input: this.input,
@@ -346,6 +365,7 @@ export class Game {
         this.audio.playLoop("ambience", { fadeMs: 3000 });
 
         this.sawMotor ??= new SawMotorAudio(this.audio.createLoopVoice("sawMotor"));
+        this.audioAdapter.setSawMotor(this.sawMotor);
         if (typeof window !== "undefined") window.sawMotor = this.sawMotor;
         this.gameLoop.start();
     }
@@ -595,6 +615,10 @@ export class Game {
             this.tiles.ensureSafeSpawn(this.p2, rect);
         }
         this._rememberEntrySpawns();
+        this.simulation = new GameSimulation({
+            spawnP1: { x: this.p1.x, y: this.p1.y },
+            spawnP2: { x: this.p2.x, y: this.p2.y }
+        });
 
         const center = this.rooms.cellCenter();
         this.renderer.camX = center.x;
@@ -933,6 +957,33 @@ export class Game {
 
     _step(deltaSeconds) {
         if (this.gameOver) return;
+
+        // Sample input snapshot through WebInputAdapter
+        const inputSnapshot = this.webInput?.getInputSnapshot(deltaSeconds) || { players: [], menu: {}, dt: deltaSeconds };
+        this.lastInputSnapshot = inputSnapshot;
+
+        // Coordinate GameSimulation and flush events through audio and juice adapters
+        if (this.simulation) {
+            if (this.p1 && this.p2) {
+                this.simulation.players[0].x = this.p1.x;
+                this.simulation.players[0].y = this.p1.y;
+                this.simulation.players[0].vx = this.p1.vx;
+                this.simulation.players[0].vy = this.p1.vy;
+                this.simulation.players[0].lives = this.p1.lives;
+                this.simulation.players[1].x = this.p2.x;
+                this.simulation.players[1].y = this.p2.y;
+                this.simulation.players[1].vx = this.p2.vx;
+                this.simulation.players[1].vy = this.p2.vy;
+                this.simulation.players[1].lives = this.p2.lives;
+                this.simulation.tether.connected = this.chain.isConnected;
+            }
+            const simEvents = this.simulation.step(inputSnapshot);
+            if (simEvents && simEvents.length > 0) {
+                this.audioAdapter.process(simEvents);
+                this.juiceAdapter.process(simEvents);
+            }
+        }
+
         if (this.sawCinematic?.active) {
             this._updateSawCinematic(deltaSeconds);
         } else if (this.forgeSystem?.open) {
@@ -1387,6 +1438,11 @@ export class Game {
 
     _renderView() {
         const { ctx, renderer, rooms } = this;
+        this.viewRenderer?.prepareFrame(ctx);
+        const renderSnapshot = this.getRenderSnapshot ? this.getRenderSnapshot() : null;
+        this.lastRenderSnapshot = renderSnapshot;
+        this.viewRenderer?.onRenderFrame?.(ctx, renderSnapshot);
+
         renderer.beginFrame();
         renderer.drawBackground(BACKGROUND_TILE, TILE);
 
@@ -1467,7 +1523,12 @@ export class Game {
             e.draw(ctx);
             this.arautoEffects.drawLava(ctx, e);
         };
-        drawables.filter(e => sortKey(e) <= sawY).forEach(drawEntity);
+        let splitIdx = 0;
+        const totalDrawables = drawables.length;
+        while (splitIdx < totalDrawables && sortKey(drawables[splitIdx]) <= sawY) {
+            drawEntity(drawables[splitIdx]);
+            splitIdx++;
+        }
 
         this.chain.draw(ctx, this.p1, this.p2);
 
@@ -1476,7 +1537,9 @@ export class Game {
 
         this.particleSystem.drawSparks(ctx);
 
-        drawables.filter(e => sortKey(e) > sawY).forEach(drawEntity);
+        for (let i = splitIdx; i < totalDrawables; i++) {
+            drawEntity(drawables[i]);
+        }
         this.sawCinematic?.drawWorld(ctx);
         // Cordas e gaiolas caindo: no passe do mundo, para a luz do ambiente atuar nelas.
         this.roomEvents?.drawAir(ctx);
@@ -1578,5 +1641,80 @@ export class Game {
         this._bossBarAt = now;
         this.bossBar.update(dt);
         this.bossBar.draw(ctx, canvas.width, canvas.height, this.hud.freeSpan(canvas.width, canvas.height));
+    }
+
+    /**
+     * Produces a decoupled RenderSnapshot consumed by CanvasViewRenderer and future UnityViewRenderer.
+     */
+    getRenderSnapshot() {
+        if (this.simulation) {
+            return this.simulation.getRenderSnapshot();
+        }
+
+        const rect = this.rooms?.cellRect() || { x: 0, y: 0, w: 0, h: 0 };
+        const p1 = this.p1;
+        const p2 = this.p2;
+        const weapon = this.chain?.weapon;
+        const saws = weapon?.getSawPositions?.(p1, p2) ?? [];
+        const sawPos = saws[0] || { x: (p1?.x + p2?.x) / 2 || 0, y: (p1?.y + p2?.y) / 2 || 0 };
+
+        return {
+            tick: this.gameLoop?.ticks ?? 0,
+            room: {
+                cellRect: rect,
+                tiles: this.rooms?.currentTiles || null,
+                doors: this.rooms?.doorsOfCurrent() || [],
+                bounds: this.arenaBounds
+            },
+            players: [p1, p2].filter(Boolean).map((p, i) => ({
+                index: i,
+                x: p.x,
+                y: p.y,
+                vx: p.vx,
+                vy: p.vy,
+                facingLeft: p.facingLeft,
+                animState: p.animState,
+                animFrame: p.animFrame,
+                invulnerable: (p.invulnerableTimer ?? 0) > 0,
+                isFalling: !!p.falling,
+                fallProgress: p.fallProgress ?? 0,
+                lives: p.lives,
+                maxLives: p.maxLives,
+                feetSortY: p.feetSortY ?? (p.y + 14)
+            })),
+            chain: {
+                connected: !!this.chain?.isConnected,
+                points: (p1 && p2) ? [{ x: p1.x, y: p1.y }, { x: p2.x, y: p2.y }] : [],
+                strain: weapon?.strain ?? 0,
+                hasSaw: !!this.chain?.hasSaw
+            },
+            saw: {
+                x: sawPos.x,
+                y: sawPos.y,
+                rotation: weapon?.rotation ?? 0,
+                spin: weapon?.spinSpeed ?? 0,
+                dropped: !this.chain?.isConnected && !!weapon?.dropped,
+                radius: weapon?.discRadius ?? 14
+            },
+            enemies: (this.rooms?.current?.enemies || []).map((e, idx) => ({
+                id: e.id ?? idx,
+                type: e.type || 'enemy',
+                x: e.x,
+                y: e.y,
+                facingLeft: e.facingLeft,
+                animState: e.state,
+                animFrame: e.animFrame,
+                hp: e.hp,
+                maxHp: e.maxHp,
+                feetSortY: e.feetSortY ?? (e.y + 14)
+            })),
+            pickups: (this.rooms?.current?.hearts || []).map(h => ({
+                type: 'heart',
+                x: h.x,
+                y: h.y,
+                collected: false
+            })),
+            traps: []
+        };
     }
 }

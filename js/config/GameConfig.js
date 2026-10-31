@@ -278,17 +278,6 @@ export const TORCHES = {
     enabled: true,
     index: 90,
     sideIndex: 91,
-    minPerWall: 2,
-    maxPerWall: 4,
-    marginTiles: 2,
-    minGap: 2,
-    onlyCombatRooms: true,
-
-    sides: {
-        enabled: true,
-        left: true,
-        right: true
-    },
 
     light: {
         pixelScale: 1.2,
@@ -427,12 +416,6 @@ export const HAZARDS = {
     spike: {
         size: TILE,
         damageRadius: 26,
-
-        hiddenFrames: 70,
-        warnFrames: 22,
-        exposedFrames: 46,
-        retractFrames: 16,
-
         drawSize: TILE * 0.9
     },
 

@@ -8,9 +8,12 @@ let tintBuf = null;
 
 // Recorte do sprite pintado com `color` só nos pixels opacos (flash de acerto).
 function tintedCrop(sheet, sx, sy, w, h, color, alpha) {
+    if (typeof document === 'undefined') return null;
     if (!tintBuf) tintBuf = document.createElement('canvas');
+    if (!tintBuf || !tintBuf.getContext) return null;
     if (tintBuf.width !== w || tintBuf.height !== h) { tintBuf.width = w; tintBuf.height = h; }
     const b = tintBuf.getContext('2d');
+    if (!b) return null;
     b.globalCompositeOperation = 'source-over';
     b.globalAlpha = 1;
     b.clearRect(0, 0, w, h);
@@ -26,9 +29,12 @@ let silhouetteBuf = null;
 
 // Silhueta do recorte pintada com `color` (contorno). Buffer próprio: o do flash continua válido no mesmo draw.
 function silhouetteCrop(sheet, sx, sy, w, h, color) {
+    if (typeof document === 'undefined') return null;
     if (!silhouetteBuf) silhouetteBuf = document.createElement('canvas');
+    if (!silhouetteBuf || !silhouetteBuf.getContext) return null;
     if (silhouetteBuf.width !== w || silhouetteBuf.height !== h) { silhouetteBuf.width = w; silhouetteBuf.height = h; }
     const b = silhouetteBuf.getContext('2d');
+    if (!b) return null;
     b.globalCompositeOperation = 'source-over';
     b.globalAlpha = 1;
     b.clearRect(0, 0, w, h);
@@ -699,9 +705,12 @@ export class MeleeEnemy extends Entity {
         let img = this.sheet, imgX = srcX, imgY = srcY;
         const tint = this._tintSpec();
         if (tint) {
-            img = tintedCrop(this.sheet, srcX, srcY, cw, ch, tint.color, tint.alpha);
-            imgX = 0;
-            imgY = 0;
+            const tinted = tintedCrop(this.sheet, srcX, srcY, cw, ch, tint.color, tint.alpha);
+            if (tinted) {
+                img = tinted;
+                imgX = 0;
+                imgY = 0;
+            }
         }
 
         ctx.save();
@@ -724,8 +733,10 @@ export class MeleeEnemy extends Entity {
         if (this.outline && typeof document !== 'undefined') {
             const step = Math.max(1, Math.round(this.outline.artPx * scale));
             const silhouette = silhouetteCrop(this.sheet, srcX, srcY, cw, ch, this.outline.color);
-            for (const [ox, oy] of [[-step, 0], [step, 0], [0, -step], [0, step]]) {
-                ctx.drawImage(silhouette, 0, 0, cw, ch, -drawW / 2 + ox, -drawH / 2 + oy, drawW, drawH);
+            if (silhouette) {
+                for (const [ox, oy] of [[-step, 0], [step, 0], [0, -step], [0, step]]) {
+                    ctx.drawImage(silhouette, 0, 0, cw, ch, -drawW / 2 + ox, -drawH / 2 + oy, drawW, drawH);
+                }
             }
         }
 

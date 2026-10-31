@@ -146,13 +146,20 @@ export class Physics {
     }
 
     static resolveBoxCollisions(entity, boxes) {
-        boxes.forEach(b => {
+        const r = entity.hitRadius || 16;
+        for (let i = 0; i < boxes.length; i++) {
+            const b = boxes[i];
+            // Broadphase AABB early-out
+            if (entity.x + r < b.x || entity.x - r > b.x + b.w ||
+                entity.y + r < b.y || entity.y - r > b.y + b.h) {
+                continue;
+            }
+
             const nearestX = Math.max(b.x, Math.min(entity.x, b.x + b.w));
             const nearestY = Math.max(b.y, Math.min(entity.y, b.y + b.h));
             const distX = entity.x - nearestX;
             const distY = entity.y - nearestY;
             const dist = Math.hypot(distX, distY);
-            const r = entity.hitRadius || 16;
 
             if (dist < r) {
                 const overlap = r - dist;
@@ -163,6 +170,6 @@ export class Physics {
                     entity.y += (distY / dist) * overlap;
                 }
             }
-        });
+        }
     }
 }

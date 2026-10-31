@@ -143,23 +143,6 @@ export class BloodCanvas {
         this.addZone(x, y, 26 * scale);
     }
 
-    stampGib(gib) {
-        const ctx = this.ctx;
-        ctx.save();
-        ctx.translate(gib.x, gib.y);
-        ctx.rotate(gib.angle);
-
-        ctx.drawImage(
-            gib.sheet,
-            gib.srcX, gib.srcY, gib.srcW, gib.srcH,
-            -gib.drawW / 2, -gib.drawH / 2, gib.drawW, gib.drawH
-        );
-
-        if (gib.stains) gib.stains.draw(ctx, 1);
-
-        ctx.restore();
-    }
-
     draw(ctx) {
 
         const prevOp = ctx.globalCompositeOperation;

@@ -162,3 +162,4 @@ The game is partitioned into two distinct layers:
 - `js/core/AssetLoader.js`: Image and audio asset loader.
 - `js/ui/*`: Screen menus, HUD, and overlays.
 - `js/editor/*`: Room and map editors.
+

@@ -1,5 +1,4 @@
 import { CAGE } from '../config/EventsConfig.js';
-import { Physics } from '../core/Physics.js';
 import { ANIMATED_PROPS } from '../config/PropConfig.js';
 import { StakeRopeArt, sawGap, impactBurst, drawChestDrop, easeIn, easeOut, clamp01 } from './StakeRope.js';
 

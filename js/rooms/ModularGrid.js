@@ -2,7 +2,6 @@ import {
     ALL_DIRECTIONS,
     OPPOSITE_DIRECTION,
     DIRECTION_DELTA,
-    RoomSocket,
     RoomTemplate
 } from './RoomSocket.js';
 import { ROOM_COLS, ROOM_ROWS, GRID_COLS, GRID_ROWS, TILE } from '../config/GameConfig.js';
