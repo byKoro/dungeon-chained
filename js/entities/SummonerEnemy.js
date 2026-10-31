@@ -61,7 +61,6 @@ export class SummonerEnemy extends MeleeEnemy {
         if (this.summoning) {
             // Fica parado tocando a animação da linha 5 uma única vez (sem o ciclo do melee).
             this.hitTimer = Math.max(0, this.hitTimer - 1);
-            if (this.flashTimer > 0) this.flashTimer--;
             this.vx = this.vy = 0;
             if (this.players.length) this.facingLeft = this.players[0].x < this.x;
             this._applyPush();
@@ -124,5 +123,11 @@ export class SummonerEnemy extends MeleeEnemy {
             return Math.min(Math.floor(this.summonAnimTime / anim.fps), anim.frames - 1);
         }
         return super._currentFrameIndex(anim);
+    }
+
+    // Fica vermelho apenas enquanto invoca; nos demais momentos, o tint normal do melee.
+    _tintSpec() {
+        if (this.summoning) return { color: SUMMONER.summonTint.color, alpha: SUMMONER.summonTint.alpha };
+        return super._tintSpec();
     }
 }

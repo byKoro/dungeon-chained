@@ -9,8 +9,8 @@ export const SUMMONER = {
     preferredDistance: 300,
     distanceTolerance: 24,
     retreatProbeSteps: 12,
-    // Intervalo entre invocações (7,5s a 60 Hz).
-    summonInterval: Math.round(7.5 * SIM_HZ),
+    // Intervalo entre invocações (5,5s a 60 Hz).
+    summonInterval: Math.round(5.5 * SIM_HZ),
     // Frame da animação de invocar em que os minions são liberados.
     summonReleaseFrame: 6,
     // Tipos invocados simultaneamente a cada ciclo.
@@ -19,6 +19,8 @@ export const SUMMONER = {
     spawnOffset: 34,
     spawnRadius: 18,
     maxMinions: 12,
+    // Tint vermelho aplicado SÓ durante a animação de invocação.
+    summonTint: { color: '#ff3b3b', alpha: 0.55 },
     // Morte usa o fade padrão do jogo em vez de uma sequência da folha (evita o sumiço).
     playDeathAnimation: false
 };
