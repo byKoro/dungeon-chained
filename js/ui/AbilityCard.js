@@ -12,10 +12,21 @@ import { t } from '../i18n/I18n.js';
 // `action` = botão mostrado; `dismissOn` = evento do Game (`notify`) que fecha o card antes do tempo.
 const CARDS = {
     "ability.dash": { action: "dash", dismissOn: "dash", demo: () => import('./DashDemo.js').then(m => m.DashDemo) },
-    "ability.tackle": { action: "dash", dismissOn: "tackle", demo: () => import('./TackleDemo.js').then(m => m.TackleDemo) }
+    "ability.tackle": { action: "dash", dismissOn: "tackle", demo: () => import('./TackleDemo.js').then(m => m.TackleDemo) },
+    // `recipe`: o Game mostra o card na primeira compra (nível 1) dessa receita da bigorna.
+    // Sem `action`: sem linha de botão, o card some pelo tempo.
+    "ability.coopHeal": { recipe: "coopHeal", demo: () => import('./CoopHealDemo.js').then(m => m.CoopHealDemo) },
+    "ability.drag": { recipe: "drag", action: "interact", dismissOn: "drag", demo: () => import('./DragDemo.js').then(m => m.DragDemo) },
+    "ability.snapWave": { recipe: "snapWave", demo: () => import('./SnapWaveDemo.js').then(m => m.SnapWaveDemo) },
+    "ability.inertia": { recipe: "inertia", demo: () => import('./InertiaDemo.js').then(m => m.InertiaDemo) },
+    "ability.dashPush": { recipe: "dashPush", action: "dash", dismissOn: "dashPush", demo: () => import('./DashPushDemo.js').then(m => m.DashPushDemo) }
 };
 
 export const ABILITY_CARD_KEYS = Object.freeze(Object.keys(CARDS));
+
+export function cardForRecipe(id) {
+    return ABILITY_CARD_KEYS.find(key => CARDS[key].recipe === id) ?? null;
+}
 
 const COLORS = { text: "#efe3c2", gold: "#ffd166", shadow: "#000" };
 const PAD = 6;

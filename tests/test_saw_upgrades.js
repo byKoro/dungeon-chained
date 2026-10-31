@@ -38,7 +38,7 @@ const setup = (buys = []) => {
 
 // Só Serra e Tamanho existem na forja; o cabo fica com os valores-base e a serra nunca divide.
 {
-    assert(Object.keys(FORGE.recipes).join() === "tackle,saw,size,inertia,snapWave,quickLink,hearts,moveSpeed,dashPush,coopHeal,dashCooldown,dashCharges", "catálogo da forja");
+    assert(Object.keys(FORGE.recipes).join() === "tackle,saw,drag,size,inertia,snapWave,quickLink,hearts,moveSpeed,dashPush,coopHeal,dashCooldown,dashCharges", "catálogo da forja");
     const { chain, weapon } = setup(["size"]);
     assert(near(chain.strainDistance, CHAIN.strainDistance) && near(chain.breakDistance, CHAIN.breakDistance), "cabo com tensão e ruptura base");
     const p1 = player(0, 0), p2 = player(0.9 * 240, 0);

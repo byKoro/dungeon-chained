@@ -118,6 +118,19 @@ Existing ground/slam VFX now pair with dedicated stratified rock impacts and amb
 ## Arauto visual fixes (2026-10-29)
 Arauto outline disabled via null (zero artPx still rounds to one pixel in MeleeEnemy); debug attack marks disabled. ArautoEffects owns full-world transient camera blur, rendered once after all views and before HUD. Attack start triggers shake/blur, charging sustains moderate shake/blur, ground/slam impacts use stronger presets. Blur decays per render and resets on dungeon reset; tuning in ArautoEffectsConfig.js. No gameplay timing changes.
 
+## Impacto (dash launch) feedback (2026-10-31)
+`DashPushFeedback` (`js/systems/DashPushFeedback.js`, tuning `DASH_PUSH_FEEL` in `js/config/DashPushFeelConfig.js`), owned by `Game` and injected into `DashPush`.
+- Contact (`launch`, medium tier): hit-stop 0,04 s, shake 5, hit sparks in the launch direction + small flash at the contact point, dust at the enemy's feet, enemy white flash (`_startFlash` 8), `enemyAttack` at 0,75 rate (placeholder).
+- Flight: dust at the feet every 2 steps while faster than 3 px/step.
+- Slam: `update()` runs in `Game._updateGameplay` after wall boxes/`ensureOnWalkableTile`, so it measures the real displacement. Moving less than 0,45 × the previous speed while faster than 4 px/step = slam (wall, hole edge, another body): dust + spark burst, shake 6, hit-stop 0,03 s, `arautoGround` at 1,6 rate / 0,45 volume (placeholder), push zeroed. If the launcher is still dashing within 2,5 × the summed radii, its dash is cancelled and its velocity zeroed; otherwise the dash overtook the pinned enemy and body collision spat it out behind the player. Reduced motion scales shake.
+
+## Vínculo (coop heal) feedback (2026-10-31)
+`CoopHealFeedback` (`js/systems/CoopHealFeedback.js`, tuning `COOP_HEAL_FEEL` in `js/config/CoopHealFeelConfig.js`) reads `CoopHeal.charging/progress` and its one-step flags `healed`/`broke`. Everything is 1 art pixel = 4 world px, snapped to the world grid. Updated in the sim step right after `coopHeal.update()`; reset with `coopHeal.reset()` and on door transitions.
+- `drawFloor` (world pass, right after player shadows): pixel ellipse ring at the shadow point (`footOffsetY` 17) per player, filled clockwise from the top by progress, dim remainder, bright head pixel, pulse from 75%. Ring pixel lists are cached by radius (`ellipsePixels`).
+- `drawOverlay` (unlit overlay pass, gated by `active`): heal burst rings, rising motes/crosses spawned on the left/right arcs of the ring (so they do not cover the sprite), shards when damage breaks the charge.
+- `renderLights`: green light per player growing with progress, plus a heal pulse. "+1" uses `triggerDamageNumber(..., { text })`.
+- Shown only while someone is below max lives; hidden during cooldown; after a damage break it stays hidden for `shards.holdSteps`. `prefers-reduced-motion` scales mote/shard motion and disables the pulse.
+
 Arrowtrap wall hits emit a small spark burst (HAZARDS.arrow.wallSpark: radius 5, count 3, power 0.35). Game consumes the one-step ChallengeCorridor.arrowImpacts list; no shake or added sound.
 
 

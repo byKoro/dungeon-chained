@@ -19,7 +19,9 @@ import { SawDrag } from './systems/SawDrag.js';
 import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
 import { DashPush } from './systems/DashPush.js';
+import { DashPushFeedback } from './systems/DashPushFeedback.js';
 import { CoopHeal } from './systems/CoopHeal.js';
+import { CoopHealFeedback } from './systems/CoopHealFeedback.js';
 import { SawTackle } from './systems/SawTackle.js';
 import { SawTackleFeedback } from './systems/SawTackleFeedback.js';
 import { SAW_TACKLE_FEEL } from './config/SawTackleFeelConfig.js';
@@ -32,9 +34,9 @@ import { RUN_DEATH } from './config/EventsConfig.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
 import { InteractPrompt, propTargetId } from './systems/InteractPrompt.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
-import { AbilityCard } from './ui/AbilityCard.js';
+import { AbilityCard, cardForRecipe } from './ui/AbilityCard.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
-import { FORGE, SAW_CINEMATIC } from './config/ForgeConfig.js';
+import { FORGE, SAW_CINEMATIC, PLAYER_UPGRADES } from './config/ForgeConfig.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
@@ -285,12 +287,14 @@ export class Game {
             onBuy: (id, result, anvil) => this._onForgeBuy(id, anvil)
         }) : null;
         this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
+        this._mapSellsDrag = !!this.mapData && mapOffersRecipe(this.mapData.map, "drag");
         this.sawDrag = this.mapData ? new SawDrag({
             chain: this.chain, getPlayers: () => [this.p1, this.p2], input: this.input,
             getStats: () => sawDragStats(TILE),
             isBlocked: (x, y) => this._sawDragBlocked(x, y),
             getBounds: () => this.arenaBounds,
-            canDrag: () => !this.forgeSystem?.open && !this.sawCinematic?.active,
+            // Mapa sem bigorna que venda o Arrastar: fica liberado, como a Serra.
+            canDrag: () => (this.forge.has("drag") || !this._mapSellsDrag) && !this.forgeSystem?.open && !this.sawCinematic?.active,
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         }) : null;
         this.sawPush = new DroppedSawPush({
@@ -324,10 +328,16 @@ export class Game {
             },
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         });
-        // Melhoria "Impacto": o dash empurra inimigos (sala "botas").
-        this.dashPush = new DashPush({ getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current, particleSystem: this.particleSystem });
+        // Melhoria "Impacto": o dash arremessa inimigos (sala "botas").
+        this.dashPushFeedback = new DashPushFeedback({ particleSystem: this.particleSystem, renderer: this.renderer, audio: this.audio,
+            hitStop: s => this.gameLoop?.triggerHitStop(s), endSpeed: PLAYER_UPGRADES.dashPush.launchEndSpeed,
+            reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false });
+        this.dashPush = new DashPush({ getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current,
+            particleSystem: this.particleSystem, feedback: this.dashPushFeedback });
         // Melhoria "Vínculo": os dois perto curam com o tempo (sala "botas").
         this.coopHeal = new CoopHeal({ getPlayers: () => [this.p1, this.p2], particleSystem: this.particleSystem, audio: this.audio });
+        this.coopHealFeedback = new CoopHealFeedback({ coopHeal: this.coopHeal, getPlayers: () => [this.p1, this.p2],
+            particleSystem: this.particleSystem, reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false });
         // Telinha ao ganhar uma habilidade (dash nas botas, Investida na bigorna): "vídeo" de uma sala real.
         this.abilityCard = this.mapData ? new AbilityCard({
             getDevice: i => this.input.deviceFor(i), assets: this.assets
@@ -616,6 +626,7 @@ export class Game {
         this.sawTackle.reset();
         this.dashPush?.reset();
         this.coopHeal?.reset();
+        this.coopHealFeedback?.reset();
         this.roomEvents?.reset();
         this._respawnFadeAt = -Infinity;
         this.sawCinematic?.reset();
@@ -722,6 +733,13 @@ export class Game {
             this.abilityCard?.show("ability.tackle");
             return;
         }
+        // Receitas com card (Vínculo, Arrastar, Estalo, Inércia, Impacto): só na primeira compra; o nível 2 não muda a mecânica.
+        const card = cardForRecipe(id);
+        if (card && this.forge.level(id) === 1 && this.abilityCard) {
+            this.forgeSystem.close({ silent: true });
+            this.abilityCard.show(card);
+            return;
+        }
         if (id !== "saw") return;
         this.forgeSystem.close({ silent: true });
         this.sawCinematic.start(anvil);
@@ -758,6 +776,7 @@ export class Game {
         this.sawTackle.reset();
         this.dashPush?.reset();
         this.coopHeal?.reset();
+        this.coopHealFeedback?.reset();
         // Morte na sala "botas": a bota volta e o dash concedido por ela re-trava (reset só vale nesta sala).
         if (this.rooms.current.cell.authored?.name === "botas") this.bootsPickup?.reset();
         this.dialogue?.clear();
@@ -894,6 +913,7 @@ export class Game {
         this.sawTackle.reset();
 
         this.particleSystem.clearDamageNumbers();
+        this.coopHealFeedback?.reset();
 
         const combat = this._activateRoomEnemies();
         if (!combat && !this.rooms.isLocked()) {
@@ -1199,6 +1219,7 @@ export class Game {
         this.effects.processPlayer(p2);
 
         this.sawDrag?.update();
+        if (this.sawDrag?.justGrabbed) this.abilityCard?.notify("drag");
         // Antes do Chain: um tackle no mesmo passo que a reconexão vence (a serra fica travada no impacto).
         this.sawTackle.update();
         if (this.sawTackle.justTackled) this.abilityCard?.notify("tackle");
@@ -1289,6 +1310,7 @@ export class Game {
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
         this.dashPush?.update();
+        if (this.dashPush?.justPushed) this.abilityCard?.notify("dashPush");
         this.sawTackle.onBossImpacts(enemies);
         this.arautoEffects.update(enemies);
         this.ghostfire.update(room, [p1, p2]);
@@ -1324,6 +1346,7 @@ export class Game {
         if (barBoxes.length) for (const entity of [p1, p2, ...liveEnemies]) Physics.resolveBoxCollisions(entity, barBoxes);
 
         for (const enemy of liveEnemies) enemy.ensureOnWalkableTile?.();
+        this.dashPushFeedback.update();
 
         enemies.forEach(e => rooms.clampEnemy(e, this.arenaBounds));
         const doors = rooms.doorsOfCurrent();
@@ -1370,6 +1393,7 @@ export class Game {
 
         this._updateHearts(room);
         this.coopHeal?.update();
+        this.coopHealFeedback?.update();
         this.chests?.update();
         this.roomEvents?.update();
         this.scrap?.update([p1, p2], this.arenaBounds);
@@ -1605,6 +1629,7 @@ export class Game {
         const p2Bounce = this.p2.speedMag > 0.15 ? Math.abs(Math.sin(this.p2.animTimer)) : 0;
         if (!this.p1.falling) renderer.drawRoundShadow(this.p1.x, this.p1.y, 14, p1Bounce);
         if (!this.p2.falling) renderer.drawRoundShadow(this.p2.x, this.p2.y, 14, p2Bounce);
+        this.coopHealFeedback?.drawFloor(ctx);
         const enemies = rooms.current.enemies;
 
         enemies.forEach(e => {
@@ -1698,18 +1723,21 @@ export class Game {
         this.bootsPickup?.renderLights(renderer, this.postProcessor);
         this.demoDoors.renderLights(this.postProcessor);
         this.sawTackleFeedback.renderLights(renderer, this.postProcessor, this.sawTackle, this.chain.weapon);
+        this.coopHealFeedback?.renderLights(renderer, this.postProcessor);
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
         if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length
             || this.chainTension.state.effort > 0 || this.chainTension.snapTime > 0
-            || this.sawTackle.active || this.sawTackleFeedback.bursts.length || this.sawTackleFeedback.visual.lit) {
+            || this.sawTackle.active || this.sawTackleFeedback.bursts.length || this.sawTackleFeedback.visual.lit
+            || this.coopHealFeedback?.active) {
             renderer.beginOverlayWorld();
 
             this.chainTension.draw(ctx, this.p1, this.p2, this.chain.isConnected, this.chain.weapon);
             this.sawTackleFeedback.draw(ctx, this.sawTackle, this.chain.weapon);
             this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
+            this.coopHealFeedback?.drawOverlay(ctx);
             this.particleSystem.drawDamageNumbers(ctx);
             renderer.endOverlayWorld();
         }

@@ -57,7 +57,7 @@ assert(!fs.open && fs.promptTargets[0]?.blocked === true, "com inimigos vivos n�
 enemiesAlive = false;
 
 tap(fs, "shiftright");
-assert(fs.open && fs.recipes.join() === "saw,size,inertia,snapWave,quickLink,hearts", "P2 perto abre com as receitas padrão");
+assert(fs.open && fs.recipes.join() === "saw,drag,size,inertia,snapWave,quickLink,hearts", "P2 perto abre com as receitas padrão");
 assert(sounds.includes("uiOpen"), "som de abrir");
 fs.handleInput();
 assert(fs.open, "a tecla que abriu não fecha no frame seguinte");
@@ -75,9 +75,9 @@ fs.handleInput({ up: true });
 fs.handleInput({});
 assert(fs.cursor === 0, "D-pad sobe o cursor");
 fs.handleInput({ up: true });
-assert(fs.cursor === 5, "o cursor dá a volta");
+assert(fs.cursor === 6, "o cursor dá a volta");
 fs.handleInput({});
-fs.handleInput({ down: true }); fs.handleInput({}); fs.handleInput({ down: true }); fs.handleInput({});
+for (let i = 0; i < 3; i++) { fs.handleInput({ down: true }); fs.handleInput({}); }
 fs.handleInput({ a: true });
 assert(bought[1] === "size" && scrap.amount === 5, "A do controle compra Tamanho (15)");
 

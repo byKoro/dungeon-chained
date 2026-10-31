@@ -13,6 +13,9 @@ export class CoopHeal {
     reset() {
         this.hold = 0;
         this.cooldown = 0;
+        // Flags de um step para o CoopHealFeedback: quem curou e por que o carregamento caiu ('hurt' | 'apart').
+        this.healed = [];
+        this.broke = null;
         const players = this.getPlayers?.() || [];
         this._damageSeen = [players[0]?.damageTaken ?? 0, players[1]?.damageTaken ?? 0];
     }
@@ -32,6 +35,8 @@ export class CoopHeal {
     }
 
     update() {
+        this.healed = [];
+        this.broke = null;
         if (!this.params) return;
         const players = this.getPlayers() || [];
         const [p1, p2] = players;
@@ -44,13 +49,13 @@ export class CoopHeal {
             if (d > (this._damageSeen[i] ?? 0)) hurt = true;
             this._damageSeen[i] = d;
         }
-        if (hurt) { this.hold = 0; return; }
+        if (hurt) { this._break('hurt'); return; }
 
         if (this.cooldown > 0) { this.cooldown--; this.hold = 0; return; }
 
         const alive = p1.lives > 0 && p2.lives > 0 && !p1.falling && !p2.falling;
         const near = Math.hypot(p1.x - p2.x, p1.y - p2.y) <= this.cfg.radius;
-        if (!alive || !near) { this.hold = 0; return; }
+        if (!alive || !near) { this._break('apart'); return; }
 
         this.hold++;
         if (this.hold < this.params.holdSteps) return;
@@ -59,7 +64,7 @@ export class CoopHeal {
         this.hold = 0;
         let healed = false;
         for (const p of [p1, p2]) {
-            if (p.lives < (p.maxLives ?? p.lives)) { p.lives += 1; healed = true; }
+            if (p.lives < (p.maxLives ?? p.lives)) { p.lives += 1; healed = true; this.healed.push(p); }
         }
         if (!healed) return;
         this.cooldown = this.params.cooldownSteps;
@@ -67,5 +72,10 @@ export class CoopHeal {
         this.particleSystem?.triggerFlash?.(mx, my, this.cfg.flashLife ?? 10, 0.8);
         this.audio?.play?.("pickup", { rateMultiplier: 1.1 });
         this.onHeal?.(mx, my);
+    }
+
+    _break(reason) {
+        if (this.hold > 0) this.broke = reason;
+        this.hold = 0;
     }
 }

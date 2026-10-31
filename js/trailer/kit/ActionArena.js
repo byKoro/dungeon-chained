@@ -677,8 +677,8 @@ export class ActionArena {
         e.vy += (vy - e.vy) * 0.15;
         e.x += e.vx + (e.pushVx || 0);
         e.y += e.vy + (e.pushVy || 0);
-        e.pushVx = (e.pushVx || 0) * 0.85;
-        e.pushVy = (e.pushVy || 0) * 0.85;
+        e.pushVx = (e.pushVx || 0) * (e.pushDamp ?? 0.85);
+        e.pushVy = (e.pushVy || 0) * (e.pushDamp ?? 0.85);
         if (Math.hypot(e.vx, e.vy) > 0.2 || ((this.t * 60) | 0) % 3 === 0) e.animTime++;
         const look = e.lookAt || this.midTarget;
         e.facingLeft = look.x < e.x;

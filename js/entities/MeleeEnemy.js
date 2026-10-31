@@ -282,6 +282,20 @@ export class MeleeEnemy extends Entity {
         this.flashTotal = steps;
     }
 
+    // Arremesso sem dano (Impacto): interrompe o ataque e segura a pose de "hurt" por `steps` enquanto voa,
+    // para a IA não andar contra o empurrão. Não mexe em vida nem poise.
+    launchStagger(steps) {
+        if (this.state === 'dying' || this.state === 'dead' || this.state === 'stunned' || this.superArmor) return;
+        if (this.state !== 'hurt') {
+            const anim = this._currentAnim();
+            this._hurtPose = { anim, frame: this._currentFrameIndex(anim) };
+            this.animTime = 0;
+        }
+        this.state = 'hurt';
+        this.stateTimer = Math.max(this.stateTimer ?? 0, steps);
+        this.vx = this.vy = 0;
+    }
+
     // Interrompe windup/attack/recover, congela a pose atual e empurra para longe da fonte do golpe.
     _enterStagger(hit, broken) {
         const wasStunned = this.state === 'stunned';
@@ -614,8 +628,10 @@ export class MeleeEnemy extends Entity {
             if (stuck || this._standsOnFloor(nx, this.y)) this.x = nx; else this.pushVx = 0;
             if (stuck || this._standsOnFloor(this.x, ny)) this.y = ny; else this.pushVy = 0;
         }
-        this.pushVx *= 0.85;
-        this.pushVy *= 0.85;
+        // `pushDamp`: arremesso do Impacto (DashPush) desliza mais; sem ele, o amortecimento padrão.
+        const damp = this.pushDamp ?? 0.85;
+        this.pushVx *= damp;
+        this.pushVy *= damp;
         if (Math.abs(this.pushVx) < 0.01) this.pushVx = 0;
         if (Math.abs(this.pushVy) < 0.01) this.pushVy = 0;
     }
@@ -759,7 +775,7 @@ export class MeleeEnemy extends Entity {
 
     _jitterX() {
         if (this.state === "hurt") {
-            const amp = ENEMY_HIT.jitter.hurt * (this.stateTimer / ENEMY_HIT.stagger.steps);
+            const amp = ENEMY_HIT.jitter.hurt * Math.min(1, this.stateTimer / ENEMY_HIT.stagger.steps);
             return (this.stateTimer % 2 ? 1 : -1) * amp;
         }
         if (this.state === "stunned") return Math.sin(this.animTime * 0.6) * ENEMY_HIT.jitter.stunned;

@@ -5,7 +5,7 @@ import { drawText, measureText } from '../ui/PixelFont.js';
 export class DamageNumber {
     constructor(x, y, amount, opts = {}) {
         const c = DAMAGE_NUMBER;
-        this.text = String(Math.max(0, Math.round(amount)));
+        this.text = opts.text ?? String(Math.max(0, Math.round(amount)));
         this.x = x + (Math.random() - 0.5) * c.scatterX;
         this.y = y;
         this.vx = (Math.random() - 0.5) * 2 * c.driftX;

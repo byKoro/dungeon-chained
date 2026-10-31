@@ -9,6 +9,8 @@ export const FORGE = Object.freeze({
         // Editor 2.0 o tackle só funciona com ela. Primeira no catálogo porque o editor ordena a bigorna por aqui.
         tackle: { kind: "item", item: "saw", costs: [0] },
         saw: { kind: "item", costs: [10] },
+        // "Arrastar" (bigorna da sala inicial): com o cabo arrebentado, um jogador sozinho puxa a serra (SawDrag).
+        drag: { kind: "item", item: "saw", costs: [20] },
         size: { kind: "upgrade", item: "saw", costs: [15, 30, 50], perLevel: 0.12 },
         // Solta (cabo arrebentado ou queda), a serra segue girando e cortando inimigos por `seconds[nível-1]`.
         inertia: { kind: "upgrade", item: "saw", costs: [20, 35, 55], seconds: [1.5, 2.5, 4] },
@@ -23,7 +25,7 @@ export const FORGE = Object.freeze({
         // "Passo veloz": +`perLevel` na velocidade dos dois por nível (multiplicador no speedScale).
         moveSpeed: { kind: "upgrade", costs: [15, 30, 50], perLevel: 0.08 },
         // "Impacto": o dash empurra inimigos (knockback, sem dano). `impulse` px/step por nível (pancada mais forte).
-        dashPush: { kind: "upgrade", costs: [20, 40], impulse: [6, 10] },
+        dashPush: { kind: "upgrade", costs: [20, 40], impulse: [12, 17] },
         // "Vínculo": os dois perto por `seconds[nível-1]` curam 1 vida cada; `cooldownSeconds` entre curas.
         coopHeal: { kind: "upgrade", costs: [40, 70], seconds: [6, 4], cooldownSeconds: 8 },
         // "Fôlego": reduz a recarga do dash. `cooldownScale[nível-1]` multiplica PLAYER_DASH.cooldownSteps.
@@ -31,7 +33,8 @@ export const FORGE = Object.freeze({
         // "Pés ligeiros": +1 carga de dash por nível (encadear mais dashes antes de recarregar).
         dashCharges: { kind: "upgrade", costs: [35, 70], perLevel: 1 }
     }),
-    defaultRecipes: Object.freeze(["saw", "size", "inertia", "snapWave", "quickLink", "hearts"]),
+    // Catálogo das bigornas sem `recipes` autorado (no mapa da demo, só a da sala inicial).
+    defaultRecipes: Object.freeze(["saw", "drag", "size", "inertia", "snapWave", "quickLink", "hearts"]),
     // Catálogo da bigorna da sala "botas": melhorias de dash/jogador.
     bootsRecipes: Object.freeze(["moveSpeed", "dashPush", "coopHeal", "dashCooldown", "dashCharges"]),
     // Feedback da onda do Estalo, além do que o arrebentar já faz.
@@ -50,7 +53,12 @@ export const FORGE_RECIPE_IDS = Object.freeze(Object.keys(FORGE.recipes));
 // Ajustes das melhorias de jogador/dash da sala "botas" que não são por nível. Px de mundo, steps de 60 Hz.
 export const PLAYER_UPGRADES = Object.freeze({
     // Empurrão do dash: raio = raio do disco de contato do jogador + folga; cada inimigo é empurrado uma vez por dash.
-    dashPush: Object.freeze({ radiusPad: 10, knockMinSpeedKeep: 0.2 }),
+    // `launchDamp`: amortecimento por step do inimigo arremessado (o padrão é 0.85); voo termina abaixo de `launchEndSpeed`.
+    // Distância ≈ impulso / (1 − launchDamp): 12 → 120 px, 17 → 170 px.
+    // `contactBias`: quanto a direção do contato desvia o arremesso da direção do dash.
+    dashPush: Object.freeze({ radiusPad: 10, knockMinSpeedKeep: 0.2, launchDamp: 0.9, launchEndSpeed: 1, contactBias: 0.5,
+        // O inimigo fica em "hurt" (sem dano, ataque interrompido) por este tempo, para não andar contra o voo.
+        launchStaggerSteps: 24 }),
     // Cura por proximidade: raio entre os dois (centro a centro) e duração do feedback.
     coopHeal: Object.freeze({ radius: 2 * TILE, flashLife: 10 })
 });
