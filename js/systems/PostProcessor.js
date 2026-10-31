@@ -36,6 +36,11 @@ export class PostProcessor {
         this._lights.push({ kind: "ellipse", x, y, radius, pixel, flatten, profile });
     }
 
+    // Silhueta branca (px de tela) somada à luz: os pixels cobertos não escurecem (sprite "sem sombra do ambiente").
+    addMask(img, x, y, w, h, alpha = 1) {
+        this._lights.push({ kind: "mask", img, x, y, w, h, alpha });
+    }
+
     addAreaLight(x, y, radiusX, radiusY, pixel = 6, profile = null) {
         this._lights.push({ kind: "ellipse", x, y, radiusX, radiusY, pixel, profile });
     }
@@ -81,6 +86,12 @@ export class PostProcessor {
 
         lctx.globalCompositeOperation = "lighter";
         for (const light of this._lights) {
+            if (light.kind === "mask") {
+                lctx.globalAlpha = light.alpha;
+                lctx.drawImage(light.img, Math.round(light.x), Math.round(light.y), Math.round(light.w), Math.round(light.h));
+                lctx.globalAlpha = 1;
+                continue;
+            }
 
             const p = light.profile || this.lighting;
 

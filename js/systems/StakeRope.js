@@ -3,7 +3,7 @@ export const easeIn = k => k * k;
 export const easeOut = k => 1 - (1 - k) * (1 - k);
 export const clamp01 = v => Math.max(0, Math.min(1, v));
 
-// Distância entre o disco que gira (preso à corrente, lançado ou solto por Inércia) e um ponto; ≤ 0 = encostando.
+// Distância entre o disco que gira (preso à corrente, lançado, dado tackle, ou solto por Inércia) e um ponto; ≤ 0 = encostando.
 export function sawGap(chain, players, point) {
     const w = chain?.weapon;
     if (!w) return Infinity;
@@ -14,7 +14,8 @@ export function sawGap(chain, players, point) {
         for (const p of w.getSawPositions?.(p1, p2) || []) best = Math.min(best, Math.hypot(p.x - point.x, p.y - point.y) - disc);
         return best;
     }
-    if (w.thrown || w.spinningLoose) return Math.hypot(w.dropX - point.x, w.dropY - point.y) - disc;
+    // Solta: lançada pelo cabo (thrown), girando por Inércia, ou em voo do tackle (dash na serra) corta a corda.
+    if (w.thrown || w.spinningLoose || w.tackleState) return Math.hypot(w.dropX - point.x, w.dropY - point.y) - disc;
     return Infinity;
 }
 

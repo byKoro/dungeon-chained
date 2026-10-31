@@ -28,10 +28,13 @@ export class RopeChests {
         });
     }
 
-    // Tile onde o baú cai: `drop` autorado, senão a própria estaca.
+    // Tile onde o baú cai: `drop` autorado; sem ele, um tile abaixo da estaca (em cima dela fica estranho) ou,
+    // se não for piso, na própria estaca.
     _dropCell(o) {
         const d = o.drop;
-        return d && Number.isInteger(d.col) && Number.isInteger(d.row) ? { col: d.col, row: d.row } : { col: o.col, row: o.row };
+        if (d && Number.isInteger(d.col) && Number.isInteger(d.row)) return { col: d.col, row: d.row };
+        const kinds = this.api.authored.kinds || [];
+        return kinds[o.row + 1]?.[o.col] === "f" ? { col: o.col, row: o.row + 1 } : { col: o.col, row: o.row };
     }
 
     get valid() {
@@ -111,6 +114,11 @@ export class RopeChests {
             for (const f of L.ropeAt) out.push({ x: knot.x + (top.x - knot.x) * f, y: knot.y + (top.y - knot.y) * f, radius: L.ropeRadius });
         }
         return out;
+    }
+
+    // Pontos de estaca ainda cortáveis (mira assistida do tackle da serra).
+    stakeAimPoints() {
+        return this.ropes.filter(r => !r.cut).map(r => this.art.stakePoint(r));
     }
 
     solidCircles() {

@@ -184,6 +184,15 @@ export class RoomManager {
         return room;
     }
 
+    // Reconstrói só a sala atual (morte na sala): descarta a instância em cache para que inimigos,
+    // props e estado de limpeza voltem ao autorado, depois repovoa. As outras salas ficam intactas.
+    resetCurrentRoom() {
+        const key = this.currentKey;
+        this.rooms.delete(key);
+        this.dungeon.cleared?.delete(key);
+        return this.enter();
+    }
+
     get enemies() {
         return this.current.enemies;
     }

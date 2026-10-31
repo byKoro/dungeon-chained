@@ -67,7 +67,8 @@ export function renderArena(A, w, h) {
             e.x += ox; e.y += oy; e.draw(ctx); e.x -= ox; e.y -= oy;
         } else e.draw(ctx);
     };
-    [p1, p2, ...A.enemies].sort((a, b) => a.y - b.y).forEach(drawEnt);
+    // `A.drawables` (opcional): objetos { y, draw(ctx) } da cena ordenados junto com jogadores e inimigos.
+    [p1, p2, ...A.enemies, ...(A.drawables?.() ?? [])].sort((a, b) => a.y - b.y).forEach(drawEnt);
     A.particles.drawSparks(ctx);
     A.particles.drawFlames(ctx);
     renderer.drawFrontWall(A.rect, A.tiles, TILE, true, A.doorList, A.doorHalf, DOOR_STUB_TILES);

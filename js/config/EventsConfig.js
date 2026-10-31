@@ -36,6 +36,8 @@ export const CAGE = Object.freeze({
     brokenScrap: 2,
     // Monstros saltando de dentro da gaiola quebrada até um tile de piso alcançável.
     jump: Object.freeze({ delay: 10, stagger: 7, steps: 28, height: 76, holdSteps: 10, shake: 3, dust: 6 }),
+    // Som do baque quando o monstro toca o chão (além do passo leve): thud grave reaproveitado.
+    landSound: Object.freeze({ cue: "sawTackleLand", rate: 0.82, volume: 0.6 }),
     landMinTiles: 1,
     landMaxTiles: 3,
     // Baú do encontro: cai da última corda quando a última leva morre.
@@ -57,6 +59,32 @@ export const CAGE = Object.freeze({
 export const ROPE_CHEST = Object.freeze({
     ...CAGE,
     chestGround: 26,
+    light: Object.freeze({ idleRadius: 70, nearRadius: 120, ropeAt: Object.freeze([0.3]), ropeRadius: 40 })
+});
+
+// Inimigos soltos que caem quando a dupla entra na zona deles (ZoneSpawner). Cinemática própria (mais lenta e
+// aérea que o salto da gaiola) para dar tempo de ver a queda. Distâncias em px, tempos em steps de 60 Hz.
+export const ZONE_SPAWN = Object.freeze({
+    ...CAGE,
+    fallHeight: 11 * TILE,
+    // Queda: anúncio curto parado no alto, depois descida acelerada (gravidade).
+    jump: Object.freeze({
+        delay: 18, stagger: 12, hangSteps: 10, steps: 40, holdSteps: 16,
+        stretch: 0.28, squash: 0.4, settleSteps: 12,
+        shake: 7, dust: 10
+    }),
+    // Câmera: aproxima suave, acompanha o grupo com folga no tempo, afasta suave.
+    cam: Object.freeze({ zoom: 1.18, easeIn: 22, hold: 70, easeOut: 30 }),
+    // Cinemática de fim de combate: dupla → chave (hold) → corda (hold) → volta. Tempos em steps de 60 Hz.
+    outro: Object.freeze({ zoom: 1.5, travel: 40, pan: 70, hold: 60 })
+});
+
+// Corda com grade: cortar a estaca levanta os tiles de grade (`gate`) dela. Mesma estaca/corte da gaiola;
+// a grade sobe com a animação das grades levadiças (BARS). Steps de 60 Hz.
+export const ROPE_GATE = Object.freeze({
+    ...CAGE,
+    // Quanto a grade sobe por step depois do corte (0 = fechada no chão, 1 = recolhida na verga).
+    raiseSteps: 48,
     light: Object.freeze({ idleRadius: 70, nearRadius: 120, ropeAt: Object.freeze([0.3]), ropeRadius: 40 })
 });
 

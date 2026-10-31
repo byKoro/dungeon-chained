@@ -14,9 +14,23 @@ export const FORGE = Object.freeze({
         // Reconectar de mais longe (`pickupScale` × raio de pegar e distância de reconexão) e mais cedo (`delaySteps`).
         quickLink: { kind: "upgrade", item: "saw", costs: [15, 30], pickupScale: [1.4, 1.8], delaySteps: [12, 6] },
         // +1 coração máximo para cada jogador por nível (e já vem cheio).
-        hearts: { kind: "upgrade", costs: [80, 140], perLevel: 1 }
+        hearts: { kind: "upgrade", costs: [80, 140], perLevel: 1 },
+
+        // --- Melhorias de jogador/dash (bigorna da sala "botas"; sem pré-requisito de serra). ---
+        // "Passo veloz": +`perLevel` na velocidade dos dois por nível (multiplicador no speedScale).
+        moveSpeed: { kind: "upgrade", costs: [15, 30, 50], perLevel: 0.08 },
+        // "Impacto": o dash empurra inimigos (knockback, sem dano). `impulse` px/step por nível.
+        dashPush: { kind: "upgrade", costs: [20, 40], impulse: [3, 5.4] },
+        // "Vínculo": os dois perto por `seconds[nível-1]` curam 1 vida cada; `cooldownSeconds` entre curas.
+        coopHeal: { kind: "upgrade", costs: [40, 70], seconds: [6, 4], cooldownSeconds: 8 },
+        // "Fôlego": reduz a recarga do dash. `cooldownScale[nível-1]` multiplica PLAYER_DASH.cooldownSteps.
+        dashCooldown: { kind: "upgrade", costs: [20, 40], cooldownScale: [0.75, 0.55] },
+        // "Pés ligeiros": +1 carga de dash por nível (encadear mais dashes antes de recarregar).
+        dashCharges: { kind: "upgrade", costs: [35, 70], perLevel: 1 }
     }),
     defaultRecipes: Object.freeze(["saw", "size", "inertia", "snapWave", "quickLink", "hearts"]),
+    // Catálogo da bigorna da sala "botas": melhorias de dash/jogador.
+    bootsRecipes: Object.freeze(["moveSpeed", "dashPush", "coopHeal", "dashCooldown", "dashCharges"]),
     // Feedback da onda do Estalo, além do que o arrebentar já faz.
     snapWave: Object.freeze({ ringLife: 16, ringColor: "#ffe9b0", sparks: 14, shake: 4, sound: Object.freeze({ cue: "sawLand", rate: 0.6, volume: 0.7 }) }),
     // Serra girando por inércia: giro mínimo mantido e quanto do giro sobra a cada step depois do tempo.
@@ -29,6 +43,14 @@ export const FORGE = Object.freeze({
 });
 
 export const FORGE_RECIPE_IDS = Object.freeze(Object.keys(FORGE.recipes));
+
+// Ajustes das melhorias de jogador/dash da sala "botas" que não são por nível. Px de mundo, steps de 60 Hz.
+export const PLAYER_UPGRADES = Object.freeze({
+    // Empurrão do dash: raio = raio do disco de contato do jogador + folga; cada inimigo é empurrado uma vez por dash.
+    dashPush: Object.freeze({ radiusPad: 10, knockMinSpeedKeep: 0.2 }),
+    // Cura por proximidade: raio entre os dois (centro a centro) e duração do feedback.
+    coopHeal: Object.freeze({ radius: 2 * TILE, flashLife: 10 })
+});
 
 // Arrastar a serra largada: um jogador segura interagir perto dela e a puxa por um cabo curto.
 // Distâncias em px de mundo, tempos em steps de 60 Hz.

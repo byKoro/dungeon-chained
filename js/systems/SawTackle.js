@@ -8,9 +8,9 @@ const unit = (x, y, fx = 1, fy = 0) => { const d = Math.hypot(x, y); return d > 
 
 export class SawTackle {
     constructor({ chain, getPlayers, getRoom, getBounds = () => null, isSolid = () => false,
-        safeDrop = (x, y) => ({ x, y }), findLandingRoute = null, canLand = null, onEnemyHit = null, audio = null, particleSystem = null, renderer = null,
+        safeDrop = (x, y) => ({ x, y }), findLandingRoute = null, canLand = null, getAimTargets = null, onEnemyHit = null, audio = null, particleSystem = null, renderer = null,
         cfg = SAW_TACKLE, flightMode = cfg.flightMode, feedback = null }) {
-        Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, onEnemyHit, audio, particleSystem, renderer, cfg });
+        Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, getAimTargets, onEnemyHit, audio, particleSystem, renderer, cfg });
         this.flightMode = flightMode === 'coast' ? 'coast' : 'return';
         this.feedback = feedback;
         this.trail = [];
@@ -144,16 +144,23 @@ export class SawTackle {
             && (e.hp ?? 1) > 0 && !this.processed.has(e);
     }
 
-    // Uma correção por lançamento: o inimigo mais alinhado dentro do cone e do alcance, sem parede no meio.
+    // Alvos da mira assistida: inimigos atingíveis + estacas de corda não cortadas (injetadas pelo Game).
+    _aimCandidates() {
+        const pts = [];
+        for (const e of this.getRoom()?.enemies || []) if (this._targetable(e)) pts.push({ x: e.x, y: e.y });
+        for (const s of this.getAimTargets?.() || []) if (s) pts.push({ x: s.x, y: s.y });
+        return pts;
+    }
+
+    // Uma correção por lançamento: o alvo mais alinhado (inimigo ou estaca) dentro do cone e do alcance, sem parede no meio.
     _assistAim(w, dir) {
         const c = this.cfg, cone = c.aimConeDeg * Math.PI / 180;
         let best = null;
-        for (const e of this.getRoom()?.enemies || []) {
-            if (!this._targetable(e)) continue;
-            const ex = e.x - w.dropX, ey = e.y - w.dropY, d = Math.hypot(ex, ey);
+        for (const t of this._aimCandidates()) {
+            const ex = t.x - w.dropX, ey = t.y - w.dropY, d = Math.hypot(ex, ey);
             if (d < 1 || d > c.aimRange) continue;
             const angle = Math.acos(Math.max(-1, Math.min(1, (ex * dir.x + ey * dir.y) / d)));
-            if (angle > cone || this._wallBetween(w.dropX, w.dropY, e.x, e.y)) continue;
+            if (angle > cone || this._wallBetween(w.dropX, w.dropY, t.x, t.y)) continue;
             const score = angle + (d / c.aimRange) * 0.05;
             if (!best || score < best.score) best = { score, angle, ex, ey };
         }
@@ -383,9 +390,14 @@ export class SawTackle {
         this._finishLanding();
     }
 
-    // Sem rota depois de várias tentativas (cercada ou presa): cai direto no piso seguro, sem ficar parada no ar.
+    // Sem rota depois de várias tentativas (cercada ou presa): cai no piso seguro e alcançável. Prefere perto da
+    // origem do lançamento (a serra "volta para onde foi lançada" e nunca fica inalcançável), senão perto de onde parou.
+    // `safeDrop` já devolve um tile de chão; quando há `canLand`, só aceita o ponto perto da origem se for alcançável.
     _forceLanding(w) {
-        const p = this.safeDrop(w.dropX, w.dropY);
+        const origin = this.origin;
+        const nearOrigin = origin ? this.safeDrop(origin.x, origin.y) : null;
+        const ok = nearOrigin && (!this.canLand || this.canLand(nearOrigin.x, nearOrigin.y));
+        const p = ok ? nearOrigin : this.safeDrop(w.dropX, w.dropY);
         w.dropX = p.x;
         w.dropY = p.y;
         this._finishLanding();

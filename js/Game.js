@@ -2,7 +2,9 @@ import { DemoEncounter } from './systems/DemoEncounter.js';
 import { HAZARDS } from './config/GameConfig.js';
 import { DemoVictory } from './ui/DemoVictory.js';
 import { DemoProgress } from './systems/DemoProgress.js';
+import { BootsPickup } from './systems/BootsPickup.js';
 import { DemoCamera } from './systems/DemoCamera.js';
+import { SawOffscreenIndicator } from './systems/SawOffscreenIndicator.js';
 import { DemoDoors } from './systems/DemoDoors.js';
 import { ThrownSaw } from './systems/ThrownSaw.js';
 import { ScrapSystem } from './systems/ScrapSystem.js';
@@ -11,24 +13,28 @@ import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRIPT_LINES } from './config/DialogueConfig.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
-import { ForgeState, mapOffersRecipe, applySawUpgrades, applyHeartUpgrades, sawDragStats, snapWaveRadius } from './systems/ForgeState.js';
+import { CHAIN_TENSION } from './config/ChainTensionConfig.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades, applyHeartUpgrades, applyPlayerUpgrades, coopHealParams, sawDragStats, snapWaveRadius } from './systems/ForgeState.js';
 import { SawDrag } from './systems/SawDrag.js';
 import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
+import { DashPush } from './systems/DashPush.js';
+import { CoopHeal } from './systems/CoopHeal.js';
 import { SawTackle } from './systems/SawTackle.js';
 import { SawTackleFeedback } from './systems/SawTackleFeedback.js';
 import { SAW_TACKLE_FEEL } from './config/SawTackleFeelConfig.js';
 import { PlayerLeash } from './systems/PlayerLeash.js';
-import { PLAYER_LEASH } from './config/DemoConfig.js';
+import { PLAYER_LEASH, BOOTS } from './config/DemoConfig.js';
 import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
+import { DebugMenu } from './systems/DebugMenu.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
 import { ForgeSystem } from './systems/ForgeSystem.js';
 import { InteractPrompt, propTargetId } from './systems/InteractPrompt.js';
 import { ForgeMenu } from './ui/ForgeMenu.js';
+import { AbilityCard } from './ui/AbilityCard.js';
 import { SawForgeCinematic } from './systems/SawForgeCinematic.js';
 import { FORGE, SAW_CINEMATIC } from './config/ForgeConfig.js';
-import { t } from './i18n/I18n.js';
 import { PropSprites } from './core/PropSprites.js';
 import { RoomProps } from './systems/RoomProps.js';
 import { InputHandler } from './core/InputHandler.js';
@@ -82,7 +88,7 @@ import { playerConfigs } from './config/EntityConfig.js';
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
     CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
-    DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
+    DOOR_STUB_TILES, DOOR_ENTER_DEPTH, DOOR_SAW_PASS_TILES, DOOR_FOLLOW_TILES, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
     SIM_STEP, ROOM_INTRO, HOLE_FALL, PLAYER_DASH, GAME_OVER_INPUT_DELAY_MS
@@ -190,12 +196,23 @@ export class Game {
 
         this.tiles = new DungeonTileQuery({ rooms: this.rooms });
         this.holes = new HoleEffects({ rooms: this.rooms });
-        this.demoProgress = new DemoProgress({ rooms: this.rooms, input: this.input, assets: this.assets, getPlayers: () => [this.p1, this.p2], getSaw: () => this.chain.weapon });
+        this.demoProgress = new DemoProgress({ rooms: this.rooms, input: this.input, assets: this.assets, getPlayers: () => [this.p1, this.p2], getSaw: () => this.chain.weapon,
+            renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, hitStop: s => this.gameLoop?.triggerHitStop(s) });
+        this.bootsPickup = this.mapData ? new BootsPickup({
+            rooms: this.rooms, getPlayers: () => [this.p1, this.p2], assets: this.assets, demoProgress: this.demoProgress,
+            particleSystem: this.particleSystem, renderer: this.renderer, audio: this.audio,
+            hitStop: s => this.gameLoop?.triggerHitStop(s),
+            onPickup: () => this.abilityCard?.show(BOOTS.cinematic.cardText)
+        }) : null;
         this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current,
             safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]),
             onHit: (enemy, info) => { if (this.arautoEffects.owns(enemy)) this.arautoEffects.hit(enemy, info); } });
         this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(),
             mode: this.mapData?.test?.camera, lockZoom: PLAYER_LEASH.enabled });
+        this.sawIndicator = this.mapData ? new SawOffscreenIndicator({
+            renderer: this.renderer, getSaw: () => this.chain.weapon, getPlayers: () => [this.p1, this.p2],
+            getScale: () => this.hud.pixelScale(this.canvas.width, this.canvas.height), sawSprite: this.assets.saw
+        }) : null;
         // Só nos mapas do Editor 2.0, fora da tela dividida (F6) e das cinemáticas com câmera própria.
         this.playerLeash = this.mapData ? new PlayerLeash({
             getPlayers: () => [this.p1, this.p2], getView: () => this.demoCamera.viewSize(),
@@ -244,7 +261,7 @@ export class Game {
         this.roomEvents = this.mapData ? new RoomEvents({
             rooms: this.rooms, spawnSystem: this.spawnSystem, getPlayers: () => [this.p1, this.p2], chain: this.chain,
             scrap: this.scrap, chests: this.chests, dialogue: this.dialogue, audio: this.audio,
-            particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets,
+            particleSystem: this.particleSystem, renderer: this.renderer, assets: this.assets, camera: this.demoCamera,
             hooks: {
                 hitStop: s => this.gameLoop?.triggerHitStop(s),
                 propsChanged: room => this.roomProps?.invalidate(room),
@@ -297,6 +314,7 @@ export class Game {
                 const p = this.tiles.reachableDropPoint(x, y, [this.p1, this.p2]);
                 return p.x === x && p.y === y;
             },
+            getAimTargets: () => this.roomEvents?.aimPoints() ?? [],
             onEnemyHit: (enemy, result, impact) => {
                 const info = this.combat.feedbackForHit(enemy, result, impact, { soundVolumeMultiplier: SAW_TACKLE_FEEL.audio.hitVolume });
                 enemy.freezeOnHit?.(info.hitStop);
@@ -304,6 +322,12 @@ export class Game {
             },
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         });
+        // Melhoria "Impacto": o dash empurra inimigos (sala "botas").
+        this.dashPush = new DashPush({ getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current, particleSystem: this.particleSystem });
+        // Melhoria "Vínculo": os dois perto curam com o tempo (sala "botas").
+        this.coopHeal = new CoopHeal({ getPlayers: () => [this.p1, this.p2], particleSystem: this.particleSystem, audio: this.audio });
+        // Telinha curta ao ganhar o dash (ao pegar as botas).
+        this.abilityCard = this.mapData ? new AbilityCard({ getDevice: i => this.input.deviceFor(i) }) : null;
         this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
             renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
             getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
@@ -318,8 +342,10 @@ export class Game {
 
         this.lighting = new LightingRenderer({ renderer: this.renderer, postProcessor: this.postProcessor });
 
+        this.debugMenu = new DebugMenu({ getGame: () => this });
+
         this.gameLoop = new GameLoop({
-            onFrameStart: () => { this.input.pollGamepads(); this._maskLatchedInteract(); this._pollMenuPad(); this._updateSawMotor(); },
+            onFrameStart: () => { this.input.pollGamepads(); this.debugMenu.maskInput(this.input); this._maskLatchedInteract(); this._pollMenuPad(); this._updateSawMotor(); },
             onStep: (dt) => this._step(dt),
             onRender: () => this._render()
         });
@@ -567,6 +593,8 @@ export class Game {
         this.arautoEffects.reset();
         this.rooms.reset();
         this.demoProgress.reset(this.mapData?.test?.progress);
+        this.bootsPickup?.reset();
+        this.abilityCard?.reset();
         this.demoDoors.opened.clear();
         this.demoVictory.hide();
         this.demoEncounter.reset();
@@ -579,9 +607,12 @@ export class Game {
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
+        this.dashPush?.reset();
+        this.coopHeal?.reset();
         this.roomEvents?.reset();
         this._respawnFadeAt = -Infinity;
         this.sawCinematic?.reset();
+        this.sawIndicator?.reset();
         this._sawOnAnvil = false;
         this._sawFirstConnect = false;
         this.bloodCanvas.clear();
@@ -605,6 +636,7 @@ export class Game {
         const startsWithSaw = this._startsWithSaw();
         this.chain.reset({ present: startsWithSaw });
         this.forge.reset({ items: startsWithSaw ? ["saw"] : [] });
+        this._roomForgeBuys?.clear();
         this._applySawUpgrades();
 
         this.rooms.enter();
@@ -671,13 +703,27 @@ export class Game {
     _applySawUpgrades() {
         applySawUpgrades(this.forge, this.chain, this.chain.weapon, CHAIN);
         applyHeartUpgrades(this.forge, [this.p1, this.p2]);
+        applyPlayerUpgrades(this.forge, [this.p1, this.p2]);
+        this.coopHeal?.setParams(coopHealParams(this.forge));
     }
 
     _onForgeBuy(id, anvil) {
+        this._recordRoomForgeBuy(id);
         this._applySawUpgrades();
         if (id !== "saw") return;
         this.forgeSystem.close({ silent: true });
         this.sawCinematic.start(anvil);
+    }
+
+    // Guarda o nível anterior de cada receita comprada, por sala, para desfazer na morte da sala.
+    _recordRoomForgeBuy(id) {
+        const key = this.rooms.current?.key;
+        if (!key) return;
+        const log = this._roomForgeBuys ??= new Map();
+        const buys = log.get(key) ?? [];
+        // `level` já subiu quando onBuy dispara: o nível anterior é o atual menos 1.
+        buys.push({ id, prevLevel: Math.max(0, this.forge.level(id) - 1) });
+        log.set(key, buys);
     }
 
     // Fim da cinemática: a serra fica em cima da bigorna até os dois chegarem perto.
@@ -691,28 +737,35 @@ export class Game {
         this.dialogue?.say(1, "talk.sawReady");
     }
 
-    // Regra de morte da run (ADR 0012): a dupla volta ao spawn da sala inicial com as vidas cheias. A sucata zera;
-    // itens, melhorias, baús abertos e eventos concluídos ficam; o encontro interrompido recomeça.
-    _respawnRun() {
-        this.roomEvents?.onDeath();
-        this.scrap?.reset();
+    // Morte na sala (ADR 0014): a dupla renasce no spawn da sala atual, só esta sala reseta e o status
+    // ganho nela (melhorias compradas na bigorna, baús abertos) é perdido. As outras salas e a sucata ficam.
+    _respawnRoom() {
+        const key = this.rooms.current.key;
+        this._rollbackRoomForgeBuys(key);
+        this.chests?.forgetRoom(key);
+        this.roomEvents?.resetRoom(key);
+
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
+        this.dashPush?.reset();
+        this.coopHeal?.reset();
+        // Morte na sala "botas": a bota volta e o dash concedido por ela re-trava (reset só vale nesta sala).
+        if (this.rooms.current.cell.authored?.name === "botas") this.bootsPickup?.reset();
         this.dialogue?.clear();
         this.forgeSystem?.close({ silent: true });
         this.gibs = [];
         this.particleSystem.clear();
-        const start = this.rooms.dungeon.graph.start;
-        if (this.rooms.dungeon.current !== start) {
-            this.rooms.transitionTo({ gx: start.gx, gy: start.gy });
-            this.bloodCanvas.clear();
-        }
+
+        this.rooms.resetCurrentRoom();
         this.arenaBounds = this.rooms.currentBounds;
+
         const spawns = this.rooms.dungeon.spawnPositions();
+        const rect = this.rooms.cellRect();
         for (const [p, s] of [[this.p1, spawns.p1], [this.p2, spawns.p2]]) {
             p.lives = p.maxLives;
             p.respawnAt(s.x, s.y, RUN_DEATH.invulnSteps);
+            this.tiles.ensureSafeSpawn(p, rect);
             p._livesSeen = p.lives;
             p._fallSeen = false;
         }
@@ -726,6 +779,41 @@ export class Game {
         this._respawnFadeAt = performance.now();
         this.screenGore.triggerFlash();
         this.audio.play("playerFall", { rateMultiplier: 0.8 });
+        this._activateRoomEnemies();
+    }
+
+    // Desfaz as compras da forja feitas nesta sala (na ordem inversa) e esquece o registro dela.
+    _rollbackRoomForgeBuys(roomKey) {
+        const buys = this._roomForgeBuys?.get(roomKey);
+        if (buys) {
+            for (let i = buys.length - 1; i >= 0; i--) this.forge.setLevel(buys[i].id, buys[i].prevLevel);
+            this._roomForgeBuys.delete(roomKey);
+        }
+        this._applySawUpgrades();
+    }
+
+    // Debug: leva a dupla para a sala (gx, gy) e recoloca nos spawns dela (sem transição, câmera salta).
+    teleportToCell(gx, gy) {
+        if (!this.mapData) return;
+        this.forgeSystem?.close({ silent: true });
+        this.rooms.transitionTo({ gx, gy });
+        this.arenaBounds = this.rooms.currentBounds;
+        const rect = this.rooms.cellRect();
+        const spawns = this.rooms.dungeon.spawnPositions();
+        for (const [p, s] of [[this.p1, spawns.p1], [this.p2, spawns.p2]]) {
+            p.x = s.x; p.y = s.y; p.vx = 0; p.vy = 0;
+            p.cancelDash();
+            this.tiles.ensureSafeSpawn(p, rect);
+        }
+        if (!this.chain.isConnected) this.chain.reset({ present: this.chain.hasSaw });
+        this.sawDrag?.reset();
+        this.sawPush?.reset();
+        this.sawTackle.reset();
+        this._rememberEntrySpawns();
+        this.renderer.camX = (this.p1.x + this.p2.x) / 2;
+        this.renderer.camY = (this.p1.y + this.p2.y) / 2;
+        this.renderer.resetSway();
+        this._activateRoomEnemies();
     }
 
     // A serra largada (arrastada ou empurrada) não entra em buraco, parede, grade, estaca nem prop sólido.
@@ -848,7 +936,9 @@ export class Game {
         p.loseLife(HOLE_FALL.livesLost ?? 1);
         if (p.lives <= 0) { p.fallComplete = false; return; }
 
-        const spot = this._entrySpawns?.get(p) ?? this.rooms.cellCenter();
+        // Ainda tem vida: renasce perto do buraco (ensureSafeSpawn empurra para o chão seguro mais perto),
+        // não no ponto de entrada da sala. Morrer de vez (lives<=0) segue a regra de morte lá embaixo.
+        const spot = { x: p.fallX, y: p.fallY };
         p.respawnAt(spot.x, spot.y, HOLE_FALL.respawnInvulnFrames ?? 0);
         this.tiles.ensureSafeSpawn(p, this.rooms.cellRect());
         p._fallSeen = false;
@@ -860,6 +950,8 @@ export class Game {
 
     _activateRoomEnemies() {
         const room = this.rooms.current;
+        // Handlers de evento (ex.: ZoneSpawner) reivindicam seus inimigos soltos antes do intro genérico.
+        this.roomEvents?.claimPendingEnemies(room);
         if (!room.hasPendingEnemies) return false;
         if (this._startArautoIntro(room)) return true;
         if (ROOM_INTRO.enabled) this._beginRoomIntro();
@@ -1099,6 +1191,7 @@ export class Game {
         p2.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(1), feetInHole: this.tiles.feetInHole(p2), speedScale: drag?.speedScaleFor(1) ?? 1 });
         this._dashFeedback(p1);
         this._dashFeedback(p2);
+        if (p1.justDashed || p2.justDashed) this.abilityCard?.dismiss();
         this.dashTether.apply(p1, p2);
 
         this._resolveFall(p1);
@@ -1113,8 +1206,14 @@ export class Game {
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {
-                this.chainTension.onSnap();
+                const sp = this.chain.weapon?.getSawPositions?.(p1, p2)?.[0];
+                const fx = sp ? sp.x : (p1.x + p2.x) / 2;
+                const fy = sp ? sp.y : (p1.y + p2.y) / 2;
+
+                this.chainTension.onSnap({ x: fx, y: fy });
                 if (this.mapData && this.demoProgress.state.sawThrow) this.thrownSaw.launch();
+                // Camadas do estalo: mordida de hit-stop + tremor + clarão + faíscas no ponto de ruptura.
+                this.gameLoop.triggerHitStop(CHAIN_TENSION.hitStopSeconds);
                 this.renderer.triggerShake(14);
 
                 this.audio.play("sawSnap");
@@ -1122,12 +1221,8 @@ export class Game {
                 this.audio.duck(-9, { attackMs: 10, holdMs: 250, releaseMs: 1100 });
                 this._sawLandPending = true;
 
-                const sp = this.chain.weapon?.getSawPositions?.(p1, p2)?.[0];
-                const fx = sp ? sp.x : (p1.x + p2.x) / 2;
-                const fy = sp ? sp.y : (p1.y + p2.y) / 2;
                 const r = this.chain.weapon?.discRadius ?? 24;
-                this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
-                this.particleSystem.triggerFlash(fx, fy, 12, 1);
+                this.particleSystem.triggerSparkBurst(fx, fy, r, CHAIN_TENSION.snap.sparks, 1.4);
                 this._snapWave(fx, fy, room.enemies);
             },
             onReconnect: () => this._onSawReconnect(),
@@ -1194,6 +1289,7 @@ export class Game {
 
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
+        this.dashPush?.update();
         this.sawTackle.onBossImpacts(enemies);
         this.arautoEffects.update(enemies);
         this.ghostfire.update(room, [p1, p2]);
@@ -1202,13 +1298,16 @@ export class Game {
         const allEntities = [p1, p2].filter(p => !p.dashing).concat(liveEnemies.filter(e => !e.ignoresEntityCollisions));
 
         const sawR = (this.chain.isConnected && weapon) ? (weapon.collisionRadius ?? 0) : 0;
+        // Perto de uma porta aberta a serra presa não empurra a própria dupla: no vão estreito ela fica entre os dois
+        // e empurrava um para trás, travando a passagem. Inimigos continuam sendo empurrados.
+        const sawBodies = sawR > 0 ? allEntities.filter(e => (e !== p1 && e !== p2) || !this._nearOpenDoor(e)) : [];
         this.chainObstacles.beginStep(this.chain);
         for (let it = 0; it < 3; it++) {
             Physics.resolveEntityCollisions(allEntities);
             this.chainObstacles.resolve(this.chain, p1, p2, liveEnemies);
             if (sawR > 0) {
                 for (const sc of weapon.getSawPositions(p1, p2)) {
-                    for (const e of allEntities) Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
+                    for (const e of sawBodies) Physics.resolveCircleCollision(e, sc.x, sc.y, sawR);
                 }
             }
         }
@@ -1271,6 +1370,7 @@ export class Game {
         }, [p1, p2]);
 
         this._updateHearts(room);
+        this.coopHeal?.update();
         this.chests?.update();
         this.roomEvents?.update();
         this.scrap?.update([p1, p2], this.arenaBounds);
@@ -1318,7 +1418,7 @@ export class Game {
         this.wind.update(this.arenaBounds);
 
         if ((p1.lives <= 0 || p2.lives <= 0) && this._runRules) {
-            this._respawnRun();
+            this._respawnRoom();
         } else if (p1.lives <= 0 || p2.lives <= 0) {
             this.gameOver = true;
             this._gameOverAt = performance.now();
@@ -1333,6 +1433,7 @@ export class Game {
         this.interactPrompt?.update(performance.now());
         this.dialogue?.update(deltaSeconds);
         this.demoProgress.update(deltaSeconds);
+        this.bootsPickup?.update();
         this.demoEncounter.update();
         this._checkDoorTransition(doors);
         this._updateCameraToCurrentRoom(deltaSeconds);
@@ -1397,6 +1498,18 @@ export class Game {
         }
     }
 
+    // Jogador alinhado a uma porta aberta e a menos de `DOOR_SAW_PASS_TILES` da borda dela (ou já dentro do vão).
+    _nearOpenDoor(p) {
+        if (this.rooms.isLocked()) return false;
+        for (const door of this.rooms.doorsOfCurrent()) {
+            if (door.blocked || door.type === 'stairs') continue;
+            const half = door.passHalfWidth ?? door.halfWidth ?? this.rooms.doorHalfWidth;
+            const across = door.dir === 'N' || door.dir === 'S' ? Math.abs(p.x - door.x) : Math.abs(p.y - door.y);
+            if (across < half && this.rooms.doorEntryDepth(p, door, this.arenaBounds) > -DOOR_SAW_PASS_TILES * TILE) return true;
+        }
+        return false;
+    }
+
     _checkDoorTransition(doors) {
 
         if (this.mapData ? this.mapData.test?.isolated : this.playtest) return;
@@ -1404,11 +1517,19 @@ export class Game {
         const { p1, p2, rooms } = this;
         for (const door of doors) {
             if (door.blocked) continue;
-            const a1 = rooms.playerAlignedToDoor(p1, door);
-            const a2 = rooms.playerAlignedToDoor(p2, door);
             const d1 = rooms.doorEntryDepth(p1, door, this.arenaBounds);
             const d2 = rooms.doorEntryDepth(p2, door, this.arenaBounds);
-            if (a1 && a2 && d1 > 2 && d2 > 2 && Math.max(d1, d2) > DOOR_ENTER_DEPTH * 0.5) {
+            // O vão só cabe um jogador de cada vez: basta o da frente entrar e o parceiro estar no umbral
+            // (alinhado e a menos de DOOR_FOLLOW_TILES da borda). Exigir os dois dentro obrigava a se espremer.
+            const lead = d1 >= d2 ? { p: p1, d: d1 } : { p: p2, d: d2 };
+            const back = lead.p === p1 ? { p: p2, d: d2 } : { p: p1, d: d1 };
+            const across = (p) => door.dir === 'N' || door.dir === 'S' ? Math.abs(p.x - door.x) : Math.abs(p.y - door.y);
+            const half = door.passHalfWidth ?? door.halfWidth ?? rooms.doorHalfWidth;
+            const leadIn = lead.d > DOOR_ENTER_DEPTH * 0.5 && (door.type === 'stairs' || across(lead.p) < half);
+            const backNear = door.type === 'stairs'
+                ? back.d > 0
+                : back.d > 2 || (across(back.p) < half + back.p.hitRadius && back.d > -DOOR_FOLLOW_TILES * TILE);
+            if (leadIn && backNear) {
                 this.transition = { phase: "out", t: 0, door };
                 break;
             }
@@ -1428,11 +1549,10 @@ export class Game {
         this._renderOverlays();
         if (this.mapData && !cinematic && !this.forgeSystem?.open) {
             this.demoCamera.drawIndicators(this.ctx);
-            const ctx = this.ctx; ctx.save(); ctx.textAlign = 'center'; ctx.font = 'bold 18px sans-serif';
-            const promptKey = this.sawCinematic?.active ? null : this.sawDrag?.prompt;
-            const message = this.demoProgress.messageTime ? this.demoProgress.message
-                : (this.demoProgress.prompt || (promptKey ? t(promptKey) : ""));
-            if (message) { ctx.fillStyle = '#16121ee6'; ctx.fillRect(this.canvas.width / 2 - 250, this.canvas.height - 60, 500, 36); ctx.fillStyle = '#fff'; ctx.fillText(message, this.canvas.width / 2, this.canvas.height - 36); }
+            if (this.demoCamera.mode !== 'split' && !this.transition && !this.roomIntro && !this.gameOver) {
+                this.sawIndicator?.draw(this.ctx, this.canvas.width, this.canvas.height);
+            }
+            const ctx = this.ctx; ctx.save();
             if (this.mapData.test) { ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`Câmera: ${this.demoCamera.mode} • F6 alterna`, 12, 24); }
             ctx.restore();
         }
@@ -1504,7 +1624,7 @@ export class Game {
 
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const wallDrawables = this.roomProps ? renderer.wallDrawables(rect, rooms.current.frontWalls, tiles, TILE, HOLE_FALL.footOffset) : [];
-        const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? []), ...wallDrawables];
+        const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? []), ...(this.demoProgress?.drawables?.() ?? []), ...this.demoDoors.drawables(), ...wallDrawables];
         // Recém-forjada, a serra fica em cima da bigorna: ordenada logo depois do prop.
         if (this._sawOnAnvil) {
             const k = this._sawAnvilSortY + 0.5;
@@ -1535,6 +1655,8 @@ export class Game {
         this.sawCinematic?.drawWorld(ctx);
         // Cordas e gaiolas caindo: no passe do mundo, para a luz do ambiente atuar nelas.
         this.roomEvents?.drawAir(ctx);
+        // Botas flutuando sobre a bigorna da sala "botas" (acima dos props; a máscara em renderLights as tira da escuridão).
+        this.bootsPickup?.draw(ctx);
         this.interactPrompt?.draw(ctx, nowMs);
 
         this.particleSystem.drawFlames(ctx);
@@ -1581,6 +1703,8 @@ export class Game {
 
         this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
         this.roomEvents?.renderLights(renderer, this.postProcessor);
+        this.demoProgress.renderLights(renderer, this.postProcessor);
+        this.bootsPickup?.renderLights(renderer, this.postProcessor);
         this.demoDoors.renderLights(this.postProcessor);
         this.sawTackleFeedback.renderLights(renderer, this.postProcessor, this.sawTackle, this.chain.weapon);
         this.postProcessor.draw();
@@ -1631,11 +1755,14 @@ export class Game {
             this.introSkip.draw(ctx, canvas, this.hud.pixelScale(canvas.width, canvas.height), letterboxHeight(canvas.height, k));
         }
         this.forgeMenu?.draw(ctx, canvas);
+        if (!this.forgeSystem?.open) this.abilityCard?.draw(ctx, canvas);
 
         const now = performance.now();
         const dt = this._bossBarAt === null ? 0 : Math.min(0.05, (now - this._bossBarAt) / 1000);
         this._bossBarAt = now;
         this.bossBar.update(dt);
         this.bossBar.draw(ctx, canvas.width, canvas.height, this.hud.freeSpan(canvas.width, canvas.height));
+
+        this.debugMenu.draw(ctx, canvas);
     }
 }

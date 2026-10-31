@@ -1,18 +1,22 @@
-import { BARS, STAKE_LIGHT } from '../config/EventsConfig.js';
+import { BARS, STAKE_LIGHT, ZONE_SPAWN } from '../config/EventsConfig.js';
 import { TILE, LIGHT_PIXEL_SCALE } from '../config/GameConfig.js';
 import { findSafeFloorCell } from '../rooms/SafeSpawn.js';
+import { objectsOwnedByZone } from '../rooms/ZoneAssign.js';
 import { InicialRoomScript } from './roomScripts/InicialRoomScript.js';
+import { BotasRoomScript } from './roomScripts/BotasRoomScript.js';
 import { RopeChests } from './RopeChests.js';
+import { RopeGate } from './RopeGate.js';
+import { ZoneSpawner } from './ZoneSpawner.js';
 import { CageEncounter } from './CageEncounter.js';
 
 // Script por sala, escolhido pelo nome da sala do Editor 2.0. Cada script recebe uma API pequena (zonas, encontros,
 // inimigos, grades, baús, falas) e guarda o próprio estado; os eventos concluídos sobrevivem à morte da dupla.
-const ROOM_SCRIPTS = Object.freeze({ inicial: InicialRoomScript });
+const ROOM_SCRIPTS = Object.freeze({ inicial: InicialRoomScript, botas: BotasRoomScript });
 
 export class RoomEvents {
     constructor({ rooms, spawnSystem, getPlayers, chain, scrap = null, chests = null, dialogue = null, audio = null,
-        particleSystem = null, renderer = null, assets = null, hooks = {}, scripts = ROOM_SCRIPTS, tile = TILE }) {
-        Object.assign(this, { rooms, spawnSystem, getPlayers, chain, scrap, chests, dialogue, audio, particleSystem, renderer, assets, hooks, scripts, tile });
+        particleSystem = null, renderer = null, assets = null, camera = null, hooks = {}, scripts = ROOM_SCRIPTS, tile = TILE }) {
+        Object.assign(this, { rooms, spawnSystem, getPlayers, chain, scrap, chests, dialogue, audio, particleSystem, renderer, assets, camera, hooks, scripts, tile });
         this.reset();
     }
 
@@ -20,6 +24,8 @@ export class RoomEvents {
         this.completed = new Set();
         this._scripts = new Map();
         this._ropes = new Map();
+        this._gates = new Map();
+        this._zoneSpawns = new Map();
         this._cages = new Map();
         this._bars = new Map();
     }
@@ -42,24 +48,47 @@ export class RoomEvents {
         return value;
     }
 
+    // Cordas com grade da sala (qualquer sala): cortar a estaca levanta os tiles de grade dela.
+    _ropeGate(room) {
+        if (this._gates.has(room.key)) return this._gates.get(room.key);
+        const gate = new RopeGate({ api: this._api(room) });
+        const value = gate.valid ? gate : null;
+        this._gates.set(room.key, value);
+        return value;
+    }
+
     // Gaiolas da sala: uma por zona que contém estacas `rope` (a zona dispara e delimita o encontro). Vale em qualquer sala.
     _cageList(room) {
         if (this._cages.has(room.key)) return this._cages.get(room.key);
         const api = this._api(room);
         const authored = room.cell.authored || {};
         const ropes = (authored.interactives || []).filter(o => o.type === "rope");
-        const inZone = (z, o) => o.col >= z.col && o.row >= z.row && o.col < z.col + z.w && o.row < z.row + z.h;
-        // Zonas com estaca de gaiola; mais os ids de encontro autorado que também são zonas (compatível com mapas antigos).
-        const zoneIds = new Set((authored.zones || []).filter(z => ropes.some(o => inZone(z, o))).map(z => z.id));
+        const zones = authored.zones || [];
+        // Cada estaca pertence a uma zona só (a menor que a contém): só criamos encontro para a zona DONA de alguma estaca.
+        const zoneIds = new Set(zones.filter(z => objectsOwnedByZone(zones, ropes, z.id).length).map(z => z.id));
         for (const e of authored.encounters || []) if ((authored.zones || []).some(z => z.id === e.id)) zoneIds.add(e.id);
         const list = [...zoneIds].map(id => new CageEncounter({ api, zoneId: id, encounterId: id })).filter(c => c.valid);
         this._cages.set(room.key, list);
         return list;
     }
 
+    // Zona-spawner da sala: inimigos soltos (autorados) que caem quando a dupla entra na zona deles.
+    _zoneSpawn(room) {
+        if (this._zoneSpawns.has(room.key)) return this._zoneSpawns.get(room.key);
+        const spawner = new ZoneSpawner({ api: this._api(room), cfg: ZONE_SPAWN });
+        const value = spawner.valid ? spawner : null;
+        this._zoneSpawns.set(room.key, value);
+        return value;
+    }
+
     _handlers(room = this.rooms.current) {
         if (!room) return [];
-        return [this._script(room), ...this._cageList(room), this._ropeChests(room)].filter(Boolean);
+        return [this._script(room), ...this._cageList(room), this._ropeChests(room), this._ropeGate(room), this._zoneSpawn(room)].filter(Boolean);
+    }
+
+    // Deixa os handlers reivindicarem seus inimigos autorados antes do intro genérico (chamado pelo Game na entrada).
+    claimPendingEnemies(room = this.rooms.current) {
+        if (room) this._zoneSpawn(room);
     }
 
     _api(room) {
@@ -76,6 +105,13 @@ export class RoomEvents {
                 if (!z) return null;
                 const r = rect();
                 return { x: r.x + z.col * tile, y: r.y + z.row * tile, w: z.w * tile, h: z.h * tile };
+            },
+            // Inimigos vivos (não morrendo) com os pés dentro da zona — serve para saber se um encontro de zona acabou.
+            livingEnemiesInZone(id) {
+                const z = this.zone(id);
+                if (!z) return 0;
+                return (room.enemies || []).filter(e => e && e.state !== "dying"
+                    && e.x >= z.x && e.x < z.x + z.w && e.y >= z.y && e.y < z.y + z.h).length;
             },
             // Os dois vivos e dentro da zona (design: "entrar na zona" = os dois).
             bothInZone(id) {
@@ -114,6 +150,11 @@ export class RoomEvents {
             removeEnemies(list) {
                 room.enemies = room.enemies.filter(e => !list.includes(e));
             },
+            // Câmera cinematográfica: foca um ponto do mundo (zoom multiplica o de referência); null solta de volta.
+            cameraFocus(x, y, zoom = 1) { if (self.camera) self.camera.focus = { x, y, zoom }; },
+            clearCameraFocus() { if (self.camera) self.camera.focus = null; },
+            // Tira um inimigo autorado da lista pendente da sala (o intro genérico não o spawna; o script assume).
+            claimAuthoredEnemy(foe) { room.claimAuthoredEnemy?.(foe); },
             hitStop: s => self.hooks.hitStop?.(s),
             pushPlayers(x, y, radius, force) {
                 for (const p of self.getPlayers() || []) {
@@ -139,6 +180,11 @@ export class RoomEvents {
             },
             drawPropFrame: (ctx, type, frame, dx, dy, sx, sy) => self.hooks.drawPropFrame?.(ctx, type, frame, dx, dy, sx, sy)
         };
+    }
+
+    // Pontos de estaca cortáveis da sala atual, para a mira assistida do tackle da serra (mundo).
+    aimPoints() {
+        return this._handlers().flatMap(h => h.stakeAimPoints?.() ?? []);
     }
 
     // Luzes pedidas pelo script da sala (ex.: estacas), em coordenadas do mundo.
@@ -248,10 +294,21 @@ export class RoomEvents {
         }
     }
 
+    // Reset de uma sala (morte na sala): a sala volta ao estado inicial — encontros (até os concluídos),
+    // scripts, cordas, gaiolas e grades daquela sala são descartados para serem recriados do zero.
+    resetRoom(roomKey) {
+        const prefix = `${roomKey}/`;
+        for (const id of [...this.completed]) if (id.startsWith(prefix)) this.completed.delete(id);
+        this._scripts.delete(roomKey);
+        this._ropes.delete(roomKey);
+        this._cages.delete(roomKey);
+        this._bars.delete(roomKey);
+    }
+
     // Morte da dupla: encontros interrompidos voltam ao começo; concluídos ficam.
     onDeath() {
         const cages = [...this._cages.values()].flat();
-        for (const h of [...this._scripts.values(), ...cages, ...this._ropes.values()]) h?.onDeath?.();
+        for (const h of [...this._scripts.values(), ...cages, ...this._ropes.values(), ...this._gates.values(), ...this._zoneSpawns.values()]) h?.onDeath?.();
         for (const [key, bars] of this._bars) {
             if (!bars.down) continue;
             bars.down = false;
@@ -262,12 +319,15 @@ export class RoomEvents {
         }
     }
 
-    // Caixas de colisão das grades descidas (bloqueiam a partir de `solidAt` da descida).
+    // Caixas de colisão das grades: as grades levadiças da sala (descidas) mais as grades das cordas (gateRope).
     solidBoxes() {
         const room = this.rooms.current;
-        if (!room || this._barsOf(room).t < BARS.solidAt) return [];
+        if (!room) return [];
+        const handlerBoxes = this._handlers(room).flatMap(h => h.solidBoxes?.() ?? []);
+        if (this._barsOf(room).t < BARS.solidAt) return handlerBoxes;
         const r = this.rooms.cellRect();
-        return (room.cell.authored?.bars || []).map(b => ({ x: r.x + b.col * this.tile, y: r.y + b.row * this.tile, w: this.tile, h: this.tile }));
+        const bars = (room.cell.authored?.bars || []).map(b => ({ x: r.x + b.col * this.tile, y: r.y + b.row * this.tile, w: this.tile, h: this.tile }));
+        return [...bars, ...handlerBoxes];
     }
 
     // Círculos sólidos no chão pedidos pelo script (estacas).

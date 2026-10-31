@@ -212,7 +212,9 @@ const press = (p, input, canDash = true) => {
     };
     const edge = dashAcross(3 * TILE);
     assert(!edge.falling && edge.x > 5 * TILE, `Vão de 2 tiles: saindo colado na beirada cruza (x=${edge.x.toFixed(1)})`);
-    assert(dashAcross(3 * TILE - 40).falling, "Vão de 2 tiles: saindo 40px antes da beirada cai");
+    // Assistência do dash: aterrissar curto num vão de 2 tiles agora é salvo (puxado para o chão), não cai.
+    const shortLand = dashAcross(3 * TILE - 40);
+    assert(!shortLand.falling, "Vão de 2 tiles: aterrissar curto é salvo pela assistência do dash");
 
     const u = makePlayer(3 * TILE + HOLE_FALL.edgeMargin, ROW_Y);
     const ui = makeInput();
@@ -226,6 +228,57 @@ const press = (p, input, canDash = true) => {
         query.checkHoleFalls([r]);
     }
     assert(!r.falling && r.x === 3 * TILE + 20, "Em dash, o buraco não empurra nem derruba");
+
+    // Sem a janela de perdão (holeGrace=0), pés sobre o buraco caem mesmo com chão perto.
+    const noGrace = makePlayer(3 * TILE + TILE / 2, ROW_Y);
+    noGrace.holeGrace = 0; noGrace.dashing = false;
+    query2.checkHoleFalls([noGrace]);
+    assert(noGrace.falling, "Sem holeGrace: pés no buraco caem (a assistência só vale logo após o dash)");
+
+    // Miolo de um vão de 3 tiles: longe demais para a assistência, cai mesmo com a janela aberta.
+    const deep = makePlayer(7 * TILE + TILE / 2, ROW_Y);
+    deep.holeGrace = HOLE_FALL.dashGraceSteps; deep.dashing = false; deep.dashDirX = 1; deep.dashDirY = 0;
+    query.checkHoleFalls([deep]);
+    assert(deep.falling, "Miolo de um vão largo (fora do alcance) cai apesar da assistência");
+}
+
+// 8) Melhorias da bigorna da botas: velocidade, cargas de dash e recarga.
+{
+    // Velocidade: speedMult multiplica a velocidade de andar.
+    const p = makePlayer();
+    p.setPlayerUpgrades({ speedMult: 1.24 });
+    const input = makeInput();
+    input.held.add('right');
+    for (let i = 0; i < 30; i++) step(p, input);
+    const fast = p.vx;
+    const q = makePlayer();
+    const qi = makeInput(); qi.held.add('right');
+    for (let i = 0; i < 30; i++) step(q, qi);
+    assert(fast > q.vx + 0.1, `speedMult deixa mais rápido (${fast.toFixed(2)} > ${q.vx.toFixed(2)})`);
+
+    // Cargas: com 2 cargas dá pra encadear 2 dashes sem esperar; o 3º espera a recarga.
+    const r = makePlayer();
+    r.setPlayerUpgrades({ dashMaxCharges: 2 });
+    assert(r.dashCharges === 2, "setPlayerUpgrades enche até o novo máximo de cargas");
+    const ri = makeInput();
+    press(r, ri); // dash 1
+    assert(r.dashing && r.dashCharges === 1, "1º dash consome uma carga, resta 1");
+    while (r.dashing) step(r, ri);
+    press(r, ri); // dash 2 imediatamente
+    assert(r.dashing && r.dashCharges === 0, "2º dash encadeado consome a última carga");
+    while (r.dashing) step(r, ri);
+    press(r, ri);
+    assert(!r.dashing, "3º dash sem carga não dispara");
+
+    // Fôlego: cooldownScale encurta a recarga.
+    const s = makePlayer();
+    s.setPlayerUpgrades({ dashCooldownScale: 0.5 });
+    assert(s._dashCooldownSteps === Math.round(PLAYER_DASH.cooldownSteps * 0.5), "cooldownScale reduz os steps de recarga");
+    const si = makeInput();
+    press(s, si);
+    while (s.dashing) step(s, si);
+    for (let i = 0; i < s._dashCooldownSteps + 1; i++) step(s, si);
+    assert(s.dashCharges >= 1, "após a recarga encurtada, a carga volta");
 }
 
 console.log(`\nRESULTADO: ${passed}/${passed + failed} testes passaram.`);

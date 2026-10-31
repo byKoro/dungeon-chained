@@ -70,6 +70,18 @@ const player = (x, y) => ({ x, y, vx: 0, vy: 0, speed: 4.2, speedMag: 0, hitRadi
     assert(forge.status("size", wallet.amount) === "maxed" && !forge.buy("size", wallet).ok, "Tamanho para no nível 3");
     forge.reset({ items: ["saw"] });
     assert(forge.has("saw") && forge.level("size") === 0, "reset com a serra já liberada");
+
+    // setLevel: desfaz melhorias na morte da sala (sem devolver sucata).
+    const w2 = new ScrapWallet(200);
+    const f2 = new ForgeState();
+    f2.buy("saw", w2); f2.buy("size", w2); f2.buy("size", w2);
+    assert(f2.level("size") === 2, "duas compras de Tamanho");
+    f2.setLevel("size", 1);
+    assert(f2.level("size") === 1, "setLevel volta um nível");
+    f2.setLevel("saw", 0);
+    assert(!f2.has("saw"), "setLevel(0) remove a receita");
+    f2.setLevel("size", 99);
+    assert(f2.level("size") === f2.maxLevel("size"), "setLevel satura no máximo");
 }
 
 console.log(`\n${passed} passaram, ${failed} falharam`);

@@ -88,6 +88,21 @@ assert(chestScrapAmount({ scrap: 15 }) === 15 && chestScrapAmount({ scrap: -1 })
 chests.reset();
 assert(!chests.isOpen("1,1", chest1), "reset fecha os baús (nova partida)");
 
+// forgetRoom: morte na sala reabre só os baús daquela sala.
+{
+    const s = new ScrapSystem();
+    const room2 = { key: "2,0", tiles: { props: [] } };
+    const rooms2 = { current: room, cellRect: () => ({ x: 0, y: 0, w: 30 * TILE, h: 30 * TILE }) };
+    const cs = new ChestSystem({ rooms: rooms2, scrap: s, getPlayers: () => [player(c1.x, c1.y)], input: { isDown: () => false } });
+    cs.opened.set("1,1/21,26", { t: 0, burst: true, amount: 10 });
+    cs.opened.set("2,0/5,5", { t: 0, burst: true, amount: 5 });
+    cs.hidden.add("1,1/9,9");
+    cs.forgetRoom("1,1");
+    assert(!cs.opened.has("1,1/21,26") && !cs.hidden.has("1,1/9,9"), "forgetRoom reabre os baús da sala e limpa escondidos");
+    assert(cs.opened.has("2,0/5,5"), "forgetRoom não toca nas outras salas");
+    void room2;
+}
+
 {
     const s = new ScrapSystem();
     const keys = new Set();

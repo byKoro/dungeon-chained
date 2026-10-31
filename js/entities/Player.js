@@ -1,5 +1,5 @@
 import { Entity } from './Entity.js';
-import { PLAYER_DASH } from '../config/GameConfig.js';
+import { PLAYER_DASH, HOLE_FALL } from '../config/GameConfig.js';
 
 export class Player extends Entity {
     constructor(x, y, color, controls, spriteImg, name, spriteConfig = null) {
@@ -52,6 +52,8 @@ export class Player extends Entity {
         this.fallDuration = 34;
         this.fallX = 0;
         this.fallY = 0;
+        // Janela de perdão logo após o dash: a queda no buraco não dispara enquanto > 0 (ver DungeonTileQuery).
+        this.holeGrace = 0;
 
         this.lastMoveX = 1; this.lastMoveY = 0;
         this.dashEnabled = false;
@@ -62,6 +64,12 @@ export class Player extends Entity {
         this.justDashed = false;
         this.justEndedDash = false;
         this._dashHeld = false;
+        // Melhorias da bigorna da sala "botas" (aplicadas pelo Game via setPlayerUpgrades).
+        this.speedMult = 1;                       // "Passo veloz": multiplica a velocidade de andar.
+        this.dashCooldownScale = 1;               // "Fôlego": multiplica PLAYER_DASH.cooldownSteps.
+        this.dashMaxCharges = 1;                  // "Pés ligeiros": dashes em sequência antes de recarregar.
+        this.dashCharges = 1;                     // cargas disponíveis agora.
+        this.dashPushImpulse = 0;                 // "Impacto": empurrão do dash (0 = sem empurrão).
         this.afterimages = [];
         this._tintBuf = null;
         this._dashFlashT = 0;
@@ -115,9 +123,27 @@ export class Player extends Entity {
         this._dashHeld = true;
     }
 
+    get _dashCooldownSteps() {
+        return Math.max(1, Math.round(PLAYER_DASH.cooldownSteps * (this.dashCooldownScale ?? 1)));
+    }
+
+    // Progresso do dash para o HUD: cheio se houver carga pronta, senão o quanto a próxima está recarregando.
     get dashCharge() {
         if (this.dashing) return 0;
-        return 1 - this.dashCooldown / PLAYER_DASH.cooldownSteps;
+        if ((this.dashCharges ?? 1) >= 1) return 1;
+        return 1 - this.dashCooldown / this._dashCooldownSteps;
+    }
+
+    // Melhorias de jogador/dash da bigorna da sala "botas"; mantém as cargas atuais dentro do novo máximo.
+    setPlayerUpgrades({ speedMult = 1, dashCooldownScale = 1, dashMaxCharges = 1, dashPushImpulse = 0 } = {}) {
+        const prevMax = this.dashMaxCharges ?? 1;
+        this.speedMult = speedMult;
+        this.dashCooldownScale = dashCooldownScale;
+        this.dashMaxCharges = Math.max(1, dashMaxCharges);
+        this.dashPushImpulse = dashPushImpulse;
+        // Subir o máximo (comprou "Pés ligeiros") já entrega as cargas novas, como os corações enchem ao subir.
+        const gained = Math.max(0, this.dashMaxCharges - prevMax);
+        this.dashCharges = Math.min(this.dashMaxCharges, (this.dashCharges ?? 1) + gained);
     }
 
     cancelDash() {
@@ -128,7 +154,12 @@ export class Player extends Entity {
         if (!this.dashing) return;
         this.dashing = false;
         this.dashTimer = 0;
-        this.dashCooldown = PLAYER_DASH.cooldownSteps;
+        // O dash interrompido (ex.: tackle) conta como gasto: desce uma carga e entra em recarga se faltar carga.
+        this.dashCharges = Math.min(this.dashCharges ?? 1, (this.dashMaxCharges ?? 1) - 1);
+        if (this.dashCharges < 0) this.dashCharges = 0;
+        if (this.dashCooldown <= 0 && (this.dashCharges ?? 0) < (this.dashMaxCharges ?? 1)) {
+            this.dashCooldown = this._dashCooldownSteps;
+        }
     }
 
     _resetDash() {
@@ -137,9 +168,21 @@ export class Player extends Entity {
         this.dashCooldown = 0;
         this.justDashed = false;
         this.justEndedDash = false;
+        this.dashCharges = this.dashMaxCharges ?? 1;
         this.afterimages.length = 0;
         this._dashFlashT = 0;
         this._landT = 0;
+    }
+
+    // Recarrega as cargas de dash uma a uma: cada cooldown completo devolve uma carga; repete até o máximo.
+    _tickDashCooldown() {
+        const max = this.dashMaxCharges ?? 1;
+        if ((this.dashCharges ?? 1) >= max) { this.dashCooldown = 0; return; }
+        if (this.dashCooldown > 0) this.dashCooldown--;
+        if (this.dashCooldown <= 0) {
+            this.dashCharges = Math.min(max, (this.dashCharges ?? 0) + 1);
+            this.dashCooldown = this.dashCharges < max ? this._dashCooldownSteps : 0;
+        }
     }
 
     _startDash() {
@@ -151,6 +194,7 @@ export class Player extends Entity {
         this.dashDirY = dy / mag;
         this.dashing = true;
         this.dashTimer = PLAYER_DASH.durationSteps;
+        this.dashCharges = Math.max(0, (this.dashCharges ?? 1) - 1);
         this.justDashed = true;
         this.slideTimer = 0;
         this._dashFlashT = PLAYER_DASH.flashSteps;
@@ -164,8 +208,11 @@ export class Player extends Entity {
         if (this.dashTimer <= 0) {
             this.dashing = false;
             this.justEndedDash = true;
-            this.dashCooldown = PLAYER_DASH.cooldownSteps;
+            if (this.dashCooldown <= 0 && (this.dashCharges ?? 1) < (this.dashMaxCharges ?? 1)) {
+                this.dashCooldown = this._dashCooldownSteps;
+            }
             this._landT = PLAYER_DASH.landSteps;
+            this.holeGrace = HOLE_FALL.dashGraceSteps ?? 0;
             this.vx = this.dashDirX * PLAYER_DASH.exitSpeed;
             this.vy = this.dashDirY * PLAYER_DASH.exitSpeed;
             return;
@@ -271,7 +318,7 @@ export class Player extends Entity {
         if (hasInput) {
             this.lastMoveX = moveX;
             this.lastMoveY = moveY;
-            const speed = this.speed * (this.speedScale ?? 1);
+            const speed = this.speed * (this.speedScale ?? 1) * (this.speedMult ?? 1);
             this.vx = this.vx * 0.76 + moveX * speed * 0.24;
             this.vy = this.vy * 0.76 + moveY * speed * 0.24;
             this.slideTimer = 0;
@@ -348,10 +395,11 @@ export class Player extends Entity {
         if (this.dashing) {
             this._updateDash();
         } else {
-            if (this.dashCooldown > 0) this.dashCooldown--;
+            this._tickDashCooldown();
+            if (this.holeGrace > 0) this.holeGrace--;
             this.handleInput(input);
-            // Com os pés sobre o buraco não há dash: a queda vence.
-            const ready = canDash && !feetInHole && this.dashCooldown === 0 && this.hurtTimer === 0;
+            // Com uma carga pronta e os pés fora do buraco, o dash dispara (a queda vence sobre o buraco).
+            const ready = canDash && !feetInHole && (this.dashCharges ?? 1) >= 1 && this.hurtTimer === 0;
             if (dashPressed && ready) this._startDash();
         }
         super.update();

@@ -53,6 +53,7 @@ export class AssetLoader {
             this.load(key, `assets/bars/${file}.png`);
         }
         this.load("interactPrompt", INTERACT_PROMPT.sheet);
+        this.load("boots", "assets/boots/boots.png");
         this.load("saw", "assets/saw/saw.png");
 
         this.load("cable", "assets/saw/rope.png");

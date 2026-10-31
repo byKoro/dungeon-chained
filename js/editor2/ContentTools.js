@@ -27,7 +27,7 @@ const TOOL_LABELS = {
     paint: 'Tile', hole: 'Buraco', void: 'Vazio', collision: 'Colisão', door: 'Porta', prop: 'Prop animado', erase: 'Borracha', wall: 'Parede',
     spawn1: 'Spawn P1', spawn2: 'Spawn P2', enemy: 'Inimigo', torch: 'Tocha', hazard: 'Armadilha', interactive: 'Interativo',
     bridge: 'Ponte da alavanca', staticProp: 'Decoração (tile como prop)', eraseContent: 'Remover conteúdo',
-    zone: 'Zona', bars: 'Grade'
+    zone: 'Zona', bars: 'Grade', gateTiles: 'Grade da corda'
 };
 
 export class ContentTools {
@@ -43,6 +43,7 @@ export class ContentTools {
         this.interactiveType = Object.keys(INTERACTIVES)[0];
         this.selectedRopeId = null;
         this.dropRopeId = null;
+        this.gateRopeId = null;
         this.thumbs = [];
         this.cageThumbs = [];
         this._build();
@@ -310,12 +311,22 @@ export class ContentTools {
             if (!onFloor) { this._hint('O baú precisa cair num tile de chão.'); return true; }
             rope.drop = { col, row };
             this._hint(`Baú de "${rope.id}" cai em (${col},${row}).`);
+        } else if (type === 'gateTiles') {
+            // Tiles da grade de uma "Corda com grade": clique nos tiles de chão que a grade ocupa (toggle).
+            const rope = (r.interactives || []).find(o => o.type === 'gateRope' && o.id === this.gateRopeId);
+            if (!rope) { this._hint('Selecione primeiro uma estaca "Corda com grade" (ferramenta Interativos).'); return true; }
+            if (!onFloor) { this._hint('A grade só ocupa tiles de chão.'); return true; }
+            rope.gate ||= [];
+            const i = rope.gate.findIndex(p => p.col === col && p.row === row);
+            if (i >= 0) rope.gate.splice(i, 1); else rope.gate.push({ col, row });
+            this._hint(`Grade de "${rope.id}": ${rope.gate.length} tile(s).`);
         } else if (type === 'interactive') {
             const hit = (r.interactives || []).find(o => o.col === col && o.row === row);
             if (hit?.type === 'lever') { this.bridgeId = hit.id; $('content-hint').textContent = 'Alavanca selecionada. Use “Marcar ponte”.'; return true; }
             // Clicar numa estaca já existente a seleciona (não remove): gaiola abre o painel de inimigos; corda com baú entra no modo "ponto de queda".
             if (hit?.type === 'rope') { this.selectedRopeId = hit.id; this.dropRopeId = null; this._hint('Estaca da gaiola selecionada: escolha os inimigos no painel "Inimigos desta gaiola".'); return true; }
-            if (hit?.type === 'chestRope') { this.dropRopeId = hit.id; this.selectedRopeId = null; this.select('dropPoint'); this._hint(`Estaca "${hit.id}" selecionada: clique num tile de chão para o ba\u00fa cair.`); return true; }
+            if (hit?.type === 'chestRope') { this.dropRopeId = hit.id; this.selectedRopeId = null; this.gateRopeId = null; this.select('dropPoint'); this._hint(`Estaca "${hit.id}" selecionada: clique num tile de chão para o ba\u00fa cair.`); return true; }
+            if (hit?.type === 'gateRope') { this.gateRopeId = hit.id; this.selectedRopeId = null; this.dropRopeId = null; this.select('gateTiles'); this._hint(`Estaca "${hit.id}" selecionada: clique nos tiles de chão da grade.`); return true; }
             if (!onFloor) return true;
             const object = { ...cell, type: this.interactiveType, id: `object_${Date.now()}_${col}_${row}` };
             if (object.type === 'lever') { object.tiles = []; this.bridgeId = object.id; }
@@ -332,6 +343,16 @@ export class ContentTools {
                 object.id = `corda${n}`;
                 this.dropRopeId = object.id;
                 this._hint(`Corda com baú "${object.id}" colocada: clique num tile de chão para marcar onde o baú cai.`);
+            }
+            if (object.type === 'gateRope') {
+                const used = new Set((r.interactives || []).map(o => o.id));
+                let n = 1;
+                while (used.has(`grade${n}`)) n++;
+                object.id = `grade${n}`;
+                object.gate = [];
+                this.gateRopeId = object.id;
+                this.select('gateTiles');
+                this._hint(`Corda com grade "${object.id}" colocada: clique nos tiles de chão que a grade ocupa.`);
             }
             this._toggle(r, 'interactives', object);
         } else if (type === 'bridge') {
@@ -359,6 +380,8 @@ export class ContentTools {
             <button class="btn" data-content="zone">Desenhar zona (clique em dois cantos)</button>
             <div id="content-zones"></div>
             <button class="btn" data-content="bars">Grade (clique nos tiles do acesso)</button>
+            <button class="btn" data-content="gateTiles">Grade da corda selecionada (clique nos tiles)</button>
+            <p class="hint">Coloque uma “Corda com grade” e clique nela; depois marque os tiles de chão que a grade bloqueia. Cortar a corda levanta a grade.</p>
             <label><input type="checkbox" id="content-rope-auto"> Corda arrebenta sozinha</label>
             <div class="panel-title">Inimigos desta gaiola</div>
             <p class="hint" id="cage-hint">Coloque uma "Corda com gaiola" e clique nela para escolher os inimigos que ela solta.</p>
@@ -638,6 +661,21 @@ export class ContentTools {
         // Gaiola selecionada: destaque na estaca.
         if (this.selectedRopeId) for (const o of room.interactives || []) if (o.type === 'rope' && o.id === this.selectedRopeId) {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2);
+        }
+        // Corda com grade: tiles da grade marcados, ligados à estaca por linha tracejada.
+        for (const o of room.interactives || []) if (o.type === 'gateRope') {
+            const cx = ox + (o.col + 0.5) * tile, cy = oy + (o.row + 0.5) * tile, sel = this.gateRopeId === o.id;
+            const color = INTERACTIVES.gateRope.color;
+            for (const t of o.gate || []) {
+                if (!Number.isInteger(t.col)) continue;
+                const tx = ox + (t.col + 0.5) * tile, ty = oy + (t.row + 0.5) * tile;
+                ctx.strokeStyle = color; ctx.lineWidth = sel ? 2 : 1; ctx.setLineDash([4, 3]);
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(tx, ty); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(127, 214, 192, 0.35)'; ctx.fillRect(ox + t.col * tile + 2, oy + t.row * tile + 2, tile - 4, tile - 4);
+                ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(ox + t.col * tile + 2, oy + t.row * tile + 2, tile - 4, tile - 4);
+            }
+            if (sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2); }
         }
         for (const z of room.zones || []) {
             ctx.strokeStyle = 'rgba(127, 219, 255, 0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);

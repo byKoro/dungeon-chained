@@ -370,6 +370,17 @@ export const AUDIO_CONFIG = {
             maxVoices: 4,
             enabled: true
         },
+        keyCollect: {
+            description: "Coleta da chave: arpejo de sinos suave subindo, sem pancada (scripts/build-key-collect-audio.mjs)",
+            files: ["assets/audio/key-collect.wav"],
+            volume: 0.55,
+            rate: 1.0,
+            rateVariance: 0,
+            pitchShift: true,
+            cooldownMs: 200,
+            maxVoices: 1,
+            enabled: true
+        },
         chestOpen: {
             description: "Tampa do baú abrindo (placeholder: thunk do trailer)",
             files: [1, 2].map(i => `assets/audio/trailer/thunk-0${i}.wav`),

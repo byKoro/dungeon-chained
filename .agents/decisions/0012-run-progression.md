@@ -1,5 +1,5 @@
 # Run progression: scrap resets on death, items and finished events stay
-Status: accepted (feat/room-events, 2026-10-29)
+Status: accepted (feat/room-events, 2026-10-29) — superseded for anvil-map death by ADR 0014 (2026-10-31, room-scoped death)
 
 Applies to Editor 2.0 maps that have at least one anvil (`Game._runRules`). Other maps keep the game over screen.
 

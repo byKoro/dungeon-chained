@@ -54,6 +54,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
 | Interact icon | indicador de interagir | Round icon floating above a chest or anvil while a player is in range, one per player in their colour with the button of the device they used last (`InteractPrompt`, `assets/ui/interact_prompt.png`). The prop also gets a white 1 art px outline (borda branca) while someone is in range |
 | Speech bubble | balão (de fala) | Text bubble above the speaking player, typed letter by letter with a voice blip (`DialogueSystem.say`) |
+| Debug menu | menu de debug | In-game cheat console (F1, `DebugMenu`): grant the saw/upgrades/abilities, heal, kill the room, teleport between rooms. Current run only, nothing saved |
 | Anvil / forge | bigorna / forja | Prop `anvil`; interact opens the forge menu (`ForgeSystem`), which sells the recipes the anvil offers (`prop.recipes`) for scrap |
 | Recipe | receita | Catalog entry in `FORGE.recipes`: an item (`saw`) or an upgrade of an item (`size`, `elasticity`, `doubleSaw`), with a cost per level |
 | Upgrade | melhoria | Tamanho (+20% disc), Elasticidade (+15% cable), Serra dupla; Peso comes in slice 3 |
@@ -62,8 +63,10 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Zone | zona | Named rectangle of a room (`room.zones`); "enter the zone" means both players inside |
 | Encounter / wave | encontro / leva | Named list of waves (`room.encounters`); the room script decides when each wave drops |
 | Bars | grade | Bar tiles at a zone's accesses; closed (solid) while an encounter runs |
+| Zone spawner | inimigo por zona | Loose authored enemies placed inside a zone (`ZoneSpawner`): hidden until both players enter the zone, then they drop in from above with a camera pan, no fire and no spawn sound |
 | Cage / rope / stake | gaiola / corda / estaca | Vertical ropes tied to stakes (`rope` interactive), each holding a hidden cage above; cutting a rope drops its cage, which shatters and releases that stake's wave. One encounter per zone containing stakes, in any room of any map. Enemies are chosen per stake in the editor (`rope.drops`) |
 | Chest rope | corda com baú | `chestRope` interactive: a stake whose rope holds a chest; cutting it drops a system-generated chest on the stake's authored drop tile (`rope.drop`), no coins defined (default scrap) |
+| Gate rope | corda com grade | `gateRope` interactive: a stake whose rope holds a portcullis gate over authored tiles (`rope.gate`); the gate starts closed/solid and cutting the rope raises it, opening the path (used in penhasco to free the boss key) |
 | Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |

@@ -19,6 +19,8 @@ export class Room {
         this.populated = false;
 
         this.enemiesSpawned = false;
+        // Inimigos autorados "reivindicados" por um script/handler (ex.: ZoneSpawner): o spawn genérico os ignora.
+        this._claimedEnemies = new Set();
 
         this.challenge = null;
 
@@ -131,7 +133,13 @@ export class Room {
 
     get _authoredEnemies() {
         if (!this.cell.customEnemies || !this.cell.customEnemies.length) return [];
-        return this.cell.customEnemies;
+        if (!this._claimedEnemies.size) return this.cell.customEnemies;
+        return this.cell.customEnemies.filter(foe => !this._claimedEnemies.has(foe));
+    }
+
+    // Um script/handler assume este inimigo autorado: o spawn genérico (intro) deixa de criá-lo.
+    claimAuthoredEnemy(foe) {
+        if (foe) this._claimedEnemies.add(foe);
     }
 
     get hasPendingEnemies() {

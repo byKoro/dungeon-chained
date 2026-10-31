@@ -62,6 +62,8 @@ export class DungeonTileQuery {
             const { col, row } = this._toTile(fx, fy, rect);
             // Pés no tile do buraco: cai na hora.
             if (this._tileValue(tiles, col, row) === HOLE_TILE) {
+                // Assistência do dash: logo após um dash, "ganha" a borda se houver chão seguro bem perto.
+                if (player.holeGrace > 0 && this._dashLandAssist(player, tiles, rect, col, row)) continue;
                 player.startFalling(rect.x + (col + 0.5) * TILE, rect.y + (row + 0.5) * TILE);
                 continue;
             }
@@ -80,6 +82,37 @@ export class DungeonTileQuery {
             player.x += nx * push;
             player.y += ny * push;
         }
+    }
+
+    // Assistência do dash: os pés pararam sobre o buraco logo depois de um dash. Procura o tile de chão
+    // seguro mais perto (até `dashLandAssistTiles` de distância do centro do tile do buraco), preferindo
+    // a direção do dash — como se tivesse "ganhado" a borda — e coloca o jogador nele. true = salvou a queda.
+    _dashLandAssist(player, tiles, rect, col, row) {
+        const reachTiles = this.holeFall.dashLandAssistTiles ?? 1.5;
+        const reach = Math.max(1, Math.ceil(reachTiles));
+        const maxDist = reachTiles + 0.5; // em tiles, do centro do tile do buraco ao centro do tile de chão
+        const safe = (c, r) => {
+            const value = this._tileValue(tiles, c, r);
+            return value !== undefined && value >= 0 &&
+                c > 0 && r > 0 && c < tiles.cols - 1 && r < tiles.rows - 1;
+        };
+        const dirX = player.dashDirX ?? 0, dirY = player.dashDirY ?? 0;
+        let best = null, bestScore = Infinity;
+        for (let dr = -reach; dr <= reach; dr++) {
+            for (let dc = -reach; dc <= reach; dc++) {
+                if (!dr && !dc || !safe(col + dc, row + dr)) continue;
+                const tileDist = Math.hypot(dc, dr);
+                if (tileDist > maxDist) continue;
+                // Pontua por distância em tiles, descontando o chão à frente do dash (o dash "cruza").
+                const ahead = tileDist ? (dc * dirX + dr * dirY) / tileDist : 0;
+                const score = tileDist - Math.max(0, ahead) * 0.6;
+                if (score < bestScore) { bestScore = score; best = { c: col + dc, r: row + dr }; }
+            }
+        }
+        if (!best) return false;
+        player.x = rect.x + (best.c + 0.5) * TILE;
+        player.y = rect.y + (best.r + 0.5) * TILE - (this.holeFall.footOffset ?? 0);
+        return true;
     }
 
     // Distância dos pés até o tile de buraco vizinho mais perto e a direção para longe dele.

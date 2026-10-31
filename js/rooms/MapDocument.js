@@ -256,6 +256,7 @@ export function resizeRoom(room, cols, rows, { rebuildFrame = true } = {}) {
         next[field] = structuredClone((room[field] || []).filter(inside));
     }
     for (const o of next.interactives) if (o.tiles) o.tiles = o.tiles.filter(interior);
+    for (const o of next.interactives) if (o.gate) o.gate = o.gate.filter(interior);
     // Zonas são retângulos: recortadas para caber; as que ficariam vazias somem.
     next.zones = (room.zones || []).map(z => {
         const col = Math.max(0, z.col), row = Math.max(0, z.row);

@@ -2,6 +2,7 @@ import { CAGE } from '../config/EventsConfig.js';
 import { Physics } from '../core/Physics.js';
 import { ANIMATED_PROPS } from '../config/PropConfig.js';
 import { StakeRopeArt, sawGap, impactBurst, drawChestDrop, easeIn, easeOut, clamp01 } from './StakeRope.js';
+import { objectsOwnedByZone } from '../rooms/ZoneAssign.js';
 
 // Estacas no chão, cada uma segurando por uma corda vertical uma gaiola lá no alto (fora da vista).
 // Os dois entram na zona → a corda `auto` arrebenta sozinha e as grades descem. Passar a serra pela estaca corta a
@@ -12,14 +13,19 @@ export class CageEncounter {
     constructor({ api, zoneId, encounterId, rng = Math.random, cfg = CAGE }) {
         Object.assign(this, { api, zoneId, encounterId, rng, cfg });
         this.art = new StakeRopeArt(cfg, () => api.assets);
-        // Estacas da gaiola desta zona (uma sala pode ter vários encontros). Sem zona, pega todas (compatível com salas de um encontro só).
-        const zone = (api.authored.zones || []).find(z => z.id === zoneId) || null;
-        const inZone = o => !zone || (o.col >= zone.col && o.row >= zone.row && o.col < zone.col + zone.w && o.row < zone.row + zone.h);
-        // Ordem autorada das estacas desta zona = ordem das levas do encontro (cada estaca solta a leva de mesmo índice).
-        const objs = (api.authored.interactives || []).filter(o => o.type === "rope" && inZone(o));
+        // Estacas da gaiola desta zona (uma sala pode ter vários encontros). Cada estaca pertence a UMA zona só
+        // (a menor que a contém), então zonas sobrepostas não criam dois encontros sobre as mesmas estacas.
+        const zones = api.authored.zones || [];
+        const ropes = (api.authored.interactives || []).filter(o => o.type === "rope");
+        // Sem zonas (salas antigas de um encontro só): pega todas as estacas.
+        const objs = zones.length ? objectsOwnedByZone(zones, ropes, zoneId) : ropes;
         // `drops` da estaca (editor visual) = a leva que ela solta; sem isso, cai para `encounter.waves[index]` (mapas antigos).
         this.ropeDefs = objs.map(o => ({ col: o.col, row: o.row, ...api.tileCenter(o.col, o.row), auto: !!o.auto, drops: Array.isArray(o.drops) ? o.drops : null }));
-        if (this.ropeDefs.length && !this.ropeDefs.some(r => r.auto)) this.ropeDefs[0].auto = true;
+        // Só força um corte automático de entrada nos mapas antigos (levas em `encounter.waves`, estacas sem `drops`).
+        // No Editor 2.0 (estacas com `drops`) a corda só corta com a serra, a menos que o autor marque `auto` —
+        // senão a primeira corda "cortava sozinha" ao entrar na zona (bug da sala botas/penhasco).
+        const authoredDrops = this.ropeDefs.some(r => r.drops);
+        if (this.ropeDefs.length && !authoredDrops && !this.ropeDefs.some(r => r.auto)) this.ropeDefs[0].auto = true;
         // Baú do encontro: prop com `encounter` igual ao id; fica escondido até o fim.
         this.chest = (api.authored.props || []).find(p => ANIMATED_PROPS[p.type]?.opens && p.encounter === encounterId) || null;
         this.chestHome = this.chest ? { col: this.chest.col, row: this.chest.row } : null;
@@ -243,6 +249,8 @@ export class CageEncounter {
                     e.x = k.toX; e.y = k.toY;
                     this.api.renderer?.triggerShake(j.shake);
                     this.api.audio?.play("enemyStep", { rateMultiplier: 0.8 });
+                    const ls = this.cfg.landSound;
+                    if (ls) this.api.audio?.play(ls.cue, { rateMultiplier: ls.rate, volumeMultiplier: ls.volume });
                     for (let n = 0; n < j.dust; n++) {
                         const a = (n / j.dust) * Math.PI * 2;
                         ps?.triggerDust?.(e.x + Math.cos(a) * 14, (e.footY ?? e.y + 20) + Math.sin(a) * 5, Math.cos(a), Math.sin(a) * 0.5, 1);
@@ -353,6 +361,12 @@ export class CageEncounter {
             this.art.shadow(ctx, d.x, d.ground, this.art.fallK(d, this.cfg.chest.warnSteps, this.cfg.chest.fallSteps));
         }
         ctx.restore();
+    }
+
+    // Pontos de estaca ainda cortáveis (para a mira assistida do tackle da serra): só com o encontro ativo.
+    stakeAimPoints() {
+        if (!this.valid || this.phase !== "active") return [];
+        return this.ropes.filter(r => !r.cut).map(r => this._stakePoint(r));
     }
 
     // Corpos sólidos das estacas (ficam mesmo depois do corte).

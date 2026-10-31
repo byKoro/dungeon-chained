@@ -58,6 +58,10 @@ export const ROOM_INTRO = {
 
 export const DOOR_STUB_TILES = 2;
 export const DOOR_ENTER_DEPTH = 70;
+// Até quantos tiles antes da borda de uma porta aberta a serra presa deixa de empurrar os jogadores (passagem livre).
+export const DOOR_SAW_PASS_TILES = 1.5;
+// Basta o jogador da frente entrar no v�o: o parceiro precisa estar alinhado a at� este tanto de tiles da borda.
+export const DOOR_FOLLOW_TILES = 1.5;
 
 // Folga para o player subir um pouco "para dentro" das paredes superiores (salas do Editor 2.0),
 // dando a sensação de encostar/sobrepor a parede de cima. 20% de um tile.
@@ -126,7 +130,14 @@ export const HOLE_FALL = Object.freeze({
     pushBack: 0.9,
 
     livesLost: 1,
-    respawnInvulnFrames: 90
+    respawnInvulnFrames: 90,
+
+    // Assistência do dash: ao acabar o dash sobre (ou perto de) um buraco, o jogador "ganha"
+    // a borda — é puxado para o tile de chão seguro mais perto, até `dashLandAssistTiles`
+    // de distância, em vez de cair. Durante `dashGraceSteps` logo após o dash a queda não dispara.
+    // 1 tile: um vão de 2 tiles aterrissando curto ainda é salvo; o miolo de um vão de 3 tiles cai.
+    dashLandAssistTiles: 1,
+    dashGraceSteps: 8
 });
 
 // 12 × 12 px = 144 px (2,25 tiles): vão de 1 tile folgado, 2 só saindo colado na borda, 3 nunca.

@@ -57,7 +57,8 @@ export class SawWeapon extends Weapon {
         this.wasSpinning = false;
         this.spinKick = 0;
         this.strain = 0;
-        this.flashPhase = 0;
+        this.blinkPhase = 0;
+        this.shakePhase = 0;
         this._flashCanvas = null;
         this.textureOffset = 0;
         this.dragX = 0;
@@ -183,7 +184,18 @@ export class SawWeapon extends Weapon {
 
         if (this.reconnectTimer > 0) this.reconnectTimer--;
 
-        this.flashPhase += 0.15 + this.strain * 0.6;
+        // Piscar da corda: frequência cresce com o risco (um passo = 1/60 s).
+        const blink = CHAIN_TENSION.cableBlink;
+        const risk = this.tensionFeedback?.risk ?? 0;
+        const blinkK = risk <= blink.startRisk ? 0 : Math.min(1, (risk - blink.startRisk) / (1 - blink.startRisk));
+        const blinkHz = blink.hzMin + (blink.hzMax - blink.hzMin) * blinkK;
+        this.blinkPhase += (Math.PI * 2 * blinkHz) / 60;
+
+        // Tremidinha: começa cedo (em `start`) e acelera rumo à ruptura (freq cresce com o risco).
+        const pss = CHAIN_TENSION.preSnapShake;
+        const shakeK = risk <= pss.start ? 0 : Math.pow(Math.min(1, (risk - pss.start) / (1 - pss.start)), pss.power ?? 1);
+        const shakeHz = pss.hzMin + (pss.hzMax - pss.hzMin) * shakeK;
+        this.shakePhase += (Math.PI * 2 * shakeHz) / 60;
 
         let target = 0;
         if (p1 && p2) {
@@ -310,27 +322,60 @@ export class SawWeapon extends Weapon {
         );
     }
 
+    // Ponto único de amostragem do cabo pros desenhos. Em repouso segue a reta física; a partir de
+    // `preSnapShake.start` a corda já dá uma tremidinha transversal, que cresce até a ruptura.
     visualCablePoint(p1, p2, t) {
         const point = this.cablePoint(p1, p2, t);
         const s = this.tensionFeedback;
-        if (!s) return point;
-        const m = CHAIN_TENSION.motion;
+        const pss = CHAIN_TENSION.preSnapShake;
+        const risk = s?.risk ?? 0;
+        if (!s || risk <= pss.start) return point;
+
+        if (t <= 0 || t >= 1) return point; // âncoras presas exatamente nos jogadores
+        const k = Math.pow(Math.min(1, (risk - pss.start) / (1 - pss.start)), pss.power ?? 1);
+        const scale = s.motionScale ?? 1;
+        const amp = (pss.ampMin ?? 0) + ((pss.ampMax - (pss.ampMin ?? 0))) * k;
         const length = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
-        const settle = s.settle / CHAIN_TENSION.settleSeconds;
-        const amplitude = (Math.pow(s.effort, m.effortPower) * m.amplitude + settle * m.settleAmplitude) * s.motionScale;
-        const wave = Math.sin(s.phase + t * Math.PI * 2 * m.waveCycles) * Math.sin(t * Math.PI);
-        const offset = Math.round(amplitude * wave / m.pixel) * m.pixel;
-        return { x: point.x - (p2.y - p1.y) / length * offset,
-            y: point.y + (p2.x - p1.x) / length * offset };
+        const nx = (p2.x - p1.x) / length, ny = (p2.y - p1.y) / length;
+        // Ruído por segmento: duas senóides defasadas por t dão um chacoalho irregular, não um balanço.
+        const noise = Math.sin(this.shakePhase + t * 7.9) * 0.6 + Math.sin(this.shakePhase * 1.7 + t * 3.3) * 0.4;
+        const env = Math.sin(t * Math.PI); // preso nas âncoras (jogadores), máximo no meio
+        const offset = noise * env * amp * scale;
+        return { x: point.x - ny * offset, y: point.y + nx * offset };
+    }
+
+    // Afinamento: quanto mais perto da ruptura (risk alto), mais fino o cabo é desenhado.
+    // Cai de 1 até CHAIN_TENSION.cableThin.minThickness; segura no começo com startRisk.
+    _cableThickness() {
+        const c = CHAIN_TENSION.cableThin;
+        const risk = this.tensionFeedback?.risk ?? 0;
+        if (!c || risk <= c.startRisk) return 1;
+        const k = Math.min(1, (risk - c.startRisk) / (1 - c.startRisk));
+        return 1 - (1 - c.minThickness) * Math.pow(k, c.power);
+    }
+
+    // Piscar: opacidade da corda oscila entre 1 e (1 - depth). Profundidade e frequência
+    // (via blinkPhase, montado em update) crescem com o risco; sem risco fica em 1 (sem piscar).
+    _cableAlpha() {
+        const b = CHAIN_TENSION.cableBlink;
+        const risk = this.tensionFeedback?.risk ?? 0;
+        if (!b || risk <= b.startRisk) return 1;
+        const k = Math.min(1, (risk - b.startRisk) / (1 - b.startRisk));
+        const depth = b.depthMin + (b.depthMax - b.depthMin) * k;
+        const osc = 0.5 + 0.5 * Math.sin(this.blinkPhase);
+        return 1 - depth * osc;
     }
 
     drawChain(ctx, p1, p2) {
         const cable = this.cableSprite;
+        const thin = this._cableThickness();
+        const alpha = this._cableAlpha();
 
         if (!cable || !cable.complete || !cable.naturalWidth) {
             ctx.save();
+            ctx.globalAlpha = alpha;
             ctx.strokeStyle = "#1a1a1e";
-            ctx.lineWidth = 4;
+            ctx.lineWidth = Math.max(1.5, 4 * thin);
             ctx.beginPath();
             const start = this.visualCablePoint(p1, p2, 0);
             ctx.moveTo(start.x, start.y);
@@ -347,10 +392,13 @@ export class SawWeapon extends Weapon {
         const scale = linkH / cable.naturalHeight;
 
         const tileW = cable.naturalWidth * scale;
+        // Só a altura desenhada afina; o passo da textura (tileW) continua igual pra não acelerar o scroll.
+        const drawH = linkH * thin;
 
         const SUB = 48;
 
         ctx.save();
+        ctx.globalAlpha = alpha;
         ctx.imageSmoothingEnabled = false;
         let prev = this.visualCablePoint(p1, p2, 0);
         let u = this.textureOffset % tileW;
@@ -369,16 +417,16 @@ export class SawWeapon extends Weapon {
             ctx.rotate(ang);
             if (su + sw <= cable.naturalWidth) {
                 ctx.drawImage(cable, su, 0, sw, cable.naturalHeight,
-                    -segLen / 2 - 0.5, -linkH / 2, segLen + 1, linkH);
+                    -segLen / 2 - 0.5, -drawH / 2, segLen + 1, drawH);
             } else {
 
                 const sw1 = cable.naturalWidth - su;
                 const frac = sw1 / sw;
                 const w1 = (segLen + 1) * frac;
                 ctx.drawImage(cable, su, 0, sw1, cable.naturalHeight,
-                    -segLen / 2 - 0.5, -linkH / 2, w1, linkH);
+                    -segLen / 2 - 0.5, -drawH / 2, w1, drawH);
                 ctx.drawImage(cable, 0, 0, sw - sw1, cable.naturalHeight,
-                    -segLen / 2 - 0.5 + w1, -linkH / 2, (segLen + 1) - w1, linkH);
+                    -segLen / 2 - 0.5 + w1, -drawH / 2, (segLen + 1) - w1, drawH);
             }
             ctx.restore();
 
@@ -407,19 +455,10 @@ export class SawWeapon extends Weapon {
         const spinning = this.spin > BLEND_LO;
         const transPulse = blend * (1 - blend) * 4;
 
-        const strain = this.tensionFeedback?.risk ?? this.strain;
-        const strainShake = strain * strain * 3.5;
-        const shake = (spinning ? SHAKE_SPIN : 0) + SHAKE_TRANSITION * transPulse + strainShake;
+        // Tensão não treme nem brilha mais no disco: o aviso de ruptura é só a corda (afina + pisca).
+        const shake = (spinning ? SHAKE_SPIN : 0) + SHAKE_TRANSITION * transPulse;
 
-        let flash = 0;
-        if (strain > 0.02) {
-            const osc = 0.5 + 0.5 * Math.sin(this.flashPhase);
-            const env = strain * strain;
-
-            flash = Math.min(1, osc * env * 1.4 + env * env * 0.6);
-        }
-
-        flash = Math.max(flash, this._reconnectFlash);
+        const flash = this._reconnectFlash;
 
         const popScale = (1 + 0.22 * this.spinKick) * this._reconnectScale;
 

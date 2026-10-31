@@ -10,6 +10,9 @@ async function bootstrap() {
     const canvas = document.getElementById('gameCanvas');
     const params = new URLSearchParams(location.search);
     const skipTrailer = params.has('skipTrailer') || params.get('playtest') === 'true';
+    // Debug: `?scene=N` abre o trailer direto na cena N (0-based) e liga o timer.
+    const sceneParam = params.get('scene');
+    const startScene = sceneParam !== null && sceneParam !== '' ? Math.max(0, parseInt(sceneParam, 10) || 0) : 0;
     const loading = new LoadingScreen();
     const assets = new AssetLoader();
     const roomCatalog = new RoomCatalog();
@@ -21,7 +24,7 @@ async function bootstrap() {
         onEnd: () => { if (!started) overlay?.showStart(); },
         onBegin: () => overlay?.showSkip(),
         onPadAction: (button) => overlay?.padAction(button) ?? false,
-        showTimer: params.has('timer'),
+        showTimer: params.has('timer') || sceneParam !== null,
         audio: !params.has('mute')
     });
     if (trailer) window.trailer = trailer;
@@ -65,7 +68,7 @@ async function bootstrap() {
         onPause: () => trailer.togglePause(),
         isTrailerPaused: () => trailer.paused
     });
-    trailer.play();
+    trailer.play(startScene);
 }
 
 bootstrap();

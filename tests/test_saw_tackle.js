@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { SawTackle } from '../js/systems/SawTackle.js';
+import { sawGap } from '../js/systems/StakeRope.js';
 import { DroppedSawPush } from '../js/systems/DroppedSawPush.js';
 import { SawDrag } from '../js/systems/SawDrag.js';
 import { Chain } from '../js/core/Chain.js';
@@ -506,4 +507,63 @@ for (const dir of [[1, 0], [-1, 0], [0, 1], [1, 1]]) {
     assert.ok(s.log.drops.length >= 1, 'usa o piso seguro');
 }
 
-console.log('Tackle da serra: versões com retorno e sem retorno, desaceleração por percurso, quiques, hits, Arauto, reconexão, jogador e serra presa em parede/Arauto passaram.');
+// --- queda forçada volta para perto da origem e num ponto alcançável ---
+{
+    // Serra cercada (isSolid em tudo menos perto da origem): o force-landing escolhe o ponto perto da origem.
+    const origin = { x: 1300, y: 1000 };
+    const chain = new Chain([new SawWeapon()], CHAIN);
+    chain.spawnSaw(1000, 1000);
+    const safe = { x: origin.x + 10, y: origin.y };
+    const tackle = new SawTackle({
+        chain, getPlayers: () => [player(972, 1000), player(100, 1600)], getRoom: () => ({ enemies: [], wallBoxes: [] }),
+        getBounds: () => BOUNDS, isSolid: () => true,
+        safeDrop: (x, y) => (Math.hypot(x - origin.x, y - origin.y) < 60 ? safe : { x, y }),
+        canLand: (x, y) => Math.hypot(x - safe.x, y - safe.y) < 1e-6,
+        cfg: SAW_TACKLE
+    });
+    Object.assign(tackle, { state: 'flight', mode: 'tackle', origin, vx: SAW_TACKLE.speed, vy: 0, landingFails: 99 });
+    tackle._forceLanding(chain.weapon);
+    assert.equal(tackle.state, null, 'force landing termina o voo');
+    assert.ok(Math.hypot(chain.weapon.dropX - origin.x, chain.weapon.dropY - origin.y) < 60, 'cai perto da origem, não onde ficou presa');
+}
+
+// --- mira assistida também mira estacas (cordas), não só inimigos ---
+{
+    const chain = new Chain([new SawWeapon()], CHAIN);
+    chain.spawnSaw(1000, 1000);
+    const p1 = player(972, 1000), p2 = player(100, 1600);
+    const stake = { x: 1300, y: 1055 };
+    const tackle = new SawTackle({
+        chain, getPlayers: () => [p1, p2], getRoom: () => ({ enemies: [], wallBoxes: [] }), getBounds: () => BOUNDS,
+        getAimTargets: () => [stake], safeDrop: (x, y) => ({ x, y }), cfg: SAW_TACKLE
+    });
+    dashing(p1); tackle.update();
+    const aim = tackle.pending;
+    assert.ok(aim.y > 0 && aim.x > 0, 'puxa para a estaca à frente');
+    assert.ok(Math.atan2(aim.y, aim.x) <= SAW_TACKLE.aimMaxTurnDeg * Math.PI / 180 + 1e-9, 'correção para a estaca limitada');
+
+    // estaca atrás não é mirada
+    const backChain = new Chain([new SawWeapon()], CHAIN); backChain.spawnSaw(1000, 1000);
+    const bp = player(972, 1000), bp2 = player(100, 1600);
+    const back = new SawTackle({
+        chain: backChain, getPlayers: () => [bp, bp2], getRoom: () => ({ enemies: [], wallBoxes: [] }), getBounds: () => BOUNDS,
+        getAimTargets: () => [{ x: 700, y: 1000 }], safeDrop: (x, y) => ({ x, y }), cfg: SAW_TACKLE
+    });
+    dashing(bp); back.update();
+    assert.deepEqual(back.pending, { x: 1, y: 0 }, 'não mira estaca atrás');
+}
+
+// --- sawGap enxerga a serra em voo do tackle: a técnica corta cordas ---
+{
+    const chain = new Chain([new SawWeapon()], CHAIN);
+    chain.spawnSaw(500, 500);
+    const w = chain.weapon;
+    const stake = { x: 500, y: 500 };
+    assert.ok(sawGap(chain, [], stake) === Infinity, 'serra parada (sem voo) não corta a corda');
+    w.tackleState = 'flight';
+    assert.ok(sawGap(chain, [], stake) <= 0, 'serra em voo do tackle encosta na estaca (corta)');
+    w.tackleState = null;
+    assert.ok(sawGap(chain, [], stake) === Infinity, 'fora do voo volta a não cortar');
+}
+
+console.log('Tackle da serra: versões com retorno e sem retorno, desaceleração por percurso, quiques, hits, Arauto, reconexão, jogador, serra presa em parede/Arauto, mira em estacas e corte de corda em voo passaram.');

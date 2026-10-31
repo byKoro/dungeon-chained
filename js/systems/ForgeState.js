@@ -46,6 +46,13 @@ export class ForgeState {
         this.levels[id] = this.level(id) + 1;
         return { ok: true, status, cost, level: this.levels[id] };
     }
+
+    // Volta uma receita a um nível anterior (morte na sala: perde a melhoria comprada ali). A sucata gasta não volta.
+    setLevel(id, level) {
+        const clamped = Math.max(0, Math.min(level, this.maxLevel(id)));
+        if (clamped <= 0) delete this.levels[id];
+        else this.levels[id] = clamped;
+    }
 }
 
 export function mapOffersRecipe(map, id) {
@@ -77,6 +84,28 @@ export function applySawUpgrades(forge, chain, weapon, base, recipes = FORGE.rec
 export function snapWaveRadius(forge, recipes = FORGE.recipes) {
     const lvl = forge.level("snapWave");
     return lvl > 0 ? recipes.snapWave.radius[lvl - 1] : 0;
+}
+
+// Melhorias de jogador/dash da bigorna da sala "botas": velocidade, recarga e cargas do dash, empurrão do dash.
+export function applyPlayerUpgrades(forge, players, recipes = FORGE.recipes) {
+    const speedLvl = forge.level("moveSpeed");
+    const speedMult = 1 + recipes.moveSpeed.perLevel * speedLvl;
+    const cdLvl = forge.level("dashCooldown");
+    const dashCooldownScale = cdLvl > 0 ? recipes.dashCooldown.cooldownScale[cdLvl - 1] : 1;
+    const dashMaxCharges = 1 + recipes.dashCharges.perLevel * forge.level("dashCharges");
+    const pushLvl = forge.level("dashPush");
+    const dashPushImpulse = pushLvl > 0 ? recipes.dashPush.impulse[pushLvl - 1] : 0;
+    for (const p of players) p?.setPlayerUpgrades?.({ speedMult, dashCooldownScale, dashMaxCharges, dashPushImpulse });
+}
+
+// Duração (steps) de proximidade e cooldown da cura cooperativa no nível atual; 0 = melhoria não comprada.
+export function coopHealParams(forge, recipes = FORGE.recipes) {
+    const lvl = forge.level("coopHeal");
+    if (lvl <= 0) return null;
+    return {
+        holdSteps: Math.round(recipes.coopHeal.seconds[lvl - 1] * 60),
+        cooldownSteps: Math.round(recipes.coopHeal.cooldownSeconds * 60)
+    };
 }
 
 // Corações comprados: sobe o máximo dos dois e enche o que foi ganho; voltando ao nível 0, corta o excesso.

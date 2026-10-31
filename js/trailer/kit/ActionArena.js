@@ -11,7 +11,7 @@ import { SpawnSystem } from '../../systems/SpawnSystem.js';
 import { ScreenGore } from '../../systems/ScreenGore.js';
 import { PostProcessor } from '../../systems/PostProcessor.js';
 import { WindSystem } from '../../systems/WindSystem.js';
-import { TILE, ROOM_ROWS, BLOOD_COLORS, BLOOD_PIXEL, MAX_ACTIVE_GIBS, WIND } from '../../config/GameConfig.js';
+import { TILE, ROOM_ROWS, BLOOD_COLORS, BLOOD_PIXEL, MAX_ACTIVE_GIBS, WIND, PLAYER_DASH } from '../../config/GameConfig.js';
 import { LensSplatter } from '../fx/LensSplatter.js';
 import { renderArena } from './arenaRender.js';
 import { hookRendererAudio } from '../audio/TrailerAudio.js';
@@ -156,8 +156,49 @@ export class ActionArena {
             airborne: false, swerveT: 0, swerveVX: 0, swerveVY: 0, brakeT: 0,
             expression: null, _exprBase: null, _exprTimer: 0,
             hurtTimer: 0, scaredTimer: 0, invulnerableTimer: 0,
-            walkFrame: 0, facingLeft: false, _faceLock: false
+            walkFrame: 0, facingLeft: false, _faceLock: false,
+            dashT: 0, dashing: false, dashSpeed: 0, dashDirX: 1, dashDirY: 0, dashAng: 0, dashTurn: 0, dashSteps: 0, dashFreeze: 0,
+            _dashFlashT: 0, _landT: 0
         });
+        if (p.afterimages) p.afterimages.length = 0;
+    }
+
+    // Dash encenado com o visual do Player real (rastro, esticada, flash). Chega no alvo em `steps`
+    // passos, limitado a `maxSpeed`; ao terminar o jogador segura posição no ponto final.
+    // `curve` (rad) faz o trajeto em arco até o mesmo alvo; a velocidade sai alta e freia no fim.
+    dash(p, tx, ty, { steps = 14, maxSpeed = 30, sound = true, curve = 0 } = {}) {
+        const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1;
+        const len = Math.abs(curve) > 0.01 ? d * (curve / 2) / Math.sin(curve / 2) : d;
+        p.dashAng = Math.atan2(dy, dx) - curve / 2;
+        p.dashTurn = curve / len;
+        p.dashDirX = Math.cos(p.dashAng); p.dashDirY = Math.sin(p.dashAng);
+        p.dashSpeed = Math.min(maxSpeed, len / steps);
+        p.dashSteps = steps;
+        p.dashT = steps;
+        p.dashing = true;
+        p._dashFlashT = PLAYER_DASH.flashSteps;
+        p._landT = 0;
+        p.stumble = 0; p.swerveT = 0; p.brakeT = 0;
+        p.goal = { follow: true, x: tx, y: ty, gain: 0.3, max: 8 };
+        p.facingLeft = dx < 0;
+        p.tiltKick = 0.4 * Math.sign(dx || 1);
+        this.particles.triggerDust(p.x, p.y + 14, -p.dashDirX, -p.dashDirY, PLAYER_DASH.dustCount);
+        if (sound) this.sfx('whoosh', p.x, p.y, { vol: 0.5, rate: 1.45 + Math.random() * 0.2, cool: 0.03 });
+        this.renderer.triggerShake(PLAYER_DASH.shake);
+    }
+
+    _tickDash(p) {
+        if (p._dashFlashT > 0) p._dashFlashT--;
+        if (p._landT > 0 && !p.dashing) p._landT--;
+        const imgs = p.afterimages;
+        if (!imgs) return;
+        for (let i = imgs.length - 1; i >= 0; i--) if (--imgs[i].life <= 0) imgs.splice(i, 1);
+        if (!p.dashing || !p.sprite?.animated || p.dashT % PLAYER_DASH.afterimageEvery !== 0) return;
+        imgs.push({
+            x: p.x, y: p.y - p.hopZ, tilt: p.tilt, facingLeft: p.facingLeft,
+            scale: p.dashScale, sp: p.resolveSprite(), life: PLAYER_DASH.afterimageLife
+        });
+        if (imgs.length > PLAYER_DASH.afterimages + 2) imgs.shift();
     }
 
     ensureSize(w, h) {
@@ -364,7 +405,7 @@ export class ActionArena {
         for (const p of [p1, p2]) this._drive(p);
         if (this.connected) this._rope(p1, p2);
         else this._bump(p1, p2);
-        for (const p of [p1, p2]) { this._animate(p); if (p.hurtTimer > 0) p.hurtTimer--; }
+        for (const p of [p1, p2]) { this._animate(p); this._tickDash(p); if (p.hurtTimer > 0) p.hurtTimer--; }
 
         if (this.sawVisible && this.freeSaw) {
             const f = this.freeSaw;
@@ -482,6 +523,29 @@ export class ActionArena {
                 this.onWallHit?.(p, side);
             }
             else if (Math.hypot(p.vx, p.vy) < 1.2) p.airborne = false;
+            return;
+        }
+        // Hit-stop local: o jogador congela no meio do dash (a serra fica presa no alvo) e depois segue.
+        if (p.dashFreeze > 0) { p.dashFreeze--; p.vx = p.vy = 0; return; }
+        if (p.dashT > 0) {
+            const k = 1 - p.dashT / (p.dashSteps || p.dashT);
+            const v = p.dashSpeed * (1.5 - k);
+            p.dashDirX = Math.cos(p.dashAng ?? Math.atan2(p.dashDirY, p.dashDirX));
+            p.dashDirY = Math.sin(p.dashAng ?? Math.atan2(p.dashDirY, p.dashDirX));
+            if (p.dashAng !== undefined) p.dashAng += (p.dashTurn || 0) * v;
+            p.dashT--;
+            p.vx = p.dashDirX * v;
+            p.vy = p.dashDirY * v;
+            p.x = Math.max(b.minX + 10, Math.min(b.maxX - 10, p.x + p.vx));
+            p.y = Math.max(b.minY + 10, Math.min(b.maxY - 6, p.y + p.vy));
+            if (p.dashT === 0) {
+                p.dashing = false;
+                p._landT = PLAYER_DASH.landSteps;
+                p.vx = p.dashDirX * PLAYER_DASH.exitSpeed;
+                p.vy = p.dashDirY * PLAYER_DASH.exitSpeed;
+                this.particles.triggerDust(p.x, p.y + 14, 0, 0, PLAYER_DASH.landDust);
+                this.onDashEnd?.(p);
+            }
             return;
         }
         let tvx = 0, tvy = 0;

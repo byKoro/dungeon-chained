@@ -31,6 +31,13 @@ export class ChestSystem {
         return this.opened.has(this._id(roomKey, prop));
     }
 
+    // Reset de uma sala (morte na sala): esquece os baús abertos/escondidos dela para que voltem a fechar.
+    forgetRoom(roomKey) {
+        const prefix = `${roomKey}/`;
+        for (const id of [...this.opened.keys()]) if (id.startsWith(prefix)) this.opened.delete(id);
+        for (const id of [...this.hidden]) if (id.startsWith(prefix)) this.hidden.delete(id);
+    }
+
     // Baú guardado por um evento (ex.: dentro da gaiola): não aparece, não colide e não abre por interagir.
     setHidden(roomKey, prop, hidden) {
         const id = this._id(roomKey, prop);

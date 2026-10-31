@@ -81,12 +81,21 @@ assert(ropes.solidCircles().length === 1, "estaca fica depois do corte");
     assert(reborn.ropes[0].cut && !reborn.ropes[0].drop, "corda cortada continua cortada");
 }
 
-// Estaca sem `drop` autorado: o baú cai na própria estaca (compatibilidade).
+// Estaca sem `drop` autorado: o baú cai um tile abaixo da estaca quando esse tile é piso (em cima dela fica estranho).
 {
     completed.clear(); hidden.clear(); liveProps.length = 0;
-    const apiNoDrop = { ...api, authored: { interactives: [{ type: "chestRope", id: "c2", col: 7, row: 9 }] } };
-    const rc = new RopeChests({ api: apiNoDrop, rng: () => 0.5 });
-    assert(rc.ropes[0].chest.col === 7 && rc.ropes[0].chest.row === 9, "sem ponto de queda: baú nasce na estaca");
+    const kinds = []; kinds[10] = "fffffffff"; // piso na linha 10 (abaixo da estaca em row 9)
+    const apiBelow = { ...api, authored: { kinds, interactives: [{ type: "chestRope", id: "c2", col: 7, row: 9 }] } };
+    const rc = new RopeChests({ api: apiBelow, rng: () => 0.5 });
+    assert(rc.ropes[0].chest.col === 7 && rc.ropes[0].chest.row === 10, "sem ponto de queda, com piso abaixo: baú cai um tile abaixo da estaca");
+}
+
+// Estaca sem `drop` e sem piso abaixo: o baú cai na própria estaca (não cai em parede/buraco).
+{
+    completed.clear(); hidden.clear(); liveProps.length = 0;
+    const apiNoFloor = { ...api, authored: { kinds: [], interactives: [{ type: "chestRope", id: "c3", col: 7, row: 9 }] } };
+    const rc = new RopeChests({ api: apiNoFloor, rng: () => 0.5 });
+    assert(rc.ropes[0].chest.col === 7 && rc.ropes[0].chest.row === 9, "sem ponto de queda e sem piso abaixo: baú nasce na estaca");
 }
 
 // Anel "passe a serra aqui" só aparece quando a dupla tem a serra (chain.hasSaw).

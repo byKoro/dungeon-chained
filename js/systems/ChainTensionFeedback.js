@@ -26,18 +26,6 @@ export function tensionAudioTargets({ effort = 0, risk = 0 }, active = true) {
     };
 }
 
-export function tensionGlowTargets({ effort = 0, risk = 0, pulse = 0 }, reducedMotion = false) {
-    const g = C.glow;
-    const heat = clamp(Math.max(effort * 0.55, risk));
-    const from = heat < 0.5 ? g.low : g.medium;
-    const to = heat < 0.5 ? g.medium : g.high;
-    const blend = heat < 0.5 ? heat * 2 : (heat - 0.5) * 2;
-    const color = from.map((channel, i) => Math.round(channel + (to[i] - channel) * blend));
-    const breathing = 1 - g.pulseDepth * risk * (reducedMotion ? C.motion.reduced : 1)
-        * (0.5 + 0.5 * Math.sin(pulse * Math.PI * 2));
-    return { color: `rgb(${color.join(',')})`, strength: Math.sqrt(clamp(effort)) * breathing };
-}
-
 export class ChainTensionFeedback {
     constructor({ audio, reducedMotion = false } = {}) {
         this.audio = audio;
@@ -45,6 +33,7 @@ export class ChainTensionFeedback {
         this.voice = null;
         this.state = { effort: 0, risk: 0, phase: 0, pulse: 0, settle: 0, expression: null, motionScale: this.motionScale };
         this.snapTime = 0;
+        this.snapPoint = null;
         this.lastTargetEffort = 0;
         this.lastTime = null;
     }
@@ -54,13 +43,15 @@ export class ChainTensionFeedback {
         this.voice = null;
         Object.assign(this.state, { effort: 0, risk: 0, phase: 0, pulse: 0, settle: 0, expression: null });
         this.snapTime = 0;
+        this.snapPoint = null;
         this.lastTargetEffort = 0;
         this.lastTime = null;
         for (const p of players) if (p) p.tensionExpression = null;
     }
 
-    onSnap() {
+    onSnap(point = null) {
         this.snapTime = C.snapSeconds;
+        this.snapPoint = point;
         this.voice?.set({ level: 0 }, C.inactiveTau);
     }
 
@@ -81,83 +72,54 @@ export class ChainTensionFeedback {
             if (target.effort === 0 && this.lastTargetEffort > 0 && oldEffort >= C.effortExit && chain.isConnected) s.settle = C.settleSeconds;
             s.settle = Math.max(0, s.settle - dt);
             this.snapTime = Math.max(0, this.snapTime - dt);
-            s.phase += dt * Math.PI * 2 * (C.motion.hzMin + (C.motion.hzMax - C.motion.hzMin) * s.effort);
-            s.pulse += dt * (C.motion.pulseHzMin + (C.motion.pulseHzMax - C.motion.pulseHzMin) * s.risk);
         }
         this.lastTargetEffort = target.effort;
-        const critical = s.expression === C.expressions.critical ? C.criticalExit : C.criticalEnter;
-        const effort = s.expression ? C.effortExit : C.effortEnter;
-        s.expression = s.risk >= critical ? C.expressions.critical : s.effort >= effort ? C.expressions.effort : null;
-        if (!chain.isConnected || !active) s.expression = null;
-        for (const p of players) if (p) p.tensionExpression = p.falling || p.lives <= 0 ? null : s.expression;
+        // Sem cara de raiva/fúria: a tensão é mostrada só pela corda (afina + pisca), não pelo rosto.
+        s.expression = null;
+        for (const p of players) if (p) p.tensionExpression = null;
         chain.weapon.tensionFeedback = s;
         const sound = tensionAudioTargets(s, active && chain.isConnected);
         if (sound.level > 0 && !this.voice) this.voice = this.audio?.createLoopVoice('chainTension') ?? null;
         this.voice?.set(sound, active && chain.isConnected ? C.attackTau : C.inactiveTau);
     }
 
-    _drawGlow(ctx, p1, p2, weapon) {
-        if (!weapon) return;
-        const g = C.glow;
-        const { color, strength } = tensionGlowTargets(this.state, this.motionScale < 1);
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = color;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        const saws = weapon.getSawPositions(p1, p2);
-        let drawing = false;
-        for (let i = 0; i <= g.samples; i++) {
-            const t = g.inset + i / g.samples * (1 - g.inset * 2);
-            const p = weapon.visualCablePoint(p1, p2, t);
-            if (saws.some(saw => Math.hypot(p.x - saw.x, p.y - saw.y) < weapon.discRadius)) {
-                drawing = false;
-                continue;
-            }
-            const x = Math.round(p.x / C.motion.pixel) * C.motion.pixel;
-            const y = Math.round(p.y / C.motion.pixel) * C.motion.pixel;
-            if (!drawing) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-            drawing = true;
-        }
-        for (const [width, alpha] of [[g.haloWidth, g.haloAlpha], [g.bodyWidth, g.bodyAlpha], [g.coreWidth, g.coreAlpha]]) {
-            ctx.lineWidth = width;
-            ctx.globalAlpha = strength * alpha;
-            ctx.stroke();
-        }
-        ctx.restore();
+    // Só o estalo da ruptura desenha aqui. O aviso de tensão (afinar + piscar) mora na própria
+    // corda em SawWeapon.drawChain — sem glow vermelho nem anéis sobre o canvas.
+    draw(ctx, p1, p2, connected, weapon) {
+        if (this.snapTime > 0) this._drawSnap(ctx, p1, p2);
     }
 
-    draw(ctx, p1, p2, connected, weapon) {
-        const s = this.state, m = C.motion;
-        if ((!connected || s.effort < C.effortExit) && this.snapTime <= 0) return;
-        if (connected) this._drawGlow(ctx, p1, p2, weapon);
-        const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
-        const nx = (p2.x - p1.x) / distance, ny = (p2.y - p1.y) / distance;
-        const progress = s.pulse % 1;
-        const snap = this.snapTime > 0 ? 1 - this.snapTime / C.snapSeconds : null;
-        const radius = m.pulseRadius + (snap === null ? progress * m.pulseTravel : snap * m.snapTravel) * this.motionScale;
-        const alpha = snap === null ? (1 - progress) * s.effort : (1 - snap);
+    // Estalo: corte seco. As duas metades do cabo recuam RETAS e RÁPIDO pra cada jogador e somem
+    // num piscar (sem overshoot, sem onda, sem acomodação). `k` 0→1 é o progresso do estalo.
+    _drawSnap(ctx, p1, p2) {
+        const cfg = C.snap;
+        const k = 1 - this.snapTime / C.snapSeconds;
+        const mid = this.snapPoint ?? { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        // Tudo acontece na janela inicial `cutWindow`: a ponta some por completo e o resto é vazio.
+        const w = Math.min(1, k / (cfg.cutWindow ?? 0.4));
+        if (w >= 1) return; // corte terminou: nada desenhado (abrupto, sem rastro)
+
+        // Recuo linear e veloz (ease-out forte, sem back): a ponta livre volta rápido pro jogador.
+        const retract = 1 - Math.pow(1 - w, 3);
+
         ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = s.risk >= C.criticalExit || snap !== null ? m.light : m.dark;
-        for (const [p, dir] of [[p1, 1], [p2, -1]]) {
+        ctx.lineCap = 'butt'; // ponta reta, não arredondada — leitura de corte
+        ctx.strokeStyle = cfg.color;
+        ctx.globalAlpha = 1; // sem fade suave: a corda é opaca até sumir de uma vez
+
+        for (const p of [p1, p2]) {
             if (p.falling) continue;
-            const x = p.x + nx * dir * m.anchorInset;
-            const y = p.y + ny * dir * m.anchorInset;
-            if (snap !== null) {
-                ctx.strokeStyle = m.light;
-                ctx.lineWidth = m.pixel;
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(x + nx * dir * m.snapTravel * (1 - snap), y + ny * dir * m.snapTravel * (1 - snap));
-                ctx.stroke();
-            }
-            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-                const px = Math.round((x + dx * radius) / m.pixel) * m.pixel;
-                const py = Math.round((y + dy * radius) / m.pixel) * m.pixel;
-                ctx.fillRect(px, py, m.pixel * 2, m.pixel);
-            }
+            const ax = p.x, ay = p.y;
+            let dx = mid.x - ax, dy = mid.y - ay;
+            const len = Math.hypot(dx, dy) || 1;
+            dx /= len; dy /= len;
+            // Da âncora até a ponta que recua: comprimento encolhe reto até zero.
+            const tip = len * (1 - retract);
+            ctx.beginPath();
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(ax + dx * tip, ay + dy * tip);
+            ctx.lineWidth = cfg.thickness;
+            ctx.stroke();
         }
         ctx.restore();
     }

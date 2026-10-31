@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { ChainTensionFeedback, tensionTargets, tensionAudioTargets, tensionGlowTargets } from '../js/systems/ChainTensionFeedback.js';
+import { ChainTensionFeedback, tensionTargets, tensionAudioTargets } from '../js/systems/ChainTensionFeedback.js';
 import { Chain } from '../js/core/Chain.js';
 import { SawWeapon } from '../js/weapons/SawWeapon.js';
 import { CHAIN } from '../js/config/ChainConfig.js';
+import { CHAIN_TENSION as C } from '../js/config/ChainTensionConfig.js';
 import { Player } from '../js/entities/Player.js';
 import { playerConfigs } from '../js/config/EntityConfig.js';
 
@@ -56,30 +57,15 @@ test('áudio aumenta ganho, altura e abertura; inatividade silencia', () => {
     assert.equal(tensionAudioTargets({ effort: 1, risk: 1 }, false).level, 0);
     assert.equal(tensionAudioTargets({ effort: 0, risk: 0 }).level, 0);
 });
-test('brilho permanece visível e progride do vermelho escuro ao vermelho quente', () => {
-    const rest = tensionGlowTargets({ effort: 0 });
-    const light = tensionGlowTargets({ effort: 0.23, risk: 0 });
-    const hot = tensionGlowTargets({ effort: 0.9, risk: 0.9 });
-    assert.equal(rest.strength, 0);
-    assert(light.strength > 0.4 && hot.strength > light.strength);
-    assert.notEqual(light.color, hot.color);
-    for (const pulse of [0, 0.25, 0.5, 0.75]) {
-        assert(tensionGlowTargets({ effort: 1, risk: 1, pulse }).strength > 0.7, 'aviso crítico não apaga entre pulsos');
-    }
-});
-test('expressões têm histerese e alívio termina em 250ms sem reiniciar acomodação', () => {
+test('a tensão nunca coloca cara de raiva/fúria nos jogadores', () => {
     const c = chain(), p = players(190), f = new ChainTensionFeedback();
     let now = 0;
     const tick = (count, options = {}) => { for (let i = 0; i < count; i++) f.update(c, p, options, now += 1000 / 60); };
     c.strain = c.strainLimit * 0.9; tick(12);
-    assert.equal(p[0].tensionExpression, 'furia');
-    c.strain = c.strainLimit * 0.65; tick(12);
-    assert.equal(p[0].tensionExpression, 'furia');
-    c.strain = c.strainLimit * 0.55; tick(12);
-    assert.equal(p[0].tensionExpression, 'raiva');
-    c.strain = 0; p[1].x = c.rest; tick(15);
     assert.equal(p[0].tensionExpression, null);
-    assert(f.state.effort < 0.02); assert.equal(f.state.settle, 0);
+    assert.equal(p[1].tensionExpression, null);
+    assert.equal(f.state.expression, null);
+    assert(f.state.risk > 0, 'o risco ainda sobe (só o rosto não reage mais)');
 });
 test('voz única, snap imediato, pausa, desconexão, ausência da serra e reset', () => {
     let created = 0, stopped = 0, last;
@@ -101,19 +87,32 @@ test('voz única, snap imediato, pausa, desconexão, ausência da serra e reset'
     c.present = false; assert.deepEqual(tensionTargets(c, ...p), { effort: 0, risk: 0 });
     f.reset(p); assert.equal(stopped, 1); assert.equal(f.voice, null);
 });
-test('vibração desenhada não altera cabo físico nem posição da serra', () => {
+test('cabo só treme no limite: abaixo do risco segue a reta, perto da ruptura chacoalha', () => {
     const c = chain(), p = players(210), w = c.weapon;
-    const before = w.getSawPositions(...p);
-    w.tensionFeedback = { effort: 1, phase: 0.7, settle: 0, motionScale: 1 };
-    assert.deepEqual(w.getSawPositions(...p), before);
-    assert.deepEqual(w.visualCablePoint(...p, 0), w.cablePoint(...p, 0));
-    assert.deepEqual(w.visualCablePoint(...p, 1), w.cablePoint(...p, 1));
-    assert.notDeepEqual(w.visualCablePoint(...p, 0.4), w.cablePoint(...p, 0.4));
-    w.tensionFeedback.effort = 0.23;
-    assert(Array.from({ length: 20 }, (_, i) => (i + 1) / 21).some(t => {
-        const visual = w.visualCablePoint(...p, t), physical = w.cablePoint(...p, t);
-        return visual.x !== physical.x || visual.y !== physical.y;
-    }), 'vibração leve deve sobreviver à quantização de pixels');
+    // Risco baixo (abaixo de preSnapShake.start): sem tremida, segue a reta física.
+    w.tensionFeedback = { effort: 1, risk: C.preSnapShake.start - 0.05, motionScale: 1 };
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+        assert.deepEqual(w.visualCablePoint(...p, t), w.cablePoint(...p, t), 'sem tremida longe do limite');
+    }
+    // Risco máximo: âncoras (t=0 e t=1) presas, mas o meio desvia da reta em algum momento da fase.
+    w.tensionFeedback = { effort: 1, risk: 1, motionScale: 1 };
+    assert.deepEqual(w.visualCablePoint(...p, 0), w.cablePoint(...p, 0), 't=0 fica preso no jogador');
+    assert.deepEqual(w.visualCablePoint(...p, 1), w.cablePoint(...p, 1), 't=1 fica preso no jogador');
+    const amp = (risk) => { w.tensionFeedback = { effort: 1, risk, motionScale: 1 }; return Math.max(...Array.from({ length: 40 }, (_, i) => { w.shakePhase = i / 40 * Math.PI * 2; const v = w.visualCablePoint(...p, 0.5), q = w.cablePoint(...p, 0.5); return Math.hypot(v.x - q.x, v.y - q.y); })); };
+    const start = amp(C.preSnapShake.start + 0.02), full = amp(1);
+    assert(start > 0 && start < 2, 'logo que entra em tensão é só uma tremidinha sutil');
+    assert(full > start + 1, 'a tremida cresce bastante rumo à ruptura');
+});
+test('a corda pisca conforme o risco (opacidade cai no vale, piso em 1 sem risco)', () => {
+    const w = new SawWeapon();
+    w.tensionFeedback = { risk: 0 };
+    assert.equal(w._cableAlpha(), 1, 'sem risco a corda não pisca');
+    w.tensionFeedback = { risk: 1 };
+    // Varre a fase do piscar: deve existir um vale (alpha < 1) e um pico perto de 1.
+    let lo = 1, hi = 0;
+    for (let i = 0; i < 64; i++) { w.blinkPhase = i / 64 * Math.PI * 2; const a = w._cableAlpha(); lo = Math.min(lo, a); hi = Math.max(hi, a); }
+    assert(lo < 1 - C.cableBlink.depthMax * 0.4, 'no risco alto a opacidade cai bastante no vale');
+    assert(hi > 0.98, 'a corda volta a quase cheia no pico do piscar');
 });
 test('sprite de esforço preserva animação; dano e expressão explícita prevalecem', () => {
     const img = { complete: true, naturalWidth: 800 };
@@ -129,5 +128,25 @@ test('sprite de esforço preserva animação; dano e expressão explícita preva
     p.hurtTimer = 0; p.expression = 'furia';
     assert.equal(p.resolveSprite().sheet, angry);
     p.expression = null; p.scaredTimer = 2; assert.equal(p.resolveSprite().sheet, scared);
+});
+test('cabo afina conforme o risco sobe e tem piso mínimo', () => {
+    const w = new SawWeapon();
+    w.tensionFeedback = { risk: 0 };
+    assert.equal(w._cableThickness(), 1, 'em repouso o cabo tem espessura cheia');
+    w.tensionFeedback = { risk: 0.5 };
+    const mid = w._cableThickness();
+    w.tensionFeedback = { risk: 1 };
+    const full = w._cableThickness();
+    assert(mid < 1 && full < mid, 'mais risco, mais fino');
+    assert(full >= C.cableThin.minThickness - 1e-9, 'não afina além do piso mínimo');
+});
+test('onSnap guarda o ponto de ruptura e arma o corte; reset limpa', () => {
+    const f = new ChainTensionFeedback();
+    f.onSnap({ x: 120, y: 40 });
+    assert.deepEqual(f.snapPoint, { x: 120, y: 40 });
+    assert.equal(f.snapTime, C.snapSeconds, 'o corte dura snapSeconds');
+    f.reset([]);
+    assert.equal(f.snapPoint, null, 'reset limpa o ponto de ruptura');
+    assert.equal(f.snapTime, 0);
 });
 console.log(`${passed}/${passed} ok`);

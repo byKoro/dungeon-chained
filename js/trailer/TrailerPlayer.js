@@ -10,7 +10,7 @@ import { ArrowRunShot } from './scenes/rush/ArrowRunShot.js';
 import { HoleRunShot } from './scenes/rush/HoleRunShot.js';
 import { ButtonDoorShot } from './scenes/rush/ButtonDoorShot.js';
 import { GiantSawShot } from './scenes/rush/GiantSawShot.js';
-import { BossWallShot } from './scenes/rush/BossWallShot.js';
+import { ArautoBossShot } from './scenes/rush/ArautoBossShot.js';
 import { TrailerAudio } from './audio/TrailerAudio.js';
 import { PauseScreen } from '../ui/PauseScreen.js';
 import { playUi, preloadUi } from '../ui/UiSound.js';
@@ -29,12 +29,12 @@ const SCENE_MOOD = {
     HoleRunShot: [-2, 16000, 0.3],
     ButtonDoorShot: [-5, 9000, 0.3],
     GiantSawShot: [-3, 14000, 0.3],
-    BossWallShot: [-20, 650, 0.5]
+    ArautoBossShot: [-20, 650, 0.5]
 };
 
 const SCENES = [
     IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene,
-    ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot, BossWallShot
+    ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot, ArautoBossShot
 ];
 
 const IMPACT_INVERT = 0.06;
