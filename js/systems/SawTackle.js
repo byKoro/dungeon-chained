@@ -25,6 +25,8 @@ export class SawTackle {
         this.distance = 0;
         this.landingRoute = [];
         this.landingRetry = 0;
+        this.landingFails = 0;
+        this.stalled = 0;
         this.processed = new Set();
         this.stuck = null;
         this.homing = null;
@@ -174,6 +176,7 @@ export class SawTackle {
     }
 
     _launch(dir, speed) {
+        this.stalled = 0;
         this.state = 'flight';
         this.vx = dir.x * speed;
         this.vy = dir.y * speed;
@@ -236,6 +239,13 @@ export class SawTackle {
         return false;
     }
 
+    // A serra encosta (com uma folga) num corpo sólido já atingido neste lançamento.
+    _touchingProcessed(w) {
+        const r = w.discRadius * this.cfg.enemyContactScale + this.cfg.sweepStep;
+        for (const e of this.processed) if (this._insideBody(e, w.dropX, w.dropY, r)) return true;
+        return false;
+    }
+
     _insideBody(e, x, y, r) {
         if (!e?.immovable || !e.collisionBodies || e.ignoresEntityCollisions) return false;
         return e.collisionBodies.some(body => Math.hypot(
@@ -270,10 +280,32 @@ export class SawTackle {
         this.vy = Math.sin(a) * speed;
     }
 
+    // Serra já dentro de algo que bloqueia (encostada na parede além da margem do voo, ou dentro do corpo do
+    // Arauto que mexeu os braços): todo passo seria bloqueado nos dois sentidos e ela ficaria parada para sempre.
+    // Leva para o ponto livre mais próximo, de preferência contra o movimento. Devolve false se não achou.
+    _unstick(w) {
+        if (!this._blocked(w, w.dropX, w.dropY)) return true;
+        const c = this.cfg, max = w.discRadius * c.unstickMaxScale;
+        const away = unit(-this.vx, -this.vy, 0, 0);
+        for (let r = c.unstickStep; r <= max; r += c.unstickStep) {
+            let best = null;
+            for (let i = 0; i < 16; i++) {
+                const a = i * Math.PI / 8, x = w.dropX + Math.cos(a) * r, y = w.dropY + Math.sin(a) * r;
+                if (this._blocked(w, x, y)) continue;
+                const score = Math.cos(a) * away.x + Math.sin(a) * away.y;
+                if (!best || score > best.score) best = { x, y, score };
+            }
+            if (best) { w.dropX = best.x; w.dropY = best.y; return true; }
+        }
+        return false;
+    }
+
     _updateFlight(w) {
         const c = this.cfg, boss = this.mode === 'boss';
         const coast = !boss && this.flightMode === 'coast';
         this.elapsed++;
+        if (!this._unstick(w)) { this._land(w); return; }
+        this._stepFrom = { x: w.dropX, y: w.dropY };
         let speed = Math.hypot(this.vx, this.vy);
         if (!boss && !coast) { speed = c.speed; this._steer(w, speed); }
         const steps = Math.max(1, Math.ceil(speed / c.sweepStep));
@@ -293,6 +325,13 @@ export class SawTackle {
             }
         }
         w.dropSpin = c.spin;
+        // Sem sair do lugar por vários passos (quinas, ou o volante empurrando contra o corpo do Arauto): cai no
+        // piso seguro em vez de ficar quicando parada.
+        const moved = Math.hypot(w.dropX - this._stepFrom.x, w.dropY - this._stepFrom.y);
+        this.stalled = moved < c.stallMinMove ? this.stalled + 1 : 0;
+        if (this.stalled >= c.stallSteps) { this._land(w); return; }
+        // Na volta direta, bater no Arauto (e não numa parede) troca para a volta normal com quiques.
+        if (bounced && this.specialReturn && this._touchingProcessed(w)) this.specialReturn = false;
         if (bounced) this._bounceFeedback(w);
         if (bounced && this.homing) {
             this.steerPause = c.steerPauseSteps;
@@ -326,9 +365,11 @@ export class SawTackle {
     _land(w) {
         const p = this.safeDrop(w.dropX, w.dropY);
         if (Math.hypot(p.x - w.dropX, p.y - w.dropY) > 1e-6 || this._blocked(w, w.dropX, w.dropY)) {
+            if (this.state !== 'landing') this.landingFails = 0;
             this.state = 'landing';
             this.stuck = null;
             this.homing = null;
+            this._unstick(w);
             this.landingRoute = this.findLandingRoute
                 ? this.findLandingRoute(w.dropX, w.dropY, (x, y) => this._blocked(w, x, y)) || [] : [p];
             this.landingRetry = this.cfg.landingRepathSteps;
@@ -337,12 +378,22 @@ export class SawTackle {
         this._finishLanding();
     }
 
+    // Sem rota depois de várias tentativas (cercada ou presa): cai direto no piso seguro, sem ficar parada no ar.
+    _forceLanding(w) {
+        const p = this.safeDrop(w.dropX, w.dropY);
+        w.dropX = p.x;
+        w.dropY = p.y;
+        this._finishLanding();
+    }
+
     _updateLanding(w) {
         if (!this.landingRoute.length) {
             if (--this.landingRetry > 0) return;
+            if (++this.landingFails > this.cfg.landingMaxRetries) { this._forceLanding(w); return; }
             this._land(w);
             if (this.state !== 'landing' || !this.landingRoute.length) return;
         }
+        this._unstick(w);
         const target = this.landingRoute[0];
         const dx = target.x - w.dropX, dy = target.y - w.dropY, distance = Math.hypot(dx, dy);
         const travel = Math.min(distance, this.cfg.landingSpeed);

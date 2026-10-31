@@ -70,7 +70,7 @@
         "p2": { "col": 12, "row": 4 }
       },
       "lock": "none",
-      "type": "normal",
+      "type": "boss",
       "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29]
     },
     "2,0": {
@@ -105,14 +105,21 @@
         { "col": 0, "row": 3, "type": "normal", "width": 2, "id": "door_0" }
       ],
       "props": [],
-      "enemies": [],
+      "enemies": [
+        { "col": 9, "row": 3, "type": "blackKnightB" },
+        { "col": 7, "row": 5, "type": "blackKnightB" },
+        { "col": 10, "row": 6, "type": "blackKnightB" }
+      ],
       "hazards": [],
       "torches": [],
       "interactives": [],
       "zones": [],
       "encounters": [],
       "bars": [],
-      "spawns": null,
+      "spawns": {
+        "p1": { "col": 1, "row": 3 },
+        "p2": { "col": 1, "row": 4 }
+      },
       "lock": "none",
       "type": "normal",
       "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29]

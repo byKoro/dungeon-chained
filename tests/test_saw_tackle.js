@@ -464,4 +464,46 @@ for (const attack of ['attack', 'attack3']) {
     assert.equal(s.tackle.vx, -SAW_TACKLE.speed, 'novo tackle renova a velocidade');
 }
 
-console.log('Tackle da serra: versões com retorno e sem retorno, desaceleração por percurso, quiques, hits, Arauto, reconexão e jogador passaram.');
+// --- serra encostada na parede: o tackle não deixa ela presa ---
+for (const dir of [[1, 0], [-1, 0], [0, 1], [1, 1]]) {
+    // Parede à direita em x ≥ 1020; a serra fica dentro da margem do voo (raio × wallContactScale ≈ 16 px).
+    const s = setup({ sawX: 1012, sawY: 1000, isSolid: (x) => x >= 1020 });
+    const m = Math.hypot(dir[0], dir[1]);
+    s.p1.x = 1012 - dir[0] / m * 28; s.p1.y = 1000 - dir[1] / m * 28;
+    dashing(s.p1, dir[0], dir[1]);
+    s.tackle.update();
+    assert.equal(s.p1.tackles, 1, `dash ${dir}: houve tackle`);
+    let moved = 0;
+    for (let i = 0; i < 400 && s.tackle.state; i++) {
+        const x = s.w.dropX, y = s.w.dropY;
+        s.tackle.update();
+        moved += Math.hypot(s.w.dropX - x, s.w.dropY - y);
+    }
+    assert.equal(s.tackle.state, null, `dash ${dir}: o voo termina`);
+    assert.ok(moved > 0, `dash ${dir}: a serra sai do lugar`);
+    assert.ok(s.w.dropX < 1020, `dash ${dir}: termina fora da parede`);
+}
+
+// --- serra dentro do corpo do Arauto (braço que se mexeu, volta direta bloqueada) não fica presa ---
+{
+    const boss = arauto(1060, 1000);
+    const s = setup({ sawX: 1040, sawY: 1000, enemies: [boss] });
+    Object.assign(s.tackle, { processed: new Set([boss]), specialReturn: true, homing: 'direct', mode: 'tackle',
+        origin: { x: 1200, y: 1000 }, state: 'flight', vx: SAW_TACKLE.speed, vy: 0 });
+    for (let i = 0; i < 600 && s.tackle.state; i++) s.tackle.update();
+    assert.equal(s.tackle.state, null, 'volta atrás do Arauto termina (contorna ou pousa)');
+    const r = s.w.discRadius * SAW_TACKLE.enemyContactScale;
+    assert.ok(Math.hypot((s.w.dropX - boss.x) / (48 + r), (s.w.dropY - boss.y) / (30 + r)) >= 1, 'termina fora do corpo');
+}
+{
+    // Sem nenhuma saída livre: pousa no piso seguro em vez de ficar parada no ar.
+    const boss = arauto(1000, 1000);
+    const s = setup({ sawX: 1000, sawY: 1000, enemies: [boss], isSolid: () => true });
+    Object.assign(s.tackle, { processed: new Set([boss]), specialReturn: true, mode: 'tackle',
+        origin: { x: 1300, y: 1000 }, state: 'flight', vx: SAW_TACKLE.speed, vy: 0 });
+    for (let i = 0; i < 400 && s.tackle.state; i++) s.tackle.update();
+    assert.equal(s.tackle.state, null, 'cercada: pousa em vez de ficar parada');
+    assert.ok(s.log.drops.length >= 1, 'usa o piso seguro');
+}
+
+console.log('Tackle da serra: versões com retorno e sem retorno, desaceleração por percurso, quiques, hits, Arauto, reconexão, jogador e serra presa em parede/Arauto passaram.');

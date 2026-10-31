@@ -42,6 +42,15 @@ export const SAW_TACKLE = Object.freeze({
     coastMinSpeed: 1,
     landingSpeed: 4,
     landingRepathSteps: 15,
+    // Em voo, andar menos que `stallMinMove` px por `stallSteps` passos seguidos = presa: pousa.
+    stallMinMove: 1,
+    stallSteps: 8,
+    // Sem rota para pousar depois destas tentativas: cai direto no piso seguro mais próximo.
+    landingMaxRetries: 4,
+    // Serra já dentro de parede ou do corpo do Arauto: procura o ponto livre mais próximo em anéis de
+    // `unstickStep` px, até o raio do disco × `unstickMaxScale`, antes de mover.
+    unstickStep: 4,
+    unstickMaxScale: 3,
 
     // Presa no inimigo.
     hits: 5,
