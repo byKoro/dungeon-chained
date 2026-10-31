@@ -9,8 +9,8 @@ const unit = (x, y, fx = 1, fy = 0) => { const d = Math.hypot(x, y); return d > 
 export class SawTackle {
     constructor({ chain, getPlayers, getRoom, getBounds = () => null, isSolid = () => false,
         safeDrop = (x, y) => ({ x, y }), findLandingRoute = null, canLand = null, getAimTargets = null, onEnemyHit = null, audio = null, particleSystem = null, renderer = null,
-        cfg = SAW_TACKLE, flightMode = cfg.flightMode, feedback = null }) {
-        Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, getAimTargets, onEnemyHit, audio, particleSystem, renderer, cfg });
+        cfg = SAW_TACKLE, flightMode = cfg.flightMode, feedback = null, canTackle = () => true }) {
+        Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, getAimTargets, onEnemyHit, audio, particleSystem, renderer, cfg, canTackle });
         this.flightMode = flightMode === 'coast' ? 'coast' : 'return';
         this.feedback = feedback;
         this.trail = [];
@@ -94,7 +94,8 @@ export class SawTackle {
             const d = Math.hypot(w.dropX - p.x, w.dropY - p.y);
             if (!best || d < best.d) best = { p, d, R: r + (p.hitRadius ?? 16) };
         });
-        if (best) this._tackle(w, best.p, best.R);
+        // Sem a Investida o dash só encosta: empurrão e arrasto seguem por conta deles.
+        if (best && this.canTackle()) this._tackle(w, best.p, best.R);
     }
 
     _tackle(w, p, R) {

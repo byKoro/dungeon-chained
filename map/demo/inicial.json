@@ -686,6 +686,7 @@
         { "col": 18, "row": 26, "index": 59, "generated": true },
         {
           "recipes": [
+            "tackle",
             "saw",
             "size",
             "inertia",

@@ -5,6 +5,9 @@ import { TILE } from './GameConfig.js';
 export const FORGE = Object.freeze({
     openRadius: 1.7 * TILE,
     recipes: Object.freeze({
+        // "Investida" (bigorna da Penhasco, grátis): dash na serra solta a lança (SawTackle). Nos mapas do
+        // Editor 2.0 o tackle só funciona com ela. Primeira no catálogo porque o editor ordena a bigorna por aqui.
+        tackle: { kind: "item", item: "saw", costs: [0] },
         saw: { kind: "item", costs: [10] },
         size: { kind: "upgrade", item: "saw", costs: [15, 30, 50], perLevel: 0.12 },
         // Solta (cabo arrebentado ou queda), a serra segue girando e cortando inimigos por `seconds[nível-1]`.

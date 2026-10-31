@@ -305,6 +305,8 @@ export class Game {
         this.sawTackle = new SawTackle({
             feedback: this.sawTackleFeedback,
             flightMode: this.mapData?.test?.sawTackleMode,
+            // Editor 2.0: só com a receita Investida (bigorna da Penhasco). Modo clássico não tem forja: liberado.
+            canTackle: () => !this.mapData || this.forge.has("tackle"),
             chain: this.chain, getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current,
             getBounds: () => this.arenaBounds,
             isSolid: (x, y) => this._sawSolidAt(x, y),
@@ -326,7 +328,7 @@ export class Game {
         this.dashPush = new DashPush({ getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current, particleSystem: this.particleSystem });
         // Melhoria "Vínculo": os dois perto curam com o tempo (sala "botas").
         this.coopHeal = new CoopHeal({ getPlayers: () => [this.p1, this.p2], particleSystem: this.particleSystem, audio: this.audio });
-        // Telinha ao ganhar o dash (ao pegar as botas): "vídeo" de uma sala real com o dash do jogador.
+        // Telinha ao ganhar uma habilidade (dash nas botas, Investida na bigorna): "vídeo" de uma sala real.
         this.abilityCard = this.mapData ? new AbilityCard({
             getDevice: i => this.input.deviceFor(i), assets: this.assets
         }) : null;
@@ -638,7 +640,9 @@ export class Game {
 
         const startsWithSaw = this._startsWithSaw();
         this.chain.reset({ present: startsWithSaw });
-        this.forge.reset({ items: startsWithSaw ? ["saw"] : [] });
+        const items = startsWithSaw ? ["saw"] : [];
+        if (this.mapData?.test?.progress?.tackle) items.push("tackle");
+        this.forge.reset({ items });
         this._roomForgeBuys?.clear();
         this._applySawUpgrades();
 
@@ -713,6 +717,11 @@ export class Game {
     _onForgeBuy(id, anvil) {
         this._recordRoomForgeBuy(id);
         this._applySawUpgrades();
+        if (id === "tackle") {
+            this.forgeSystem.close({ silent: true });
+            this.abilityCard?.show("ability.tackle");
+            return;
+        }
         if (id !== "saw") return;
         this.forgeSystem.close({ silent: true });
         this.sawCinematic.start(anvil);
@@ -1180,7 +1189,7 @@ export class Game {
         p2.update(this.input, this.arenaBounds, { canDash: canDash && !drag?.isDragging(1), feetInHole: this.tiles.feetInHole(p2), speedScale: drag?.speedScaleFor(1) ?? 1 });
         this._dashFeedback(p1);
         this._dashFeedback(p2);
-        if (p1.justDashed || p2.justDashed) this.abilityCard?.dismiss();
+        if (p1.justDashed || p2.justDashed) this.abilityCard?.notify("dash");
         this.dashTether.apply(p1, p2);
 
         this._resolveFall(p1);
@@ -1192,6 +1201,7 @@ export class Game {
         this.sawDrag?.update();
         // Antes do Chain: um tackle no mesmo passo que a reconexão vence (a serra fica travada no impacto).
         this.sawTackle.update();
+        if (this.sawTackle.justTackled) this.abilityCard?.notify("tackle");
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {

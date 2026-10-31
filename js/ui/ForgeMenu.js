@@ -74,9 +74,10 @@ export class ForgeMenu {
             if (r.max > 1) for (let n = 0; n < r.max; n++) {
                 rect(78 + n * 6, y + 4, 4, 4, n < r.level ? COLORS.gold : (usable ? FRAME.stoneDark : "#2b2735"));
             }
-            const right = r.status === "maxed" ? t("forge.max") : String(r.cost);
+            const free = r.status !== "maxed" && r.cost === 0;
+            const right = r.status === "maxed" ? t("forge.max") : free ? t("forge.free") : String(r.cost);
             const end = W - PAD - 2;
-            if (r.status === "maxed") text(right, end - measureText(right), y + 3, col);
+            if (r.status === "maxed" || free) text(right, end - measureText(right), y + 3, free && r.status === "ok" ? COLORS.ok : col);
             else {
                 const coinX = end - COIN_W;
                 text(right, coinX - COIN_GAP - measureText(right), y + 3, r.status === "poor" ? COLORS.red : col);
