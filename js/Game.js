@@ -15,6 +15,7 @@ import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './s
 import { SawDrag } from './systems/SawDrag.js';
 import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
+import { SawTackle } from './systems/SawTackle.js';
 import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
@@ -266,6 +267,24 @@ export class Game {
             isBlocked: (x, y) => this._sawDragBlocked(x, y),
             getBounds: () => this.arenaBounds,
             canPush: () => !this._sawOnAnvil && !this.sawDrag?.active && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
+        });
+        this.sawTackle = new SawTackle({
+            flightMode: this.mapData?.test?.sawTackleMode,
+            chain: this.chain, getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current,
+            getBounds: () => this.arenaBounds,
+            isSolid: (x, y) => this._sawSolidAt(x, y),
+            safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]),
+            findLandingRoute: (x, y, blocked) => this.tiles.safeDropRoute(x, y, [this.p1, this.p2], blocked),
+            canLand: (x, y) => {
+                const p = this.tiles.reachableDropPoint(x, y, [this.p1, this.p2]);
+                return p.x === x && p.y === y;
+            },
+            onEnemyHit: (enemy, result, impact) => {
+                const info = this.combat.feedbackForHit(enemy, result, impact);
+                enemy.freezeOnHit?.(info.hitStop);
+                if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
+            },
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         });
         this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
@@ -541,6 +560,7 @@ export class Game {
         this.forgeSystem?.reset();
         this.sawDrag?.reset();
         this.sawPush?.reset();
+        this.sawTackle.reset();
         this.roomEvents?.reset();
         this._respawnFadeAt = -Infinity;
         this.sawCinematic?.reset();
@@ -645,6 +665,7 @@ export class Game {
         this.scrap?.reset();
         this.sawDrag?.reset();
         this.sawPush?.reset();
+        this.sawTackle.reset();
         this.dialogue?.clear();
         this.forgeSystem?.close({ silent: true });
         this.gibs = [];
@@ -676,7 +697,11 @@ export class Game {
 
     // A serra largada (arrastada ou empurrada) não entra em buraco, parede, grade, estaca nem prop sólido.
     _sawDragBlocked(x, y) {
-        if (this.tiles.isHoleAtWorld(x, y)) return true;
+        return this.tiles.isHoleAtWorld(x, y) || this._sawSolidAt(x, y);
+    }
+
+    // Sólidos para a serra (paredes, grades, estacas, props sólidos); buracos não contam: em voo ela os cruza.
+    _sawSolidAt(x, y) {
         const r = this.chain.weapon?.collisionRadius ?? 16;
         const boxes = [...(this.rooms.current?.wallBoxes || []), ...(this.roomEvents?.solidBoxes() ?? []),
             ...(this.roomProps?.solid.map(s => s.box) ?? [])];
@@ -745,6 +770,7 @@ export class Game {
         if (!this.chain.isConnected) this.chain.reset();
         this.sawDrag?.reset();
         this.sawPush?.reset();
+        this.sawTackle.reset();
         if (firstPickup) this._onSawReconnect();
         this._sawOnAnvil = false;
 
@@ -1061,6 +1087,8 @@ export class Game {
         this.effects.processPlayer(p2);
 
         this.sawDrag?.update();
+        // Antes do Chain: um tackle no mesmo passo que a reconexão vence (a serra fica travada no impacto).
+        this.sawTackle.update();
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {
@@ -1143,6 +1171,7 @@ export class Game {
 
         const enemies = room.enemies;
         this.combat.updateEnemies(enemies, [p1, p2]);
+        this.sawTackle.onBossImpacts(enemies);
         this.arautoEffects.update(enemies);
         this.ghostfire.update(room, [p1, p2]);
 
@@ -1462,7 +1491,10 @@ export class Game {
         this.chain.draw(ctx, this.p1, this.p2);
 
         // Recém-forjada, a serra fica em cima da bigorna: desenhada depois do prop.
-        if (!this._sawOnAnvil) this.chain.drawDropped(ctx);
+        if (!this._sawOnAnvil) {
+            this.sawTackle.drawTrail(ctx);
+            this.chain.drawDropped(ctx);
+        }
 
         this.particleSystem.drawSparks(ctx);
 

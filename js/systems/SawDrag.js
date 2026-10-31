@@ -43,7 +43,7 @@ export class SawDrag {
 
     _eligible() {
         const w = this.chain.weapon;
-        return this.chain.hasSaw && !this.chain.isConnected && w.dropped && !w.thrown && this.canDrag();
+        return this.chain.hasSaw && !this.chain.isConnected && w.dropped && !w.thrown && !w.tackleState && this.canDrag();
     }
 
     _alive(p) {

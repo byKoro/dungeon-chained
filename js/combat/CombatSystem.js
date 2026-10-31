@@ -165,6 +165,13 @@ export class CombatSystem {
         if (hits > 0) this._playSawHit(hits, heavy);
     }
 
+    feedbackForHit(enemy, result, impact) {
+        const info = this._hitInfo(enemy, result, impact);
+        this._hitFeedback(enemy, info);
+        if (enemy.effectMaterial !== 'lavaStone') this._playSawHit(1, info.poiseBroken);
+        return info;
+    }
+
     _hitInfo(enemy, result, impact) {
         const r = typeof result === "object" ? result : {};
         const killed = r.killed ?? (enemy.state === "dying");

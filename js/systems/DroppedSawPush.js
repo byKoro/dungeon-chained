@@ -20,7 +20,8 @@ export class DroppedSawPush {
 
     _eligible() {
         const w = this.chain.weapon;
-        return this.chain.hasSaw && !this.chain.isConnected && w?.dropped && !w.thrown && this.canPush();
+        // Com o tackle ativo (impacto, voo ou presa) quem move a serra é o SawTackle: sem empurrão duplicado.
+        return this.chain.hasSaw && !this.chain.isConnected && w?.dropped && !w.thrown && !w.tackleState && this.canPush();
     }
 
     update() {

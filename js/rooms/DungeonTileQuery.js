@@ -122,6 +122,15 @@ export class DungeonTileQuery {
         const tiles = this._floor();
         if (!tiles) return { x, y };
         const rect = this.rooms.cellRect();
+        const { ok, awayFromHoles } = this._dropTests(tiles, rect, seeds);
+        const { col, row } = this._toTile(x, y, rect);
+        if (awayFromHoles(col, row)) return { x, y };
+        return this._nearestTileCenter(tiles, rect, x, y, awayFromHoles)
+            ?? this._nearestTileCenter(tiles, rect, x, y, ok)
+            ?? { x, y };
+    }
+
+    _dropTests(tiles, rect, seeds) {
         const ok = this._reachableTest(tiles, rect, seeds);
         const awayFromHoles = (c, r) => {
             if (!ok(c, r)) return false;
@@ -132,9 +141,58 @@ export class DungeonTileQuery {
             }
             return true;
         };
-        return this._nearestTileCenter(tiles, rect, x, y, awayFromHoles)
-            ?? this._nearestTileCenter(tiles, rect, x, y, ok)
-            ?? { x, y };
+        return { ok, awayFromHoles };
+    }
+
+    safeDropRoute(x, y, seeds, isBlocked = () => false) {
+        const tiles = this._floor();
+        if (!tiles) return [];
+        const rect = this.rooms.cellRect();
+        const { ok, awayFromHoles } = this._dropTests(tiles, rect, seeds);
+        const walls = new Set((tiles.walls || []).map(w => `${w.col},${w.row}`));
+        const center = (c, r) => ({ x: rect.x + (c + 0.5) * TILE, y: rect.y + (r + 0.5) * TILE });
+        const canFly = (c, r) => {
+            const value = this._tileValue(tiles, c, r);
+            return c > 0 && r > 0 && c < tiles.cols - 1 && r < tiles.rows - 1
+                && (value >= 0 || value === HOLE_TILE) && !walls.has(`${c},${r}`);
+        };
+        const clear = (a, b) => {
+            const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (TILE / 8)));
+            for (let i = 1; i <= steps; i++) {
+                const px = a.x + (b.x - a.x) * i / steps, py = a.y + (b.y - a.y) * i / steps;
+                const { col, row } = this._toTile(px, py, rect);
+                if (!canFly(col, row) || isBlocked(px, py)) return false;
+            }
+            return true;
+        };
+        const { col, row } = this._toTile(x, y, rect);
+        const queue = [], seen = new Set();
+        const add = (c, r, parent) => {
+            const key = `${c},${r}`;
+            if (seen.has(key) || !canFly(c, r)) return;
+            const point = center(c, r);
+            if (!clear(parent?.point ?? { x, y }, point)) return;
+            seen.add(key);
+            queue.push({ c, r, point, parent });
+        };
+        const roots = [];
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) roots.push({ c: col + dc, r: row + dr });
+        roots.sort((a, b) => {
+            const pa = center(a.c, a.r), pb = center(b.c, b.r);
+            return Math.hypot(pa.x - x, pa.y - y) - Math.hypot(pb.x - x, pb.y - y);
+        });
+        for (const root of roots) add(root.c, root.r, null);
+        let goal = null, fallback = null;
+        for (let i = 0; i < queue.length; i++) {
+            const node = queue[i];
+            if (awayFromHoles(node.c, node.r)) { goal = node; break; }
+            if (!fallback && ok(node.c, node.r)) fallback = node;
+            for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) add(node.c + dc, node.r + dr, node);
+        }
+        goal ??= fallback;
+        const route = [];
+        while (goal) { route.push(goal.point); goal = goal.parent; }
+        return route.reverse();
     }
 
     _nearestTileCenter(tiles, rect, x, y, test) {

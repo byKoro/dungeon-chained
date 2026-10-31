@@ -250,3 +250,11 @@ Arauto distant pursuit variety (2026-10-31): valid ranged decisions choose attac
 Arauto attack repetition memory (2026-10-31): near attack1/attack2 choices now reduce the last used attack weight progressively (repeatWeight 0.35 per streak). Retreat/re-entry retains memory. Repetition stays possible; no fixed alternating pattern. Regression covers both phases, real recovery and retreat, allowed repeats and stronger penalty after repeats. Runtime feel remains unobserved.
 
 Arauto nearby action variety (2026-10-31): nearby decisions now mix adaptive attack1/attack2 (60%), short walking pursuit (25%,0.4..0.9s) and safe dash targeting the nearby player (15%). Separate nearby walking commitment avoids per-frame attack retries. Ranged pursuit, repeat memory and phase2 sequences preserved. Regression tests cover both phases and unsafe dash fallback. Runtime feel not observed.
+
+### Tackle da serra — playtest (2026-10-31)
+
+Na branch `feat/tackle-serra`, Editor 2.0 permite comparar retorno à origem e voo que desacelera após 600 px acumulados. O jogo normal conserva o retorno. Attack1, attack2, dash e slam do Arauto lançam a serra solta. Pouso em ponto inseguro agora percorre rota até piso alcançável, sem teleporte ou reinício de escala.
+
+Regressões e integração em Electron passaram (seleção das duas versões e pouso gradual); sensação em co-op ainda depende de playtest manual. Histórico em `.agents/tasks/2026-10-31-saw-tackle-flight-variants/`, `2026-10-31-saw-tackle-smooth-landing/`, `2026-10-31-boss-launches-loose-saw/` e `2026-10-31-saw-safe-landing-route/`.
+
+Check permanece bloqueado pelas falhas de Arauto (`test_arauto_effects`, asserts chase/windup intermitentes), Curva SE e peça `corridor_vertical_ns_1.json` não listada. Arte experimental sem carregamento e ferramentas temporárias ficam em `_local/tackle-unused/` (ignorado pelo Git); não fazem parte da implementação atual.

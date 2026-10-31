@@ -63,9 +63,42 @@ export class Player extends Entity {
         this._tintBuf = null;
         this._dashFlashT = 0;
         this._landT = 0;
+        // Tackle na serra: `tackleFreeze` = hit stop local (só este jogador); `tackleT` = pose até o fim da reação.
+        this.tackleFreeze = 0;
+        this.tackleT = 0;
+        this._tackle = null;
+    }
+
+    get tackling() {
+        return this.tackleFreeze > 0 || this.tackleT > 0;
+    }
+
+    // Interrompe o dash no contato: impact frame (achatado contra a serra, branco) e uma reação curta para trás.
+    startTackle(dirX, dirY, { freezeSteps = 4, reactionSteps = 14, recoilSpeed = 4.5, invulnSteps = 18, impactScale = 0.74 } = {}) {
+        this.cancelDash();
+        this.dashDirX = dirX;
+        this.dashDirY = dirY;
+        this.vx = this.vy = 0;
+        this.tackleFreeze = freezeSteps;
+        this.tackleT = reactionSteps;
+        this._tackle = { reactionSteps, recoilSpeed, impactScale };
+        this._dashFlashT = PLAYER_DASH.flashSteps;
+        this.invulnerableTimer = Math.max(this.invulnerableTimer, invulnSteps);
+    }
+
+    _clearTackle() {
+        this.tackleFreeze = 0;
+        this.tackleT = 0;
+        this._tackle = null;
     }
 
     get dashScale() {
+        if (this._tackle && this.tackling) {
+            const t = this._tackle;
+            if (this.tackleFreeze > 0) return t.impactScale;
+            const k = 1 - this.tackleT / t.reactionSteps;
+            return t.impactScale + (1 - t.impactScale) * (1 - (1 - k) * (1 - k));
+        }
         if (this.dashing) return 1 + PLAYER_DASH.stretch;
         if (this._landT <= 0) return 1;
         const k = 1 - this._landT / PLAYER_DASH.landSteps;
@@ -88,6 +121,7 @@ export class Player extends Entity {
         this.afterimages.length = 0;
         this._dashFlashT = 0;
         this._landT = 0;
+        this._clearTackle();
         if (!this.dashing) return;
         this.dashing = false;
         this.dashTimer = 0;
@@ -171,6 +205,7 @@ export class Player extends Entity {
         this.holeGrace = 0;
         this.x = x; this.y = y;
         this.vx = 0; this.vy = 0;
+        this._clearTackle();
         this.invulnerableTimer = Math.max(this.invulnerableTimer, invulnFrames);
         this._resetDash();
     }
@@ -288,6 +323,17 @@ export class Player extends Entity {
             }
             return;
         }
+
+        // Hit stop local do tackle: só este jogador congela; o parceiro e os inimigos seguem.
+        if (this.tackleFreeze > 0) {
+            this.vx = this.vy = 0;
+            if (--this.tackleFreeze === 0 && this._tackle) {
+                this.vx = -this.dashDirX * this._tackle.recoilSpeed;
+                this.vy = -this.dashDirY * this._tackle.recoilSpeed;
+            }
+            return;
+        }
+        if (this.tackleT > 0 && --this.tackleT === 0) this._tackle = null;
 
         if (this.invulnerableTimer > 0) this.invulnerableTimer--;
         if (this.hurtTimer > 0) this.hurtTimer--;

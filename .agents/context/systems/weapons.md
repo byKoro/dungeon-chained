@@ -96,3 +96,13 @@ Tests: test_chain_obstacles.js. Gameplay feel not observed.
 
 ### Arauto and double-saw integration (2026-10-29)
 ChainObstacleSystem samples cable separately from actual getSawPositions discs, so split mode has no phantom midpoint disc. Both real discs can resist the boss; CombatSystem preserves either-disc hits and material surface contacts. Game final boss/tether constraints reapply room props, event bars, walls and roomclamps to prevent pushing players into main's solids. Regression test_arauto_double_saw.js.
+
+### Tackle da serra solta (2026-10-31)
+
+`Game` atualiza `SawTackle` antes do Chain e processa os impactos do Arauto após os inimigos. Um dash lança a serra solta com mira assistida inicial; o jogador recebe hit stop local e recuo. A serra quica, prende uma vez por inimigo por lançamento e aplica os hits aceitos configurados (5, intervalo de 0.1 s). `weapon.tackleState` exclui arraste/empurrão duplicados; `sawLocked` impede reconexão durante impacto ou enquanto presa. Novo tackle renova impulso, percurso e alvos.
+
+`flightMode: 'return' | 'coast'` é injetado pelo construtor. `return` mantém a volta original e é padrão fora do playtest. `coast` mantém direção/quiques, sem retorno normal ou especial do Arauto; após 600 px de percurso efetivo aplica atrito 0.975/step, até velocidade inferior a 1 px/step ou limite de voo. Soltar inimigo conserva velocidade/percurso. Parâmetros em `SawTackleConfig.js`; seletor no Editor 2.0 (room-editor.md).
+
+Pouso inseguro entra em `landing`, percorrendo `DungeonTileQuery.safeDropRoute` a 4 px/step com verificação de sólidos. Prefere piso afastado de buracos e aceita fallback alcançável; sem rota, tenta novamente a cada 15 steps, sem teleporte. Game revalida a chegada com `reachableDropPoint`; som de pouso só toca ao chegar. Posição já segura, fase, escala e rotação são preservadas. Novo tackle ou reconexão interrompe a aproximação.
+
+Attack1 (`attack`) e attack2 lançam no frame `justGroundHit`; slam usa `justSlammed`. Dash (`attack3`, `charging`) verifica o trecho varrido do passo e lança na direção do movimento; os outros golpes lançam radialmente. Só afeta serra solta parada, sem parede no contato. Voo `boss*` tem atrito/quiques próprios, sem retorno, em ambas as versões. Testes: `test_saw_tackle.js` e `test_saw_tackle_landing.js`.

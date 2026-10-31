@@ -149,7 +149,8 @@ export class Chain {
 
     _canReconnect(p1, p2, dist) {
         const w = this.weapon;
-        if (!this.present || w.thrown) return false;
+        // Tackle: no impacto e enquanto presa num inimigo não reconecta; em voo reconecta normalmente.
+        if (!this.present || w.thrown || w.sawLocked) return false;
         if (!w.dropped) return dist < this.reconnectDistance;
 
         const r = this.pickupRadius;

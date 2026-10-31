@@ -103,3 +103,9 @@ Door openings (2 tiles each, `midC=7`, `midR=4`): N `row0 col6–7`, S `row8 col
 Editor 2.0 doors may have type stairs: one interior floor cell, rendered with STAIR_INDEX (39). AuthoredDungeon exposes its cell centre and existing connection target/requirement state. RoomManager recognizes both players within STAIR_ENTRY_RADIUS tiles; the usual Game transition handles travel and safeSpawnPair places the pair without immediate re-entry. Stairs have no border opening, corridor stub or door gradient.
 
 Border stairs use the inward adjacent floor for safe arrivals. Their south-edge floor is excluded from the late front-wall redraw so the staircase remains visible.
+
+### Ponto e rota de pouso da serra (2026-10-31)
+
+`DungeonTileQuery.safeDropPoint(x, y, seeds)` preserva coordenadas já alcançáveis e sem buracos na vizinhança 3×3. Caso contrário, busca centro de tile afastado dos buracos, depois piso alcançável. `_dropTests` compartilha esses predicados com `safeDropRoute(x, y, seeds, isBlocked)`.
+
+A rota faz busca em largura nos centros dos tiles, conectados à posição atual por segmentos desobstruídos. Cruza buracos em voo; rejeita paredes, vazio e borda externa. O callback do jogo verifica o volume da serra e os demais sólidos (props, grades e estacas). Prefere piso afastado dos buracos; sem rota até ele, aceita piso alcançável desobstruído. Sem destino retorna lista vazia. SawTackle executa o movimento e novas buscas; Game revalida a chegada com `reachableDropPoint`. Regressões em `test_saw_tackle_landing.js`.

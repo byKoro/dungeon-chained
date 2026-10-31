@@ -190,6 +190,7 @@ export class ContentTools {
             <label><input type="checkbox" id="test-arauto-intro"> Repetir apresentação completa do Arauto</label>
             <label class="field">Serra no início<select id="test-sawstart"><option value="">Conforme o mapa (sem serra se uma bigorna oferece a Serra)</option><option value="yes">Com serra</option><option value="no">Sem serra</option></select></label>
             <label class="field">Câmera para comparar<select id="test-camera"><option value="zoom">Zoom-out</option><option value="fixed">Zoom fixo + indicadores</option><option value="split">Tela dividida</option></select></label>
+            <label class="field">Versão do tackle da serra<select id="test-saw-tackle"><option value="coast">Nova: segue e desacelera</option><option value="return">Atual: retorna à origem</option></select></label>
             <button class="btn btn-primary" id="content-test-map">Testar mapa</button>
             <button class="btn" id="content-main">Definir mapa salvo como principal</button>
             <p class="hint">No jogo: P1 E / P2 Shift direito / controle X interagem. F6 alterna as câmeras e F7 liga/desliga a vida infinita durante o teste.</p>
@@ -598,7 +599,7 @@ export class ContentTools {
         const sawStart = $('test-sawstart').value;
         if (sawStart) progress.saw = sawStart === 'yes';
         sessionStorage.setItem(DEMO.sessionKey, JSON.stringify({ map, isolated, progress, camera: $('test-camera').value, infiniteLives: $('test-infinite-lives').checked,
-            repeatArautoIntro: $('test-arauto-intro').checked }));
+            repeatArautoIntro: $('test-arauto-intro').checked, sawTackleMode: $('test-saw-tackle').value }));
         a._persistNow();
         location.href = 'index.html?playtest=true&editor2=true';
     }

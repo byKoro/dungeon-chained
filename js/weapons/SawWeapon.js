@@ -128,6 +128,8 @@ export class SawWeapon extends Weapon {
         this._cuttingSteps = 0;
         this.obstacleContacts?.clear();
         this.thrown = false;
+        this.tackleState = null;
+        this.sawLocked = false;
         this.dropped = false;
         this.split = 0;
         this._splitTarget = 0;
