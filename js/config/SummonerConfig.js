@@ -6,8 +6,8 @@ import { SIM_HZ } from './GameConfig.js';
 export const SUMMONER = {
     hp: 3,
     speed: 1.2,
-    preferredDistance: 300,
-    distanceTolerance: 24,
+    // Só recua quando um jogador chega muito perto; fora disso fica parado conjurando.
+    fleeDistance: 110,
     retreatProbeSteps: 12,
     // Intervalo entre invocações (5,5s a 60 Hz).
     summonInterval: Math.round(5.5 * SIM_HZ),
@@ -21,6 +21,21 @@ export const SUMMONER = {
     maxMinions: 12,
     // Tint vermelho aplicado SÓ durante a animação de invocação.
     summonTint: { color: '#ff3b3b', alpha: 0.55 },
+    // Ataque: pilar de fogo que sai do chão (linha 3), num ponto aleatório entre os jogadores.
+    castInterval: Math.round(4 * SIM_HZ),   // intervalo entre ataques (4s)
+    castReleaseFrame: 8,                     // frame em que o dano é aplicado
+    castSpread: 70,                          // variação aleatória (px) em torno do meio dos players
+    cast: {
+        radius: 30,
+        damageFirstFrame: 8,
+        damageLastFrame: 11,
+        // Recorte do pilar de fogo na folha do cultista (linha 3).
+        cropX: 70, cropY: 10, cropW: 30, cropH: 54,
+        scale: 3, anchorX: 84, anchorY: 62,
+        firstFrame: 5,
+        // Largura do recorte do corpo do conjurador nos frames do pilar (evita puxar o pilar embutido).
+        casterCropW: 30
+    },
     // Morte usa o fade padrão do jogo em vez de uma sequência da folha (evita o sumiço).
     playDeathAnimation: false
 };
@@ -34,6 +49,8 @@ export const SUMMONER_SPRITE = {
     combat: SUMMONER,
     rows: {
         walk: { row: 1, frames: 8, fps: 7 },
+        // Pilar de fogo que sai do chão (linha 3 da folha do cultista).
+        cast: { row: 3, frames: 14, fps: 6, hitFrame: 8 },
         // Animação de invocar na linha 5.
         summon: { row: 5, frames: 10, fps: 6 },
         // Fonte dos gibs/último frame; a morte em si é o fade padrão.
