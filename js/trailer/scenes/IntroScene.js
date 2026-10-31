@@ -6,6 +6,12 @@ import {
     PLAYER_LIGHT_RADIUS, LIGHT_PIXEL_SCALE, TORCHES
 } from '../../config/GameConfig.js';
 import { clamp01, lerp, easeInOut, easeOut, easeIn } from '../anim.js';
+import { PropSprites } from '../../core/PropSprites.js';
+import { ParticleSystem } from '../../particles/ParticleSystem.js';
+import { ANIMATED_PROPS } from '../../config/PropConfig.js';
+
+// Bigorna no centro da sala: a serra cai do teto e crava no tampo dela.
+const ANVIL_TOP = 0.42;
 
 const BLADE_LIGHT_PROFILE = {
     color: '150, 196, 255',
@@ -34,6 +40,10 @@ export class IntroScene {
         this.doorWorld = { dir: 'S', x: midC * TILE, y: this.rect.h - TILE };
         this.doorList = [{ dir: 'S', x: this.doorWorld.x, y: this.rect.h }];
         this.center = { x: this.rect.w / 2, y: this.rect.h / 2 - TILE * 0.3 };
+        this.props = new PropSprites({ anvil: ANIMATED_PROPS.anvil });
+        this.particles = new ParticleSystem();
+        const c = this.center;
+        this.anvil = { x: c.x, dx: c.x - TILE, dy: c.y - TILE / 2, top: c.y - ANVIL_TOP * TILE, sortY: c.y + 20 };
 
         this.postProcessor = new PostProcessor(stage.canvas, stage.ctx, {
             lighting: { ambient: '30, 26, 40' },
@@ -100,8 +110,8 @@ export class IntroScene {
             p2OutsideDoor: { x: d.x + TILE * 0.6, y: d.y + TILE * 1.9 },
             p1NearDoor: { x: d.x - TILE * 0.75, y: d.y - TILE * 0.4 },
             p2NearDoor: { x: d.x + TILE * 0.75, y: d.y - TILE * 0.4 },
-            p1AtSaw: { x: this.center.x - TILE * 1.15, y: this.center.y + TILE * 0.15 },
-            p2AtSaw: { x: this.center.x + TILE * 1.15, y: this.center.y + TILE * 0.15 }
+            p1AtSaw: { x: this.center.x - TILE * 1.25, y: this.center.y + TILE * 0.75 },
+            p2AtSaw: { x: this.center.x + TILE * 1.25, y: this.center.y + TILE * 0.75 }
         };
     }
 
@@ -114,6 +124,9 @@ export class IntroScene {
         this.sawCarried = false;
         this.chainReveal = 0;
         this.sawDropWorld = { x: this.center.x, y: this.center.y };
+        this.grindT = 0;
+        this.anvilFlash = 0;
+        this.particles?.clear();
     }
 
     start() {
@@ -147,7 +160,7 @@ export class IntroScene {
 
         this.beats = [
             {
-                dur: 2.6,
+                dur: 1.6,
                 enter: () => {
                     this._place(this.p1, L.p1OutsideDoor);
                     this._place(this.p2, L.p2OutsideDoor);
@@ -168,15 +181,28 @@ export class IntroScene {
             },
 
             {
-                dur: 2.0,
+                dur: 1.6,
                 enter: () => {
-                    this.saw.drop(this.center.x, this.center.y);
+                    // A serra cai do teto e crava no tampo da bigorna: faísca, clangor e tremida.
+                    const a = this.anvil;
+                    this.saw.drop(a.x, a.top);
+                    this.saw.spin = 1;
                     this.sawVisibleDropped = true;
                     this.sawCarried = false;
                     this.screenFlashT = 1;
-                    this.renderer.triggerShake(10);
+                    this.grindT = 0.5;
+                    this.anvilFlash = 1;
+                    this.renderer.triggerShake(18);
+                    this.renderer.triggerZoomPunch(0.08);
+                    this.particles.triggerSparkBurst(a.x, a.top + 6, 22, 40, 2.2);
+                    this.particles.triggerFlash(a.x, a.top + 6, 16, 1.4);
+                    for (let i = 0; i < 8; i++) {
+                        const ang = (i / 8) * Math.PI * 2;
+                        this.particles.triggerDust(a.x + Math.cos(ang) * 50, a.sortY + Math.sin(ang) * 14, Math.cos(ang), Math.sin(ang) * 0.5, 2);
+                    }
                     this._sfx('sawLand', { vol: 1 });
-                    this._sfx('impact', { vol: 0.45, rate: 1.3 });
+                    this._sfx('impact', { vol: 0.6, rate: 1.1 });
+                    this._sfx('sawHit', { vol: 0.7, rate: 0.8 });
                     this.stage.audio?.mood(-22, 650, 0.8);
                     this._express(this.p1, 'espantado');
                     this._express(this.p2, 'espantado');
@@ -198,7 +224,7 @@ export class IntroScene {
             },
 
             {
-                dur: 2.8,
+                dur: 2.0,
                 enter: () => {
                     this._express(this.p1, 'preocupado');
                     this._express(this.p2, 'preocupado');
@@ -217,10 +243,11 @@ export class IntroScene {
                         this._express(this.p2, 'desconfiado');
                     }
 
-                    const mid = this._playersMid();
+                    // A serra salta do tampo da bigorna para o meio dos dois.
+                    const mid = this._playersMid(), a = this.anvil;
                     const slide = easeInOut(clamp01((k - 0.4) / 0.38));
-                    this.saw.dropX = lerp(this.center.x, mid.x, slide);
-                    this.saw.dropY = lerp(this.center.y, mid.y, slide);
+                    this.saw.dropX = lerp(a.x, mid.x, slide);
+                    this.saw.dropY = lerp(a.top, mid.y, slide) - Math.sin(slide * Math.PI) * 70;
 
                     if (k > 0.55 && !this.sawCarried) {
                         this._calm(this.p1);
@@ -247,13 +274,13 @@ export class IntroScene {
             },
 
             {
-                dur: 2.6,
+                dur: 1.6,
                 enter: () => {
                     this._calm(this.p1);
                     this._calm(this.p2);
                     this._express(this.redPlayer, 'neutro');
                     this._express(this.bluePlayer, 'desconfiado');
-                    this._speak(this.redPlayer, 'Look how sharp this saw is…', 2.4);
+                    this._speak(this.redPlayer, 'Look how sharp this saw is…', 1.5);
                 },
                 update: () => {
                     this._camTo(this.center.x, this.center.y + TILE * 0.35, fit() * 2.7, 0.08);
@@ -266,13 +293,13 @@ export class IntroScene {
             },
 
             {
-                dur: 2.4,
+                dur: 1.6,
                 enter: () => {
                     this._calm(this.p1);
                     this._calm(this.p2);
                     this._express(this.bluePlayer, 'neutro');
                     this._express(this.redPlayer, 'neutro');
-                    this._speak(this.bluePlayer, 'Totally. It cuts through anything!', 2.2);
+                    this._speak(this.bluePlayer, 'Totally. It cuts through anything!', 1.5);
                 },
                 update: () => {
                     this._camTo(this.center.x, this.center.y + TILE * 0.35, fit() * 2.6, 0.08);
@@ -284,11 +311,11 @@ export class IntroScene {
                 }
             },
 
-            this._faceCloseUp(this.redPlayer, ['desconfiado', 'raiva']),
-            this._faceCloseUp(this.bluePlayer, ['olhos_fechados', 'furia']),
+            this._faceCloseUp(this.redPlayer, ['desconfiado', 'raiva'], 1.0),
+            this._faceCloseUp(this.bluePlayer, ['olhos_fechados', 'furia'], 1.0),
 
             {
-                dur: 2.2,
+                dur: 1.2,
                 enter: () => {
                     this.worldQuake = 1;
                     this.renderer.triggerShake(22);
@@ -312,10 +339,10 @@ export class IntroScene {
             },
 
             {
-                dur: 3.6,
+                dur: 1.6,
                 enter: () => {
-                    this.stage.audio?.mood(-34, 300, 3.0);
-                    this._sfx('riser', { vol: 0.35, delay: 2.1 });
+                    this.stage.audio?.mood(-34, 300, 1.4);
+                    this._sfx('riser', { vol: 0.35, delay: 0.6 });
                     this._faceFree();
                     this._express(this.p1, 'preocupado');
                     this._express(this.p2, 'preocupado');
@@ -428,7 +455,19 @@ export class IntroScene {
             this.chainReveal = Math.min(1, this.chainReveal + dt / 0.45);
         }
         if (this.sawCarried) this.saw.update(this.p1, this.p2);
-        else if (this.sawVisibleDropped) this.saw.updateDropped();
+        else if (this.sawVisibleDropped) {
+            // Cravada na bigorna: segue girando e raspando o tampo até a dupla pegar.
+            const s = this.saw;
+            s.inertiaLeft = Math.max(s.inertiaLeft || 0, 4);
+            s.spin = 1;
+            s.updateDropped();
+            // Presa no tampo: sem o balanço de serra flutuando.
+            if (Math.abs(s.dropX - this.anvil.x) < 6) s.dropPhase = 0;
+            if (Math.abs(s.dropX - this.anvil.x) < 6) this.particles.triggerSparks(s.dropX, s.dropY + 10, s.discRadius * 0.6, -1, 2);
+        }
+        if (this.grindT > 0) this.grindT -= dt;
+        this.anvilFlash = Math.max(0, this.anvilFlash - dt * 3);
+        this.particles.update([this.p1, this.p2], this.bounds);
     }
 
     render() {
@@ -465,7 +504,12 @@ export class IntroScene {
             if (rev < 1) this._drawChainConnectPulse(ctx, rev);
         }
 
-        [this.p1, this.p2].sort((a, b) => a.y - b.y).forEach(e => e.draw(ctx));
+        const a = this.anvil;
+        const anvilDraw = { y: a.sortY, draw: (c) => this.props.drawFrame(c, 'anvil', 0, a.dx, a.dy, TILE, false, 1, 1, this.anvilFlash > 0 ? 1 - this.anvilFlash : null) };
+        [this.p1, this.p2, anvilDraw].sort((p, q) => p.y - q.y).forEach(e => e.draw(ctx));
+        this.particles.drawSmoke(ctx);
+        this.particles.drawSparks(ctx);
+        this.particles.drawAir(ctx);
 
         renderer.drawFrontWall(this.rect, this.tiles, TILE, true, this.doorList, this.doorHalf, DOOR_STUB_TILES);
         this.wind.draw(ctx);
@@ -580,6 +624,13 @@ export class IntroScene {
             const s = r.worldToScreen(this.saw.dropX, this.saw.dropY);
             const breathe = 0.85 + (this.saw.dropHover ?? 0) * 0.15;
             pp.addLight(s.x, s.y, 150 * breathe * s.zoom, lightPixel(s.zoom), 1, bladeProfile);
+        }
+        if (this.anvilFlash > 0.01) {
+            const s = r.worldToScreen(this.anvil.x, this.anvil.top);
+            pp.addLight(s.x, s.y, 260 * this.anvilFlash * s.zoom, lightPixel(s.zoom), 1, {
+                color: '255, 210, 150', falloff: [{ offset: 0, alpha: 1 }, { offset: 0.5, alpha: 0.4 }, { offset: 1, alpha: 0 }],
+                flickerBase: 1, flickerSine: 0, flickerNoise: 0.1
+            });
         }
     }
 

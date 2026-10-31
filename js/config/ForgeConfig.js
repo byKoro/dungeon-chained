@@ -19,8 +19,8 @@ export const FORGE = Object.freeze({
         // --- Melhorias de jogador/dash (bigorna da sala "botas"; sem pré-requisito de serra). ---
         // "Passo veloz": +`perLevel` na velocidade dos dois por nível (multiplicador no speedScale).
         moveSpeed: { kind: "upgrade", costs: [15, 30, 50], perLevel: 0.08 },
-        // "Impacto": o dash empurra inimigos (knockback, sem dano). `impulse` px/step por nível.
-        dashPush: { kind: "upgrade", costs: [20, 40], impulse: [3, 5.4] },
+        // "Impacto": o dash empurra inimigos (knockback, sem dano). `impulse` px/step por nível (pancada mais forte).
+        dashPush: { kind: "upgrade", costs: [20, 40], impulse: [6, 10] },
         // "Vínculo": os dois perto por `seconds[nível-1]` curam 1 vida cada; `cooldownSeconds` entre curas.
         coopHeal: { kind: "upgrade", costs: [40, 70], seconds: [6, 4], cooldownSeconds: 8 },
         // "Fôlego": reduz a recarga do dash. `cooldownScale[nível-1]` multiplica PLAYER_DASH.cooldownSteps.
@@ -71,21 +71,33 @@ export const SAW_DRAG = Object.freeze({
     ropeSag: 10
 });
 
-// Cinemática de craft da Serra (~4 s, segundos de simulação).
+// Cinemática de craft da Serra (segundos de simulação; px de mundo). Os dois andam até um lado cada da bigorna
+// e só então começa a forja: `hits`…`end` contam a partir da chegada (+ `settle`).
 export const SAW_CINEMATIC = Object.freeze({
     letterboxIn: 0.45,
-    hits: Object.freeze([0.7, 1.25, 1.8]),
+    // Caminhada: `walkScale` × velocidade de andar, desacelera nos últimos `slowRadius` px e chega a `arriveRadius`.
+    // `walkMax` = a forja começa mesmo se alguém travar no caminho.
+    walkScale: 0.6,
+    slowRadius: 24,
+    arriveRadius: 3,
+    walkMax: 2.2,
+    settle: 0.2,
+    // Folga entre a base da bigorna e os pés de cada jogador (lados) e quanto à frente da base eles param
+    // (pés abaixo da base: a serra conectada no meio deles fica na frente da bigorna).
+    sideGap: 24,
+    frontGap: 6,
+    hits: Object.freeze([0.2, 0.7, 1.2]),
     hitShake: Object.freeze([3, 5, 8]),
     hitSparks: Object.freeze([10, 14, 20]),
-    jumpStart: 2.05,
-    jumpEnd: 2.85,
+    jumpStart: 1.45,
+    jumpEnd: 2.2,
     jumpHeight: 120,
     jumpSpins: 3,
     squashTime: 0.3,
     squashAmount: 0.32,
-    glowTime: 0.6,
-    outStart: 3.35,
-    end: 3.8,
+    // A serra desce da bigorna até o meio dos dois e conecta no fim; as faixas saem junto.
+    connectStart: 2.55,
+    end: 2.9,
     zoom: 1.7,
     focusOffsetY: -16,
     barRatio: 0.12,

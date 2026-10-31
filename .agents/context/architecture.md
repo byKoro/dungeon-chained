@@ -52,7 +52,7 @@ Entry points: `index.html` (game, loads `js/main.js`), `editor.html` (room edito
 | `forgeSystem` / `forgeMenu` | ForgeSystem / ForgeMenu | js/systems/ForgeSystem.js, js/ui/ForgeMenu.js | anvil proximity, open/close, shared cursor, purchase; canvas menu. `null` without `scrap` |
 | `sawDrag` | SawDrag | js/systems/SawDrag.js | drag the dropped saw with a short cable (hold interact), Peso stats. Updated after the players, before `chain.update`. `null` without `mapData` |
 | `roomEvents` | RoomEvents (+ CageEncounter, roomScripts/*) | js/systems/RoomEvents.js | per-room scripts (ADR 0011): zones, encounters, bars (collision + y-sorted draw), completed events; updated after `chests.update`. `null` without `mapData` |
-| `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | ~3,8 s craft cutscene (letterbox, camera focus, hammer hits, saw jump). `null` without `scrap` |
+| `sawCinematic` | SawForgeCinematic | js/systems/SawForgeCinematic.js | craft cutscene (letterbox, camera focus, players walk to the anvil sides via `Player.autoMove`, hammer hits, saw jump, saw connects to both at the end; ~4-4,5 s). `null` without `scrap` |
 | `dialogue` | DialogueSystem | js/systems/DialogueSystem.js | speech bubbles queue, typewriter, voice blips (`window.dialogue` debug global). `null` without `mapData` |
 | `sawMotor` | SawMotorAudio | js/weapons/SawMotorAudio.js | created lazily in `start()` |
 

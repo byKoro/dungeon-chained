@@ -290,14 +290,14 @@ export class Game {
             getStats: () => sawDragStats(TILE),
             isBlocked: (x, y) => this._sawDragBlocked(x, y),
             getBounds: () => this.arenaBounds,
-            canDrag: () => !this._sawOnAnvil && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            canDrag: () => !this.forgeSystem?.open && !this.sawCinematic?.active,
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         }) : null;
         this.sawPush = new DroppedSawPush({
             chain: this.chain, getPlayers: () => [this.p1, this.p2],
             isBlocked: (x, y) => this._sawDragBlocked(x, y),
             getBounds: () => this.arenaBounds,
-            canPush: () => !this._sawOnAnvil && !this.sawDrag?.active && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            canPush: () => !this.sawDrag?.active && !this.forgeSystem?.open && !this.sawCinematic?.active,
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         });
         this.sawTackleFeedback = new SawTackleFeedback({ audio: this.audio, renderer: this.renderer,
@@ -326,11 +326,16 @@ export class Game {
         this.dashPush = new DashPush({ getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current, particleSystem: this.particleSystem });
         // Melhoria "Vínculo": os dois perto curam com o tempo (sala "botas").
         this.coopHeal = new CoopHeal({ getPlayers: () => [this.p1, this.p2], particleSystem: this.particleSystem, audio: this.audio });
-        // Telinha curta ao ganhar o dash (ao pegar as botas).
-        this.abilityCard = this.mapData ? new AbilityCard({ getDevice: i => this.input.deviceFor(i) }) : null;
+        // Telinha ao ganhar o dash (ao pegar as botas): "vídeo" de uma sala real com o dash do jogador.
+        this.abilityCard = this.mapData ? new AbilityCard({
+            getDevice: i => this.input.deviceFor(i), assets: this.assets
+        }) : null;
         this.sawCinematic = this.forgeSystem ? new SawForgeCinematic({
             renderer: this.renderer, particleSystem: this.particleSystem, audio: this.audio, camera: this.demoCamera,
-            getWeapon: () => this.chain.weapon, onEnd: (anvil) => this._onSawForged(anvil)
+            getWeapon: () => this.chain.weapon, getPlayers: () => [this.p1, this.p2],
+            getAnvilBox: anvil => this.roomProps?.solid.find(s => s.prop === anvil.prop)?.box ?? null,
+            resolvePlayers: () => this._constrainTetherPlayers(this.rooms.current, this.roomEvents?.solidBoxes() ?? [], this.rooms.doorsOfCurrent(), false),
+            onEnd: () => this._onSawForged()
         }) : null;
 
         this.interactPrompt = this.chests && this.forgeSystem ? new InteractPrompt({
@@ -613,8 +618,6 @@ export class Game {
         this._respawnFadeAt = -Infinity;
         this.sawCinematic?.reset();
         this.sawIndicator?.reset();
-        this._sawOnAnvil = false;
-        this._sawFirstConnect = false;
         this.bloodCanvas.clear();
         this.gibs = [];
         this.effects.clear();
@@ -726,16 +729,12 @@ export class Game {
         log.set(key, buys);
     }
 
-    // Fim da cinemática: a serra fica em cima da bigorna até os dois chegarem perto.
-    _onSawForged(anvil) {
-        const top = this.sawCinematic.anvilTop;
-        this.chain.spawnSaw(top.x, top.y);
-        this.chain.weapon.dropT = 1;
-        this._sawOnAnvil = true;
-        this._sawAnvilSortY = this.roomProps?.solid.find(s => s.prop === anvil.prop)?.feetSortY ?? top.y;
-        this._sawFirstConnect = true;
-        this.dialogue?.say(1, "talk.sawReady");
+    // Fim da cinemática: os dois estão dos lados da bigorna e a serra conecta direto neles (primeira conexão).
+    _onSawForged() {
+        this.chain.reset({ present: true });
+        this._onSawReconnect({ first: true });
     }
+
 
     // Morte na sala (ADR 0014): a dupla renasce no spawn da sala atual, só esta sala reseta e o status
     // ganho nela (melhorias compradas na bigorna, baús abertos) é perdido. As outras salas e a sucata ficam.
@@ -769,8 +768,6 @@ export class Game {
             p._livesSeen = p.lives;
             p._fallSeen = false;
         }
-        this._sawOnAnvil = false;
-        this._sawFirstConnect = false;
         this.chain.reset({ present: this.forge.has("saw") });
         this._rememberEntrySpawns();
         this.renderer.camX = (spawns.p1.x + spawns.p2.x) / 2;
@@ -830,10 +827,7 @@ export class Game {
         return (this.roomEvents?.solidCircles() ?? []).some(c => Math.hypot(x - c.x, y - c.y) < r + c.r);
     }
 
-    _onSawReconnect() {
-        const first = this._sawFirstConnect;
-        this._sawFirstConnect = false;
-        this._sawOnAnvil = false;
+    _onSawReconnect({ first = false } = {}) {
         this.renderer.triggerShake(first ? SAW_CINEMATIC.firstReconnectShake : 4);
 
         this.audio.play("sawPickup");
@@ -853,7 +847,6 @@ export class Game {
 
     _updateSawCinematic(dt) {
         this.sawCinematic.update(dt);
-        for (const p of this.players) { p.vx = 0; p.vy = 0; }
         this.particleSystem.update([this.p1, this.p2], this.arenaBounds);
         this._updateCameraToCurrentRoom(dt);
     }
@@ -886,14 +879,10 @@ export class Game {
         this.p2.cancelDash();
         this._rememberEntrySpawns();
 
-        // Saindo com a serra ainda na bigorna, a troca de sala reconecta: toca a primeira conexão aqui.
-        const firstPickup = this._sawFirstConnect && this.chain.hasSaw && !this.chain.isConnected;
         if (!this.chain.isConnected) this.chain.reset();
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
-        if (firstPickup) this._onSawReconnect();
-        this._sawOnAnvil = false;
 
         this.particleSystem.clearDamageNumbers();
 
@@ -1625,11 +1614,6 @@ export class Game {
         const occluders = challenge ? challenge.buttonOccluders(entities) : [];
         const wallDrawables = this.roomProps ? renderer.wallDrawables(rect, rooms.current.frontWalls, tiles, TILE, HOLE_FALL.footOffset) : [];
         const propDrawables = [...(this.roomProps?.drawables(nowMs) ?? []), ...(this.roomEvents?.drawables() ?? []), ...(this.demoProgress?.drawables?.() ?? []), ...this.demoDoors.drawables(), ...wallDrawables];
-        // Recém-forjada, a serra fica em cima da bigorna: ordenada logo depois do prop.
-        if (this._sawOnAnvil) {
-            const k = this._sawAnvilSortY + 0.5;
-            propDrawables.push({ y: k - HOLE_FALL.footOffset, feetSortY: k, draw: c => this.chain.drawDropped(c) });
-        }
         // Com props sólidos a ordem é pelos pés (inimigos têm os pés bem abaixo do centro); sem eles, pelo centro.
         const sortKey = this.roomProps ? feetSortKey : (d => d.y);
         const drawables = [...entities, ...(rooms.current.corpses ?? []), ...occluders, ...propDrawables].sort((a, b) => sortKey(a) - sortKey(b));
@@ -1644,10 +1628,7 @@ export class Game {
 
         this.chain.draw(ctx, this.p1, this.p2);
 
-        // Recém-forjada, a serra fica em cima da bigorna: desenhada depois do prop.
-        if (!this._sawOnAnvil) {
-            this.chain.drawDropped(ctx);
-        }
+        this.chain.drawDropped(ctx);
 
         this.particleSystem.drawSparks(ctx);
 

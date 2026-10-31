@@ -86,8 +86,9 @@ export class ForgeMenu {
         });
 
         const sel = rows[fs.cursor];
-        const info = !sel ? "" : sel.status === "locked" ? t("forge.locked") : sel.status === "poor" ? t("forge.poor") : t(`forge.desc.${sel.id}`);
-        text(info, PAD, y + 3, sel?.status === "locked" || sel?.status === "poor" ? COLORS.red : COLORS.text);
+        // Sem moedas (`poor`) mostra a descrição mesmo assim; o custo em vermelho já indica a falta. `locked` (precisa da serra) segue com o aviso.
+        const info = !sel ? "" : sel.status === "locked" ? t("forge.locked") : t(`forge.desc.${sel.id}`);
+        text(info, PAD, y + 3, sel?.status === "locked" ? COLORS.red : COLORS.text);
         return c;
     }
 

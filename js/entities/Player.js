@@ -55,6 +55,8 @@ export class Player extends Entity {
         // Janela de perdão logo após o dash: a queda no buraco não dispara enquanto > 0 (ver DungeonTileQuery).
         this.holeGrace = 0;
 
+        // Cinemáticas: `{ x, y }` (comprimento ≤ 1) substitui as teclas de andar; null = controle do jogador.
+        this.autoMove = null;
         this.lastMoveX = 1; this.lastMoveY = 0;
         this.dashEnabled = false;
         this.dashing = false;
@@ -300,14 +302,19 @@ export class Player extends Entity {
     handleInput(input) {
         let moveX = 0;
         let moveY = 0;
-        if (input.isDown(this.controls[0])) moveY -= 1;
-        if (input.isDown(this.controls[1])) moveY += 1;
-        if (input.isDown(this.controls[2])) moveX -= 1;
-        if (input.isDown(this.controls[3])) moveX += 1;
+        if (this.autoMove) {
+            moveX = this.autoMove.x;
+            moveY = this.autoMove.y;
+        } else {
+            if (input.isDown(this.controls[0])) moveY -= 1;
+            if (input.isDown(this.controls[1])) moveY += 1;
+            if (input.isDown(this.controls[2])) moveX -= 1;
+            if (input.isDown(this.controls[3])) moveX += 1;
 
-        if (moveX !== 0 && moveY !== 0) {
-            moveX *= 0.7071;
-            moveY *= 0.7071;
+            if (moveX !== 0 && moveY !== 0) {
+                moveX *= 0.7071;
+                moveY *= 0.7071;
+            }
         }
 
         const hasInput = moveX !== 0 || moveY !== 0;

@@ -630,19 +630,6 @@
         { "type": "flag", "col": 21, "row": 2 },
         { "type": "flag", "col": 36, "row": 0 },
         { "type": "flag", "col": 27, "row": 0 },
-        {
-          "recipes": [
-            "saw",
-            "size",
-            "inertia",
-            "snapWave",
-            "quickLink",
-            "hearts"
-          ],
-          "type": "anvil",
-          "col": 36,
-          "row": 2
-        },
         { "scrap": 10, "type": "chest", "col": 19, "row": 27 },
         { "col": 2, "row": 3, "index": 64, "generated": true },
         { "col": 21, "row": 3, "index": 68, "generated": true },
@@ -696,7 +683,20 @@
         { "col": 33, "row": 22, "index": 77, "generated": true },
         { "col": 20, "row": 24, "index": 59, "generated": true },
         { "col": 20, "row": 25, "index": 68, "generated": true },
-        { "col": 18, "row": 26, "index": 59, "generated": true }
+        { "col": 18, "row": 26, "index": 59, "generated": true },
+        {
+          "recipes": [
+            "saw",
+            "size",
+            "inertia",
+            "snapWave",
+            "quickLink",
+            "hearts"
+          ],
+          "type": "anvil",
+          "col": 36,
+          "row": 2
+        }
       ],
       "enemies": [
         { "col": 27, "row": 21, "type": "demon" },
@@ -790,6 +790,20 @@
             { "col": 20, "row": 23 },
             { "col": 21, "row": 23 }
           ]
+        },
+        {
+          "col": 35,
+          "row": 9,
+          "type": "rope",
+          "id": "object_1793474581475_35_9",
+          "drops": []
+        },
+        {
+          "col": 37,
+          "row": 5,
+          "type": "rope",
+          "id": "object_1793474585611_37_5",
+          "drops": []
         }
       ],
       "zones": [
