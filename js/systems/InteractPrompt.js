@@ -6,9 +6,9 @@ const smooth = k => k * k * (3 - 2 * k);
 // Id de um prop interagível numa sala: o mesmo para o alvo do indicador e para a borda do prop.
 export const propTargetId = (roomKey, prop) => `${roomKey}/${prop.col},${prop.row}`;
 
-// Círculo flutuante sobre o que pode ser interagido (baú, bigorna). Um por jogador no alcance, na cor dele, com o
-// botão do dispositivo que ele usou por último. Só desenha; quem decide o alcance são as fontes (ChestSystem, ForgeSystem),
-// que devolvem alvos { id, x, topY, users: [índices], blocked }.
+// Medalhão neutro flutuante sobre o que pode ser interagido (baú, bigorna), um por alvo. Mostra o botão do dispositivo
+// que o jogador no alcance usou por último; com os dois no alcance e botões diferentes, alterna a cada pulso.
+// Só desenha; quem decide o alcance são as fontes (ChestSystem, ForgeSystem): alvos { id, x, topY, users, blocked }.
 export class InteractPrompt {
     constructor({ sources, getDevice, sheet = null, cfg = INTERACT_PROMPT, isVisible = () => true }) {
         Object.assign(this, { sources, getDevice, sheet, cfg, isVisible });
@@ -76,18 +76,16 @@ export class InteractPrompt {
             const bob = Math.sin((now / c.bobPeriodMs) * Math.PI * 2) * c.bobAmplitude;
             const pressed = Math.floor(now / (c.pulsePeriodMs / 2)) % 2 === 1;
             const size = c.cell * c.pixelScale;
-            const users = target.users;
-            users.forEach((user, i) => {
-                const offset = (i - (users.length - 1) / 2) * (size + c.pairSpacing);
-                out.push({
-                    x: target.x + offset,
-                    y: target.topY - c.gap - size / 2 + bob,
-                    scale,
-                    column: this.columnFor(user) + (pressed && !target.blocked ? 1 : 0),
-                    row: user === 0 ? 0 : 1,
-                    blocked: !!target.blocked,
-                    alpha: target.blocked ? c.blockedAlpha : 1
-                });
+            const columns = [...new Set(target.users.map(u => this.columnFor(u)))];
+            if (!columns.length) continue;
+            const column = columns[Math.floor(now / c.pulsePeriodMs) % columns.length];
+            out.push({
+                x: target.x,
+                y: target.topY - c.gap - size / 2 + bob,
+                scale,
+                column: column + (pressed && !target.blocked ? 1 : 0),
+                blocked: !!target.blocked,
+                alpha: target.blocked ? c.blockedAlpha : 1
             });
         }
         return out;
@@ -103,10 +101,10 @@ export class InteractPrompt {
             const w = Math.round(size * f.scale);
             const dx = Math.round(f.x - w / 2), dy = Math.round(f.y - w / 2);
             ctx.globalAlpha = f.alpha;
-            ctx.drawImage(img, f.column * c.cell, f.row * c.cell, c.cell, c.cell, dx, dy, w, w);
+            ctx.drawImage(img, f.column * c.cell, 0, c.cell, c.cell, dx, dy, w, w);
             if (f.blocked) {
                 ctx.globalAlpha = 1;
-                ctx.drawImage(img, c.columns.blocked * c.cell, f.row * c.cell, c.cell, c.cell, dx, dy, w, w);
+                ctx.drawImage(img, c.columns.blocked * c.cell, 0, c.cell, c.cell, dx, dy, w, w);
             }
         }
         ctx.restore();

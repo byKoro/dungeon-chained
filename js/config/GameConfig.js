@@ -18,8 +18,6 @@ export const BLOOD_STEPS = 6;
 export const MAX_ACTIVE_GIBS = 90;
 export const MAX_FOOTPRINTS = 60;
 
-export const MAX_PLAYER_SEPARATION = 620;
-
 export const CAM_MARGIN = 30;
 
 export const CAMERA_DRONE = {

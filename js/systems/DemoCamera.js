@@ -2,12 +2,19 @@ import { DEMO } from '../config/DemoConfig.js';
 import { TILE, ROOM_COLS, ROOM_ROWS, CAM_MARGIN } from '../config/GameConfig.js';
 
 export class DemoCamera {
-    constructor({ canvas, renderer, getPlayers, getRect, mode = DEMO.cameraMode }) {
-        Object.assign(this, { canvas, renderer, getPlayers, getRect, mode });
+    // `lockZoom`: com o limite de distância dos jogadores, a câmera não precisa afastar o zoom.
+    constructor({ canvas, renderer, getPlayers, getRect, mode = DEMO.cameraMode, lockZoom = false }) {
+        Object.assign(this, { canvas, renderer, getPlayers, getRect, mode, lockZoom });
     }
 
     referenceZoom() {
         return DEMO.cameraZoom * Math.min(this.canvas.width / (ROOM_COLS * TILE + CAM_MARGIN * 2), this.canvas.height / (ROOM_ROWS * TILE + CAM_MARGIN));
+    }
+
+    // Área visível no enquadramento normal, em px de mundo.
+    viewSize() {
+        const zoom = this.referenceZoom();
+        return { w: this.canvas.width / zoom, h: this.canvas.height / zoom };
     }
 
     update() {
@@ -18,7 +25,7 @@ export class DemoCamera {
             return;
         }
         let zoom = this.referenceZoom();
-        if (this.mode === 'zoom') zoom = Math.min(zoom,
+        if (this.mode === 'zoom' && !this.lockZoom) zoom = Math.min(zoom,
             this.canvas.width / (Math.abs(p1.x - p2.x) + DEMO.cameraMargin * 2),
             this.canvas.height / (Math.abs(p1.y - p2.y) + DEMO.cameraMargin * 2));
         // Sem limite na borda do mapa: a câmera fica sempre centrada na dupla.

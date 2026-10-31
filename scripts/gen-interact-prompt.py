@@ -4,11 +4,10 @@ Uso: python scripts/gen-interact-prompt.py            (escreve assets/ui/interac
      python scripts/gen-interact-prompt.py --preview  (também escreve _local/interact-prompt-preview.png)
 
 Origem: pixel art desenhada por script, sem IA generativa. Segue a UI do jogo: pedra, contorno e lábio do `FRAME`
-(PixelButton) e da tecla do HoldToSkip, glifos 3x5 do `PixelFont` em creme com sombra preta, ponta na cor do jogador
-(como a gema do balão de fala), selo na cor da face `red` do PixelButton.
+(PixelButton) e da tecla do HoldToSkip, glifos 3x5 do `PixelFont` em creme com sombra preta, selo na cor da face
+`red` do PixelButton. Neutro: sem ponta e sem cor de jogador (um indicador só para a dupla).
 
-Folha 144x32, células 16x16, 1 pixel de arte = 4 px de mundo (mesma densidade dos sprites):
-  linha 0 = Amarelo (P1), linha 1 = Azul (P2): só a ponta muda.
+Folha 144x16, células 16x16, 1 pixel de arte = 4 px de mundo (mesma densidade dos sprites):
   colunas 0-7: [E, Shift, X Xbox, quadrado DualShock] x [normal, pressionado]
   coluna 8   : selo "bloqueado" (desenhado por cima do ícone)
 """
@@ -42,14 +41,12 @@ RED_DARK = hex_rgba("#6e0f1c")
 XBOX_BLUE = hex_rgba("#5d9bd6")
 PS_PINK = hex_rgba("#d07ca6")
 
-PLAYERS = ["#ffd166", "#6bb4db"]
-
 CELL = 16
 COLS = 9
 MED_X = 2
+MED_Y = 1
 
-# Medalhão 11x11 com ponta para baixo, apontando o objeto. O = contorno, R = aro de pedra, F = face,
-# a/A/d = ponta na cor do jogador (luz, base, sombra).
+# Medalhão redondo 11x11. O = contorno, R = aro de pedra, F = face.
 MEDALLION = [
     "...OOOOO...",
     ".OORRRRROO.",
@@ -61,9 +58,7 @@ MEDALLION = [
     "ORRFFFFFRRO",
     ".ORRFFFRRO.",
     ".OORRRRROO.",
-    "...OaAdO...",
-    "....OAO....",
-    ".....O.....",
+    "...OOOOO...",
 ]
 CENTER = 5  # coluna e linha do centro da face
 
@@ -102,13 +97,10 @@ def cells():
                 yield c, r, ch
 
 
-def medallion(img, ox, oy, accent, light):
-    tip = {"a": shade(accent, 0.45), "A": accent, "d": shade(accent, -0.35)}
+def medallion(img, ox, oy, light):
     for c, r, ch in cells():
         if ch == "O":
             color = OUTLINE
-        elif ch in tip:
-            color = tip[ch]
         elif ch == "R":
             # Luz de cima à esquerda, sombra embaixo à direita (como os painéis de pedra).
             d = (c - CENTER) + (r - CENTER)
@@ -129,22 +121,22 @@ def glyph(img, ox, oy, name, color):
                     put(img, gx + c, gy + r + layer, col)
 
 
-def badge(img, ox, oy, accent, icon, pressed):
+def badge(img, ox, oy, icon, pressed):
     name, color = icon
-    mx = ox + MED_X
+    mx, oy = ox + MED_X, oy + MED_Y
     # Sombra projetada, depois o lábio de pedra escura 1 px abaixo; pressionado, a face desce e cobre o lábio.
     for c, r, _ in cells():
         blend(img, mx + c + 1, oy + r + 2, SHADOW)
     for c, r, ch in cells():
         put(img, mx + c, oy + r + 1, STONE_DARK if ch in "RF" else OUTLINE)
     dy = 1 if pressed else 0
-    medallion(img, mx, oy + dy, hex_rgba(accent), light=not pressed)
+    medallion(img, mx, oy + dy, light=not pressed)
     glyph(img, mx, oy + dy, name, color)
 
 
 def blocked_seal(img, ox, oy):
     # Selo 5x5 no canto de baixo à direita da face, com um X creme.
-    sx, sy = ox + MED_X + 7, oy + 6
+    sx, sy = ox + MED_X + 7, oy + MED_Y + 6
     seal = [".OOO.", "OLRRO", "ORRRO", "ORRDO", ".OOO."]
     for r, row in enumerate(seal):
         for c, ch in enumerate(row):
@@ -157,19 +149,18 @@ def blocked_seal(img, ox, oy):
 
 
 def build():
-    img = Image.new("RGBA", (CELL * COLS, CELL * 2), (0, 0, 0, 0))
-    for row, accent in enumerate(PLAYERS):
-        for i, icon in enumerate(ICONS):
-            for pressed in (False, True):
-                badge(img, (i * 2 + int(pressed)) * CELL, row * CELL, accent, icon, pressed)
-        blocked_seal(img, 8 * CELL, row * CELL)
+    img = Image.new("RGBA", (CELL * COLS, CELL), (0, 0, 0, 0))
+    for i, icon in enumerate(ICONS):
+        for pressed in (False, True):
+            badge(img, (i * 2 + int(pressed)) * CELL, 0, icon, pressed)
+    blocked_seal(img, 8 * CELL, 0)
     return img
 
 
 def preview(img):
     """Folha na escala do jogo (4x) sobre o chão escuro, e em contexto acima do baú e da bigorna."""
     S, tile = 4, 64
-    sheet = Image.new("RGBA", (tile * 12, tile * 5), hex_rgba("#2a2030"))
+    sheet = Image.new("RGBA", (tile * 12, tile * 4), hex_rgba("#2a2030"))
     for y in range(0, sheet.height, tile):
         for x in range(0, sheet.width, tile):
             for i in range(tile):
@@ -180,19 +171,17 @@ def preview(img):
     chest = up(Image.open(os.path.join(ROOT, "assets", "chest", "chest_1.png")).convert("RGBA"))
     anvil = up(Image.open(os.path.join(ROOT, "assets", "anvil", "anvil.png")).convert("RGBA"))
 
-    for row in range(2):
-        for col in range(9):
-            sheet.alpha_composite(up(cell(col, row)), (col * tile + tile // 2 + (tile if col == 8 else 0), row * tile + 8))
-    base_y = 3 * tile + 24
+    for col in range(9):
+        sheet.alpha_composite(up(cell(col, 0)), (col * tile + tile // 2 + (tile if col == 8 else 0), 8))
+    base_y = 2 * tile + 24
     sheet.alpha_composite(chest, (2 * tile, base_y))
     sheet.alpha_composite(up(cell(0, 0)), (2 * tile, base_y - tile + 4))
     sheet.alpha_composite(anvil, (6 * tile, base_y - 8 * S))
-    icon = up(cell(4, 1))
-    icon.alpha_composite(up(cell(8, 1)))
+    icon = up(cell(4, 0))
+    icon.alpha_composite(up(cell(8, 0)))
     sheet.alpha_composite(icon, (6 * tile + 4 * S, base_y - 8 * S - tile + 4 * S))
     sheet.alpha_composite(chest, (9 * tile + tile // 2, base_y))
-    sheet.alpha_composite(up(cell(6, 0)), (9 * tile - 6, base_y - tile + 4))
-    sheet.alpha_composite(up(cell(2, 1)), (10 * tile + 6, base_y - tile + 4))
+    sheet.alpha_composite(up(cell(2, 0)), (9 * tile + tile // 2, base_y - tile + 4))
     return sheet
 
 

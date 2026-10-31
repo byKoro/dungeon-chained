@@ -18,6 +18,8 @@ import { DroppedSawPush } from './systems/DroppedSawPush.js';
 import { SawTackle } from './systems/SawTackle.js';
 import { SawTackleFeedback } from './systems/SawTackleFeedback.js';
 import { SAW_TACKLE_FEEL } from './config/SawTackleFeelConfig.js';
+import { PlayerLeash } from './systems/PlayerLeash.js';
+import { PLAYER_LEASH } from './config/DemoConfig.js';
 import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
@@ -79,7 +81,7 @@ import { playerConfigs } from './config/EntityConfig.js';
 
 import {
     TILE, WORLD_W, WORLD_H, BLOOD_COLORS, BLOOD_PIXEL,
-    MAX_PLAYER_SEPARATION, CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
+    CAM_MARGIN, CAMERA_DRONE, TRANSITION_SPEED,
     DOOR_STUB_TILES, DOOR_ENTER_DEPTH, BACKGROUND_TILE,
     TORCHES, DOOR_LIGHT, WIND,
     getPlayerSpawnPositions, AUDIO_CONFIG,
@@ -192,7 +194,14 @@ export class Game {
         this.thrownSaw = new ThrownSaw({ getWeapon: () => this.chain.weapon, getRoom: () => this.rooms.current,
             safeDrop: (x, y) => this.tiles.safeDropPoint(x, y, [this.p1, this.p2]),
             onHit: (enemy, info) => { if (this.arautoEffects.owns(enemy)) this.arautoEffects.hit(enemy, info); } });
-        this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(), mode: this.mapData?.test?.camera });
+        this.demoCamera = new DemoCamera({ canvas, renderer: this.renderer, getPlayers: () => [this.p1, this.p2], getRect: () => this.rooms.cellRect(),
+            mode: this.mapData?.test?.camera, lockZoom: PLAYER_LEASH.enabled });
+        // Só nos mapas do Editor 2.0, fora da tela dividida (F6) e das cinemáticas com câmera própria.
+        this.playerLeash = this.mapData ? new PlayerLeash({
+            getPlayers: () => [this.p1, this.p2], getView: () => this.demoCamera.viewSize(),
+            isActive: () => this.demoCamera.mode !== 'split' && !this.demoCamera.focus,
+            particleSystem: this.particleSystem
+        }) : null;
         // A câmera da cena usa `demoCamera.focus`, que só vale no mapa da demo; no modo clássico a câmera fica parada.
         this.arautoIntro = new ArautoIntroScene({ camera: this.demoCamera, hud: this.hud, effects: this.arautoEffects,
             arautoAudio: this.arautoAudio, audio: this.audio, particles: this.particleSystem,
@@ -925,19 +934,6 @@ export class Game {
         this.gameLoop.triggerHitSlowmo();
     }
 
-    enforceSeparationLimit() {
-
-        if (!this.chain.isConnected) return;
-        const dx = this.p2.x - this.p1.x, dy = this.p2.y - this.p1.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > MAX_PLAYER_SEPARATION) {
-            const over = dist - MAX_PLAYER_SEPARATION;
-            const nx = dx / (dist || 1), ny = dy / (dist || 1);
-            this.p1.x += nx * over / 2; this.p1.y += ny * over / 2;
-            this.p2.x -= nx * over / 2; this.p2.y -= ny * over / 2;
-        }
-    }
-
     _updateCameraToCurrentRoom(dt = SIM_STEP) {
         if (this.mapData) { this.demoCamera.update(); return; }
         const rect = this.rooms.cellRect();
@@ -1172,7 +1168,7 @@ export class Game {
                 }
             }
         }
-        this.enforceSeparationLimit();
+        this.playerLeash?.update();
 
         if (room.challenge) {
             room.challenge.update([p1, p2], deltaSeconds);
