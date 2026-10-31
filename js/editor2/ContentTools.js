@@ -300,7 +300,7 @@ export class ContentTools {
             const torch = this.torchType;
             if (torch === 'torch') {
                 const mount = torchPlacement(r, cell);
-                if (!mount) this._hint('Encaixe a tocha numa parede (não em porta, canto ou buraco).');
+                if (!mount) this._hint('Encaixe a tocha numa parede com face para o chão ou buraco (borda ou parede criada; não em porta ou canto).');
                 else this._toggle(r, 'torches', { col: mount.col, row: mount.row, type: torch, side: mount.side });
             } else if (onFloor) this._toggle(r, 'torches', { ...cell, type: torch, side: 'F' });
         } else if (type === 'hazard') this._applyHazard(r, cell, onFloor);
