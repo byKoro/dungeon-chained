@@ -33,7 +33,7 @@ export class ForgeState {
         const r = this.recipes[id];
         if (!r) return "unknown";
         if (this.level(id) >= this.maxLevel(id)) return "maxed";
-        if (r.item && !this.has(r.item)) return "locked";
+        if (r.item && this.level(r.item) < (r.itemLevel ?? 1)) return "locked";
         if (amount < this.nextCost(id)) return "poor";
         return "ok";
     }
@@ -74,10 +74,49 @@ export function applySawUpgrades(forge, chain, weapon, base, recipes = FORGE.rec
     chain.reconnectDistance = base.reconnectDistance * scale;
     chain.reconnectDelay = link > 0 ? recipes.quickLink.delaySteps[link - 1] : (base.reconnectDelay ?? 20);
     if (!weapon) return;
-    weapon.sizeScale = 1 + recipes.size.perLevel * forge.level("size");
+    weapon.sizeScale = 1 + recipes.size.perLevel * forge.level("size") + recipes.size2.perLevel * forge.level("size2");
     weapon.doubleSaw = false;
     const inertia = forge.level("inertia");
     weapon.inertiaSteps = inertia > 0 ? Math.round(recipes.inertia.seconds[inertia - 1] * 60) : 0;
+}
+
+// Ajustes do tackle comprados na Penhasco, por cima de SAW_TACKLE. Só traz as chaves com melhoria.
+export function sawTackleTuning(forge, recipes = FORGE.recipes) {
+    const out = {};
+    const hits = forge.level("tackleHits");
+    if (hits > 0) out.hits = recipes.tackleHits.hits[hits - 1];
+    const long = forge.level("tackleLong");
+    if (long > 0) {
+        out.speed = recipes.tackleLong.speed[long - 1];
+        out.returnStartSteps = recipes.tackleLong.returnStartSteps[long - 1];
+    }
+    const jumps = forge.level("ricochet");
+    if (jumps > 0) {
+        out.ricochetJumps = recipes.ricochet.jumps[jumps - 1];
+        out.ricochetRange = recipes.ricochet.range;
+    }
+    return out;
+}
+
+// Brasa: null sem a melhoria.
+export function embersParams(forge, recipes = FORGE.recipes) {
+    if (forge.level("embers") <= 0) return null;
+    const r = recipes.embers;
+    return { lifeSteps: Math.round(r.lifeSeconds * 60), damage: r.damage, spacing: r.spacing, radius: r.radius };
+}
+
+// Reconexão explosiva: null sem a melhoria.
+export function reconnectBlastParams(forge, recipes = FORGE.recipes) {
+    const lvl = forge.level("reconnectBlast");
+    if (lvl <= 0) return null;
+    const r = recipes.reconnectBlast;
+    return { radius: r.radius[lvl - 1], cooldownSteps: Math.round(r.cooldownSeconds * 60) };
+}
+
+// Segunda chance: null sem a melhoria.
+export function lastStandParams(forge, recipes = FORGE.recipes) {
+    if (forge.level("lastStand") <= 0) return null;
+    return { invulnSteps: Math.round(recipes.lastStand.invulnSeconds * 60) };
 }
 
 // Raio da onda do Estalo no nível atual (0 = sem a melhoria).

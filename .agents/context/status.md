@@ -270,6 +270,12 @@ Receita grátis `tackle` ("Investida"/"Saw Tackle", precisa da Serra) só na big
 
 Verificado por testes headless (trava, receita grátis, fechamento do card por evento) e por script (F1). A lógica do `TackleDemo` foi rodada num harness no Chrome headless (posições e morte do inimigo corretas), mas os sprites não carregaram no harness (o `DashDemo` também não), então **o visual do vídeo e o fluxo dentro do jogo não foram vistos**. Nome "Investida" já era usado no glossário para o dash e para a investida do golem; ver glossário. `npm test` 60/63: só as falhas antigas (Arauto ×2, Curva SE #5); map validation segue com #4.
 
+### Bigorna da Penhasco ampliada + Segunda chance (2026-10-31, `feat/penhasco-forge`)
+
+A Penhasco vende só o catálogo próprio: Investida, Tamanho II (exige Tamanho 3), Mais cortes, Ricochete, Brasa, Investida longa (essas quatro exigem a Investida) e Reconexão explosiva (exige a Serra). A botas ganhou Segunda chance. Pré-requisito por nível e aviso de travado por receita ("Precisa de Tamanho 3."). Subsistemas novos: `SawEmbers`, `ReconnectBlast`, `LastStand`. Valores e preços provisórios. Detalhes em `systems/weapons.md` e `systems/players-and-chain.md`; tarefa em `.agents/tasks/2026-10-31-penhasco-forge/`.
+
+Verificado por `tests/test_penhasco_forge.js` (catálogo, travas, preços, 1,60×, cada efeito com fakes) e por captura headless do menu da forja (Penhasco travada/aberta e botas: nomes, pontos de nível, GRÁTIS, avisos). **Não visto no jogo:** brasas, ricochete, onda da reconexão e Segunda chance em combate real; o equilíbrio de preços. `npm test` 62/64 (só `test_arauto_effects` e Curva SE #5); map validation segue com #4.
+
 
 ## Tensão da corrente — 2026-10-31 (feat/chain-tension-juice)
 Feedback compartilhado de carga/risco com antecipação, brilho vermelho gradual acima da iluminação, vibração do cabo, rangido crescente, alívio rápido e recuo na ruptura. Reutiliza raiva/furia originais no personagem/avatar; preserva dano/cinemáticas e as proteções de dash/serra dupla. Artes geradas foram rejeitadas e removidas com as ferramentas temporárias.

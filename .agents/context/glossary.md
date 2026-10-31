@@ -70,6 +70,8 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | Saw Tackle (recipe) | Investida | Free forge recipe `tackle` (Penhasco anvil, needs the Serra) that unlocks the saw tackle (dash into the loose saw launches it, `SawTackle`) on Editor 2.0 maps. Note: older text also uses "investida" for the plain dash and for the golem's marked charge |
+| Size II / More Cuts / Ricochet / Embers / Long Tackle / Reconnect Blast | Tamanho II / Mais cortes / Ricochete / Brasa / Investida longa / Reconexão explosiva | Penhasco anvil recipes (`size2`, `tackleHits`, `ricochet`, `embers`, `tackleLong`, `reconnectBlast`): bigger disc after Tamanho 3; more hits while stuck; jump to the next foe; burning embers behind the launched saw; faster/farther tackle flight; Estalo wave on reconnect |
+| Last Stand | Segunda chance | Botas anvil recipe `lastStand`: once per room per player, the hit or fall that would zero them leaves 1 heart (`LastStand`) |
 | Ability card | telinha (de tutorial) | Quick tutorial panel shown when an ability is gained (`AbilityCard`: dash from the boots, Investida from the anvil), with a live "video" demo and the button prompt; does not pause |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 
