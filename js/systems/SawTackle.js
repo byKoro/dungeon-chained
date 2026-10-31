@@ -9,8 +9,10 @@ const unit = (x, y, fx = 1, fy = 0) => { const d = Math.hypot(x, y); return d > 
 export class SawTackle {
     constructor({ chain, getPlayers, getRoom, getBounds = () => null, isSolid = () => false,
         safeDrop = (x, y) => ({ x, y }), findLandingRoute = null, canLand = null, getAimTargets = null, onEnemyHit = null, audio = null, particleSystem = null, renderer = null,
-        cfg = SAW_TACKLE, flightMode = cfg.flightMode, feedback = null, canTackle = () => true }) {
-        Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, getAimTargets, onEnemyHit, audio, particleSystem, renderer, cfg, canTackle });
+        cfg = SAW_TACKLE, flightMode = cfg.flightMode, feedback = null, canTackle = () => true, getTuning = null }) {
+        Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, getAimTargets, onEnemyHit, audio, particleSystem, renderer, cfg, canTackle, getTuning });
+        // `cfg` vira o ajuste do lançamento atual (base + melhorias da forja via `getTuning`); `baseCfg` é o original.
+        this.baseCfg = cfg;
         this.flightMode = flightMode === 'coast' ? 'coast' : 'return';
         this.feedback = feedback;
         this.trail = [];
@@ -38,6 +40,9 @@ export class SawTackle {
         this.impactSteps = 0;
         this.pending = null;
         this.justTackled = null;
+        this.launchId = this.launchId ?? 0;
+        this.ricochetLeft = 0;
+        this.cfg = this.baseCfg;
         this._lockedTouch = [false, false];
         this.trail.length = 0;
         this._sync();
@@ -99,7 +104,9 @@ export class SawTackle {
     }
 
     _tackle(w, p, R) {
-        const c = this.cfg;
+        const c = this.cfg = { ...this.baseCfg, ...(this.getTuning?.() ?? {}) };
+        this.ricochetLeft = c.ricochetJumps ?? 0;
+        this.launchId++;
         const dir = unit(p.dashDirX ?? p.vx, p.dashDirY ?? p.vy, Math.sign(p.vx) || 1, 0);
         // O jogador para na borda do contato, do lado de onde veio.
         const back = { x: w.dropX - dir.x * R, y: w.dropY - dir.y * R };
@@ -226,6 +233,10 @@ export class SawTackle {
         if (this._wallBetween(cx, cy, w.dropX, w.dropY)) return false;
         // Serra no centro exato do impacto: sai para baixo (direção fixa, sem sorteio).
         const dir = direction ?? unit(dx, dy, 0, 1);
+        // Lançamento do Arauto: sem as melhorias do tackle.
+        this.cfg = this.baseCfg;
+        this.ricochetLeft = 0;
+        this.launchId++;
         this.processed = new Set([boss]);
         this.stuck = null;
         this.homing = null;
@@ -493,6 +504,7 @@ export class SawTackle {
         this.state = 'flight';
         this.vx = s.vx;
         this.vy = s.vy;
+        if (this._ricochet(w, e)) return;
         if (this.flightMode === 'coast') return;
         if (!completed || this.mode !== 'tackle' || e.effectMaterial !== 'lavaStone') return;
         if (this.cfg.arautoAfterHits === 'drop') { this._land(w); return; }
@@ -504,6 +516,28 @@ export class SawTackle {
         const dir = unit(this.origin.x - w.dropX, this.origin.y - w.dropY, -s.vx, -s.vy);
         this.vx = dir.x * this.cfg.speed;
         this.vy = dir.y * this.cfg.speed;
+    }
+
+    // Ricochete (melhoria): ao soltar um inimigo, vira para o inimigo válido mais perto dentro do alcance, sem parede no
+    // meio. O volante da volta pausa até chegar lá. O Arauto não dispara ricochete (segue a volta direta dele).
+    _ricochet(w, from) {
+        if (this.mode !== 'tackle' || !(this.ricochetLeft > 0) || from?.effectMaterial === 'lavaStone') return false;
+        const range = this.cfg.ricochetRange ?? 300;
+        let best = null;
+        for (const e of this.getRoom()?.enemies || []) {
+            if (!this._targetable(e)) continue;
+            const d = Math.hypot(e.x - w.dropX, e.y - w.dropY);
+            if (d < 1 || d > range || this._wallBetween(w.dropX, w.dropY, e.x, e.y)) continue;
+            if (!best || d < best.d) best = { e, d };
+        }
+        if (!best) return false;
+        const dir = unit(best.e.x - w.dropX, best.e.y - w.dropY);
+        this.vx = dir.x * this.cfg.speed;
+        this.vy = dir.y * this.cfg.speed;
+        this.steerPause = Math.ceil(best.d / this.cfg.speed) + 6;
+        this.ricochetLeft--;
+        this.feedback?.launch(w, dir);
+        return true;
     }
 
     _updateTrail(w) {

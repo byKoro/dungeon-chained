@@ -14,7 +14,11 @@ import { SCRIPT_LINES } from './config/DialogueConfig.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
 import { CHAIN_TENSION } from './config/ChainTensionConfig.js';
-import { ForgeState, mapOffersRecipe, applySawUpgrades, applyHeartUpgrades, applyPlayerUpgrades, coopHealParams, sawDragStats, snapWaveRadius } from './systems/ForgeState.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades, applyHeartUpgrades, applyPlayerUpgrades, coopHealParams, sawDragStats, snapWaveRadius,
+    sawTackleTuning, embersParams, reconnectBlastParams, lastStandParams } from './systems/ForgeState.js';
+import { SawEmbers } from './systems/SawEmbers.js';
+import { ReconnectBlast } from './systems/ReconnectBlast.js';
+import { LastStand } from './systems/LastStand.js';
 import { SawDrag } from './systems/SawDrag.js';
 import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
@@ -311,6 +315,8 @@ export class Game {
             flightMode: this.mapData?.test?.sawTackleMode,
             // Editor 2.0: só com a receita Investida (bigorna da Penhasco). Modo clássico não tem forja: liberado.
             canTackle: () => !this.mapData || this.forge.has("tackle"),
+            // Mais cortes, Investida longa e Ricochete (bigorna da Penhasco), lidos a cada lançamento.
+            getTuning: () => sawTackleTuning(this.forge),
             chain: this.chain, getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current,
             getBounds: () => this.arenaBounds,
             isSolid: (x, y) => this._sawSolidAt(x, y),
@@ -327,6 +333,25 @@ export class Game {
                 if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
             },
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
+        });
+        // Melhoria "Brasa" (Penhasco): brasas atrás da serra lançada.
+        this.sawEmbers = new SawEmbers({
+            getParams: () => embersParams(this.forge), getTackle: () => this.sawTackle, getRoom: () => this.rooms.current,
+            particleSystem: this.particleSystem,
+            onEnemyHit: (enemy, result, impact) => {
+                const info = this.combat.feedbackForHit(enemy, result, impact, { soundVolumeMultiplier: SAW_TACKLE_FEEL.audio.hitVolume });
+                enemy.freezeOnHit?.(info.hitStop);
+            }
+        });
+        // Melhoria "Reconexão explosiva" (Penhasco): a onda do Estalo ao reconectar.
+        this.reconnectBlast = new ReconnectBlast({
+            getParams: () => reconnectBlastParams(this.forge),
+            blast: (x, y, radius) => this._cutWave(x, y, radius, this.rooms.current.enemies)
+        });
+        // Melhoria "Segunda chance" (sala "botas"): uma vez por sala, quem zeraria fica com 1 coração.
+        this.lastStand = new LastStand({
+            getParams: () => lastStandParams(this.forge), getPlayers: () => [this.p1, this.p2],
+            onSave: p => this._onLastStand(p)
         });
         // Melhoria "Impacto": o dash arremessa inimigos (sala "botas").
         this.dashPushFeedback = new DashPushFeedback({ particleSystem: this.particleSystem, renderer: this.renderer, audio: this.audio,
@@ -624,6 +649,9 @@ export class Game {
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
+        this.sawEmbers.reset();
+        this.reconnectBlast.reset();
+        this.lastStand.reset();
         this.dashPush?.reset();
         this.coopHeal?.reset();
         this.coopHealFeedback?.reset();
@@ -707,7 +735,11 @@ export class Game {
     // Melhoria Estalo: onda em volta da serra quando o cabo arrebenta (não na queda nem no corte forçado).
     _snapWave(x, y, enemies) {
         const radius = snapWaveRadius(this.forge);
-        if (radius <= 0) return;
+        if (radius > 0) this._cutWave(x, y, radius, enemies);
+    }
+
+    // Onda cortante do Estalo (também usada pela Reconexão explosiva).
+    _cutWave(x, y, radius, enemies) {
         const fx = FORGE.snapWave;
         this.particleSystem.triggerShockRing(x, y, radius, { life: fx.ringLife, color: fx.ringColor });
         this.particleSystem.triggerSparkBurst(x, y, radius * 0.5, fx.sparks, 1.4);
@@ -774,6 +806,9 @@ export class Game {
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
+        this.sawEmbers.reset();
+        this.reconnectBlast.reset();
+        this.lastStand.reset();
         this.dashPush?.reset();
         this.coopHeal?.reset();
         this.coopHealFeedback?.reset();
@@ -834,6 +869,9 @@ export class Game {
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
+        this.sawEmbers.reset();
+        this.reconnectBlast.reset();
+        this.lastStand.reset();
         this._rememberEntrySpawns();
         this.renderer.camX = (this.p1.x + this.p2.x) / 2;
         this.renderer.camY = (this.p1.y + this.p2.y) / 2;
@@ -871,6 +909,16 @@ export class Game {
         } else {
             this.chain.weapon?.playReconnect?.();
         }
+        const at = this.chain.weapon?.getSawPositions?.(this.p1, this.p2)?.[0];
+        if (at) this.reconnectBlast?.onReconnect(at.x, at.y, { first });
+    }
+
+    // Segunda chance: clarão e som de coração no jogador salvo.
+    _onLastStand(p) {
+        const fx = FORGE.lastStand;
+        this.particleSystem.triggerFlash(p.x, p.y, fx.flash, fx.flashPower);
+        this.renderer.triggerShake(fx.shake);
+        this.audio.play(fx.sound.cue, { rateMultiplier: fx.sound.rate, volumeMultiplier: fx.sound.volume });
     }
 
     _updateSawCinematic(dt) {
@@ -911,6 +959,9 @@ export class Game {
         this.sawDrag?.reset();
         this.sawPush?.reset();
         this.sawTackle.reset();
+        this.sawEmbers.reset();
+        this.reconnectBlast.reset();
+        this.lastStand.reset();
 
         this.particleSystem.clearDamageNumbers();
         this.coopHealFeedback?.reset();
@@ -952,6 +1003,7 @@ export class Game {
     _resolveFall(p) {
         if (!p.falling || !p.fallComplete) return;
         p.loseLife(HOLE_FALL.livesLost ?? 1);
+        if (p.lives <= 0) this.lastStand?.save(p);
         if (p.lives <= 0) { p.fallComplete = false; return; }
 
         // Ainda tem vida: renasce perto do buraco (ensureSafeSpawn empurra para o chão seguro mais perto),
@@ -1222,6 +1274,8 @@ export class Game {
         if (this.sawDrag?.justGrabbed) this.abilityCard?.notify("drag");
         // Antes do Chain: um tackle no mesmo passo que a reconexão vence (a serra fica travada no impacto).
         this.sawTackle.update();
+        this.sawEmbers.update();
+        this.reconnectBlast.update();
         if (this.sawTackle.justTackled) this.abilityCard?.notify("tackle");
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
@@ -1404,6 +1458,8 @@ export class Game {
         }
 
         this.effects.update();
+        // Antes do feedback de dano e da regra de morte: quem zerou com a Segunda chance fica com 1 coração.
+        this.lastStand?.check([p1, p2]);
 
         for (const p of [p1, p2]) {
             // damageTaken sobe a cada acerto aceito, inclusive com vida infinita (a vida não muda).
