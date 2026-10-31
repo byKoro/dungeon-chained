@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { SpawnSystem } from '../js/systems/SpawnSystem.js';
 import { FLAME_GOLEM } from '../js/config/FlameGolemConfig.js';
-import { SIM_HZ, TILE } from '../js/config/GameConfig.js';
+import { TILE } from '../js/config/GameConfig.js';
 
 // Critérios do spec .agents/tasks/2026-10-31-arauto-reactive-ai/ (numeração entre colchetes).
 const spawn = new SpawnSystem({ assets: { get: () => ({ complete: true, naturalWidth: 1200 }) }, bloodCanvas: { palette: [] } });
@@ -31,7 +31,8 @@ const room = (e, { walls = [], holes = [] } = {}) => {
 };
 const Y = 160; // centro na linha 3; pés (y + 70) na linha 4
 const MELEE = FLAME_GOLEM.attacks.attack.triggerRange;
-const PRESSURE_TICKS = FLAME_GOLEM.ai.pressureSeconds * SIM_HZ;
+const originalRandom = Math.random;
+Math.random = () => 0;
 
 // [1] Jogador perto → melee, mesmo com outro longe; nunca investe contra o distante enquanto alguém está perto.
 {
@@ -42,54 +43,6 @@ const PRESSURE_TICKS = FLAME_GOLEM.ai.pressureSeconds * SIM_HZ;
     const started = [];
     tick(e, ps, 400, () => { if (e.justAttacked) started.push(e.currentAttack); });
     assert.ok(!started.includes('attack3'), `sem investida com alguém perto (${started})`);
-}
-
-// [2][3] Pressão de 2 s sem precisar de dano; a pancada vem depois do ataque e da recuperação atuais.
-const firstSlam = withHits => {
-    const e = create(), ps = [dummy(60), dummy(300)];
-    e.hp = e.maxHp = 1000;
-    let readyAt = -1, slamAt = -1, before = null;
-    tick(e, ps, 600, i => {
-        if (withHits) e.takeHit(1, { dirX: 1, dirY: 0 });
-        if (readyAt < 0 && e.pressureReady) readyAt = i;
-        if (slamAt < 0 && e.state === 'windup' && e.currentAttack === 'attack2') { slamAt = i; return false; }
-        before = e.state;
-    });
-    return { readyAt, slamAt, before };
-};
-{
-    const calm = firstSlam(false);
-    assert.equal(calm.readyAt, PRESSURE_TICKS - 1, 'pressão completa após 2 s contínuos');
-    assert.ok(calm.slamAt > calm.readyAt, 'a pancada não interrompe o ataque em curso');
-    assert.equal(calm.before, 'chase', 'começa só depois da recuperação');
-    const hit = firstSlam(true);
-    assert.equal(hit.slamAt, calm.slamAt, 'acertos não aceleram nem mudam a pressão');
-}
-
-// [4] Os dois saem → zera; impacto da pancada → zera.
-{
-    const e = create(), near = [dummy(60), dummy(-60)];
-    tick(e, near, PRESSURE_TICKS + 5);
-    assert.ok(e.pressureReady);
-    e.update([dummy(1000), dummy(-1000)], () => {});
-    assert.equal(e.pressureTicks, 0);
-    assert.equal(e.pressureReady, false, 'pancada pendente cancelada quando ninguém está perto');
-
-    const s = create(), ps = [dummy(60), dummy(-60)];
-    let zeroAfterImpact = null;
-    tick(s, ps, 600, () => {
-        if (s.justGroundHit && s.currentAttack === 'attack2') { zeroAfterImpact = s.pressureTicks; return false; }
-    });
-    assert.equal(zeroAfterImpact, 0, 'executar a pancada reinicia a pressão');
-}
-
-// [5] Fase 2: sem pressão e sem pancada parada.
-{
-    const e = create(), ps = [dummy(60), dummy(-60)];
-    toPhase2(e);
-    const started = new Set();
-    tick(e, ps, 600, () => { if (e.justAttacked) started.add(e.currentAttack); assert.equal(e.pressureReady, false); });
-    assert.deepEqual([...started], ['attack'], 'fase 2 com a dupla perto: só melee');
 }
 
 // [6] Longe e acessível → investida. Parede no caminho: fase 1 contorna andando; fase 2 salta.
@@ -190,7 +143,7 @@ const wallColumn = [1, 2, 3, 4].map(row => [5, row]); // x 256..320, y 0..256; p
     assert.equal(e.plan.target, ps[1], 'escolhe o jogador com trajeto válido');
 }
 
-// [11] Salto: destino acompanha no aviso, fica fixo no ar.
+// [11] Salto: destino fixo desde o aviso.
 {
     const e = create(), ps = [dummy(200), dummy(300)];
     toPhase2(e);
@@ -198,7 +151,7 @@ const wallColumn = [1, 2, 3, 4].map(row => [5, row]); // x 256..320, y 0..256; p
     e.update(ps, () => {});
     ps[0].x = 260;
     e.update(ps, () => {});
-    assert.equal(e.slam.mark.x, 260, 'no aviso o destino segue o alvo');
+    assert.equal(e.slam.mark.x, 200, 'no aviso o destino fica fixo');
     tick(e, ps, 200, () => !e.airborne);
     const fixed = e.slam.mark.x;
     ps[0].x = 100;
@@ -230,4 +183,5 @@ for (const [mode, count] of [['single', 1], ['sequence', FLAME_GOLEM.slam.count]
     }
 }
 
-console.log('Arauto AI: melee priority, pressure, phase 2 rules, dash/jump validity, walls, holes, modes and range passed.');
+Math.random = originalRandom;
+console.log('Arauto AI: melee priority, dash/jump validity, walls, holes, modes and range passed.');

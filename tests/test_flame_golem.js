@@ -12,19 +12,21 @@ const players = [30, 500].map(x => ({ x, y: 0, lives: 3, hitRadius: 16, takeDama
 assert.ok(editorEnemyTypes().some(t => t.key === 'flameGolem'));
 assert.deepEqual(thumbRegion(ENEMY_TYPE_BY_KEY.flameGolem.config(assets)), { sx: 36, sy: 129, w: 32, h: 28 });
 
-// Um jogador colado e outro longe: melee primeiro (sem ciclo); a pressão de 2 s leva à pancada; nunca investe.
+// Um jogador perto: sorteia melee/pancada sem investir contra o distante.
 const attacker = create();
 const attacks = [], hits = [];
-let firstSlamTick = -1;
+const originalRandom = Math.random;
+let roll = 0;
+Math.random = () => ([0, 0, 0, 0.999][roll++ % 4]);
 for (let tick = 0; tick < 700; tick++) {
     attacker.update(players, () => hits.push({ attack: attacker.currentAttack, time: attacker.animTime }));
     if (!attacker.justAttacked) continue;
     attacks.push(attacker.currentAttack);
-    if (attacker.currentAttack === 'attack2' && firstSlamTick < 0) firstSlamTick = tick;
 }
 assert.equal(attacks[0], 'attack', 'jogador perto: melee primeiro');
 assert.ok(!attacks.includes('attack3'), 'com alguém perto não investe contra o distante');
-assert.ok(firstSlamTick >= FLAME_GOLEM.ai.pressureSeconds * 60, 'pancada só depois de 2 s de pressão');
+Math.random = originalRandom;
+assert.ok(attacks.includes('attack2'), 'pancada participa do sorteio');
 assert.deepEqual(hits.find(h => h.attack === 'attack'), { attack: 'attack', time: 30 });
 assert.deepEqual(hits.find(h => h.attack === 'attack2'), { attack: 'attack2', time: 36 });
 

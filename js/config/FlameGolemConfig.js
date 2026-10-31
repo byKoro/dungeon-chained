@@ -24,7 +24,7 @@ export const FLAME_GOLEM = {
     ],
     attacks: {
         attack: {
-            triggerRange: 110, range: 70, knockback: 16,
+            triggerRange: 110, range: 80, knockback: 16,
             windupTicks: 40, recoverTicks: 36, ticksPerFrame: 5, hitFrame: 6
         },
         attack2: {
@@ -33,9 +33,9 @@ export const FLAME_GOLEM = {
             windupTicks: 35, recoverTicks: 55, ticksPerFrame: 6, hitFrame: 6
         },
         attack3: {
-            // A direção acompanha o alvo durante o aviso e fica fixa na investida.
+            // Mira fixa no aviso; correção leve durante a investida.
             triggerRange: 480, speed: 12, durationTicks: 18, hitRadius: 50,
-            knockback: 52,
+            knockback: 52, trackingStrength: 0.025,
             windupTicks: 40, recoverTicks: 60, ticksPerFrame: 5, launchFrame: 5,
             collisionProbePx: 8
         }
@@ -44,13 +44,21 @@ export const FLAME_GOLEM = {
     ai: {
         // 'single': cada decisão faz 1 investida ou 1 salto e depois reavalia.
         // 'sequence': fase 1 faz phases[0].dashCount investidas; fase 2 faz phases[1].dashCount investidas ou slam.count saltos.
-        chainMode: 'single',
-        // Fase 1: um jogador no alcance do melee por este tempo contínuo faz a próxima decisão ser a pancada.
-        pressureSeconds: 2,
+        chainMode: 'sequence',
+        // Chance de melee perto ou investida longe; a alternativa é attack2, se válido.
+        primaryAttackChance: 0.5,
+        closeAttackRepeatWeight: 0.35,
+        closeChaseChance: 0.25,
+        closeDashChance: 0.15,
+        closeChaseMinTicks: 24,
+        closeChaseMaxTicks: 54,
+        rangedAttackChance: 0.6,
+        chaseMinTicks: 60,
+        chaseMaxTicks: 105,
         // Perseguição: o caminho para o corpo termina a esta distância do alvo, sem parede no meio (px).
         chaseReachPx: 88
     },
-    // Fase 2: o golpe de área (attack2) vira salto com slam, usado quando nenhuma investida é possível.
+    // Fase 2: o golpe de área (attack2) vira salto com slam.
     slam: {
         // Distância máxima até o alvo para começar o salto (px).
         triggerRange: 480,

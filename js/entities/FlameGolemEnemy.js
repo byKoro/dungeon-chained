@@ -25,8 +25,10 @@ export class FlameGolemEnemy extends MeleeEnemy {
         // Decisão em curso: { key, target, dash?, mark? }. Escolhida em `chase` por `_decide()`.
         this.plan = null;
         this._forcedAttack = null;
-        this.pressureTicks = 0;
-        this.pressureReady = false;
+        this._chaseTicks = 0;
+        this._closeChaseTicks = 0;
+        this._lastCloseAttack = null;
+        this._closeAttackStreak = 0;
         this._dashPlan = null;
         this._dashTraveled = 0;
         this._chaseTarget = null;
@@ -84,9 +86,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
         if (!this.phaseTransitionControlled && !this.frozen && this.hitFreezeTimer <= 0) this._updatePhase();
         this.players = players.filter(p => p.lives > 0 && !p.falling);
         if (!this.frozen && this.hitFreezeTimer <= 0 && !this.isDying && this.state !== 'dead') {
-            this._updatePressure();
             if (this.state === 'chase') this._planChase();
-            else if (this.state === 'windup') this._trackAim();
         }
         const targets = this.players.length ? [this.players[0], this.players[1] || this.players[0]]
             : [{ x: this.x, y: this.y }, { x: this.x, y: this.y }];
@@ -135,6 +135,10 @@ export class FlameGolemEnemy extends MeleeEnemy {
         const plan = this.plan ?? { key: 'attack', target: this.target };
         this.plan = plan;
         this.currentAttack = plan.key;
+        if (plan.key === 'attack' || plan.key === 'attack2') {
+            this._closeAttackStreak = this._lastCloseAttack === plan.key ? this._closeAttackStreak + 1 : 1;
+            this._lastCloseAttack = plan.key;
+        }
         const mult = this.phaseConfig.animationSpeedMultiplier;
         this.windupFrames = this.abilities[plan.key].windupTicks / mult;
         this.recoverFrames = this.abilities[plan.key].recoverTicks / mult;
@@ -174,15 +178,54 @@ export class FlameGolemEnemy extends MeleeEnemy {
         const forced = this._forcedAttack;
         this._forcedAttack = null;
         if (forced) return this._forcedPlan(forced);
-        const near = this._nearPlayers()[0];
-        if (near) return { key: this.phase === 1 && this.pressureReady ? 'attack2' : 'attack', target: near };
-        const dash = this._pickDashTarget();
-        if (dash) return { key: 'attack3', target: dash.target, dash: dash.plan };
-        if (this.phase === 2) {
-            const jump = this._pickJumpTarget();
-            if (jump) return { key: 'attack2', target: jump.target, mark: jump.mark };
+        if (this._closeChaseTicks > 0) {
+            this._closeChaseTicks--;
+            return null;
         }
+        const near = this._nearPlayers()[0];
+        if (near) {
+            this._chaseTicks = 0;
+            const ai = FLAME_GOLEM.ai;
+            const action = Math.random();
+            if (action >= 1 - ai.closeDashChance) {
+                const dash = this._planDash(near);
+                if (dash) return { key: 'attack3', target: near, dash };
+            } else if (action >= 1 - ai.closeDashChance - ai.closeChaseChance) {
+                this._closeChaseTicks = ai.closeChaseMinTicks
+                    + Math.floor(Math.random() * (ai.closeChaseMaxTicks - ai.closeChaseMinTicks + 1));
+                return null;
+            }
+            const melee = { key: 'attack', target: near };
+            const mark = this.phase === 2 ? this._safeLanding(near.x, near.y) : null;
+            if (this.phase === 2 && !mark) return melee;
+            return Math.random() < this._closeAttackChance()
+                ? melee : { key: 'attack2', target: near, mark };
+        }
+        if (this._chaseTicks > 0) {
+            this._chaseTicks--;
+            return null;
+        }
+        const dash = this._pickDashTarget();
+        const jump = this.phase === 2 ? this._pickJumpTarget() : null;
+        if (!dash && !jump) return null;
+        if (Math.random() >= FLAME_GOLEM.ai.rangedAttackChance) {
+            const { chaseMinTicks, chaseMaxTicks } = FLAME_GOLEM.ai;
+            this._chaseTicks = chaseMinTicks + Math.floor(Math.random() * (chaseMaxTicks - chaseMinTicks + 1));
+            return null;
+        }
+        if (jump && (!dash || Math.random() >= FLAME_GOLEM.ai.primaryAttackChance)) {
+            return { key: 'attack2', target: jump.target, mark: jump.mark };
+        }
+        if (dash) return { key: 'attack3', target: dash.target, dash: dash.plan };
         return null;
+    }
+
+    _closeAttackChance() {
+        const base = FLAME_GOLEM.ai.primaryAttackChance;
+        const penalty = FLAME_GOLEM.ai.closeAttackRepeatWeight ** this._closeAttackStreak;
+        const melee = base * (this._lastCloseAttack === 'attack' ? penalty : 1);
+        const slam = (1 - base) * (this._lastCloseAttack === 'attack2' ? penalty : 1);
+        return melee / (melee + slam);
     }
 
     _forcedPlan(key) {
@@ -240,38 +283,10 @@ export class FlameGolemEnemy extends MeleeEnemy {
         return FLAME_GOLEM.ai.chainMode === 'sequence' ? FLAME_GOLEM.slam.count : 1;
     }
 
-    // Fase 1: tempo contínuo com alguém perto. Conta em qualquer estado; zera quando os dois saem
-    // (cancelando uma pancada ainda não começada), no impacto da pancada e na fase 2.
-    _updatePressure() {
-        if (this.phase !== 1) { this.pressureTicks = 0; this.pressureReady = false; return; }
-        if (!this._nearPlayers().length) { this.pressureTicks = 0; this.pressureReady = false; return; }
-        this.pressureTicks++;
-        if (this.pressureTicks >= FLAME_GOLEM.ai.pressureSeconds * SIM_HZ) this.pressureReady = true;
-    }
-
-    _resetPressure() {
-        this.pressureTicks = 0;
-        this.pressureReady = false;
-    }
-
     _focusTarget(nearest) {
         if (this.state === 'chase') return this.players.includes(this._chaseTarget) ? this._chaseTarget : nearest;
         const target = this.plan?.target;
         return target && this.players.includes(target) ? target : nearest;
-    }
-
-    // Aviso: a investida acompanha a direção do alvo e o salto acompanha o destino. Um plano novo só
-    // substitui o anterior se for válido, então a execução sempre usa um trajeto/aterrissagem seguros.
-    _trackAim() {
-        const target = this.plan?.target;
-        if (!target || !this.players.includes(target)) return;
-        if (this.currentAttack === 'attack3') {
-            const plan = this._planDash(target);
-            if (plan) this._setDashPlan(target, plan);
-        } else if (this.slamMode && this.slam?.phase === 'windup') {
-            const mark = this._safeLanding(target.x, target.y);
-            if (mark) this.slam.mark = mark;
-        }
     }
 
     _setDashPlan(target, plan) {
@@ -316,13 +331,12 @@ export class FlameGolemEnemy extends MeleeEnemy {
 
     // Investida em linha reta para o alvo. Válida se nenhuma parede corta o caminho antes de chegar
     // ao alvo e se existe parada segura (piso para o corpo) a partir daí; para no ponto seguro mais distante.
-    _planDash(target) {
+    _planDash(target, full = this._dashLength()) {
         if (!target) return null;
         const cfg = this.abilities.attack3;
         const dx = target.x - this.x, dy = target.y - this.y;
         const dist = Math.hypot(dx, dy);
         const dir = dist > 0 ? { x: dx / dist, y: dy / dist } : { x: this.facingLeft ? -1 : 1, y: 0 };
-        const full = this._dashLength();
         if (full <= 0) return null;
         const probe = Math.max(1, cfg.collisionProbePx);
         const at = s => ({ x: this.x + dir.x * s, y: this.y + dir.y * s });
@@ -467,7 +481,6 @@ export class FlameGolemEnemy extends MeleeEnemy {
             if (this._wallBetween(this, player)) continue;
             this._hitPlayer(player, this.x, this.y, cfg.knockback, onPlayerHit);
         }
-        if (this.currentAttack === 'attack2') this._resetPressure();
     }
 
     _hitPlayer(player, sourceX, sourceY, knockback, onPlayerHit) {
@@ -545,8 +558,6 @@ export class FlameGolemEnemy extends MeleeEnemy {
             s.mark = next.mark;
         } else if (s.phase === 'prep') {
             const raiseTicks = this._tellFrame('attack2') * this.sprite.rows.attack2.fps;
-            const target = this.plan?.target;
-            if (target && this.players.includes(target)) s.mark = this._safeLanding(target.x, target.y) ?? s.mark;
             this.animTime = Math.min(s.t, raiseTicks);
             this.facingLeft = s.mark.x < this.x;
             if (s.t >= raiseTicks + cfg.prepTicks / speed) this._launchSlam();
@@ -635,7 +646,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
         if (elapsed < 0 || elapsed >= this._chargeDuration()) return;
         const plan = this._dashPlan;
         if (!plan) return;
-        // Direção e comprimento fixados no lançamento: o trajeto já foi validado e o alvo pode desviar.
+        this._trackCharge();
         const step = Math.min(cfg.speed * this.phaseConfig.dashSpeedMultiplier, plan.length - this._dashTraveled);
         if (step <= 0) return;
         const dir = plan.dir;
@@ -651,6 +662,24 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this._dashTraveled += step;
         this.vx = dx;
         this.vy = dy;
+    }
+
+    _trackCharge() {
+        const target = this.plan?.target, plan = this._dashPlan;
+        if (!plan || !this.players.includes(target)) return;
+        const remaining = plan.length - this._dashTraveled;
+        if (remaining <= 0) return;
+        const desired = Math.atan2(target.y - this.y, target.x - this.x);
+        const angle = Math.atan2(plan.dir.y, plan.dir.x);
+        const delta = Math.atan2(Math.sin(desired - angle), Math.cos(desired - angle));
+        const tracked = angle + delta * Math.max(0, Math.min(1, this.abilities.attack3.trackingStrength));
+        const dir = { x: Math.cos(tracked), y: Math.sin(tracked) };
+        const endpoint = { x: this.x + dir.x * remaining, y: this.y + dir.y * remaining };
+        const safe = this._planDash(endpoint, remaining);
+        // Só curva se o restante inteiro ainda termina em piso seguro.
+        if (!safe || safe.length < remaining - 1e-6) return;
+        plan.dir = dir;
+        this.chargeDirection = { ...dir };
     }
 
     _chargeFits(x, y) {

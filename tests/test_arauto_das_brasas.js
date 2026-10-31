@@ -80,6 +80,7 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
 // --- aviso do ataque: a própria animação, parada na pose de espera ---
 {
     const e = create(), ps = [dummy(NEAR_ATTACK), dummy(-NEAR_ATTACK)];
+    e.forceAttack('attack');
     e.update(ps, noHit);
     assert.equal(e.state, 'windup'); assert.equal(e.currentAttack, 'attack');
     const tell = e._tellFrame();
@@ -199,23 +200,27 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
         e.abilities = structuredClone(FLAME_GOLEM.attacks);
         const ps = [dummy(70), dummy(900)];
         e.forceAttack('attack3');
-        let charged = 0;
+        let charged = 0, distance = 0;
         for (let t = 0; t < 400; t++) {
+            const from = { x: e.x, y: e.y };
             e.update(ps, () => {});
-            if (e.charging) charged++;
+            if (e.charging) {
+                charged++;
+                distance += Math.hypot(e.x - from.x, e.y - from.y);
+            }
             for (let i = 0; i < 3; i++) {
                 const solid = [...ps, e].filter(x => !x.ignoresEntityCollisions);
                 Physics.resolveEntityCollisions(solid);
             }
             if (e.state === 'recover') break;
         }
-        return { distance: Math.hypot(e.x, e.y), charged };
+        return { distance, charged };
     };
     const cfg = FLAME_GOLEM.attacks.attack3;
     const full = run();
     assert.equal(full.charged, cfg.durationTicks, 'a investida avança durante todos os ticks configurados');
     const expected = cfg.speed * cfg.durationTicks;
-    // A direção acompanha o alvo no aviso (o empurrão do corpo pode desviá-lo um pouco); o comprimento não muda.
+    // O tracking curva o trajeto; medir o caminho percorrido, não a distância em linha reta.
     assert.ok(Math.abs(full.distance - expected) < 1, `percorre a distância inteira (${full.distance} de ${expected})`);
     const e = create();
     assert.equal(e.ignoresEntityCollisions, false, 'golem no chão continua sólido');

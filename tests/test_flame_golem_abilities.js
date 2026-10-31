@@ -71,8 +71,8 @@ const INSIDE = Math.floor(AREA.radius * 0.6);
     assert.deepEqual(e.marks.map(m => [m.x, m.y]), [[100, 0]], 'dash marks only its current target');
     ps[0].x = 200; ps[0].y = 150;
     e.update(ps, () => assert.fail('windup cannot hit'));
-    assert.deepEqual([e.marks[0].x, e.marks[0].y], [200, 150], 'during the warning the mark follows the target');
-    assert.ok(e.chargeDirection.y > 0, 'and so does the heading');
+    assert.deepEqual([e.marks[0].x, e.marks[0].y], [100, 0], 'warning mark stays at the original position');
+    assert.equal(e.chargeDirection.y, 0, 'warning heading stays fixed');
     e.freezeOnHit(0.1);
     assert.equal(e.hitFreezeTimer, 0, 'chefe não congela no acerto');
     const timer = e.stateTimer;
@@ -102,7 +102,8 @@ const INSIDE = Math.floor(AREA.radius * 0.6);
     e.animTime = e.abilities.attack3.launchFrame * e.sprite.rows.attack3.fps - 1;
     e.update(ps, () => {});
     assert.ok(e.vx > 0);
-    assert.equal(e.vy, 0, 'heading is fixed during the dash, so the target can dodge');
+    const expected = Math.atan2(200, 300 - e.x + e.vx) * FLAME_GOLEM.attacks.attack3.trackingStrength;
+    assert.ok(Math.abs(Math.atan2(e.vy, e.vx) - expected) < 1e-9, 'dash uses the old gentle angular tracking');
 }
 {
     // Buraco na coluna 4 (x 192..256), parede de borda na coluna 9 (x >= 512).
