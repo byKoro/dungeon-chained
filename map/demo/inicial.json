@@ -421,7 +421,8 @@
             "dashPush",
             "coopHeal",
             "dashCooldown",
-            "dashCharges"
+            "dashCharges",
+            "lastStand"
           ],
           "type": "anvil",
           "col": 27,
@@ -687,12 +688,12 @@
         {
           "recipes": [
             "tackle",
-            "saw",
-            "size",
-            "inertia",
-            "snapWave",
-            "quickLink",
-            "hearts"
+            "size2",
+            "tackleHits",
+            "ricochet",
+            "embers",
+            "tackleLong",
+            "reconnectBlast"
           ],
           "type": "anvil",
           "col": 36,

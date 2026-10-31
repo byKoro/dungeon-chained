@@ -14,6 +14,13 @@ const COLORS = {
     row: "#221d2b", rowSel: "#3b3248", shadow: "#000"
 };
 
+// Aviso de receita travada: `forge.locked.<item>` (com o nível pedido), senão o aviso genérico.
+export function lockedText(recipe) {
+    const key = `forge.locked.${recipe?.item}`;
+    const text = t(key, { level: recipe?.itemLevel ?? 1 });
+    return text === key ? t("forge.locked") : text;
+}
+
 // Menu da bigorna desenhado no canvas (1 px de arte, escala inteira), no centro da tela.
 export class ForgeMenu {
     constructor({ forgeSystem, getAmount, coin = null }) {
@@ -70,9 +77,12 @@ export class ForgeMenu {
             const usable = r.status === "ok" || r.status === "maxed";
             const col = r.status === "ok" ? COLORS.text : r.status === "maxed" ? COLORS.ok : COLORS.dim;
             if (sel) text("▶", 6, y + 3, COLORS.gold);
-            text(t(`forge.${r.id}`), 13, y + 3, col);
+            const name = t(`forge.${r.id}`);
+            text(name, 13, y + 3, col);
+            // Nome comprido empurra os pontos de nível para a direita (ex.: "Reconexão explosiva").
+            const pipX = Math.max(78, 13 + measureText(name) + 4);
             if (r.max > 1) for (let n = 0; n < r.max; n++) {
-                rect(78 + n * 6, y + 4, 4, 4, n < r.level ? COLORS.gold : (usable ? FRAME.stoneDark : "#2b2735"));
+                rect(pipX + n * 6, y + 4, 4, 4, n < r.level ? COLORS.gold : (usable ? FRAME.stoneDark : "#2b2735"));
             }
             const free = r.status !== "maxed" && r.cost === 0;
             const right = r.status === "maxed" ? t("forge.max") : free ? t("forge.free") : String(r.cost);
@@ -87,8 +97,8 @@ export class ForgeMenu {
         });
 
         const sel = rows[fs.cursor];
-        // Sem moedas (`poor`) mostra a descrição mesmo assim; o custo em vermelho já indica a falta. `locked` (precisa da serra) segue com o aviso.
-        const info = !sel ? "" : sel.status === "locked" ? t("forge.locked") : t(`forge.desc.${sel.id}`);
+        // Sem moedas (`poor`) mostra a descrição mesmo assim; o custo em vermelho já indica a falta. `locked` diz o que falta.
+        const info = !sel ? "" : sel.status === "locked" ? lockedText(fs.forge.recipes[sel.id]) : t(`forge.desc.${sel.id}`);
         text(info, PAD, y + 3, sel?.status === "locked" ? COLORS.red : COLORS.text);
         return c;
     }

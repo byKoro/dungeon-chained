@@ -8,6 +8,19 @@ export const FORGE = Object.freeze({
         // "Investida" (bigorna da Penhasco, grátis): dash na serra solta a lança (SawTackle). Nos mapas do
         // Editor 2.0 o tackle só funciona com ela. Primeira no catálogo porque o editor ordena a bigorna por aqui.
         tackle: { kind: "item", item: "saw", costs: [0] },
+        // --- Resto da bigorna da Penhasco, na ordem do menu. `itemLevel` = nível mínimo do `item`. ---
+        // "Tamanho II": mais 2 níveis do disco depois dos 3 do Tamanho.
+        size2: { kind: "upgrade", item: "size", itemLevel: 3, costs: [70, 100], perLevel: 0.12 },
+        // "Mais cortes": acertos da serra presa no inimigo (SAW_TACKLE.hits = 5 sem a melhoria).
+        tackleHits: { kind: "upgrade", item: "tackle", costs: [25, 45], hits: [7, 10] },
+        // "Ricochete": ao soltar um inimigo, a serra pula para o inimigo válido mais perto até `range` px, `jumps` vezes.
+        ricochet: { kind: "upgrade", item: "tackle", costs: [40, 70], jumps: [1, 2], range: 300 },
+        // "Brasa": brasas no chão atrás da serra em voo; cada inimigo leva `damage` uma vez por lançamento. Arauto imune.
+        embers: { kind: "upgrade", item: "tackle", costs: [50], lifeSeconds: 1.5, damage: 1, spacing: 24, radius: 22 },
+        // "Investida longa": voo mais rápido (`speed`) e mais tempo antes de virar para a origem (`returnStartSteps`).
+        tackleLong: { kind: "upgrade", item: "tackle", costs: [20, 35], speed: [17, 19], returnStartSteps: [55, 70] },
+        // "Reconexão explosiva": reconectar solta a onda do Estalo com `radius[nível-1]`, no máximo a cada `cooldownSeconds`.
+        reconnectBlast: { kind: "upgrade", item: "saw", costs: [30, 50], radius: [1.6 * TILE, 2.4 * TILE], cooldownSeconds: 3 },
         saw: { kind: "item", costs: [10] },
         size: { kind: "upgrade", item: "saw", costs: [15, 30, 50], perLevel: 0.12 },
         // Solta (cabo arrebentado ou queda), a serra segue girando e cortando inimigos por `seconds[nível-1]`.
@@ -29,11 +42,19 @@ export const FORGE = Object.freeze({
         // "Fôlego": reduz a recarga do dash. `cooldownScale[nível-1]` multiplica PLAYER_DASH.cooldownSteps.
         dashCooldown: { kind: "upgrade", costs: [20, 40], cooldownScale: [0.75, 0.55] },
         // "Pés ligeiros": +1 carga de dash por nível (encadear mais dashes antes de recarregar).
-        dashCharges: { kind: "upgrade", costs: [35, 70], perLevel: 1 }
+        dashCharges: { kind: "upgrade", costs: [35, 70], perLevel: 1 },
+        // "Segunda chance": uma vez por sala, o golpe ou a queda que zeraria um jogador o deixa com 1 coração.
+        lastStand: { kind: "upgrade", costs: [60], invulnSeconds: 1.5 }
     }),
     defaultRecipes: Object.freeze(["saw", "size", "inertia", "snapWave", "quickLink", "hearts"]),
     // Catálogo da bigorna da sala "botas": melhorias de dash/jogador.
-    bootsRecipes: Object.freeze(["moveSpeed", "dashPush", "coopHeal", "dashCooldown", "dashCharges"]),
+    bootsRecipes: Object.freeze(["moveSpeed", "dashPush", "coopHeal", "dashCooldown", "dashCharges", "lastStand"]),
+    // Catálogo da bigorna da Penhasco: a Investida e o que melhora a serra lançada.
+    penhascoRecipes: Object.freeze(["tackle", "size2", "tackleHits", "ricochet", "embers", "tackleLong", "reconnectBlast"]),
+    // Segunda chance: clarão no jogador salvo e som do coração.
+    lastStand: Object.freeze({ flash: 16, flashPower: 1.2, shake: 6, sound: Object.freeze({ cue: "pickup", rate: 0.8, volume: 1 }) }),
+    // Brasas no chão: chamas pequenas a cada `flameEvery` steps por brasa.
+    embers: Object.freeze({ flameEvery: 6, flameAmount: 2, color: Object.freeze([255, 140, 60]) }),
     // Feedback da onda do Estalo, além do que o arrebentar já faz.
     snapWave: Object.freeze({ ringLife: 16, ringColor: "#ffe9b0", sparks: 14, shake: 4, sound: Object.freeze({ cue: "sawLand", rate: 0.6, volume: 0.7 }) }),
     // Serra girando por inércia: giro mínimo mantido e quanto do giro sobra a cada step depois do tempo.
