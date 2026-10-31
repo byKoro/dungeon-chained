@@ -48,7 +48,7 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Hit stop | congelamento de impacto | Per-enemy freeze (`MeleeEnemy.freezeOnHit`, durations in `HIT_FEEL.hitStop`) on each saw hit; players, saw and the rest of the room keep simulating. `GameLoop.triggerHitStop` (global freeze) still exists but `Game` no longer calls it |
 | Stagger / hurt | atordoamento curto | Short interruption + knockback of a surviving enemy after a saw hit (`"hurt"` state) |
 | Poise | poise, postura | Invisible per-enemy buffer for strong enemies (`combat.poise`); breaking it causes a long stun (`"stunned"`) and a vulnerability window |
-| Scrap | sucata | Shared currency of the pair (`ScrapSystem`, one pot). Drops from enemies and chests, rests 0,4 s, then a magnet pulls it to the nearest player within ~2,5 tiles. Editor 2.0 maps only |
+| Scrap | moedas (antes "sucata") | Shared currency of the pair (`ScrapSystem`, one pot). Drops from enemies and chests, rests 0,4 s, then a magnet pulls it to the nearest player within ~2,5 tiles. Editor 2.0 maps only |
 | Vacuum | aspirar, puxar a sucata | `ScrapSystem.vacuum()`: every scrap on the floor flies to the nearest player, any distance (used when a wave is cleared, slice 4) |
 | Chest | baú | Prop `chest`/`mini_chest` that sits still with a sweeping shine while closed; a player right next to it (1 tile) presses interact to open it once, and it bursts its authored scrap (`prop.scrap`) |
 | Solid prop | prop sólido | Animated prop with a `base` footprint (`PropConfig`): blocks players' and enemies' feet only and is y-sorted with them (anvil, chests) |
@@ -69,6 +69,8 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Gate rope | corda com grade | `gateRope` interactive: a stake whose rope holds a portcullis gate over authored tiles (`rope.gate`); the gate starts closed/solid and cutting the rope raises it, opening the path (used in penhasco to free the boss key) |
 | Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
+| Saw Tackle (recipe) | Investida | Free forge recipe `tackle` (Penhasco anvil, needs the Serra) that unlocks the saw tackle (dash into the loose saw launches it, `SawTackle`) on Editor 2.0 maps. Note: older text also uses "investida" for the plain dash and for the golem's marked charge |
+| Ability card | telinha (de tutorial) | Quick tutorial panel shown when an ability is gained (`AbilityCard`: dash from the boots, Investida from the anvil), with a live "video" demo and the button prompt; does not pause |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |
 
 ## Enemies (editor labels)

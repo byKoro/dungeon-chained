@@ -83,6 +83,20 @@ const player = (x, y) => ({ x, y, vx: 0, vy: 0, speed: 4.2, speedMag: 0, hitRadi
     f2.setLevel("size", 99);
     assert(f2.level("size") === f2.maxLevel("size"), "setLevel satura no máximo");
 }
+// Investida: grátis, precisa da Serra, um nível; só a bigorna que a lista oferece.
+{
+    const f = new ForgeState();
+    const wallet = new ScrapWallet();
+    assert(f.nextCost("tackle") === 0 && f.maxLevel("tackle") === 1, "Investida custa 0 e tem um nível");
+    assert(f.status("tackle", 0) === "locked", "Investida sem a Serra: precisa da Serra");
+    f.reset({ items: ["saw"] });
+    assert(f.status("tackle", 0) === "ok", "com a Serra e 0 moedas a Investida está disponível");
+    const r = f.buy("tackle", wallet);
+    assert(r.ok && f.has("tackle") && wallet.amount === 0, "pegar a Investida não gasta moedas");
+    assert(f.status("tackle", 0) === "maxed", "depois de pegar fica no máximo");
+    assert(!FORGE.defaultRecipes.includes("tackle"), "Investida fora do catálogo padrão");
+    assert(anvilRecipes({ type: "anvil", recipes: ["tackle", "saw"] })[0] === "tackle", "bigorna com a Investida na primeira linha");
+}
 
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);

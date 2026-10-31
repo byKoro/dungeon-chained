@@ -13,7 +13,7 @@ import { zoneFromCorners, setZone, toggleBar } from '../rooms/RoomEventsData.js'
 const $ = id => document.getElementById(id);
 
 const TEST_OPTIONS_KEY = 'dungeonChained.editor2.testOptions';
-const TEST_OPTION_IDS = ['test-dash', 'test-saw', 'test-key', 'test-infinite-lives', 'test-arauto-intro',
+const TEST_OPTION_IDS = ['test-dash', 'test-saw', 'test-key', 'test-tackle', 'test-infinite-lives', 'test-arauto-intro',
     'test-sawstart', 'test-camera', 'test-saw-tackle'];
 
 const TRAPS = [
@@ -194,6 +194,7 @@ export class ContentTools {
             <label><input type="checkbox" id="test-dash"> Dash liberado</label>
             <label><input type="checkbox" id="test-saw"> Lançar serra liberado</label>
             <label><input type="checkbox" id="test-key"> Chave do boss</label>
+            <label><input type="checkbox" id="test-tackle"> Investida liberada (dash na serra solta a lança)</label>
             <label><input type="checkbox" id="test-infinite-lives"> Vida infinita (ambos os jogadores)</label>
             <label><input type="checkbox" id="test-arauto-intro"> Repetir apresentação completa do Arauto</label>
             <label class="field">Serra no início<select id="test-sawstart"><option value="">Conforme o mapa (sem serra se uma bigorna oferece a Serra)</option><option value="yes">Com serra</option><option value="no">Sem serra</option></select></label>
@@ -778,7 +779,7 @@ export class ContentTools {
         identifyDoors(map);
         const errors = validatePlayable(map, { roomKey: isolated ? map.start : null });
         if (errors.length) { alert(errors.join('\n')); return; }
-        const progress = { dash: $('test-dash').checked, sawThrow: $('test-saw').checked, bossKey: $('test-key').checked };
+        const progress = { dash: $('test-dash').checked, sawThrow: $('test-saw').checked, bossKey: $('test-key').checked, tackle: $('test-tackle').checked };
         const sawStart = $('test-sawstart').value;
         if (sawStart) progress.saw = sawStart === 'yes';
         sessionStorage.setItem(DEMO.sessionKey, JSON.stringify({ map, isolated, progress, camera: $('test-camera').value, infiniteLives: $('test-infinite-lives').checked,

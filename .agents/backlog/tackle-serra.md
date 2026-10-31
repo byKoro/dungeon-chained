@@ -147,7 +147,7 @@ O usuário pediu encerrar a entrevista. Estas lacunas não devem ser apresentada
 
 1. Dano inicial por hit e números exatos do voo/assistência/retorno.
 2. Origem e retorno da serra impulsionada pelo boss.
-3. Cooldown próprio da habilidade ou somente cooldown normal do dash; não foi pedido custo adicional, desbloqueio ou menu novo.
+3. Cooldown próprio da habilidade ou somente cooldown normal do dash. **Desbloqueio revisto em 2026-10-31** (`.agents/tasks/2026-10-31-tackle-unlock/`): o tackle passou a ser a receita grátis "Investida" da bigorna da Penhasco; nos mapas do Editor 2.0 fica travado até pegar, com telinha de tutorial ao pegar. Ver `systems/weapons.md`.
 4. Reação se os dois jogadores derem tackle simultaneamente: escolher uma regra determinística, sem dois lançamentos no mesmo passo.
 5. Feedback para tentativa de tackle/reconexão durante a etapa presa.
 6. Limite de espera quando o alvo não aceita mais dano, torna-se invulnerável ou inválido: não deixar a serra presa indefinidamente tentando completar hits.

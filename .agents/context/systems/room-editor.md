@@ -131,6 +131,9 @@ Painting Tileset index 39 creates a width-one stairs endpoint on interior floor,
 
 Stairs now also replace standard walls on all four room edges (corners excluded, like doors). Placement opens the edge cell and its inner approach. The preview accepts border placement, and resizing keeps east/south stairs anchored to the new edge.
 
+### Investida no teste (2026-10-31)
+Checkbox `test-tackle` "Investida liberada" no painel "Teste e demo" (`ContentTools`, persistida com as outras opções). Marcada, `progress.tackle = true` vai na sessão de teste e o `Game` começa a run com a receita `tackle` na forja; desmarcada (padrão), o tackle fica travado até pegar a receita na bigorna da Penhasco. Também aparece na lista de receitas da bigorna (`FORGE_RECIPE_IDS`).
+
 ### Comparação do tackle da serra (2026-10-31)
 Editor 2.0 → **Teste e demo → Versão do tackle da serra** (`#test-saw-tackle`): **Nova: segue e desacelera** (`coast`, padrão do seletor) ou **Atual: retorna à origem** (`return`). Vale para Testar sala e Testar mapa. `ContentTools.playtest` serializa `sawTackleMode` na sessão de teste; `DemoMapLoader` transporta o campo e `Game` injeta em `SawTackle`. Não altera o mapa salvo nem o jogo normal, que conserva o retorno atual. A seleção é feita antes de abrir o teste.
 

@@ -566,4 +566,20 @@ for (const dir of [[1, 0], [-1, 0], [0, 1], [1, 1]]) {
     assert.ok(sawGap(chain, [], stake) === Infinity, 'fora do voo volta a não cortar');
 }
 
+// --- Investida: sem a receita (canTackle falso) o dash encosta na serra e não lança; liberada, lança ---
+{
+    const { tackle, p1, w } = setup();
+    let unlocked = false;
+    tackle.canTackle = () => unlocked;
+    dashing(p1);
+    tackle.update();
+    assert.equal(tackle.state, null, 'travado: dash na serra solta não faz tackle');
+    assert.equal(p1.tackles, 0, 'travado: jogador não recebe o impacto');
+    assert.equal(tackle.justTackled, null);
+    assert.equal(w.tackleState, null, 'travado: empurrão/arrasto não ficam bloqueados');
+    unlocked = true;
+    tackle.update();
+    assert.equal(tackle.state, 'impact', 'liberado: o mesmo dash lança');
+    assert.equal(tackle.justTackled, p1);
+}
 console.log('Tackle da serra: versões com retorno e sem retorno, desaceleração por percurso, quiques, hits, Arauto, reconexão, jogador, serra presa em parede/Arauto, mira em estacas e corte de corda em voo passaram.');

@@ -9,9 +9,13 @@ import { t } from '../i18n/I18n.js';
 // Corpo: um "vídeo" (sala do jogo renderizada ao vivo por uma demo do kit do trailer) ou, sem demo, texto.
 // Embaixo, o botão da ação no dispositivo de cada jogador; ele afunda junto com a ação do vídeo.
 // Novo tutorial = uma entrada em CARDS (+ uma demo com `restart/update/render/size/scaleFor/pressed`).
+// `action` = botão mostrado; `dismissOn` = evento do Game (`notify`) que fecha o card antes do tempo.
 const CARDS = {
-    "ability.dash": { action: "dash", demo: () => import('./DashDemo.js').then(m => m.DashDemo) }
+    "ability.dash": { action: "dash", dismissOn: "dash", demo: () => import('./DashDemo.js').then(m => m.DashDemo) },
+    "ability.tackle": { action: "dash", dismissOn: "tackle", demo: () => import('./TackleDemo.js').then(m => m.TackleDemo) }
 };
+
+export const ABILITY_CARD_KEYS = Object.freeze(Object.keys(CARDS));
 
 const COLORS = { text: "#efe3c2", gold: "#ffd166", shadow: "#000" };
 const PAD = 6;
@@ -57,6 +61,11 @@ export class AbilityCard {
 
     dismiss() {
         if (this.active && this.dismissedAt === -Infinity) this.dismissedAt = this.now();
+    }
+
+    // O jogador usou a habilidade (ex.: "dash", "tackle"): fecha só o card que espera esse evento.
+    notify(event) {
+        if (this.active && this._card?.dismissOn === event) this.dismiss();
     }
 
     get _card() { return CARDS[this.key] ?? null; }

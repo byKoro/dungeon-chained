@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { AbilityCard } from '../js/ui/AbilityCard.js';
+import { AbilityCard, ABILITY_CARD_KEYS } from '../js/ui/AbilityCard.js';
 
 let passed = 0, failed = 0;
 const ok = (c, m) => { if (c) { console.log(`✅ ${m}`); passed++; } else { console.error(`❌ ${m}`); failed++; } };
@@ -66,6 +66,26 @@ const makeCard = (device = "keyboard") => {
     ok(card._alpha() === 0 && !card.active, 'fecha no primeiro dash após o fade');
 }
 
+// notify(): cada card fecha só com o evento dele (o dash não fecha a telinha da Investida).
+{
+    const { card, tick } = makeCard();
+    ok(ABILITY_CARD_KEYS.includes("ability.dash") && ABILITY_CARD_KEYS.includes("ability.tackle"), 'lista de telinhas tem dash e Investida');
+    card.show("ability.tackle");
+    ok(card.prompts().length === 2, 'Investida mostra o botão de dash de cada jogador');
+    card.notify("dash");
+    tick(300);
+    ok(card.active && card._alpha() > 0.9, 'Investida: um dash comum não fecha');
+    card.notify("tackle");
+    tick(300);
+    ok(card._alpha() === 0 && !card.active, 'Investida: fecha no primeiro tackle');
+    card.show("ability.dash");
+    card.notify("tackle");
+    tick(300);
+    ok(card.active, 'dash: tackle não fecha a telinha do dash');
+    card.notify("dash");
+    tick(300);
+    ok(card._alpha() === 0 && !card.active, 'dash: fecha no primeiro dash');
+}
 // reset() zera.
 {
     const { card } = makeCard();
