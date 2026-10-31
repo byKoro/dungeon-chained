@@ -90,7 +90,7 @@ assert.equal(expressions.at(-1), null, 'reset clears cinematic expression overri
 
 const poseEnemy = create();
 const target = { x: 20, y: 0, lives: 3, hitRadius: 16, takeDamage() { return false; } };
-poseEnemy.attackIndex = poseEnemy.attackKeys.indexOf('attack2');
+poseEnemy.forceAttack('attack2');
 poseEnemy.update([target], () => {});
 let held = 0;
 while (poseEnemy.state === 'windup') {

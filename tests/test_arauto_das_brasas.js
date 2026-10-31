@@ -107,7 +107,7 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
 {
     // investida: pose de espera antes do lançamento
     const e = create(), ps = [dummy(120), dummy(200, 50)];
-    e.attackIndex = e.attackKeys.indexOf('attack3');
+    e.forceAttack('attack3');
     e.update(ps, noHit);
     assert.equal(e.currentAttack, 'attack3');
     assert.equal(e._tellFrame(), FLAME_GOLEM.attacks.attack3.launchFrame - 1);
@@ -117,7 +117,7 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
     // as marcas são só para teste e saem com um interruptor
     const calls = () => { const n = { arc: 0, move: 0 }; return { n, ctx: { save() {}, restore() {}, beginPath() {}, stroke() {}, setLineDash() {}, arc() { n.arc++; }, moveTo() { n.move++; }, lineTo() {} } }; };
     const e = create(), ps = [dummy(120), dummy(200, 50)];
-    e.attackIndex = e.attackKeys.indexOf('attack3');
+    e.forceAttack('attack3');
     e.update(ps, noHit);
     const was = FLAME_GOLEM.telegraph.showMarks;
     try {
@@ -197,9 +197,8 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
     const run = () => {
         const e = create();
         e.abilities = structuredClone(FLAME_GOLEM.attacks);
-        e.abilities.attack3.trackingStrength = 0;
         const ps = [dummy(70), dummy(900)];
-        e.attackIndex = e.attackKeys.indexOf('attack3');
+        e.forceAttack('attack3');
         let charged = 0;
         for (let t = 0; t < 400; t++) {
             e.update(ps, () => {});
@@ -210,13 +209,14 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
             }
             if (e.state === 'recover') break;
         }
-        return { x: e.x, charged };
+        return { distance: Math.hypot(e.x, e.y), charged };
     };
     const cfg = FLAME_GOLEM.attacks.attack3;
     const full = run();
     assert.equal(full.charged, cfg.durationTicks, 'a investida avança durante todos os ticks configurados');
     const expected = cfg.speed * cfg.durationTicks;
-    assert.ok(Math.abs(full.x - expected) < 1, `percorre a distância inteira (${full.x} de ${expected})`);
+    // A direção acompanha o alvo no aviso (o empurrão do corpo pode desviá-lo um pouco); o comprimento não muda.
+    assert.ok(Math.abs(full.distance - expected) < 1, `percorre a distância inteira (${full.distance} de ${expected})`);
     const e = create();
     assert.equal(e.ignoresEntityCollisions, false, 'golem no chão continua sólido');
     assert.equal(e.immovable, FLAME_GOLEM.immovable);
@@ -226,7 +226,7 @@ const SHIFT = Math.floor(SLAM.radius * 0.25);
 
 // --- fase 1 mantém o golpe de área; fase 2 troca por três saltos ---
 const startAttack2 = (e, ps) => {
-    e.attackIndex = e.attackKeys.indexOf('attack2');
+    e.forceAttack('attack2');
     e.update(ps, noHit);
     assert.equal(e.currentAttack, 'attack2');
     assert.equal(e.state, 'windup');
@@ -237,7 +237,13 @@ const startAttack2 = (e, ps) => {
     assert.equal(e.slamMode, false, 'fase 1: golpe de área único');
     assert.equal(e.slam, null);
 }
-{
+// Os blocos de três saltos usam o modo 'sequence'; o 'single' é coberto em test_arauto_ai.js.
+const inSequence = fn => {
+    const mode = FLAME_GOLEM.ai.chainMode;
+    FLAME_GOLEM.ai.chainMode = 'sequence';
+    try { fn(); } finally { FLAME_GOLEM.ai.chainMode = mode; }
+};
+inSequence(() => {
     const e = create();
     e.hp = FLAME_GOLEM.secondPhaseHp; e._updatePhase();
     const ps = [dummy(-NEAR_SLAM), dummy(NEAR_SLAM)];
@@ -277,13 +283,12 @@ const startAttack2 = (e, ps) => {
     launched.forEach((mark, i) => {
         assert.ok(Math.abs(landed[i].x - mark.x) < 1e-9 && Math.abs(landed[i].y - mark.y) < 1e-9, `aterrissa na marca fixada do salto ${i + 1}`);
     });
-    landed.forEach((point, i) => assert.ok(i % 2 === 0 ? point.x < 0 : point.x > 0, 'alterna entre os dois jogadores'));
     assert.equal(e.state, 'recover');
     assert.ok(Math.abs(e.recoverFrames - cfg.finalRecoverTicks / FLAME_GOLEM.phases[1].animationSpeedMultiplier) < 1e-9, 'recuperação final maior');
     assert.ok(e.recoverFrames > e.abilities.attack2.recoverTicks / FLAME_GOLEM.phases[1].animationSpeedMultiplier);
     assert.ok(ps.every(p => p.hits >= cfg.count), 'cada impacto atinge quem está no raio');
-}
-{
+});
+inSequence(() => {
     // pose de espera também nos saltos: o primeiro e a pausa agachada seguram o mesmo quadro
     const e = create();
     e.hp = FLAME_GOLEM.secondPhaseHp; e._updatePhase();
@@ -303,7 +308,7 @@ const startAttack2 = (e, ps) => {
         }
     }
     assert.ok(sawPrep);
-}
+});
 
 // --- dano no ar não interrompe; morte cancela a sequência ---
 {

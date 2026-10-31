@@ -12,17 +12,21 @@ const players = [30, 500].map(x => ({ x, y: 0, lives: 3, hitRadius: 16, takeDama
 assert.ok(editorEnemyTypes().some(t => t.key === 'flameGolem'));
 assert.deepEqual(thumbRegion(ENEMY_TYPE_BY_KEY.flameGolem.config(assets)), { sx: 36, sy: 129, w: 32, h: 28 });
 
+// Um jogador colado e outro longe: melee primeiro (sem ciclo); a pressão de 2 s leva à pancada; nunca investe.
 const attacker = create();
 const attacks = [], hits = [];
-for (let tick = 0; tick < 700 && attacks.length < 3; tick++) {
+let firstSlamTick = -1;
+for (let tick = 0; tick < 700; tick++) {
     attacker.update(players, () => hits.push({ attack: attacker.currentAttack, time: attacker.animTime }));
-    if (attacker.justAttacked) attacks.push(attacker.currentAttack);
+    if (!attacker.justAttacked) continue;
+    attacks.push(attacker.currentAttack);
+    if (attacker.currentAttack === 'attack2' && firstSlamTick < 0) firstSlamTick = tick;
 }
-assert.deepEqual(attacks, ['attack', 'attack2', 'attack3']);
-assert.deepEqual(hits.slice(0, 2), [
-    { attack: 'attack', time: 30 },
-    { attack: 'attack2', time: 36 }
-]);
+assert.equal(attacks[0], 'attack', 'jogador perto: melee primeiro');
+assert.ok(!attacks.includes('attack3'), 'com alguém perto não investe contra o distante');
+assert.ok(firstSlamTick >= FLAME_GOLEM.ai.pressureSeconds * 60, 'pancada só depois de 2 s de pressão');
+assert.deepEqual(hits.find(h => h.attack === 'attack'), { attack: 'attack', time: 30 });
+assert.deepEqual(hits.find(h => h.attack === 'attack2'), { attack: 'attack2', time: 36 });
 
 const dodged = create();
 dodged.update(players, () => assert.fail('no damage during preparation'));
@@ -65,4 +69,4 @@ for (let t = 0; t < deathTicks; t++) {
 assert.ok(dying.readyToGib);
 assert.deepEqual([...new Set(crops.map(([x]) => x))], [30, 130, 230, 330, 430, 530]);
 assert.ok(crops.every(([, y, w, h]) => y === 520 && w === 59 && h === 39));
-console.log('Flame Golem: spawn, editor, melee cycle, dodge, speed and full death passed.');
+console.log('Flame Golem: spawn, editor, melee priority, dodge, speed and full death passed.');

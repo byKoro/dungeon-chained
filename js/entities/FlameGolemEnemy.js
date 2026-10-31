@@ -1,7 +1,7 @@
 import { MeleeEnemy } from './MeleeEnemy.js';
 import { Physics } from '../core/Physics.js';
 import { FLAME_GOLEM } from '../config/FlameGolemConfig.js';
-import { SIM_HZ } from '../config/GameConfig.js';
+import { SIM_HZ, TILE } from '../config/GameConfig.js';
 import { ARAUTO_FX } from '../config/ArautoEffectsConfig.js';
 
 export class FlameGolemEnemy extends MeleeEnemy {
@@ -22,7 +22,15 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.players = [];
         this.marks = [];
         this.chargeIndex = 0;
-        this._dashTargetIndex = 0;
+        // Decisão em curso: { key, target, dash?, mark? }. Escolhida em `chase` por `_decide()`.
+        this.plan = null;
+        this._forcedAttack = null;
+        this.pressureTicks = 0;
+        this.pressureReady = false;
+        this._dashPlan = null;
+        this._dashTraveled = 0;
+        this._chaseTarget = null;
+        this._chaseStep = null;
         this.chargeDirection = { x: 1, y: 0 };
         this.attackHits = new Set();
         this.slamMode = false;
@@ -36,7 +44,6 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.lavaReveal = 0;
         // Só desenho: `{ row, frame, glow }` fixa linha/quadro do sprite durante a apresentação.
         this.introPose = null;
-        this._slamCursor = 0;
         this.bossName = sprite.combat?.bossBar?.name ?? FLAME_GOLEM.name;
         this.hasBossBar = !!sprite.combat?.bossBar;
     }
@@ -76,15 +83,20 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.charging = false;
         if (!this.phaseTransitionControlled && !this.frozen && this.hitFreezeTimer <= 0) this._updatePhase();
         this.players = players.filter(p => p.lives > 0 && !p.falling);
-        const next = this.abilities[this.attackKeys[this.attackIndex % this.attackKeys.length]];
-        this.attackRange = this.players.length ? next.triggerRange : -1;
+        if (!this.frozen && this.hitFreezeTimer <= 0 && !this.isDying && this.state !== 'dead') {
+            this._updatePressure();
+            if (this.state === 'chase') this._planChase();
+            else if (this.state === 'windup') this._trackAim();
+        }
         const targets = this.players.length ? [this.players[0], this.players[1] || this.players[0]]
             : [{ x: this.x, y: this.y }, { x: this.x, y: this.y }];
         const fromX = this.x, fromY = this.y;
         super.update(targets, onPlayerHit);
-        this._keepFeetOnFloor(fromX, fromY);
+        // A investida já foi validada inteira (pode cruzar buraco), então os pés não cortam o movimento.
+        if (!this.charging) this._keepFeetOnFloor(fromX, fromY);
         if (this.state !== 'windup' && this.state !== 'attack') {
             this.marks = [];
+            this._dashPlan = null;
             this._endSlam();
         }
         this._lightT++;
@@ -120,40 +132,272 @@ export class FlameGolemEnemy extends MeleeEnemy {
     }
 
     _beginWindup() {
-        this.currentAttack = this.attackKeys[this.attackIndex++ % this.attackKeys.length];
-        this.windupFrames = this.abilities[this.currentAttack].windupTicks / this.phaseConfig.animationSpeedMultiplier;
-        this.recoverFrames = this.abilities[this.currentAttack].recoverTicks / this.phaseConfig.animationSpeedMultiplier;
+        const plan = this.plan ?? { key: 'attack', target: this.target };
+        this.plan = plan;
+        this.currentAttack = plan.key;
+        const mult = this.phaseConfig.animationSpeedMultiplier;
+        this.windupFrames = this.abilities[plan.key].windupTicks / mult;
+        this.recoverFrames = this.abilities[plan.key].recoverTicks / mult;
         this.attackHits.clear();
         this.chargeIndex = 0;
         this._endSlam();
-        this.slamMode = this.phase === 2 && this.currentAttack === 'attack2';
+        this.marks = [];
+        this._dashPlan = null;
+        this.slamMode = this.phase === 2 && plan.key === 'attack2';
         if (this.slamMode) {
-            this.recoverFrames = FLAME_GOLEM.slam.finalRecoverTicks / this.phaseConfig.animationSpeedMultiplier;
-            this._slamCursor = this._dashTargetIndex++;
-            this.slam = { index: 0, phase: 'windup', t: 0, mark: this._pickSlamMark(0), from: null };
+            this.recoverFrames = FLAME_GOLEM.slam.finalRecoverTicks / mult;
+            const mark = plan.mark ?? this._safeLanding(plan.target.x, plan.target.y);
+            this.slam = { index: 0, phase: 'windup', t: 0, mark, from: null };
         }
-        if (this.currentAttack === 'attack3') {
-            const first = this._dashTargetIndex++ % this.players.length;
-            this.marks = [0, 1].map(offset => {
-                const player = this.players[(first + offset) % this.players.length];
-                return { player, x: player.x, y: player.y };
-            });
-            this._aimCharge();
-        }
+        if (plan.key === 'attack3') this._setDashPlan(plan.target, plan.dash ?? this._planDash(plan.target));
         super._beginWindup();
-        if (this.currentAttack === 'attack2') {
+        if (plan.key === 'attack2') {
             this.stateTimer += this._tellFrame() * this.sprite.rows.attack2.fps;
         }
         this.vx = this.vy = 0;
     }
 
-    _aimCharge() {
-        const mark = this.marks[this.chargeIndex];
-        if (!mark) return;
-        const dx = mark.x - this.x, dy = mark.y - this.y;
-        const length = Math.hypot(dx, dy);
-        this.chargeDirection = length > 0 ? { x: dx / length, y: dy / length } : { x: 1, y: 0 };
-        this.facingLeft = this.chargeDirection.x < 0;
+    // ---- decisão pela situação (sem ciclo fixo) ----
+
+    // Só para testes/depuração: a próxima decisão usa este ataque contra o jogador mais próximo.
+    forceAttack(key) {
+        this._forcedAttack = key;
+    }
+
+    _readyToAttack() {
+        if (!this.players.length) return false;
+        this.plan = this._decide();
+        return !!this.plan;
+    }
+
+    _decide() {
+        const forced = this._forcedAttack;
+        this._forcedAttack = null;
+        if (forced) return this._forcedPlan(forced);
+        const near = this._nearPlayers()[0];
+        if (near) return { key: this.phase === 1 && this.pressureReady ? 'attack2' : 'attack', target: near };
+        const dash = this._pickDashTarget();
+        if (dash) return { key: 'attack3', target: dash.target, dash: dash.plan };
+        if (this.phase === 2) {
+            const jump = this._pickJumpTarget();
+            if (jump) return { key: 'attack2', target: jump.target, mark: jump.mark };
+        }
+        return null;
+    }
+
+    _forcedPlan(key) {
+        const target = this._byDistance()[0];
+        if (key === 'attack3') {
+            const dash = this._planDash(target);
+            return dash ? { key, target, dash } : null;
+        }
+        if (key === 'attack2' && this.phase === 2) {
+            const mark = this._safeLanding(target.x, target.y);
+            return mark ? { key, target, mark } : null;
+        }
+        return { key, target };
+    }
+
+    _distanceTo(p) {
+        return Math.hypot(p.x - this.x, p.y - this.y);
+    }
+
+    _byDistance() {
+        return [...this.players].sort((a, b) => this._distanceTo(a) - this._distanceTo(b));
+    }
+
+    // "Perto" = no alcance do melee e sem parede entre o centro do golem e o jogador.
+    _nearPlayers() {
+        const range = this.abilities.attack.triggerRange;
+        return this._byDistance().filter(p => this._distanceTo(p) <= range && !this._wallBetween(this, p));
+    }
+
+    _pickDashTarget() {
+        const range = this.abilities.attack3.triggerRange;
+        for (const target of this._byDistance()) {
+            if (this._distanceTo(target) > range) break;
+            const plan = this._planDash(target);
+            if (plan) return { target, plan };
+        }
+        return null;
+    }
+
+    _pickJumpTarget() {
+        const range = FLAME_GOLEM.slam.triggerRange;
+        for (const target of this._byDistance()) {
+            if (this._distanceTo(target) > range) break;
+            const mark = this._safeLanding(target.x, target.y);
+            if (mark) return { target, mark };
+        }
+        return null;
+    }
+
+    _dashCount() {
+        return FLAME_GOLEM.ai.chainMode === 'sequence' ? this.phaseConfig.dashCount : 1;
+    }
+
+    _jumpCount() {
+        return FLAME_GOLEM.ai.chainMode === 'sequence' ? FLAME_GOLEM.slam.count : 1;
+    }
+
+    // Fase 1: tempo contínuo com alguém perto. Conta em qualquer estado; zera quando os dois saem
+    // (cancelando uma pancada ainda não começada), no impacto da pancada e na fase 2.
+    _updatePressure() {
+        if (this.phase !== 1) { this.pressureTicks = 0; this.pressureReady = false; return; }
+        if (!this._nearPlayers().length) { this.pressureTicks = 0; this.pressureReady = false; return; }
+        this.pressureTicks++;
+        if (this.pressureTicks >= FLAME_GOLEM.ai.pressureSeconds * SIM_HZ) this.pressureReady = true;
+    }
+
+    _resetPressure() {
+        this.pressureTicks = 0;
+        this.pressureReady = false;
+    }
+
+    _focusTarget(nearest) {
+        if (this.state === 'chase') return this.players.includes(this._chaseTarget) ? this._chaseTarget : nearest;
+        const target = this.plan?.target;
+        return target && this.players.includes(target) ? target : nearest;
+    }
+
+    // Aviso: a investida acompanha a direção do alvo e o salto acompanha o destino. Um plano novo só
+    // substitui o anterior se for válido, então a execução sempre usa um trajeto/aterrissagem seguros.
+    _trackAim() {
+        const target = this.plan?.target;
+        if (!target || !this.players.includes(target)) return;
+        if (this.currentAttack === 'attack3') {
+            const plan = this._planDash(target);
+            if (plan) this._setDashPlan(target, plan);
+        } else if (this.slamMode && this.slam?.phase === 'windup') {
+            const mark = this._safeLanding(target.x, target.y);
+            if (mark) this.slam.mark = mark;
+        }
+    }
+
+    _setDashPlan(target, plan) {
+        if (!plan) return;
+        this._dashPlan = plan;
+        this.chargeDirection = { x: plan.dir.x, y: plan.dir.y };
+        this.facingLeft = plan.dir.x < 0;
+        this.marks = [{ player: target, x: target.x, y: target.y }];
+    }
+
+    // ---- consultas de terreno: paredes protegem; buraco só importa para onde o corpo para ----
+
+    _isWallAt(x, y) {
+        if (!this.navigationFloor || !this.navigationBounds) return false;
+        const { col, row } = this._tileAt(x, y);
+        const floor = this.navigationFloor;
+        if (row <= 0 || row >= floor.length - 1 || col <= 0 || col >= (floor[row] || []).length - 1) return true;
+        return this.navigationWalls.has(`${col},${row}`);
+    }
+
+    _wallBetween(a, b) {
+        if (!this.navigationFloor || !this.navigationBounds) return false;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const steps = Math.ceil(Math.hypot(dx, dy) / (TILE / 4));
+        for (let i = 1; i < steps; i++) {
+            if (this._isWallAt(a.x + dx * i / steps, a.y + dy * i / steps)) return true;
+        }
+        return false;
+    }
+
+    // Corpo e pés longe de paredes e dentro da sala; buracos não contam (a investida passa por cima).
+    _bodyClearOfWalls(x, y) {
+        if (!this._insideArena(x, y)) return false;
+        const r = this.hitRadius, foot = this.footY - this.y;
+        return [[0, 0], [-r, 0], [r, 0], [0, -r], [0, r], [-r, foot], [0, foot], [r, foot]]
+            .every(([dx, dy]) => !this._isWallAt(x + dx, y + dy));
+    }
+
+    _dashLength() {
+        return this.abilities.attack3.speed * this.phaseConfig.dashSpeedMultiplier * this._chargeDuration();
+    }
+
+    // Investida em linha reta para o alvo. Válida se nenhuma parede corta o caminho antes de chegar
+    // ao alvo e se existe parada segura (piso para o corpo) a partir daí; para no ponto seguro mais distante.
+    _planDash(target) {
+        if (!target) return null;
+        const cfg = this.abilities.attack3;
+        const dx = target.x - this.x, dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        const dir = dist > 0 ? { x: dx / dist, y: dy / dist } : { x: this.facingLeft ? -1 : 1, y: 0 };
+        const full = this._dashLength();
+        if (full <= 0) return null;
+        const probe = Math.max(1, cfg.collisionProbePx);
+        const at = s => ({ x: this.x + dir.x * s, y: this.y + dir.y * s });
+        let reach = 0;
+        for (let s = Math.min(probe, full); ; s = Math.min(full, s + probe)) {
+            const p = at(s);
+            if (!this._bodyClearOfWalls(p.x, p.y)) break;
+            reach = s;
+            if (s >= full) break;
+        }
+        const need = Math.min(full, Math.max(0, dist - cfg.hitRadius));
+        if (reach < need) return null;
+        const safe = s => { const p = at(s); return this._insideArena(p.x, p.y) && this._chargeFits(p.x, p.y); };
+        for (let s = reach; s > need; s -= probe) if (safe(s)) return { dir, length: s };
+        return need > 0 && safe(need) ? { dir, length: need } : null;
+    }
+
+    // ---- perseguição considerando o corpo e os pés ----
+
+    // Escolhe o jogador com o menor caminho para o corpo; sem caminho, o mais próximo pela rota antiga.
+    _planChase() {
+        this._chaseTarget = null;
+        this._chaseStep = null;
+        if (!this.players.length) return;
+        let best = null;
+        for (const target of this._byDistance()) {
+            const route = this._bodyRoute(target);
+            if (route && (!best || route.length < best.length)) best = { target, step: route.step, length: route.length };
+        }
+        if (best) {
+            this._chaseTarget = best.target;
+            this._chaseStep = best.step;
+            return;
+        }
+        const nearest = this._byDistance()[0];
+        this._chaseTarget = nearest;
+        this._chaseStep = super._chaseWaypoint(nearest) ?? nearest;
+    }
+
+    _chaseWaypoint(target) {
+        if (target === this._chaseTarget && this._chaseStep) return this._chaseStep;
+        return this._bodyRoute(target)?.step ?? super._chaseWaypoint(target) ?? target;
+    }
+
+    // BFS em células cujo centro aceita o corpo inteiro. Termina numa célula a até `chaseReachPx`
+    // do alvo e sem parede no meio (de onde o melee alcança). Devolve o próximo ponto e o comprimento.
+    _bodyRoute(target) {
+        const reach = FLAME_GOLEM.ai.chaseReachPx;
+        const isGoal = p => Math.hypot(target.x - p.x, target.y - p.y) <= reach && !this._wallBetween(p, target);
+        if (!this.navigationFloor || !this.navigationBounds || isGoal(this)) {
+            return { step: target, length: Math.hypot(target.x - this.x, target.y - this.y) / TILE };
+        }
+        const b = this.navigationBounds;
+        const center = (col, row) => ({ x: b.minX + (col - 0.5) * TILE, y: b.minY + (row - 0.5) * TILE });
+        const start = { ...this._tileAt(this.x, this.y), depth: 0, parent: null };
+        const seen = new Set([`${start.col},${start.row}`]);
+        const queue = [start];
+        for (let q = 0; q < queue.length; q++) {
+            const cell = queue[q];
+            for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const col = cell.col + dc, row = cell.row + dr, key = `${col},${row}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                const c = center(col, row);
+                if (!this._insideArena(c.x, c.y) || !this._chargeFits(c.x, c.y)) continue;
+                const node = { col, row, depth: cell.depth + 1, parent: cell };
+                if (isGoal(c)) {
+                    let first = node;
+                    while (first.parent && first.parent !== start) first = first.parent;
+                    return { step: center(first.col, first.row), length: node.depth };
+                }
+                queue.push(node);
+            }
+        }
+        return null;
     }
 
     _updatePhase() {
@@ -195,6 +439,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
         this.justAttacked = true;
         this.animTime = tellTicks;
         this.dealtHit = false;
+        this._dashTraveled = 0;
         this.stateTimer = (this.currentAttack === 'attack3'
             ? Math.max(anim.frames * anim.fps, cfg.launchFrame * anim.fps + this._chargeDuration())
             : anim.frames * anim.fps) - tellTicks;
@@ -219,9 +464,10 @@ export class FlameGolemEnemy extends MeleeEnemy {
         for (const player of targets) {
             if (!this.players.includes(player)) continue;
             if (Math.hypot(player.x - this.x, player.y - this.y) > range + player.hitRadius) continue;
-            if (!this._hasClearWalkablePath(player)) continue;
+            if (this._wallBetween(this, player)) continue;
             this._hitPlayer(player, this.x, this.y, cfg.knockback, onPlayerHit);
         }
+        if (this.currentAttack === 'attack2') this._resetPressure();
     }
 
     _hitPlayer(player, sourceX, sourceY, knockback, onPlayerHit) {
@@ -259,13 +505,6 @@ export class FlameGolemEnemy extends MeleeEnemy {
         return null;
     }
 
-    // Escolhe o jogador do salto (alternando) e fixa a marca no chão; null se não houver alvo ou piso seguro.
-    _pickSlamMark(index) {
-        if (!this.players.length) return null;
-        const player = this.players[(this._slamCursor + index) % this.players.length];
-        return this._safeLanding(player.x, player.y);
-    }
-
     _launchSlam() {
         const s = this.slam;
         s.phase = 'air';
@@ -296,15 +535,18 @@ export class FlameGolemEnemy extends MeleeEnemy {
             if (p >= 1) this._landSlam(onPlayerHit, impactTicks);
         } else if (s.phase === 'recover') {
             if (s.t < cfg.betweenTicks / speed) return;
-            if (s.index + 1 >= cfg.count) { this._endSlam(); this.stateTimer = 0; return; }
+            const next = s.index + 1 < this._jumpCount() ? this._pickJumpTarget() : null;
+            if (!next) { this._endSlam(); this.stateTimer = 0; return; }
+            this.plan = { ...this.plan, target: next.target };
             s.index++;
             s.t = 0;
             s.phase = 'prep';
             this.animTime = 0;
-            s.mark = this._pickSlamMark(s.index);
-            if (!s.mark) { this._endSlam(); this.stateTimer = 0; }
+            s.mark = next.mark;
         } else if (s.phase === 'prep') {
             const raiseTicks = this._tellFrame('attack2') * this.sprite.rows.attack2.fps;
+            const target = this.plan?.target;
+            if (target && this.players.includes(target)) s.mark = this._safeLanding(target.x, target.y) ?? s.mark;
             this.animTime = Math.min(s.t, raiseTicks);
             this.facingLeft = s.mark.x < this.x;
             if (s.t >= raiseTicks + cfg.prepTicks / speed) this._launchSlam();
@@ -374,7 +616,7 @@ export class FlameGolemEnemy extends MeleeEnemy {
     }
 
     ensureOnWalkableTile() {
-        if (this.airborne) return;
+        if (this.airborne || this.charging) return;
         if (!this.navigationFloor || this._standsOnFloor(this.x, this.y)) { super.ensureOnWalkableTile(); return; }
         const spot = this._standsOnFloor(this.lastSafePosition.x, this.lastSafePosition.y)
             ? this.lastSafePosition : this._nearestStandingSpot();
@@ -391,34 +633,22 @@ export class FlameGolemEnemy extends MeleeEnemy {
         const cfg = this.abilities.attack3;
         const elapsed = this.animTime - cfg.launchFrame * this.sprite.rows.attack3.fps;
         if (elapsed < 0 || elapsed >= this._chargeDuration()) return;
-        const mark = this.marks[this.chargeIndex];
-        if (!mark) return;
-        if (this.players.includes(mark.player)) {
-            const desired = Math.atan2(mark.player.y - this.y, mark.player.x - this.x);
-            const angle = Math.atan2(this.chargeDirection.y, this.chargeDirection.x);
-            const delta = Math.atan2(Math.sin(desired - angle), Math.cos(desired - angle));
-            const tracked = angle + delta * Math.max(0, Math.min(1, cfg.trackingStrength));
-            this.chargeDirection = { x: Math.cos(tracked), y: Math.sin(tracked) };
-        }
-        const dir = this.chargeDirection;
+        const plan = this._dashPlan;
+        if (!plan) return;
+        // Direção e comprimento fixados no lançamento: o trajeto já foi validado e o alvo pode desviar.
+        const step = Math.min(cfg.speed * this.phaseConfig.dashSpeedMultiplier, plan.length - this._dashTraveled);
+        if (step <= 0) return;
+        const dir = plan.dir;
         this.facingLeft = dir.x < 0;
         this.charging = true;
-        const speed = cfg.speed * this.phaseConfig.dashSpeedMultiplier;
-        const steps = Math.max(1, Math.ceil(speed / Math.max(1, cfg.collisionProbePx)));
-        let dx = 0, dy = 0;
-        for (let i = 1; i <= steps; i++) {
-            const x = this.x + dir.x * speed * i / steps;
-            const y = this.y + dir.y * speed * i / steps;
-            if (!this._chargeFits(x, y)) break;
-            dx = x - this.x;
-            dy = y - this.y;
-        }
+        const dx = dir.x * step, dy = dir.y * step;
         for (const player of this.players) {
             const point = Physics.closestPointOnSegment(player.x, player.y, this.x, this.y, this.x + dx, this.y + dy);
             if (Math.hypot(player.x - point.x, player.y - point.y) > cfg.hitRadius + player.hitRadius) continue;
-            if (!this._hasClearWalkablePath(player)) continue;
+            if (this._wallBetween(this, player)) continue;
             this._hitPlayer(player, player.x - dir.x, player.y - dir.y, cfg.knockback, onPlayerHit);
         }
+        this._dashTraveled += step;
         this.vx = dx;
         this.vy = dy;
     }
@@ -435,8 +665,12 @@ export class FlameGolemEnemy extends MeleeEnemy {
 
     _finishAttack() {
         this.vx = this.vy = 0;
-        if (this.currentAttack === 'attack3' && ++this.chargeIndex < Math.min(this.marks.length, this.phaseConfig.dashCount)) {
-            this._aimCharge();
+        // Modo 'sequence': a próxima investida escolhe de novo o mais próximo com trajeto válido.
+        const next = this.currentAttack === 'attack3' && ++this.chargeIndex < this._dashCount()
+            ? this._pickDashTarget() : null;
+        if (next) {
+            this.plan = { ...this.plan, target: next.target, dash: next.plan };
+            this._setDashPlan(next.target, next.plan);
             this.attackHits.clear();
             super._beginWindup();
             return;
@@ -536,9 +770,8 @@ export class FlameGolemEnemy extends MeleeEnemy {
             ctx.stroke();
         }
         if (this.currentAttack === 'attack3') {
-            this.marks.forEach((mark, index) => {
-                if (index < this.chargeIndex) return;
-                ctx.strokeStyle = index === this.chargeIndex ? cfg.color : cfg.secondaryColor;
+            const mark = this.marks[0];
+            if (mark) {
                 ctx.beginPath();
                 ctx.arc(mark.x, mark.y, cfg.markerRadius, 0, Math.PI * 2);
                 ctx.moveTo(mark.x - cfg.crossSize, mark.y);
@@ -546,14 +779,15 @@ export class FlameGolemEnemy extends MeleeEnemy {
                 ctx.moveTo(mark.x, mark.y - cfg.crossSize);
                 ctx.lineTo(mark.x, mark.y + cfg.crossSize);
                 ctx.stroke();
-            });
-            const mark = this.marks[this.chargeIndex];
-            if (mark && this.state === 'windup') {
-                ctx.strokeStyle = cfg.color;
+            }
+            // Trajeto planejado: do golem até onde a investida vai parar.
+            const plan = this._dashPlan;
+            if (plan && this.state === 'windup') {
+                ctx.strokeStyle = cfg.secondaryColor;
                 ctx.setLineDash(cfg.dashLine);
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
-                ctx.lineTo(mark.x, mark.y);
+                ctx.lineTo(this.x + plan.dir.x * plan.length, this.y + plan.dir.y * plan.length);
                 ctx.stroke();
             }
         }

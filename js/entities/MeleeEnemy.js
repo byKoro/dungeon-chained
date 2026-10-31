@@ -470,8 +470,8 @@ export class MeleeEnemy extends Entity {
 
         const d1 = Math.hypot(players[0].x - this.x, players[0].y - this.y);
         const d2 = Math.hypot(players[1].x - this.x, players[1].y - this.y);
-        this.target = d1 < d2 ? players[0] : players[1];
-        const distToTarget = Math.min(d1, d2);
+        this.target = this._focusTarget(d1 < d2 ? players[0] : players[1]);
+        const distToTarget = Math.hypot(this.target.x - this.x, this.target.y - this.y);
 
         if (this.state === "windup" || this.state === "attack" || this.state === "recover") {
             this.facingLeft = (this.target.x < this.x);
@@ -490,10 +490,7 @@ export class MeleeEnemy extends Entity {
                     this.vy *= 0.5;
                 }
 
-                if (distToTarget <= this.attackRange && this._hasClearWalkablePath(this.target)) {
-
-                    this._beginWindup();
-                }
+                if (this._readyToAttack(distToTarget)) this._beginWindup();
                 break;
             }
 
@@ -556,6 +553,15 @@ export class MeleeEnemy extends Entity {
         } else if (this.state !== "chase") {
             this.stepDistance = 0;
         }
+    }
+
+    // Ganchos para chefes: quem encarar/perseguir e quando começar um ataque.
+    _focusTarget(nearest) {
+        return nearest;
+    }
+
+    _readyToAttack(distToTarget) {
+        return distToTarget <= this.attackRange && this._hasClearWalkablePath(this.target);
     }
 
     _beginWindup() {

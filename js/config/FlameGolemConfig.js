@@ -33,15 +33,28 @@ export const FLAME_GOLEM = {
             windupTicks: 35, recoverTicks: 55, ticksPerFrame: 6, hitFrame: 6
         },
         attack3: {
+            // A direção acompanha o alvo durante o aviso e fica fixa na investida.
             triggerRange: 480, speed: 12, durationTicks: 18, hitRadius: 50,
-            // 0 fixa a direcao marcada; 1 aponta para o alvo a cada tick.
-            knockback: 52, trackingStrength: 0.025,
+            knockback: 52,
             windupTicks: 40, recoverTicks: 60, ticksPerFrame: 5, launchFrame: 5,
             collisionProbePx: 8
         }
     },
-    // Fase 2: o slot do golpe de área (attack2) vira uma sequência de saltos com slam em direção aos jogadores.
+    // Escolha de ataque pela situação (sem ciclo fixo). Detalhes em combat-and-entities.md → Arauto reativo.
+    ai: {
+        // 'single': cada decisão faz 1 investida ou 1 salto e depois reavalia.
+        // 'sequence': fase 1 faz phases[0].dashCount investidas; fase 2 faz phases[1].dashCount investidas ou slam.count saltos.
+        chainMode: 'single',
+        // Fase 1: um jogador no alcance do melee por este tempo contínuo faz a próxima decisão ser a pancada.
+        pressureSeconds: 2,
+        // Perseguição: o caminho para o corpo termina a esta distância do alvo, sem parede no meio (px).
+        chaseReachPx: 88
+    },
+    // Fase 2: o golpe de área (attack2) vira salto com slam, usado quando nenhuma investida é possível.
     slam: {
+        // Distância máxima até o alvo para começar o salto (px).
+        triggerRange: 480,
+        // Saltos por decisão no modo 'sequence' (no 'single' é sempre 1).
         count: 3,
         // Pausa agachada antes de cada salto depois do primeiro (o primeiro usa o windup de attack2).
         prepTicks: 24,

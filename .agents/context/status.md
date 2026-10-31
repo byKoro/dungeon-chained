@@ -232,3 +232,8 @@ Branch codex/arrow-wall-impact: arrows stop at internal/perimeter walls and emit
 - Vãos de 2 tiles agora atravessáveis saindo colado na borda: `demo_map.json` sala `4,3`, `inicial.json` sala `1,1`. Revisar no playtest.
 - Testes: `test_dash_connected.js` (novo) e `test_player_dash.js` passam. Sensação de jogo não observada (sem playtest real).
 - Achado: `test_arauto_effects.js` falha em `main` desde `7c03a12` porque `FLAME_GOLEM.telegraph.showMarks` está `true` e o teste espera `false` (marcas de debug). Não mexido nesta branch.
+
+## Arauto reativo — 2026-10-31 (`feat/arauto-reactive-ai`, `.agents/tasks/2026-10-31-arauto-reactive-ai/`)
+- Ciclo fixo de ataques trocado por decisão pela situação (melee perto, pancada por pressão de 2 s na fase 1, investida/salto validados contra paredes, buracos e borda) e perseguição que considera o corpo e os pés. Modos `single`/`sequence` em `FLAME_GOLEM.ai.chainMode`. Detalhes em `systems/combat-and-entities.md` → Arauto reativo.
+- Testado por script (`test_arauto_ai.js` + testes do golem atualizados). Não jogado: sensação de combate, quinas com o corpo grande e travessia de buraco no jogo real ficam para playtest.
+- `test_arauto_effects.js` continua falhando só pelo `showMarks: true` (já estava assim na `main`).

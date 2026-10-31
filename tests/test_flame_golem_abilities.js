@@ -12,7 +12,7 @@ const create = () => {
 };
 const player = (x, y = 0) => new Player(x, y, '#fff', [], null, 'test');
 const begin = (e, key, players) => {
-    e.attackIndex = e.attackKeys.indexOf(key);
+    e.forceAttack(key);
     e.update(players, () => assert.fail('windup cannot deal damage'));
     assert.equal(e.state, 'windup');
     assert.equal(e.currentAttack, key);
@@ -68,9 +68,11 @@ const INSIDE = Math.floor(AREA.radius * 0.6);
 {
     const e = create(), ps = [player(100), player(400)];
     begin(e, 'attack3', ps);
-    assert.deepEqual(e.marks.map(m => [m.x, m.y]), [[100, 0], [400, 0]]);
+    assert.deepEqual(e.marks.map(m => [m.x, m.y]), [[100, 0]], 'dash marks only its current target');
     ps[0].x = 200; ps[0].y = 150;
-    assert.deepEqual([e.marks[0].x, e.marks[0].y], [100, 0], 'marks are snapshots');
+    e.update(ps, () => assert.fail('windup cannot hit'));
+    assert.deepEqual([e.marks[0].x, e.marks[0].y], [200, 150], 'during the warning the mark follows the target');
+    assert.ok(e.chargeDirection.y > 0, 'and so does the heading');
     e.freezeOnHit(0.1);
     assert.equal(e.hitFreezeTimer, 0, 'chefe não congela no acerto');
     const timer = e.stateTimer;
@@ -78,11 +80,10 @@ const INSIDE = Math.floor(AREA.radius * 0.6);
     assert.equal(e.stateTimer, timer - 1, 'windup segue andando depois de freezeOnHit');
     assert.ok(e.takeHit(1, { dirX: 1, dirY: 0 }));
     assert.equal(e.state, 'windup', 'acerto não interrompe a habilidade');
-    assert.equal(e.marks.length, 2, 'marcas da investida continuam');
+    assert.equal(e.marks.length, 1, 'marca da investida continua');
 }
 {
     const e = create(), ps = [player(100), player(400)];
-    e.abilities.attack3.trackingStrength = 0;
     e.abilities.attack3.speed = 200;
     begin(e, 'attack3', ps); launch(e, ps);
     const start = e.x;
@@ -95,30 +96,27 @@ const INSIDE = Math.floor(AREA.radius * 0.6);
     assert.equal(ps[0].lives, 2, 'one hit per player per dash');
 }
 {
-    for (const strength of [0, 1]) {
-        const e = create(), ps = [player(300), player(400)];
-        e.abilities.attack3.trackingStrength = strength;
-        begin(e, 'attack3', ps); launch(e, ps);
-        ps[0].y = 200;
-        e.animTime = e.abilities.attack3.launchFrame * e.sprite.rows.attack3.fps - 1;
-        e.update(ps, () => {});
-        if (strength === 0) assert.equal(e.vy, 0, 'zero tracking keeps marked heading');
-        else assert.ok(e.vy > 0, 'full tracking follows live target');
-    }
+    const e = create(), ps = [player(300), player(400)];
+    begin(e, 'attack3', ps); launch(e, ps);
+    ps[0].y = 200;
+    e.animTime = e.abilities.attack3.launchFrame * e.sprite.rows.attack3.fps - 1;
+    e.update(ps, () => {});
+    assert.ok(e.vx > 0);
+    assert.equal(e.vy, 0, 'heading is fixed during the dash, so the target can dodge');
 }
 {
+    // Buraco na coluna 4 (x 192..256), parede de borda na coluna 9 (x >= 512).
     const e = create(); e.x = e.y = 96;
     const floor = Array.from({ length: 8 }, () => Array(10).fill(17));
     for (let row = 0; row < floor.length; row++) floor[row][4] = -1;
     e.setNavigationFloor(floor, { minX: 0, minY: 0 });
     const ps = [player(160, 96), player(160, 96)];
     e.abilities.attack3.speed = 300;
-    e.abilities.attack3.trackingStrength = 0;
     begin(e, 'attack3', ps); launch(e, ps);
-    e.animTime = e.abilities.attack3.launchFrame * e.sprite.rows.attack3.fps - 1;
-    e.update(ps, () => {});
-    assert.ok(e.x + e.hitRadius < 192, 'fast dash stops before hole, including body radius');
-    assert.ok(e.x > 96);
+    for (let t = 0; t < 200 && e.state === 'attack'; t++) { e.update(ps, () => {}); e.ensureOnWalkableTile(); }
+    assert.ok(e.x - e.hitRadius > 256, `fast dash crosses the hole (x=${e.x})`);
+    assert.ok(e._chargeFits(e.x, e.y), 'and stops on safe floor for the whole body');
+    assert.ok(e.x + e.hitRadius <= 512, 'never into the border wall');
 }
 {
     const southHole = () => {
@@ -152,23 +150,30 @@ const INSIDE = Math.floor(AREA.radius * 0.6);
     assert.ok(stuck._standsOnFloor(stuck.x, stuck.y), 'a golem spawned over the hole is moved to solid floor');
 }
 {
-    for (const phase of [1, 2]) {
-        const e = create(), ps = [player(120), player(200, 50)];
-        if (phase === 2) e.hp = FLAME_GOLEM.secondPhaseHp;
-        begin(e, 'attack3', ps);
-        assert.equal(e.phase, phase);
-        const speed = FLAME_GOLEM.phases[phase - 1];
-        assert.equal(e.speed, FLAME_GOLEM.speed * speed.movementSpeedMultiplier);
-        assert.equal(e.sprite.rows.attack.fps, FLAME_GOLEM.attacks.attack.ticksPerFrame / speed.animationSpeedMultiplier);
-        assert.equal(e.windupFrames, e.abilities.attack3.windupTicks / speed.animationSpeedMultiplier);
-        let launches = 0;
-        for (let t = 0; t < 400 && e.state !== 'recover'; t++) {
-            e.update(ps, () => {});
-            if (e.justAttacked) launches++;
+    const mode = FLAME_GOLEM.ai.chainMode;
+    try {
+        for (const chainMode of ['single', 'sequence']) {
+            FLAME_GOLEM.ai.chainMode = chainMode;
+            for (const phase of [1, 2]) {
+                const e = create(), ps = [player(120), player(200, 50)];
+                if (phase === 2) e.hp = FLAME_GOLEM.secondPhaseHp;
+                begin(e, 'attack3', ps);
+                assert.equal(e.phase, phase);
+                const speed = FLAME_GOLEM.phases[phase - 1];
+                assert.equal(e.speed, FLAME_GOLEM.speed * speed.movementSpeedMultiplier);
+                assert.equal(e.sprite.rows.attack.fps, FLAME_GOLEM.attacks.attack.ticksPerFrame / speed.animationSpeedMultiplier);
+                assert.equal(e.windupFrames, e.abilities.attack3.windupTicks / speed.animationSpeedMultiplier);
+                let launches = 0;
+                for (let t = 0; t < 400 && e.state !== 'recover'; t++) {
+                    e.update(ps, () => {});
+                    if (e.justAttacked) launches++;
+                }
+                const expected = chainMode === 'sequence' ? speed.dashCount : 1;
+                assert.equal(launches, expected, `${chainMode}: ${expected} dash(es) in phase ${phase}`);
+                assert.equal(e.state, 'recover');
+            }
         }
-        assert.equal(launches, speed.dashCount, 'one dash in phase one, two in phase two');
-        assert.equal(e.state, 'recover');
-    }
+    } finally { FLAME_GOLEM.ai.chainMode = mode; }
     assert.equal(create().sprite.rows.walk.fps, FLAME_GOLEM.walkTicksPerFrame, 'phase two cannot mutate other instances');
 }
 {
