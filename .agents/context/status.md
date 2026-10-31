@@ -264,6 +264,12 @@ Regressões e integração em Electron passaram (seleção das duas versões e p
 
 Check permanece bloqueado pelas falhas de Arauto (`test_arauto_effects`, asserts chase/windup intermitentes), Curva SE e peça `corridor_vertical_ns_1.json` não listada. Arte experimental sem carregamento e ferramentas temporárias ficam em `_local/tackle-unused/` (ignorado pelo Git); não fazem parte da implementação atual.
 
+### Investida: tackle desbloqueado na bigorna da Penhasco (2026-10-31, `feat/tackle-unlock`)
+
+Receita grátis `tackle` ("Investida"/"Saw Tackle", precisa da Serra) só na bigorna da Penhasco, primeira linha, preço "GRÁTIS". Nos mapas do Editor 2.0 o tackle fica travado até pegar (modo clássico liberado). Ao pegar, a forja fecha e aparece a telinha `ability.tackle` com o "vídeo" `TackleDemo` (dash na serra solta → voa sobre o vão → mata demônio na ilha → volta); some no 1º tackle ou em 9,5 s. Teste do editor: checkbox "Investida liberada". F1 ganhou Moedas ±10, +100, Telinha (mostra sem liberar) e Bigorna (abre a forja de qualquer bigorna do mapa). Glossário: Scrap em pt-BR passa a "moedas". Detalhes em `systems/weapons.md`, `systems/ui.md`, `systems/room-editor.md`; tarefa em `.agents/tasks/2026-10-31-tackle-unlock/`.
+
+Verificado por testes headless (trava, receita grátis, fechamento do card por evento) e por script (F1). A lógica do `TackleDemo` foi rodada num harness no Chrome headless (posições e morte do inimigo corretas), mas os sprites não carregaram no harness (o `DashDemo` também não), então **o visual do vídeo e o fluxo dentro do jogo não foram vistos**. Nome "Investida" já era usado no glossário para o dash e para a investida do golem; ver glossário. `npm test` 60/63: só as falhas antigas (Arauto ×2, Curva SE #5); map validation segue com #4.
+
 
 ## Tensão da corrente — 2026-10-31 (feat/chain-tension-juice)
 Feedback compartilhado de carga/risco com antecipação, brilho vermelho gradual acima da iluminação, vibração do cabo, rangido crescente, alívio rápido e recuo na ruptura. Reutiliza raiva/furia originais no personagem/avatar; preserva dano/cinemáticas e as proteções de dash/serra dupla. Artes geradas foram rejeitadas e removidas com as ferramentas temporárias.

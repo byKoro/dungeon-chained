@@ -1,7 +1,10 @@
 // Menu de debug em jogo (F1). Só afeta a partida atual; nada é salvo.
 export const DEBUG = Object.freeze({
     toggleCode: "F1",
-    width: 300,
+    width: 340,
+    // Moedas: passo de ←/→ e a linha de encher rápido.
+    coinStep: 10,
+    coinBulk: 100,
     rowHeight: 26,
     padding: 14,
     font: "14px sans-serif",

@@ -1,6 +1,7 @@
 import { DEBUG } from '../config/DebugConfig.js';
 import { FORGE_RECIPE_IDS } from '../config/ForgeConfig.js';
 import { t } from '../i18n/I18n.js';
+import { ABILITY_CARD_KEYS } from '../ui/AbilityCard.js';
 
 // Console de debug em jogo (F1): libera serra/melhorias/habilidades, spawna a serra, teleporta e cura, só na
 // partida atual. Mexe em vários sistemas do `Game`, então recebe o próprio `Game` (getGame) em vez de getters soltos.
@@ -11,6 +12,8 @@ export class DebugMenu {
         this.cfg = cfg;
         this.open = false;
         this.index = 0;
+        this._card = 0;
+        this._anvil = 0;
         this._nav = { up: false, down: false, left: false, right: false, enter: false };
         this._items = this._build();
         if (typeof window !== "undefined") {
@@ -43,10 +46,12 @@ export class DebugMenu {
         e.preventDefault();
         e.stopPropagation();
         const items = this._visibleItems();
+        const item = items[this.index];
         if (hit.up) this.index = (this.index - 1 + items.length) % items.length;
         else if (hit.down) this.index = (this.index + 1) % items.length;
-        else if (hit.left) items[this.index]?.left?.(this.game);
-        else if (hit.right || hit.enter) items[this.index]?.right?.(this.game);
+        else if (hit.left) item?.left?.(this.game);
+        else if (hit.enter && item?.enter) item.enter(this.game);
+        else if (hit.right || hit.enter) item?.right?.(this.game);
     }
 
     // Enquanto o menu está aberto, as teclas de navegação não podem virar movimento/dash dos jogadores.
@@ -63,6 +68,34 @@ export class DebugMenu {
 
     _build() {
         const items = [];
+        items.push({
+            show: g => !!g?.scrap,
+            label: g => `Moedas: ${g?.scrap?.amount ?? 0}  (±${this.cfg.coinStep})`,
+            left: g => g && this._addCoins(g, -this.cfg.coinStep),
+            right: g => g && this._addCoins(g, this.cfg.coinStep)
+        });
+        items.push({
+            show: g => !!g?.scrap,
+            label: () => `+${this.cfg.coinBulk} moedas`,
+            right: g => g && this._addCoins(g, this.cfg.coinBulk)
+        });
+        items.push({
+            show: g => !!g?.abilityCard,
+            label: () => `Telinha ◂ ${t(`${this._cardKey()}.title`)} ▸  Enter mostra`,
+            left: () => this._cycle("_card", -1, ABILITY_CARD_KEYS.length),
+            right: () => this._cycle("_card", 1, ABILITY_CARD_KEYS.length),
+            enter: g => g && this._showCard(g)
+        });
+        items.push({
+            show: g => !!g?.forgeSystem && this._anvilList(g).length > 0,
+            label: g => {
+                const list = this._anvilList(g), a = list[this._anvil % list.length];
+                return `Bigorna ◂ ${a ? this._roomName(g, a.roomKey) : "-"} ▸  Enter abre`;
+            },
+            left: g => this._cycle("_anvil", -1, this._anvilList(g).length),
+            right: g => this._cycle("_anvil", 1, this._anvilList(g).length),
+            enter: g => g && this._openAnvil(g)
+        });
         items.push({
             label: g => `Serra: ${g?.chain?.hasSaw ? (g.chain.isConnected ? "conectada" : "largada") : "sem serra"}`,
             right: g => g && this._grantSaw(g)
@@ -125,7 +158,57 @@ export class DebugMenu {
         return `${g?.rooms?.dungeon?.current?.gx},${g?.rooms?.dungeon?.current?.gy}` === key;
     }
 
+    _cycle(field, dir, n) {
+        if (n > 0) this[field] = (this[field] + dir + n) % n;
+    }
+
+    _cardKey() {
+        return ABILITY_CARD_KEYS[this._card % ABILITY_CARD_KEYS.length];
+    }
+
+    // Todas as bigornas do mapa, na ordem das salas.
+    _anvilList(g) {
+        const out = [];
+        for (const [roomKey, room] of Object.entries(g?.mapData?.map?.rooms || {})) {
+            for (const prop of room.props || []) if (prop.type === "anvil") out.push({ roomKey, prop });
+        }
+        return out;
+    }
+
     // ---------- cheats (chamam métodos existentes do Game) ----------
+
+    _addCoins(g, n) {
+        const w = g.scrap.wallet;
+        if (n >= 0) w.add(n);
+        else w.amount = Math.max(0, w.amount + n);
+    }
+
+    // Fecha o F1 para a ação aparecer; o Enter/Espaço apertado não pode virar dash no step seguinte.
+    _closeForAction(g) {
+        this.open = false;
+        for (const p of [g.p1, g.p2]) p?.latchDashKey?.();
+    }
+
+    // Só mostra a telinha: não libera a habilidade.
+    _showCard(g) {
+        this._closeForAction(g);
+        g.abilityCard.show(this._cardKey());
+    }
+
+    // Abre a forja da bigorna escolhida onde a dupla está. Na sala atual usa a bigorna de verdade; de outra sala,
+    // o ponto da bigorna fica entre os dois (a cinemática da Serra acontece ali). Ignora inimigos vivos.
+    _openAnvil(g) {
+        if (g.transition || g.gameOver || g.sawCinematic?.active || g.forgeSystem.open) return;
+        const list = this._anvilList(g), pick = list[this._anvil % list.length];
+        if (!pick) return;
+        const here = this._isCurrent(g, pick.roomKey)
+            ? g.forgeSystem._anvils().find(a => a.prop.col === pick.prop.col && a.prop.row === pick.prop.row)
+            : null;
+        const x = (g.p1.x + g.p2.x) / 2, y = (g.p1.y + g.p2.y) / 2;
+        const anvil = here ?? { prop: pick.prop, roomKey: pick.roomKey, x, y, topY: y - 32 };
+        this._closeForAction(g);
+        g.forgeSystem.openAt(anvil);
+    }
 
     _grantSaw(g) {
         g.forge.levels.saw = 1;
