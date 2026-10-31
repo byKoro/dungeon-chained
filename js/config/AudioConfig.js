@@ -5,6 +5,39 @@ export const AUDIO_CONFIG = {
     muted: false,
 
     cues: {
+        sawTackleImpact: {
+            description: 'Pancada metálica grave do dash na serra solta',
+            files: ['assets/audio/saw-tackle-impact.wav'], volume: 0.65,
+            rate: 1, rateVariance: 0.035, pitchShift: true, cooldownMs: 90, maxVoices: 2, enabled: true
+        },
+        sawTackleLaunch: {
+            description: 'Arrancada pesada da serra após o tackle',
+            files: ['assets/audio/saw-tackle-launch.wav'], volume: 0.45,
+            rate: 1, rateVariance: 0.04, pitchShift: true, cooldownMs: 80, maxVoices: 2, enabled: true
+        },
+        sawTackleFlight: {
+            description: 'Motor e passagem de ar da serra em voo',
+            files: ['assets/audio/saw-tackle-flight-loop.wav'], volume: 0.45, loop: true, enabled: true
+        },
+        sawTackleCut: {
+            description: 'Serragem mecânica contínua da serra cravada no alvo',
+            files: ['assets/audio/saw-tackle-cut-loop.wav'], volume: 0.50, loop: true, enabled: true
+        },
+        sawTackleBite: {
+            description: 'Mordida inicial dos dentes da serra no alvo',
+            files: ['assets/audio/saw-tackle-bite.wav'], volume: 0.42,
+            rate: 1, rateVariance: 0.04, pitchShift: true, cooldownMs: 100, maxVoices: 2, enabled: true
+        },
+        sawTackleBounce: {
+            description: 'Ricochete metálico seco da serra contra a parede',
+            files: ['assets/audio/saw-tackle-bounce.wav'], volume: 0.48,
+            rate: 1, rateVariance: 0.06, pitchShift: true, cooldownMs: 70, maxVoices: 2, enabled: true
+        },
+        sawTackleLand: {
+            description: 'Peso da serra assentando no chão após o voo',
+            files: ['assets/audio/saw-tackle-land.wav'], volume: 0.5,
+            rate: 1, rateVariance: 0.03, pitchShift: true, cooldownMs: 100, maxVoices: 2, enabled: true
+        },
         chainTension: {
             description: 'Cabo metálico sob carga: rangido contínuo que cresce com a tensão',
             files: ['assets/audio/chain-tension-loop.wav'],

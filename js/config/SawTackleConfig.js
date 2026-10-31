@@ -11,8 +11,8 @@ export const SAW_TACKLE = Object.freeze({
     // Proteção curta: cobre só o hit stop e a reação (sem dash extra; o cooldown do dash é o normal).
     invulnSteps: 18,
     impactScale: 0.74,
-    impactShake: 5,
-    impactSparks: 10,
+    impactShake: 10,
+    impactSparks: 24,
 
     // Mira assistida: uma correção por lançamento, só para inimigos à frente e sem parede no meio.
     aimConeDeg: 30,
@@ -71,17 +71,15 @@ export const SAW_TACKLE = Object.freeze({
     bossMinSpeed: 1,
     bossMaxFlightSteps: 150,
 
-    // Rastro de vento atrás da serra em voo.
-    trailLength: 9,
-    trailColor: 'rgba(235, 242, 255, 0.55)',
-    trailWidth: 0.7,
+    // Histórico usado pelo rastro luminoso de SawTackleFeedback.
+    trailLength: 16,
 
     // Dash que encosta na serra presa: não faz tackle; só um aviso curto de que ela está ocupada.
     lockedSparks: 3,
     sound: Object.freeze({
-        tackle: Object.freeze({ cue: 'sawLand', rate: 1.25, volume: 0.9 }),
-        bounce: Object.freeze({ cue: 'sawLand', rate: 1.9, volume: 0.3 }),
-        land: Object.freeze({ cue: 'sawLand', rate: 1, volume: 0.6 }),
+        tackle: Object.freeze({ cue: 'sawTackleImpact', rate: 1, volume: 1 }),
+        bounce: Object.freeze({ cue: 'sawTackleBounce', rate: 1, volume: 1 }),
+        land: Object.freeze({ cue: 'sawTackleLand', rate: 1, volume: 1 }),
         locked: Object.freeze({ cue: 'sawLand', rate: 2.2, volume: 0.2 })
     })
 });

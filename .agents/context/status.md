@@ -266,3 +266,7 @@ Feedback compartilhado de carga/risco com antecipação, brilho vermelho gradual
 11/11 testes focados e Game real no Electron passaram; capturas conferidas, console sem erros, gravação com motor/ambiente/impactos com pico0.3603 e nenhuma amostra saturada. Escuta humana/co-op pendentes. Task:2026-10-31-chain-tension-juice.
 
 Gate da implementação:54/56. ArautoEffects/Curva SE e mapa não listado são falhas da base; chase/windup em test_arauto_das_brasas e test_flame_golem também se reproduzem de forma intermitente em main41aace2. Doctor encontra Python indisponível e graphify fora do PATH.
+
+
+## SawTackle gamefeel — 2026-10-31 (feat/saw-tackle-gamefeel)
+Implemented heavy-machine feedback: dedicated seven-cue audio, impact/cut pulses, rotating edge ember trails and dark steel/red/yellow thermal palette. Latest user steering: idle-level brightness with a gradual original-color→red transition; stronger contact glow only. Physical damage/trajectory/return/dash timing preserved. Seven focused feedback cases and existing tackle/landing regressions pass. Actual Game/Electron exercised five accepted hits on flesh/stone, pause silence, ricochet/landing and reset; no blood on stone, no console errors or saturated samples. Capture peak0.8261 before master. Subjective audio/co-op and real-GPU performance pending. Task2026-10-31-saw-tackle-gamefeel. Gate55/57 retains ArautoEffects/Curva SE and the known unlisted map; graphify unavailable.

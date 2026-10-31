@@ -16,6 +16,8 @@ import { SawDrag } from './systems/SawDrag.js';
 import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
 import { SawTackle } from './systems/SawTackle.js';
+import { SawTackleFeedback } from './systems/SawTackleFeedback.js';
+import { SAW_TACKLE_FEEL } from './config/SawTackleFeelConfig.js';
 import { PROP_COLLISION } from './config/PropConfig.js';
 import { RoomEvents } from './systems/RoomEvents.js';
 import { RUN_DEATH } from './config/EventsConfig.js';
@@ -272,7 +274,10 @@ export class Game {
             canPush: () => !this._sawOnAnvil && !this.sawDrag?.active && !this.forgeSystem?.open && !this.sawCinematic?.active,
             audio: this.audio, particleSystem: this.particleSystem, renderer: this.renderer
         });
+        this.sawTackleFeedback = new SawTackleFeedback({ audio: this.audio, renderer: this.renderer,
+            particleSystem: this.particleSystem, reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false });
         this.sawTackle = new SawTackle({
+            feedback: this.sawTackleFeedback,
             flightMode: this.mapData?.test?.sawTackleMode,
             chain: this.chain, getPlayers: () => [this.p1, this.p2], getRoom: () => this.rooms.current,
             getBounds: () => this.arenaBounds,
@@ -284,7 +289,7 @@ export class Game {
                 return p.x === x && p.y === y;
             },
             onEnemyHit: (enemy, result, impact) => {
-                const info = this.combat.feedbackForHit(enemy, result, impact);
+                const info = this.combat.feedbackForHit(enemy, result, impact, { soundVolumeMultiplier: SAW_TACKLE_FEEL.audio.hitVolume });
                 enemy.freezeOnHit?.(info.hitStop);
                 if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
             },
@@ -911,6 +916,7 @@ export class Game {
             timeScale: this.gameLoop.timeScale
         };
         this.sawMotor?.update(w.spinSpeed ?? 0, state);
+        this.sawTackleFeedback.update(this.sawTackle, w, state);
         this.arautoAudio.update(w, this.rooms.current.enemies,
             { ...state, players: [this.p1, this.p2] });
     }
@@ -1502,7 +1508,6 @@ export class Game {
 
         // Recém-forjada, a serra fica em cima da bigorna: desenhada depois do prop.
         if (!this._sawOnAnvil) {
-            this.sawTackle.drawTrail(ctx);
             this.chain.drawDropped(ctx);
         }
 
@@ -1559,14 +1564,17 @@ export class Game {
         this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
         this.roomEvents?.renderLights(renderer, this.postProcessor);
         this.demoDoors.renderLights(this.postProcessor);
+        this.sawTackleFeedback.renderLights(renderer, this.postProcessor, this.sawTackle, this.chain.weapon);
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
         if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length
-            || this.chainTension.state.effort > 0 || this.chainTension.snapTime > 0) {
+            || this.chainTension.state.effort > 0 || this.chainTension.snapTime > 0
+            || this.sawTackle.active || this.sawTackleFeedback.bursts.length || this.sawTackleFeedback.visual.lit) {
             renderer.beginOverlayWorld();
 
             this.chainTension.draw(ctx, this.p1, this.p2, this.chain.isConnected, this.chain.weapon);
+            this.sawTackleFeedback.draw(ctx, this.sawTackle, this.chain.weapon);
             this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
             this.particleSystem.drawDamageNumbers(ctx);

@@ -9,14 +9,16 @@ const unit = (x, y, fx = 1, fy = 0) => { const d = Math.hypot(x, y); return d > 
 export class SawTackle {
     constructor({ chain, getPlayers, getRoom, getBounds = () => null, isSolid = () => false,
         safeDrop = (x, y) => ({ x, y }), findLandingRoute = null, canLand = null, onEnemyHit = null, audio = null, particleSystem = null, renderer = null,
-        cfg = SAW_TACKLE, flightMode = cfg.flightMode }) {
+        cfg = SAW_TACKLE, flightMode = cfg.flightMode, feedback = null }) {
         Object.assign(this, { chain, getPlayers, getRoom, getBounds, isSolid, safeDrop, findLandingRoute, canLand, onEnemyHit, audio, particleSystem, renderer, cfg });
         this.flightMode = flightMode === 'coast' ? 'coast' : 'return';
+        this.feedback = feedback;
         this.trail = [];
         this.reset();
     }
 
     reset() {
+        this.feedback?.reset();
         this.state = null;
         this.mode = null;
         this.vx = this.vy = 0;
@@ -127,7 +129,8 @@ export class SawTackle {
         this.audio?.play(s.cue, { rateMultiplier: s.rate, volumeMultiplier: s.volume });
         this.particleSystem?.triggerHitSparks?.(w.dropX - dir.x * R * 0.5, w.dropY - dir.y * R * 0.5, dir.x, dir.y, c.impactSparks, 1, 0.9);
         this.particleSystem?.triggerFlash?.(w.dropX, w.dropY, 8, 0.8);
-        this.renderer?.triggerShake(c.impactShake);
+        this.renderer?.triggerShake(c.impactShake * (this.feedback?.motion ?? 1));
+        this.feedback?.impact(w, dir);
     }
 
     _lockedFeedback(w) {
@@ -182,6 +185,7 @@ export class SawTackle {
         this.vy = dir.y * speed;
         this.elapsed = 0;
         this.distance = 0;
+        this.feedback?.launch(this.chain.weapon, dir);
     }
 
     onBossImpacts(enemies) {
@@ -360,6 +364,7 @@ export class SawTackle {
         const s = this.cfg.sound.bounce;
         this.audio?.play(s.cue, { rateMultiplier: s.rate, volumeMultiplier: s.volume });
         this.particleSystem?.triggerSparkBurst?.(w.dropX, w.dropY, w.discRadius * 0.6, 3, 0.6);
+        this.feedback?.bounce(w, unit(this.vx, this.vy));
     }
 
     _land(w) {
@@ -422,6 +427,7 @@ export class SawTackle {
     _finishLanding() {
         const s = this.cfg.sound.land;
         this.audio?.play(s.cue, { rateMultiplier: s.rate, volumeMultiplier: s.volume });
+        this.feedback?.land(this.chain.weapon);
         this.state = null;
         this.mode = null;
         this.stuck = null;
@@ -436,6 +442,7 @@ export class SawTackle {
         this.stuck = { e, ox: w.dropX - e.x, oy: w.dropY - e.y, hits: 0, next: 0, wait: 0, vx: this.vx, vy: this.vy, dirX: dir.x, dirY: dir.y };
         this.state = 'stuck';
         w.dropSpin = this.cfg.spin;
+        this.feedback?.contact(w, e, dir);
     }
 
     _updateStuck(w) {
@@ -457,6 +464,7 @@ export class SawTackle {
                 s.wait = 0;
                 s.next = Math.max(1, Math.round(c.hitIntervalSeconds * SIM_HZ));
                 this.onEnemyHit?.(e, result, { x: w.dropX, y: w.dropY, dirX: s.dirX, dirY: s.dirY });
+                this.feedback?.hit(w, e, result, { x: s.dirX, y: s.dirY });
                 const killed = (typeof result === 'object' && result.killed) || e.state === 'dying';
                 if (killed) { this._release(w, false); return; }
                 if (s.hits >= c.hits) { this._release(w, true); return; }
@@ -487,26 +495,9 @@ export class SawTackle {
 
     _updateTrail(w) {
         if (this.state === 'flight' || this.state === 'landing') {
-            this.trail.push({ x: w.dropX, y: w.dropY });
+            this.trail.push({ x: w.dropX, y: w.dropY, rotation: w.rotation });
             if (this.trail.length > this.cfg.trailLength) this.trail.shift();
         } else if (this.trail.length) this.trail.shift();
     }
 
-    drawTrail(ctx) {
-        const t = this.trail, w = this.chain.weapon;
-        if (t.length < 2 || !w) return;
-        ctx.save();
-        ctx.strokeStyle = this.cfg.trailColor;
-        ctx.lineCap = 'round';
-        for (let i = 1; i < t.length; i++) {
-            const k = i / t.length;
-            ctx.globalAlpha = k;
-            ctx.lineWidth = Math.max(1, w.discRadius * this.cfg.trailWidth * k);
-            ctx.beginPath();
-            ctx.moveTo(t[i - 1].x, t[i - 1].y);
-            ctx.lineTo(t[i].x, t[i].y);
-            ctx.stroke();
-        }
-        ctx.restore();
-    }
 }

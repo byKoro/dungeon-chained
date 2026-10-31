@@ -1,6 +1,7 @@
 import { Weapon } from './Weapon.js';
 import { SAW_CONTACT } from '../config/SawWeaponConfig.js';
 import { CHAIN_TENSION } from '../config/ChainTensionConfig.js';
+import { SAW_TACKLE_FEEL } from '../config/SawTackleFeelConfig.js';
 
 const SAW_FRAME = { size: 16, cols: 4 };
 const ROW_INERTIA_CLEAN = 0;
@@ -530,6 +531,31 @@ export class SawWeapon extends Weapon {
         ctx.restore();
     }
 
+    _tackleFrame(sx, row) {
+        this._tackleFrames ??= new Map();
+        const key = `${sx}:${row}`;
+        let frame = this._tackleFrames.get(key);
+        if (frame) return frame;
+        const size = SAW_FRAME.size, c = SAW_TACKLE_FEEL.blade;
+        frame = document.createElement('canvas'); frame.width = frame.height = size;
+        const g = frame.getContext('2d');
+        g.drawImage(this.sprite, sx, row, size, size, 0, 0, size, size);
+        const pixels = g.getImageData(0, 0, size, size), data = pixels.data;
+        for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+            const i = (y * size + x) * 4;
+            if (!data[i + 3]) continue;
+            const light = (data[i] + data[i + 1] + data[i + 2]) / (3 * 255);
+            if (Math.hypot(x - (size - 1) / 2, y - (size - 1) / 2) >= c.rimStart) {
+                for (let channel = 0; channel < 3; channel++) data[i + channel] = c.rimDark[channel] + (c.rimHot[channel] - c.rimDark[channel]) * light;
+            } else {
+                const steel = light * 255 * c.steelShade;
+                data[i] = data[i + 1] = data[i + 2] = steel;
+            }
+        }
+        g.putImageData(pixels, 0, 0); this._tackleFrames.set(key, frame);
+        return frame;
+    }
+
     drawDropped(ctx) {
         if (!this.dropped) return;
 
@@ -542,16 +568,20 @@ export class SawWeapon extends Weapon {
         const draw = SAW_DRAW_LARGE * this.sizeScale;
         const bloody = this.bloodTimer > 0;
 
-        const row = (bloody ? ROW_INERTIA_BLOODY : ROW_INERTIA_CLEAN) * SAW_FRAME.size;
-        const sx = INERTIA_FRAME * SAW_FRAME.size;
+        const active = this.tackleFeedback?.lit;
+        const row = (active ? bloody ? ROW_SPIN_BLOODY : ROW_SPIN_CLEAN : bloody ? ROW_INERTIA_BLOODY : ROW_INERTIA_CLEAN) * SAW_FRAME.size;
+        const frame = active ? Math.floor(this.rotation * SAW_TACKLE_FEEL.blade.frameRate) % SAW_FRAME.cols : INERTIA_FRAME;
+        const sx = frame * SAW_FRAME.size;
 
-        const bob = Math.sin(this.dropPhase) * 5;
+        const bob = active ? 0 : Math.sin(this.dropPhase) * 5;
         const hover = (Math.sin(this.dropPhase) + 1) / 2;
 
         const settle = 1 + (1 - this.dropT) * 0.25;
 
-        const cx = this.dropX;
-        const cy = this.dropY;
+        const feedback = this.tackleFeedback;
+        const jitter = feedback?.jitter ?? 0;
+        const cx = this.dropX + Math.sin(feedback?.phase ?? 0) * jitter;
+        const cy = this.dropY + Math.cos((feedback?.phase ?? 0) * SAW_TACKLE_FEEL.blade.crossAxisFrequency) * jitter;
 
         ctx.save();
         const shadowScale = 1 - hover * 0.22;
@@ -565,7 +595,7 @@ export class SawWeapon extends Weapon {
 
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.18 + hover * 0.12;
+        ctx.globalAlpha = active ? 0 : 0.18 + hover * 0.12;
         ctx.shadowColor = "#cfe4ff";
         ctx.shadowBlur = 10;
         ctx.fillStyle = "#9fc4ff";
@@ -575,20 +605,24 @@ export class SawWeapon extends Weapon {
         ctx.restore();
 
         const ly = cy - bob;
-        const sz = draw * settle;
+        const sz = draw * settle * (feedback?.scale ?? 1);
 
         if (spriteReady) {
             ctx.save();
             ctx.translate(cx, ly);
             ctx.rotate(this.rotation * this.spinDir);
             ctx.drawImage(sprite, sx, row, SAW_FRAME.size, SAW_FRAME.size, -sz / 2, -sz / 2, sz, sz);
+            if (active) {
+                ctx.globalAlpha *= feedback.heat ?? 1;
+                ctx.drawImage(this._tackleFrame(sx, row), -sz / 2, -sz / 2, sz, sz);
+            }
             ctx.restore();
 
             ctx.save();
             ctx.globalCompositeOperation = "lighter";
             ctx.translate(cx, ly);
 
-            const beam = this._buildBeam(sx, row);
+            const beam = active ? null : this._buildBeam(sx, row);
             if (beam) ctx.drawImage(beam, -sz / 2, -sz / 2, sz, sz);
             ctx.restore();
         }

@@ -25,7 +25,7 @@ export class CombatSystem {
         return globalThis.performance?.now?.() ?? Date.now();
     }
 
-    _playSawHit(count, heavy = false) {
+    _playSawHit(count, heavy = false, volumeMultiplier = 1) {
         if (!this.audio) return;
         const now = this._now();
         this._combo = now - this._lastHitAt < HIT_COMBO_WINDOW_MS ? this._combo + 1 : 0;
@@ -34,7 +34,7 @@ export class CombatSystem {
         const boost = heavy ? HIT_FEEL.poiseBreakAudio : null;
         this.audio.play("sawHit", {
             rateMultiplier: (1 + step * HIT_COMBO_PITCH_STEP) * (boost?.rateMultiplier ?? 1),
-            volumeMultiplier: Math.min(1.35, 1 + (count - 1) * 0.15) * (boost?.volumeMultiplier ?? 1)
+            volumeMultiplier: Math.min(1.35, 1 + (count - 1) * 0.15) * (boost?.volumeMultiplier ?? 1) * volumeMultiplier
         });
         this.audio.duck?.(heavy ? -9 : -7, { attackMs: 10, holdMs: 90, releaseMs: 500 });
     }
@@ -166,10 +166,10 @@ export class CombatSystem {
         if (hits > 0) this._playSawHit(hits, heavy);
     }
 
-    feedbackForHit(enemy, result, impact) {
+    feedbackForHit(enemy, result, impact, { soundVolumeMultiplier = 1 } = {}) {
         const info = this._hitInfo(enemy, result, impact);
         this._hitFeedback(enemy, info);
-        this._playSawHit(1, info.poiseBroken);
+        this._playSawHit(1, info.poiseBroken, soundVolumeMultiplier);
         return info;
     }
 

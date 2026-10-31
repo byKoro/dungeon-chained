@@ -152,6 +152,7 @@ export class LightingRenderer {
     }
 
     _renderDroppedBladeLight(chain) {
+        if (chain.weapon?.tackleFeedback?.lit) return;
         const dropLight = chain.getDroppedLight?.();
         if (!dropLight) return;
         const s = this.renderer.worldToScreen(dropLight.x, dropLight.y);
