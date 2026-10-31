@@ -12,24 +12,36 @@ const makeCard = (device = "keyboard") => {
     return { card, tick: ms => { clock += ms; }, at: () => clock };
 };
 
-// Começa inativa; show() ativa e escolhe o botão do dispositivo.
+// Começa inativa; show() ativa; o botão segue o dispositivo de cada jogador.
 {
     const { card } = makeCard("keyboard");
     ok(!card.active, 'inativa no começo');
-    card.show("ability.dash", 0);
-    ok(card.active && card.btn === "Espaço", 'P1 teclado: Espaço');
-    card.show("ability.dash", 1);
-    ok(card.btn === "Enter", 'P2 teclado: Enter');
+    card.show("ability.dash");
+    const items = card.prompts();
+    ok(card.active && items.length === 2, 'teclado: um botão por jogador (teclas diferentes)');
+    ok(items[0].player === 0 && items[0].prompt.icon === "key" && items[0].prompt.label === "ESPAÇO", 'P1 teclado: tecla ESPAÇO');
+    ok(items[1].player === 1 && items[1].prompt.label === "ENTER", 'P2 teclado: tecla ENTER');
 }
 {
     const { card } = makeCard("xbox");
-    card.show("ability.dash", 0);
-    ok(card.btn === "A", 'Xbox: A');
+    card.show("ability.dash");
+    const items = card.prompts();
+    ok(items.length === 1 && items[0].player === null && items[0].prompt.icon === "xboxA", 'dois no Xbox: um só A, sem etiqueta');
 }
 {
     const { card } = makeCard("playstation");
-    card.show("ability.dash", 0);
-    ok(card.btn === "X", 'DualShock: X (glifo suportado pela fonte)');
+    card.show("ability.dash");
+    ok(card.prompts()[0].prompt.icon === "psCross", 'DualShock: ✕');
+}
+{
+    let clock = 0;
+    const devices = ["xbox", "keyboard"];
+    const card = new AbilityCard({ getDevice: i => devices[i], now: () => clock });
+    card.show("ability.dash");
+    const items = card.prompts();
+    ok(items.length === 2 && items[0].prompt.icon === "xboxA" && items[1].prompt.label === "ENTER", 'misto: A do P1 e ENTER do P2');
+    devices[1] = "playstation";
+    ok(card.prompts()[1].prompt.icon === "psCross", 'troca o ícone ao vivo quando o jogador muda de controle');
 }
 
 // Some sozinha depois de ~4s + fade.
@@ -37,7 +49,7 @@ const makeCard = (device = "keyboard") => {
     const { card, tick } = makeCard();
     card.show("ability.dash", 0);
     tick(120); assert.ok(card._alpha() > 0.9, 'visível logo após abrir');
-    tick(4000);           // passa o holdMs
+    tick(10000);          // passa o hold (o card de vídeo fica mais tempo na tela)
     card._alpha();        // marca dismissedAt
     tick(300);            // passa o fade
     ok(card._alpha() === 0 && !card.active, 'auto-some após hold + fade');

@@ -157,6 +157,7 @@ export class ActionArena {
             expression: null, _exprBase: null, _exprTimer: 0,
             hurtTimer: 0, scaredTimer: 0, invulnerableTimer: 0,
             walkFrame: 0, facingLeft: false, _faceLock: false,
+            airDrag: 0.99,
             dashT: 0, dashing: false, dashSpeed: 0, dashDirX: 1, dashDirY: 0, dashAng: 0, dashTurn: 0, dashSteps: 0, dashFreeze: 0,
             _dashFlashT: 0, _landT: 0
         });
@@ -510,7 +511,8 @@ export class ActionArena {
         const b = this.bounds;
         if (p.airborne) {
             p.x += p.vx; p.y += p.vy;
-            p.vx *= 0.99; p.vy *= 0.99;
+            const drag = p.airDrag ?? 0.99;
+            p.vx *= drag; p.vy *= drag;
             p.tiltKick = 0.55 * Math.sign(p.vx || 1);
             let side = null;
             if (p.x < b.minX + 10) { p.x = b.minX + 10; side = 'W'; }

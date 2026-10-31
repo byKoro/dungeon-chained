@@ -1,6 +1,7 @@
 import { TINY_RPG_ENEMIES } from '../config/TinyRpgEnemies.js';
 import { SCRAP } from '../config/ScrapConfig.js';
 import { INTERACT_PROMPT } from '../config/InteractPromptConfig.js';
+import { BUTTON_PROMPT } from '../config/ButtonPromptConfig.js';
 
 export const PLAYER_EXPRESSIONS = [
     'neutro', 'assustado', 'espantado', 'raiva', 'furia', 'preocupado',
@@ -53,6 +54,7 @@ export class AssetLoader {
             this.load(key, `assets/bars/${file}.png`);
         }
         this.load("interactPrompt", INTERACT_PROMPT.sheet);
+        this.load("buttonPrompts", BUTTON_PROMPT.sheet);
         this.load("boots", "assets/boots/boots.png");
         this.load("saw", "assets/saw/saw.png");
 

@@ -71,3 +71,20 @@ da dupla; jogadores usam dash de verdade (`ActionArena.dash`) e acertam 7 vezes;
 - Corrigido no caminho: um replace pelo PowerShell estragou os acentos do arquivo (lido como
   ANSI); revertido convertendo de volta e reescrito em UTF-8 com LF.
 - Não conferido: retrato, áudio e ritmo em tempo real.
+
+## 4ª iteração (mais frenesi, serra cortando de verdade, movimento natural, separação)
+- Serra parada em cima do boss: a causa principal eram os giros em volta dele (o meio do cabo
+  fica no centro do giro). Removidos. Cada corte agora "morde": no instante em que o disco
+  entra no corpo, a dupla trava 5 passos (`dashFreeze`) com chuva de faísca, lava, pedaços de
+  pedra, flash branco, achatamento do boss e tranco forte de câmera; depois o dash termina e o
+  disco sai pelo outro lado. Medido no Electron, passo a passo: maior sequência com o disco
+  dentro do corpo fora de uma mordida = 8 passos (0,13 s), que é o disco saindo em movimento.
+- Jogadores atacados: o soco acerta o vermelho e depois o azul e os arremessa (`fly`); o
+  salto cai entre eles, o cabo arrebenta e cada um voa para um lado; um soco é desviado com dash.
+- Separação: sem cabo, distância chega a ~400; a serra sai deslizando, eles correm até ela por
+  lados opostos e religam (`A.reconnect`).
+- Menos robótico: dash em arco e com freio (`ActionArena.dash(..., { curve })`), um sai alguns
+  passos depois do outro (`_later`), espera com passinhos e pulinhos aleatórios em ritmos diferentes.
+- Electron: `reachedEnd true`, 0 erros; 7 mordidas capturadas (`BITE-*.png`). `npm test` 61/63.
+- Não conferido: retrato, áudio, ritmo em tempo real. O anel azul da reconexão é o visual
+  padrão de `A.reconnect()` (também usado no SnapShot); não foi alterado.

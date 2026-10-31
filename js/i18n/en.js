@@ -3,7 +3,6 @@ export const EN = Object.freeze({
     "talk.start.2": "Something is shining over there, to the right.",
     "talk.chest1": "Coins! Must be good for something.",
     "talk.anvilNear": "An anvil... [E] to use it.",
-    "talk.sawReady": "Together, close to the saw!",
     "talk.connected.1": "Too far and the cable snaps.",
     "talk.connected.2": "If it snaps, [hold E] to drag it.",
     "talk.rope1": "There are still ropes holding that up...",
@@ -41,5 +40,9 @@ export const EN = Object.freeze({
     "forge.empty": "Nothing to forge here.",
     "drag.prompt": "Saw: hold E / Right Shift / pad X to drag",
     "ability.dash.title": "DASH",
-    "ability.dash.body": "{btn} to dash",
+    "ability.dash.body": "Quick burst that clears holes",
+    "key.space": "SPACE",
+    "key.enter": "ENTER",
+    "key.e": "E",
+    "key.shift": "SHIFT",
 });

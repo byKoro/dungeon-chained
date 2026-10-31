@@ -1,4 +1,5 @@
-import { RushShot, dressRoom, handheld } from '../../kit/rushKit.js';
+import { RushShot, dressRoom } from '../../kit/rushKit.js';
+import { ActionQueue, ShotCamera, knock, hold, stepHold } from '../../kit/fightKit.js';
 import { lerp, clamp01, easeOut, easeInOut } from '../../anim.js';
 import { SawIris } from '../../fx/SawIris.js';
 import { FxParticles } from '../../fx/FxParticles.js';
@@ -73,6 +74,8 @@ export class ArautoBossShot extends RushShot {
         this.fx = new FxParticles(boom, { pixel: BS });
         this.fxScreen = new FxParticles(null, { pixel: 8 });
         this.bossImg = stage.assets.get(SP.key) || stage.assets.load(SP.key, SP.src);
+        this.cam = new ShotCamera(stage);
+        this.queue = new ActionQueue();
         this._white = new Map();
         this.leapLT = -1;
     }
@@ -126,14 +129,17 @@ export class ArautoBossShot extends RushShot {
         this._fired = new Set();
         this._embAcc = 0;
         this._armed = null;
-        this._kick = null;
-        this._dutch = 1;
+        this.cam.reset();
+        this.queue.clear();
         this.mode = 'calm';
         this.blasts = [];
         this._shot = { type: 'intro', t0: 0 };
 
         this._launchIn = 0;
         this._trail = [];
+
+        this._bite = null;
+        this._sawSlide = null;
         A.freeSaw = null;
         A.connected = true;
         A.sawVisible = true;
@@ -176,25 +182,33 @@ export class ArautoBossShot extends RushShot {
         // Timeline (tempo da arena: a câmera lenta estica tudo junto).
         this.events = [
             [0.00, () => this._enter(A)],
-            [1.00, () => this._roar(A)],
-            [1.60, () => this._approach(A, -330, 10)],
-            [2.30, () => this._pincer(A, 1)],
-            [2.90, () => this._swing(A, null)],
-            [3.22, () => this._split(A)],
-            [3.75, () => this._pincer(A, 2)],
-            [4.20, () => this._pincer(A, 3, { steps: 16 })],
-            [4.75, () => this._leapAtPlayers(A)],
-            [5.35, () => this._scatter(A)],
-            [6.25, () => this._sweep(A, 4, 1.6)],
-            [6.65, () => this._sweep(A, 5, 1.6)],
-            [6.95, () => this._approach(A, -300, 14)],
-            [7.30, () => this._swing(A, A.p2)],
-            [8.00, () => this._approach(A, -300, 12)],
-            [8.35, () => this._pincer(A, 6)],
-            [8.85, () => this._stagger(A)],
-            [8.90, () => this._approach(A, -380, 10)],
-            [9.40, () => this._dropSaw(A)],
-            [10.05, () => this._tackle(A)]
+            [0.95, () => this._roar(A)],
+            [1.45, () => this._approach(A, -330, 11)],
+            [1.85, () => this._pincer(A, 1)],
+            [2.35, () => this._swing(A, null)],
+            [2.65, () => this._split(A)],
+            [3.05, () => this._pincer(A, 2)],
+            [3.45, () => this._pincer(A, 3, { steps: 14, lag: 2, curve: 0.5 })],
+            // O boss acerta o vermelho em cheio.
+            [3.85, () => this._swing(A, A.p1)],
+            [4.55, () => this._approach(A, -300, 13)],
+            [4.85, () => this._pincer(A, 4)],
+            // Salto entre os dois: o cabo arrebenta e eles se separam.
+            [5.30, () => this._leapAtPlayers(A, { separate: true })],
+            [6.55, () => this._soloHold(A)],
+            [6.75, () => this._swing(A, A.p2, { dodge: true })],
+            [7.45, () => this._regroup(A)],
+            [8.05, () => this._approach(A, -300, 12)],
+            [8.35, () => this._pincer(A, 5)],
+            [8.75, () => this._pincer(A, 6, { lag: 4, curve: 0.5 })],
+            // Agora é o azul que leva o soco.
+            [9.15, () => this._swing(A, A.p2)],
+            [9.85, () => this._approach(A, -300, 13)],
+            [10.15, () => this._pincer(A, 7, { steps: 14 })],
+            [10.60, () => this._stagger(A)],
+            [10.65, () => this._approach(A, -380, 10)],
+            [11.10, () => this._dropSaw(A)],
+            [11.75, () => this._tackle(A)]
         ];
 
         A.snapCamera(X0 + 260, BY - 90, 1.05 * A.zoomRef, 0.04);
@@ -202,6 +216,10 @@ export class ArautoBossShot extends RushShot {
     }
 
     get dist() { return this.stage.portrait ? 0.6 : 1; }
+    // O plano atual mora na câmera do kit.
+    get _shot() { return this.cam.shot; }
+    set _shot(v) { this.cam.shot = v; }
+    get _dutch() { return this.cam.dutch; }
     _bossC(dy = -BOSS_H * 0.5) { const B = this.B; return { x: B.x, y: B.y + dy + B.jumpY }; }
     _clampPt(A, x, y) {
         const b = A.bounds;
@@ -228,33 +246,45 @@ export class ArautoBossShot extends RushShot {
         this.stage.audio?.duck(-6, 0.4, 0.8);
     }
 
-    _startLeap(A, to, { entrance = false } = {}) {
+    _startLeap(A, to, { entrance = false, separate = false } = {}) {
         const B = this.B;
         B.leap = {
             x0: B.x, y0: B.y, x1: to.x, y1: clamp(to.y, FEET_MIN, FEET_MAX),
             crouch: entrance ? 0 : 0.3, air: entrance ? 0.62 : 0.6, h: entrance ? 300 : 340,
-            entrance, launched: false, landed: false
+            entrance, separate, launched: false, landed: false
         };
         B.act = 'leap'; B.actT = A.t;
         B.faceLeft = B.leap.x1 < B.leap.x0;
     }
 
     // O salto mira o meio da dupla: a queda os obriga a se separar.
-    _leapAtPlayers(A) {
-        const m = A.mid;
-        this._startLeap(A, { x: m.x, y: m.y + 60 });
+    _leapAtPlayers(A, { separate = false } = {}) {
+        // Mira onde a dupla vai estar (os pontos de espera), não onde está agora no meio do dash.
+        const h1 = A.p1._hold ?? A.p1, h2 = A.p2._hold ?? A.p2;
+        const m = { x: (h1.x + h2.x) / 2, y: (h1.y + h2.y) / 2 };
+        this._startLeap(A, { x: m.x, y: m.y + 60 }, { separate });
         this._shot = { type: 'leap', t0: A.t };
         A.both(p => A.exprFor(p, 'espantado', 0.6));
     }
 
     // Golpe corpo a corpo: passo à frente, pose de espera, pancada. Com `target`, acerta esse jogador.
-    _swing(A, target) {
+    // `dodge`: o alvo desvia com um dash no último instante em vez de levar o soco.
+    _swing(A, target, { dodge = false } = {}) {
         const B = this.B;
         const tp = target ?? A.mid;
         const face = Math.sign(tp.x - B.x) || 1;
         B.faceLeft = face < 0;
         B.act = 'swing'; B.actT = A.t;
-        B.swing = { face, x0: B.x, tx: B.x + face * SWING.step, target, hit: false, stepped: false };
+        B.swing = { face, x0: B.x, tx: B.x + face * SWING.step, target: dodge ? null : target, hit: false, stepped: false };
+        if (dodge && target) {
+            const wait = Math.round((SWING.windup + SWING.hold) * 60) - 6;
+            this._later(wait, () => {
+                const q = this._clampPt(A, target.x + face * 170, target.y + (target.y < B.y - 60 ? -60 : 60));
+                A.dash(target, q.x, q.y, { steps: 11, maxSpeed: 34, curve: 0.5 * face });
+                this._hold(target, q.x, q.y, 9);
+                A.exprFor(target, 'espantado', 0.5);
+            });
+        }
         this._shot = { type: 'swing', t0: A.t, until: A.t + SWING.windup + SWING.hold + 0.25 };
         A.sfx('roar', B.x, B.y, { vol: 0.35, rate: 1.3, cool: 0 });
         if (target) A.exprFor(target, 'espantado', 0.6);
@@ -272,7 +302,7 @@ export class ArautoBossShot extends RushShot {
 
     // --- jogadores: aproximar, desviar, dash de corte ---
 
-    _hold(p, x, y, max = 7) { p._hold = { x, y }; p._holdMax = max; }
+    _hold(p, x, y, max = 7) { hold(p, x, y, max); }
 
     // Posiciona a dupla num lado do boss (dx < 0: lado onde já estão; dx > 0: lado oposto).
     _approach(A, dx, max) {
@@ -292,65 +322,107 @@ export class ArautoBossShot extends RushShot {
     }
 
     // Os dois atravessam o boss lado a lado; o disco no meio do cabo passa pela cintura dele.
-    _pincer(A, n, { steps = 18 } = {}) {
+    // Um sai alguns passos depois do outro e o trajeto faz um arco, para não parecer trilho.
+    _pincer(A, n, { steps = 16, curve = 0.35, lag = 3 } = {}) {
         const B = this.B;
         const side = Math.sign(A.mid.x - B.x) || -1;
         const ex = B.x - side * 300 * this.dist;
         const [up, dn] = this._byLane(A);
+        const lead = n % 2 ? up : dn;
+        const bend = (n % 2 ? 1 : -1) * curve * side;
         for (const [p, lane] of [[up, LANE_UP], [dn, LANE_DN]]) {
-            const q = this._clampPt(A, ex, B.y + lane);
-            A.dash(p, q.x, q.y, { steps, maxSpeed: 40 });
-            this._hold(p, q.x, q.y);
+            const q = this._clampPt(A, ex + rnd(-30, 30), B.y + lane + rnd(-15, 15));
+            const go = () => { A.dash(p, q.x, q.y, { steps, maxSpeed: 44, curve: bend }); this._hold(p, q.x, q.y); };
+            if (p === lead || !lag) go(); else this._later(lag, go);
+            A.hop(p, 3);
         }
-        this._arm(n, steps);
-        this._cutShot(A, steps);
-    }
-
-    // Os dois giram em volta do boss: o cabo varre o corpo dele.
-    _sweep(A, n, ang, { steps = 14 } = {}) {
-        const B = this.B;
-        const C = { x: B.x, y: B.y - 60 };
-        for (const p of [A.p1, A.p2]) {
-            const dx = p.x - C.x, dy = p.y - C.y;
-            const a = Math.atan2(dy, dx) + ang;
-            const q = this._clampPt(A, C.x + Math.cos(a) * 120, C.y + Math.sin(a) * 110);
-            A.dash(p, q.x, q.y, { steps, maxSpeed: 36 });
-            this._hold(p, q.x, q.y);
-        }
-        this._arm(n, steps);
-        this._cutShot(A, steps);
+        this._arm(n, steps + lag);
+        this._cutShot(A, steps + lag);
     }
 
     // Plano de corte: a câmera persegue o disco até o acerto.
     _cutShot(A, steps) {
         if (this._shot.type === 'final') return;
-        this._shot = { type: 'cut', t0: A.t, until: A.t + steps * STEP + 0.35 };
+        this._shot = { type: 'cut', t0: A.t, until: A.t + steps * STEP + 0.4 };
     }
 
-    // Desvio do golpe: cada um dá dash para um lado, para trás.
+    // Desvio do golpe: cada um dá dash para um lado, em arco, para trás.
     _split(A) {
         const B = this.B;
         const side = Math.sign(A.mid.x - B.x) || 1;
         const x = A.mid.x + side * 110;
         const [up, dn] = this._byLane(A);
-        for (const [p, y] of [[up, B.y - 190], [dn, B.y + 70]]) {
+        for (const [p, y, c, lag] of [[up, B.y - 190, 0.5, 0], [dn, B.y + 70, -0.5, 4]]) {
             const q = this._clampPt(A, x, y);
-            A.dash(p, q.x, q.y, { steps: 13, maxSpeed: 30 });
-            this._hold(p, q.x, q.y);
+            const go = () => { A.dash(p, q.x, q.y, { steps: 12, maxSpeed: 32, curve: c * side }); this._hold(p, q.x, q.y); };
+            if (lag) this._later(lag, go); else go();
             A.exprFor(p, 'espantado', 0.4);
         }
     }
 
-    // Antes do salto cair: cada um foge para um lado do ponto de queda.
-    _scatter(A) {
-        const L = this.B.leap;
+    // Separação: o salto cai entre os dois, o cabo arrebenta e cada um é jogado para um lado;
+    // a serra sai deslizando pelo chão.
+    _separate(A) {
+        const B = this.B;
+        A.snap();
+        A.minSpin = 0;
+        const side = Math.sign(A.mid.x - B.x) || -1;
+        this._sawSlide = { vx: side * 22, vy: rnd(-2, 2) };
         const [up, dn] = this._byLane(A);
-        for (const [p, dx, dy] of [[up, -95, -150], [dn, 95, 60]]) {
-            const q = this._clampPt(A, L.x1 + dx, L.y1 + dy);
-            A.dash(p, q.x, q.y, { steps: 12, maxSpeed: 34 });
-            this._hold(p, q.x, q.y);
-            A.exprFor(p, 'assustado', 0.5);
+        for (const [p, ny] of [[up, -1], [dn, 1]]) {
+            this._knock(A, p, side * 0.35, ny, 15, 8, { fly: true });
+            A.expr(p, 'espantado');
         }
+        this._shot = { type: 'split', t0: A.t };
+        this.stage.audio?.mood(-6, 6000, 0.3);
+    }
+
+    _stepSawSlide(A) {
+        const s = this._sawSlide;
+        if (!s || A.connected) return;
+        const b = A.bounds, saw = A.saw;
+        saw.dropX = clamp(saw.dropX + s.vx, b.minX + 40, b.maxX - 40);
+        saw.dropY = clamp(saw.dropY + s.vy, b.minY + 40, b.maxY - 40);
+        s.vx *= 0.9; s.vy *= 0.9;
+        if (Math.abs(s.vx) > 1) A.particles.triggerSparks(saw.dropX, saw.dropY + 12, saw.discRadius * 0.5, -1, 1);
+        if (Math.hypot(s.vx, s.vy) < 0.2) this._sawSlide = null;
+    }
+
+    // Sozinhos: cada um se vira enquanto o boss ataca um deles.
+    _soloHold(A) {
+        const B = this.B, s = { x: A.saw.dropX, y: A.saw.dropY };
+        const [up, dn] = this._byLane(A);
+        for (const [p, y] of [[up, B.y - 230], [dn, B.y + 90]]) {
+            const q = this._clampPt(A, lerp(p.x, s.x, 0.3), y);
+            this._hold(p, q.x, q.y, 9);
+        }
+    }
+
+    // Os dois correm até a serra por lados opostos e religam o cabo em cima dela.
+    _regroup(A) {
+        const s = { x: A.saw.dropX, y: A.saw.dropY };
+        const [up, dn] = this._byLane(A);
+        for (const [p, dy, lag] of [[up, -60, 0], [dn, 60, 3]]) {
+            const go = () => {
+                A.dash(p, s.x + rnd(-10, 10), s.y + dy, { steps: 12, maxSpeed: 40, curve: dy > 0 ? 0.6 : -0.6 });
+                this._hold(p, s.x, s.y + dy, 9);
+            };
+            if (lag) this._later(lag, go); else go();
+            A.expr(p, 'furia');
+        }
+        this._shot = { type: 'regroup', t0: A.t };
+        this._later(16, () => this._reconnect(A));
+    }
+
+    _reconnect(A) {
+        this._sawSlide = null;
+        A.reconnect();
+        A.minSpin = 0.9;
+        A.slowmo(0.22, 0.3);
+        A.impactFlash = Math.max(A.impactFlash, 0.5);
+        A.both(p => { A.hop(p, 5); A.expr(p, 'furia'); });
+        this.stage.audio?.mood(0, 20000, 0.2);
+        this._shot = { type: 'fight', t0: A.t };
     }
 
     // --- golpe final: soltam a serra, dão dash nela e ela voa até o boss ---
@@ -434,11 +506,27 @@ export class ArautoBossShot extends RushShot {
         }
     }
 
-    // O acerto sai na metade do dash, quando o disco cruza o corpo do boss.
+    // Corte armado: o acerto sai quando o disco entra no corpo (ou, se a corda desviar, no fim do dash).
     _arm(n, steps) {
-        this._armed = { left: Math.max(1, Math.floor(steps / 2)), n };
+        this._armed = { n, left: steps + 10 };
     }
 
+    _discInBody(sp) {
+        const B = this.B;
+        return Math.abs(sp.x - B.x) < BODY_HALF * 0.75 && sp.y > B.y - BOSS_H * 0.8 && sp.y < B.y + 8;
+    }
+
+    _stepArmed(A) {
+        const a = this._armed;
+        if (!a) return;
+        const sp = A.sawPos;
+        if (!(A.connected && this._discInBody(sp)) && --a.left > 0) return;
+        this._armed = null;
+        this._bossHit(A, a.n);
+    }
+
+    // A mordida: a dupla trava alguns passos com o disco dentro do boss, que jorra faísca e pedra,
+    // e depois termina o dash, levando o disco para fora pelo outro lado.
     _bossHit(A, n) {
         const B = this.B, sp = A.sawPos;
         const pt = {
@@ -446,47 +534,76 @@ export class ArautoBossShot extends RushShot {
             y: clamp(sp.y, B.y - BOSS_H * 0.75, B.y - 30)
         };
         const dir = Math.sign(A.p1.dashDirX + A.p2.dashDirX) || 1;
+        const freeze = n >= 8 ? 0 : 5;
+        for (const p of [A.p1, A.p2]) if (p.dashing) p.dashFreeze = freeze;
+        this._bite = { left: freeze, dir, n };
         B.hitFlash = 1;
-        B.jx = dir * 16;
+        B.sq = 0.16;
+        B.jx = dir * 22;
         A.saw.onHit?.({ blood: false });
-        A.particles.triggerSparkBurst(pt.x, pt.y, 16, 12 + n * 2, 2);
-        A.particles.triggerLavaDebris?.(pt.x, pt.y, 8 + n, { dirX: dir, dirY: -0.4, groundY: B.y });
-        A.particles.triggerFlameBurst(pt.x, pt.y, EMBER_COLOR, { amount: 6, rise: 40, width: 50 });
-        A.sfx('sawHit', pt.x, pt.y, { vol: 0.95, rate: 1 - 0.03 * n, cool: 0 });
-        A.sfx('crack', pt.x, pt.y, { vol: 0.6, rate: 1.25, cool: 0 });
-        A.renderer.triggerShake(14 + 3 * n);
-        A.renderer.triggerZoomPunch(0.05 + 0.01 * n);
-        A.impactFlash = Math.max(A.impactFlash, 0.3);
-        this._kick = { x: pt.x, y: pt.y, t: A.t, s: this._dutch };
-        this._dutch = -this._dutch;
-        this.stage.audio?.excite(0.4);
+        A.saw.spin = 1;
+        A.particles.triggerSparkBurst(pt.x, pt.y, 18, 26 + n * 2, 2.6);
+        A.particles.triggerLavaDebris?.(pt.x, pt.y, 12 + n, { dirX: dir, dirY: -0.5, groundY: B.y });
+        A.particles.triggerFlameBurst(pt.x, pt.y, EMBER_COLOR, { amount: 10, rise: 50, width: 60 });
+        A.particles.triggerFlash?.(pt.x, pt.y, 18, 1.4);
+        for (let i = 0; i < 14; i++) {
+            const a = (dir > 0 ? 0 : Math.PI) + rnd(-1.2, 1.2), s = rnd(5, 14);
+            this.fx.ember(pt.x, pt.y, Math.cos(a) * s, Math.sin(a) * s - 2, { size: rnd(3, 7), life: rnd(0.3, 0.7), float: false, drag: 0.92 });
+        }
+        for (let i = 0; i < 3; i++) {
+            const a = (dir > 0 ? 0 : Math.PI) + rnd(-0.9, 0.9) - 0.5, s = rnd(6, 11);
+            this.fx.chunk(pt.x, pt.y, Math.cos(a) * s, Math.sin(a) * s, A.renderer.tileset, DEBRIS[(Math.random() * DEBRIS.length) | 0], { size: rnd(16, 26), life: rnd(0.8, 1.2) });
+        }
+        A.killFlashes.push({ x: pt.x, y: pt.y, life: 1, scale: 2.2 });
+        A.sfx('sawHit', pt.x, pt.y, { vol: 1, rate: 1 - 0.03 * n, cool: 0 });
+        A.sfx('crack', pt.x, pt.y, { vol: 0.7, rate: 1.2, cool: 0 });
+        A.sfx('impact', pt.x, pt.y, { vol: 0.45, rate: 1.4, cool: 0 });
+        A.renderer.triggerShake(24 + 3 * n);
+        A.renderer.triggerZoomPunch(0.08 + 0.01 * n);
+        A.impactFlash = Math.max(A.impactFlash, 0.45);
+        A.red = Math.min(1, A.red + 0.15);
+        this.cam.kick(pt.x, pt.y, A.t, true);
+        this.stage.audio?.excite(0.5);
         A.both(p => A.exprFor(p, n % 2 ? 'furia' : 'raiva', 0.4));
-        A.slowmo(0.14 + 0.02 * n, 0.22);
+        if (n < 8) A.slowmo(0.1, 0.35);
     }
 
-    // Contato contínuo: sempre que o disco do cabo está dentro do corpo, ele raspa e solta faísca.
+    // Durante a mordida o disco segue girando dentro dele: chuva de faísca a cada passo.
+    _stepBite(A) {
+        const b = this._bite;
+        if (!b || b.left <= 0) return;
+        b.left--;
+        const sp = A.sawPos, B = this.B;
+        B.jx = b.dir * 10 + rnd(-6, 6);
+        B.hitFlash = Math.max(B.hitFlash, 0.7);
+        A.particles.triggerSparks(sp.x, sp.y, A.saw.discRadius, A.saw.spinDir, 8);
+        A.particles.triggerLavaDebris?.(sp.x, sp.y, 2, { dirX: -b.dir, dirY: -0.6, groundY: B.y });
+        this.fx.ember(sp.x, sp.y, -b.dir * rnd(4, 12), rnd(-8, -2), { size: rnd(3, 6), life: rnd(0.3, 0.6), float: false, drag: 0.93 });
+        A.renderer.triggerShake(10);
+        A.sfx('sawHit', sp.x, sp.y, { vol: 0.5, rate: 1.3, cool: 0.03 });
+    }
+
+    // Seguro: se o disco do cabo ficar parado dentro do corpo fora de um corte, ele raspa.
     _stepGrind(A, t) {
         const B = this.B;
-        if (!A.connected || this._armed || !B.visible || B.jumpY < -40 || this.mode !== 'fight') return;
+        if (!A.connected || this._armed || this._bite?.left > 0 || !B.visible || B.jumpY < -40 || this.mode !== 'fight') return;
         const sp = A.sawPos;
-        const inside = Math.abs(sp.x - B.x) < BODY_HALF * 0.85 && sp.y > B.y - BOSS_H * 0.8 && sp.y < B.y + 10;
-        if (!inside || ((t * 60) | 0) % 4 !== 0) return;
-        B.hitFlash = Math.max(B.hitFlash, 0.4);
-        B.jx = rnd(-1, 1) * 5;
-        A.particles.triggerSparkBurst(sp.x, sp.y, 10, 5, 1.4);
+        if (!this._discInBody(sp)) return;
+        // Empurra os pontos de espera para fora do boss até o disco sair do corpo.
+        const out = Math.sign(A.mid.x - B.x) || 1;
+        for (const p of [A.p1, A.p2]) if (p._hold) p._hold.x += out * 9;
+        if (((t * 60) | 0) % 3 !== 0) return;
+        B.hitFlash = Math.max(B.hitFlash, 0.5);
+        B.jx = rnd(-1, 1) * 6;
+        A.particles.triggerSparks(sp.x, sp.y, A.saw.discRadius, A.saw.spinDir, 6);
         A.particles.triggerLavaDebris?.(sp.x, sp.y, 1, { groundY: B.y });
-        A.renderer.triggerShake(4);
+        A.renderer.triggerShake(5);
         A.sfx('sawHit', sp.x, sp.y, { vol: 0.4, rate: 1.2, cool: 0.08 });
     }
 
-    _knock(A, p, nx, ny, speed, hurt = 8) {
-        A.swerve(p, nx * speed, ny * speed, 0.28);
-        p.goal = null;
-        p._hold = null;
-        p._knockT = 0.32;
-        p.hurtTimer = hurt;
-        A.hop(p, 3 + speed * 0.5);
-    }
+    _knock(A, p, nx, ny, speed, hurt = 8, opts) { knock(A, p, nx, ny, speed, hurt, opts); }
+    _later(steps, fn) { this.queue.later(steps, fn); }
+    _stepQueue() { this.queue.step(); }
 
     // --- loop ---
 
@@ -495,13 +612,12 @@ export class ArautoBossShot extends RushShot {
             if (t >= at && !this._fired.has(i)) { this._fired.add(i); fn(); }
         });
         this.fx.update(1);
+        this._stepQueue();
         this._stepHold(A, t);
         this._stepBoss(A, t);
-        if (this._armed && --this._armed.left <= 0) {
-            const { n } = this._armed;
-            this._armed = null;
-            this._bossHit(A, n);
-        }
+        this._stepArmed(A);
+        this._stepBite(A);
+        this._stepSawSlide(A);
         if (this._launchIn > 0 && --this._launchIn === 0) this._launch(A);
         this._stepLaunch(A);
         this._stepGrind(A, t);
@@ -520,27 +636,14 @@ export class ArautoBossShot extends RushShot {
         this._camera(A, t);
     }
 
-    // Entre os dashes cada jogador segura um ponto, balançando de leve e encarando o boss.
-    _stepHold(A, t) {
-        const B = this.B;
-        for (const p of [A.p1, A.p2]) {
-            if (p._knockT > 0) { p._knockT -= STEP; continue; }
-            if (p.dashing || p.airborne) continue;
-            if (!p._hold) p._hold = { x: p.x, y: p.y };
-            const ph = t * 2.6 + (p === A.p1 ? 0 : 2);
-            p.goal = {
-                follow: true, x: p._hold.x + Math.sin(ph) * 14, y: p._hold.y + Math.cos(ph * 1.3) * 9,
-                gain: 0.2, max: p._holdMax ?? 7
-            };
-            if (B.visible) p.faceX = B.x;
-        }
-    }
+    _stepHold(A, t) { stepHold(A, t, this.B.visible ? this.B.x : null); }
 
     _stepBoss(A, t) {
         const B = this.B;
         if (!B.visible) return;
         const u = t - B.actT;
         B.jx *= 0.75;
+        B.sq = (B.sq ?? 0) * 0.8;
         B.hitFlash = Math.max(0, B.hitFlash - STEP * 6);
 
         if (B.act === 'leap') this._stepLeap(A, u);
@@ -576,7 +679,9 @@ export class ArautoBossShot extends RushShot {
         const B = this.B, m = A.mid;
         const dx = m.x - B.x;
         B.faceLeft = dx < 0;
-        const moving = this.mode === 'fight' && Math.abs(dx) > 280;
+        // Para antes de entrar no cabo: andar para dentro dele deixaria a serra parada no corpo.
+        const near = A.connected && Math.abs(A.sawPos.x - B.x) < BODY_HALF + 140;
+        const moving = this.mode === 'fight' && Math.abs(dx) > 280 && !near;
         if (moving) B.x += Math.sign(dx) * 0.9;
         B.row = ANIM.walk.row;
         B.frame = moving ? Math.floor(t * 8) % ANIM.walk.frames : 0;
@@ -616,7 +721,7 @@ export class ArautoBossShot extends RushShot {
         if (!L.landed) {
             L.landed = true;
             B.x = L.x1; B.y = L.y1; B.jumpY = 0;
-            this._onSlam(A, L.entrance);
+            this._onSlam(A, L.entrance, L.separate);
         }
         const k = u - L.crouch - L.air;
         B.frame = Math.min(ANIM.attack2.frames - 1, ANIM.attack2.hitFrame + Math.floor(k / 0.1));
@@ -626,7 +731,7 @@ export class ArautoBossShot extends RushShot {
         }
     }
 
-    _onSlam(A, entrance) {
+    _onSlam(A, entrance, separate = false) {
         const B = this.B, au = this.stage.audio;
         A.renderer.triggerShake(entrance ? 42 : 38);
         A.renderer.triggerZoomPunch(0.1);
@@ -644,14 +749,15 @@ export class ArautoBossShot extends RushShot {
         A.sfx('boom', B.x, B.y, { vol: 0.6, rate: 0.55, cool: 0 });
         au?.duck(-12, 0.06, 0.55);
         au?.excite(1);
+        A.exprFor(A.p1, 'olhos_fechados', 0.25);
+        if (separate) { this._separate(A); return; }
         const range = entrance ? 700 : 460;
         for (const p of [A.p1, A.p2]) {
             const dx = p.x - B.x, dy = (p.y - B.y) * 1.6, d = Math.hypot(dx, dy) || 1;
             if (d > range) continue;
-            this._knock(A, p, dx / d, dy / d * 0.6, entrance ? 4 : 7, 6);
+            this._knock(A, p, dx / d, dy / d * 0.6, entrance ? 4 : 9, 6);
             A.expr(p, 'espantado');
         }
-        A.exprFor(A.p1, 'olhos_fechados', 0.25);
     }
 
     _stepSwing(A, u) {
@@ -692,13 +798,20 @@ export class ArautoBossShot extends RushShot {
             : [A.p1, A.p2].filter(p => Math.hypot(p.x - hc.x, p.y - hc.y) < SWING.radius && !p.dashing);
         for (const p of victims) {
             const dx = p.x - B.x, dy = p.y - B.y, d = Math.hypot(dx, dy) || 1;
-            this._knock(A, p, dx / d, dy / d * 0.5, 10, 30);
+            this._knock(A, p, S.face * 0.9 + dx / d * 0.1, dy / d * 0.5, 14, 10, { fly: true });
             A.exprFor(p, 'olhos_fechados', 0.3);
             A.expr(p, 'raiva');
-            A.renderer.triggerShake(24);
-            A.slowmo(0.2, 0.3);
+            A.renderer.triggerShake(30);
+            A.renderer.triggerZoomPunch(0.08);
+            A.impactFlash = Math.max(A.impactFlash, 0.5);
+            A.red = 1;
+            A.slowmo(0.22, 0.25);
+            A.particles.triggerDust(p.x, p.y + 10, S.face, 0, 14);
+            A.particles.triggerSparkBurst(p.x, p.y - 10, 10, 10, 1.6);
             A.sfx('thud', p.x, p.y, { vol: 1, rate: 1.1, cool: 0 });
-            this._shot = { type: 'player', t0: A.t, target: p, until: A.t + 0.45 };
+            A.sfx('impact', p.x, p.y, { vol: 0.7, rate: 1.2, cool: 0 });
+            this.cam.kick(p.x, p.y, A.t, true, -this.cam.dutch);
+            this._shot = { type: 'player', t0: A.t, target: p, until: A.t + 0.5 };
         }
         if (S.target) A.expr(S.target === A.p1 ? A.p2 : A.p1, 'furia');
     }
@@ -802,12 +915,9 @@ export class ArautoBossShot extends RushShot {
 
     _camera(A, t) {
         const B = this.B, m = A.mid, { p1, p2 } = A;
-        const h = handheld(t, 1.1);
-        const pz = this.stage.portrait ? 1.2 : 1;
         const bc = this._bossC();
         const head = { x: B.x, y: B.y - BOSS_H + B.jumpY }, feet = { x: B.x, y: B.y };
-        let sh = this._shot;
-        if (sh.until !== undefined && t > sh.until) sh = this._shot = { type: 'fight', t0: t };
+        const sh = this.cam.current(t);
 
         const face = B.faceLeft ? -1 : 1;
         const u = t - sh.t0;
@@ -828,7 +938,7 @@ export class ArautoBossShot extends RushShot {
             const k = easeOut(clamp01(u / 0.7));
             o = { x: head.x - face * 20, y: lerp(bc.y, head.y + BOSS_H * 0.25, k), zoom: lerp(1.6, 2.7, k), rot: -0.09 * k, k: 0.14 };
         } else if (sh.type === 'cut') {
-            // Persegue o disco até o boss; o tranco do acerto vem do `_kick`.
+            // Persegue o disco até o boss; o tranco do acerto vem do `cam.kick`.
             const sp = A.sawPos;
             o = { x: lerp(sp.x, chest.x, 0.45), y: lerp(sp.y, chest.y, 0.4), zoom: 1.85, rot: 0.1 * this._dutch, k: 0.2, fit: [p1, p2], pad: 50 };
         } else if (sh.type === 'swing') {
@@ -840,9 +950,18 @@ export class ArautoBossShot extends RushShot {
             const L = B.leap;
             const top = { x: B.x, y: B.y - BOSS_H + Math.max(B.jumpY, -180) };
             o = { x: lerp(m.x, L.x1, 0.5), y: lerp(m.y, top.y, 0.45), zoom: 1.2, rot: 0, k: 0.12, fit: [p1, p2, top, { x: L.x1, y: L.y1 }], pad: 70 };
+        } else if (sh.type === 'split') {
+            // Separados: abre para mostrar os dois jogados longe e a serra deslizando.
+            const s = { x: A.saw.dropX, y: A.saw.dropY };
+            const k = easeOut(clamp01(u / 0.4));
+            o = { x: lerp(bc.x, s.x, 0.3), y: lerp(bc.y, m.y, 0.5), zoom: lerp(1.9, 1.35, k), rot: 0.1 * (1 - k), k: 0.14, fit: [p1, p2, s, head], pad: 50 };
+        } else if (sh.type === 'regroup') {
+            const s = A.connected ? A.sawPos : { x: A.saw.dropX, y: A.saw.dropY };
+            o = { x: s.x, y: s.y - 20, zoom: 2.1, rot: -0.08, k: 0.18, fit: [p1, p2], pad: 40 };
         } else if (sh.type === 'player') {
+            // Jogador atingido: acompanha o voo dele com o boss ainda no quadro.
             const tp = sh.target;
-            o = { x: lerp(tp.x, bc.x, 0.2), y: tp.y - 30, zoom: 2.3, rot: 0.12 * this._dutch, k: 0.2 };
+            o = { x: lerp(tp.x, bc.x, 0.35), y: lerp(tp.y - 30, bc.y, 0.25), zoom: 1.95, rot: 0.12 * this._dutch, k: 0.22, fit: [tp, chest], pad: 60 };
         } else if (sh.type === 'final') {
             // Boss cambaleando: travelling lento de perto.
             const k = easeInOut(clamp01(u / 1.2));
@@ -869,16 +988,7 @@ export class ArautoBossShot extends RushShot {
                 fit: [p1, p2, head], pad: 40
             };
         }
-        const kk = this._kick && t - this._kick.t < 0.35 ? 1 - (t - this._kick.t) / 0.35 : 0;
-        if (kk > 0) {
-            o.x += (this._kick.x - o.x) * 0.3 * kk; o.y += (this._kick.y - o.y) * 0.3 * kk;
-            o.zoom += 0.45 * kk; o.rot += 0.08 * this._kick.s * kk;
-        }
-        if (this.stage.portrait && o.fit) {
-            const xs = o.fit.map(p => p.x);
-            o.x = lerp((Math.min(...xs) + Math.max(...xs)) / 2, o.x, 0.2);
-        }
-        A.focus({ ...o, x: o.x + h.x, y: o.y + h.y, zoom: o.zoom * pz, rot: o.rot + h.r });
+        this.cam.frame(A, t, o);
     }
 
     // Raios de rachadura: aparecem só quando ele está sendo destruído (golpe final e morte).
@@ -927,7 +1037,9 @@ export class ArautoBossShot extends RushShot {
         ctx.imageSmoothingEnabled = false;
         ctx.translate(Math.round(B.x + B.jx), Math.round(B.y + B.jumpY));
         if (B.faceLeft) ctx.scale(-1, 1);
-        ctx.scale(BS, BS);
+        // Achatamento no acerto (mantém o volume: alarga e baixa).
+        const sq = B.sq ?? 0;
+        ctx.scale(BS * (1 + sq), BS * (1 - sq));
         if (img === this.bossImg) ctx.drawImage(img, sx, sy, SP.cropW, SP.cropH, DX, DY, SP.cropW, SP.cropH);
         else ctx.drawImage(img, 0, 0, SP.cropW, SP.cropH, DX, DY, SP.cropW, SP.cropH);
         ctx.restore();

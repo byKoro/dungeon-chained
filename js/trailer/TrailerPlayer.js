@@ -1,7 +1,7 @@
 import { TrailerStage } from './TrailerStage.js';
 import { IntroScene } from './scenes/IntroScene.js';
 import { TitleBloodScene } from './scenes/TitleBloodScene.js';
-import { FrenzyScene } from './scenes/frenzy/FrenzyScene.js';
+import { FrenzyShot } from './scenes/frenzy/FrenzyShot.js';
 import { ZigZagShot } from './scenes/montage/ZigZagShot.js';
 import { SnapShot } from './scenes/montage/SnapShot.js';
 import { SplitShot } from './scenes/montage/SplitShot.js';
@@ -20,7 +20,7 @@ import { MenuPad } from '../core/MenuPad.js';
 const SCENE_MOOD = {
     IntroScene: [-26, 420, 1.5],
     TitleBloodScene: [-14, 1200, 0.2],
-    FrenzyScene: [-7, 4000, 0.8],
+    FrenzyShot: [-4, 9000, 0.5],
     ZigZagShot: [0, 20000, 0.15],
     SnapShot: [-1, 20000, 0.2],
     SplitShot: [-2, 14000, 0.3],
@@ -33,7 +33,7 @@ const SCENE_MOOD = {
 };
 
 const SCENES = [
-    IntroScene, TitleBloodScene, FrenzyScene, ZigZagShot, SnapShot, SplitShot, MapGenScene,
+    IntroScene, TitleBloodScene, FrenzyShot, ZigZagShot, SnapShot, SplitShot, MapGenScene,
     ArrowRunShot, HoleRunShot, ButtonDoorShot, GiantSawShot, ArautoBossShot
 ];
 
