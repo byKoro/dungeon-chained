@@ -52,6 +52,14 @@ export const CAGE = Object.freeze({
     })
 });
 
+// Corda com baú: mesma estaca e mesma queda do baú do encontro; o baú marcado com o id da corda cai no próprio tile
+// quando qualquer disco girando (preso, lançado ou solto por Inércia) passa pela estaca.
+export const ROPE_CHEST = Object.freeze({
+    ...CAGE,
+    chestGround: 26,
+    light: Object.freeze({ idleRadius: 70, nearRadius: 120, ropeAt: Object.freeze([0.3]), ropeRadius: 40 })
+});
+
 export const STAKE_LIGHT = Object.freeze({
     color: "255, 196, 120",
     flickerBase: 1, flickerSine: 0.06, flickerNoise: 0.02,
