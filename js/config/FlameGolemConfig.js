@@ -1,6 +1,6 @@
 export const FLAME_GOLEM = {
     name: 'Arauto das Brasas',
-    hp: 100,
+    hp: 80,
     speed: 0.8,
     // 5x a arte (39 px): escala inteira mantém os pixels nítidos (156 = 4x, igual ao cenário).
     // Colisão e alcances continuam separados abaixo.
@@ -17,14 +17,14 @@ export const FLAME_GOLEM = {
     deathTicksPerFrame: 12,
     // Valor provisório de balanceamento: ticks de invulnerabilidade entre dois acertos da serra.
     hitCooldownSteps: 5,
-    secondPhaseHp: 50,
+    secondPhaseHp: 30,
     phases: [
         { movementSpeedMultiplier: 1, animationSpeedMultiplier: 1, dashSpeedMultiplier: 1, dashCount: 1 },
-        { movementSpeedMultiplier: 1.35, animationSpeedMultiplier: 1.35, dashSpeedMultiplier: 1.6, dashCount: 2 }
+        { movementSpeedMultiplier: 1.35, animationSpeedMultiplier: 1.2, dashSpeedMultiplier: 1.2, dashCount: 2 }
     ],
     attacks: {
         attack: {
-            triggerRange: 110, range: 120, knockback: 16,
+            triggerRange: 110, range: 100, knockback: 16,
             windupTicks: 40, recoverTicks: 36, ticksPerFrame: 5, hitFrame: 6
         },
         attack2: {
@@ -58,7 +58,7 @@ export const FLAME_GOLEM = {
     },
     telegraph: {
         // Marcas no chão só para teste: o aviso final é a própria animação do ataque (pose de espera).
-        showMarks: false,
+        showMarks: true,
         // Fração do windup em que a animação avança até a pose de espera; depois ela fica parada nessa pose.
         rampRatio: 0.6,
         color: '#ffad57', secondaryColor: '#80534c', lineWidth: 3,

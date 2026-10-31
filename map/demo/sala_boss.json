@@ -1,0 +1,129 @@
+{
+  "format": "dungeon-chained-map",
+  "version": 1,
+  "name": "Dungeon Chained — Demo",
+  "grid": { "cols": 3, "rows": 1 },
+  "roomSize": { "cols": 14, "rows": 9 },
+  "start": "2,0",
+  "rooms": {
+    "1,0": {
+      "id": "sala_1_0",
+      "name": "sala_arauto",
+      "notes": "",
+      "cols": 14,
+      "rows": 9,
+      "tiles": [
+        [0, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1],
+        [20, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+        [30, -1, 8, 18, 18, 9, 29, 17, 27, 27, 26, 7, 8, -1],
+        [30, -1, 8, 27, 16, 8, 6, 29, 28, 18, 16, 7, 16, 16],
+        [10, -1, 8, 28, 19, 9, 8, 8, 6, 18, 7, 8, 16, 16],
+        [10, -1, 8, 16, 9, 28, 28, 19, 9, 27, 7, 7, 8, -1],
+        [20, -1, 18, 18, 6, 28, 29, 7, 19, 18, 17, 17, 18, -1],
+        [20, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+        [40, 43, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwww",
+        "whhhhhhhhhhhhh",
+        "whfffffffffffh",
+        "whffffffffffff",
+        "whffffffffffff",
+        "whfffffffffffh",
+        "whfffffffffffh",
+        "whhhhhhhhhhhhh",
+        "wwwwwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 13, "row": 3, "type": "normal", "width": 2, "id": "door_0" }
+      ],
+      "props": [
+        { "type": "flag", "col": 3, "row": 0 },
+        { "type": "flag", "col": 6, "row": 0 },
+        { "type": "flag", "col": 9, "row": 0 },
+        { "type": "flag", "col": 3, "row": 8 },
+        { "type": "flag", "col": 6, "row": 8 },
+        { "type": "flag", "col": 9, "row": 8 }
+      ],
+      "enemies": [
+        { "col": 8, "row": 3, "type": "flameGolem" }
+      ],
+      "hazards": [],
+      "torches": [
+        { "col": 11, "row": 0, "type": "torch", "side": "N" },
+        { "col": 8, "row": 0, "type": "torch", "side": "N" },
+        { "col": 5, "row": 0, "type": "torch", "side": "N" },
+        { "col": 2, "row": 0, "type": "torch", "side": "N" },
+        { "col": 2, "row": 8, "type": "torch", "side": "S" },
+        { "col": 5, "row": 8, "type": "torch", "side": "S" },
+        { "col": 8, "row": 8, "type": "torch", "side": "S" },
+        { "col": 11, "row": 8, "type": "torch", "side": "S" },
+        { "col": 12, "row": 2, "type": "candlestick_2", "side": "F" },
+        { "col": 12, "row": 5, "type": "candlestick_2", "side": "F" }
+      ],
+      "interactives": [],
+      "zones": [],
+      "encounters": [],
+      "bars": [],
+      "spawns": {
+        "p1": { "col": 12, "row": 3 },
+        "p2": { "col": 12, "row": 4 }
+      },
+      "lock": "none",
+      "type": "normal",
+      "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29]
+    },
+    "2,0": {
+      "id": "sala_2_0",
+      "name": "Sala 12",
+      "notes": "",
+      "cols": 14,
+      "rows": 9,
+      "tiles": [
+        [0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5],
+        [20, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 14, 25],
+        [20, 21, 9, 17, 8, 17, 6, 28, 6, 9, 6, 9, 24, 25],
+        [16, 16, 19, 6, 28, 16, 7, 27, 8, 16, 19, 29, 24, 25],
+        [16, 16, 17, 18, 27, 27, 26, 7, 19, 18, 17, 19, 24, 25],
+        [20, 21, 29, 17, 17, 19, 19, 26, 27, 6, 8, 17, 24, 25],
+        [20, 21, 7, 17, 9, 19, 26, 9, 8, 17, 26, 28, 24, 25],
+        [20, 31, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 34, 25],
+        [40, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 45]
+      ],
+      "kinds": [
+        "wwwwwwwwwwwwww",
+        "wffffffffffffw",
+        "wffffffffffffw",
+        "fffffffffffffw",
+        "fffffffffffffw",
+        "wffffffffffffw",
+        "wffffffffffffw",
+        "wffffffffffffw",
+        "wwwwwwwwwwwwww"
+      ],
+      "doors": [
+        { "col": 0, "row": 3, "type": "normal", "width": 2, "id": "door_0" }
+      ],
+      "props": [],
+      "enemies": [],
+      "hazards": [],
+      "torches": [],
+      "interactives": [],
+      "zones": [],
+      "encounters": [],
+      "bars": [],
+      "spawns": null,
+      "lock": "none",
+      "type": "normal",
+      "floorPool": [16, 6, 7, 8, 9, 17, 18, 19, 26, 27, 28, 29]
+    }
+  },
+  "connections": [
+    {
+      "from": { "room": "2,0", "door": "door_0" },
+      "to": { "room": "1,0", "door": "door_0" },
+      "oneWay": false,
+      "requires": ""
+    }
+  ]
+}
