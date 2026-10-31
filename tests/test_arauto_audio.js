@@ -82,7 +82,12 @@ assert.ok(!calls.includes('playerFall'), 'slam no longer uses player fall cue');
 const saw = new SawWeapon();
 calls.length = 0;
 combat.resolveWeaponHits(saw, [boss], { x: -100, y: 0 }, { x: 100, y: 0 });
-assert.ok(!calls.includes('sawHit'), 'boss no longer plays flesh-cutting cue');
+assert.ok(calls.includes('sawHit'), 'Arauto toca o mesmo som de dano da serra dos outros monstros');
+{
+    const before = calls.length;
+    combat.feedbackForHit(boss, { damage: 1, killed: false }, { x: 0, y: 0, dirX: 1, dirY: 0 });
+    assert.ok(calls.slice(before).includes('sawHit'), 'acerto da serra presa (tackle) no Arauto também toca sawHit');
+}
 boss.update = function (players, onHit) {
     this.justSlammed = this.justGroundHit = this.justAttacked = false;
     onHit({ x: 0, y: 0 });

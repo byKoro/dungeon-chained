@@ -126,7 +126,7 @@ export class CombatSystem {
                     if (enemy.takeHit) { if (!enemy.takeHit()) continue; }
                     else enemy.startDying();
                     weapon.onHit?.({ blood: enemy.effectMaterial !== 'lavaStone' });
-                    if (enemy.effectMaterial !== 'lavaStone') hits++;
+                    hits++;
                     if (this.audio) this.audio.play("monsterHurt");
                     this.renderer.triggerShake(10);
                     if (enemy.effectMaterial === 'lavaStone') this._materialHit(enemy,
@@ -154,7 +154,8 @@ export class CombatSystem {
 
                 const info = this._hitInfo(enemy, result, impact);
                 weapon.onHit?.({ blood: enemy.effectMaterial !== 'lavaStone' });
-                if (enemy.effectMaterial !== 'lavaStone') hits++;
+                // O Arauto também toca o sawHit (mesmo som de dano da serra dos outros monstros).
+                hits++;
                 heavy = heavy || info.poiseBroken;
                 this._hitFeedback(enemy, info);
                 onHit?.(enemy, info);
@@ -168,7 +169,7 @@ export class CombatSystem {
     feedbackForHit(enemy, result, impact) {
         const info = this._hitInfo(enemy, result, impact);
         this._hitFeedback(enemy, info);
-        if (enemy.effectMaterial !== 'lavaStone') this._playSawHit(1, info.poiseBroken);
+        this._playSawHit(1, info.poiseBroken);
         return info;
     }
 
