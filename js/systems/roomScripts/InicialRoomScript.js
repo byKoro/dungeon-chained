@@ -1,13 +1,11 @@
-import { CageEncounter } from '../CageEncounter.js';
 import { ANIMATED_PROPS } from '../../config/PropConfig.js';
 import { SCRIPT_LINES } from '../../config/DialogueConfig.js';
 
-// Sala `inicial`: o encontro da gaiola no Salão (ids "salao" do Editor 2.0) e o roteiro de falas do design.
+// Sala `inicial`: só o roteiro de falas do design. As gaiolas do Salão agora são genéricas (RoomEvents, por encontro autorado).
 export class InicialRoomScript {
     constructor(api, cfg = SCRIPT_LINES) {
         this.api = api;
         this.cfg = cfg;
-        this.cage = new CageEncounter({ api, zoneId: "salao", encounterId: "salao" });
         this._steps = 0;
         const props = api.authored.props || [];
         this.anvil = props.find(p => p.type === "anvil") || null;
@@ -15,7 +13,6 @@ export class InicialRoomScript {
     }
 
     update() {
-        this.cage.update();
         this._steps++;
         if (this.cfg.enabled) this._lines();
     }
@@ -49,11 +46,4 @@ export class InicialRoomScript {
             if (this._anyNear(x, c.y, cfg.bossGateTiles)) this._once("talk:bossGate", [[1, "talk.bossGate"], [0, "talk.rightDoor"]]);
         }
     }
-
-    onDeath() { this.cage.onDeath(); }
-    drawFloor(ctx) { this.cage.drawFloor(ctx); }
-    drawables() { return this.cage.drawables?.() ?? []; }
-    solidCircles() { return this.cage.solidCircles(); }
-    drawAir(ctx) { this.cage.drawAir(ctx); }
-    lights() { return this.cage.lights(); }
 }

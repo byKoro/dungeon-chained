@@ -2,26 +2,36 @@ import { ROPE_CHEST } from '../config/EventsConfig.js';
 import { ANIMATED_PROPS } from '../config/PropConfig.js';
 import { StakeRopeArt, sawGap, impactBurst, drawChestDrop, clamp01 } from './StakeRope.js';
 
-// Cordas com baú (interativo `chestRope`) de qualquer sala do Editor 2.0. A corda sobe da estaca até o alto, acima do
-// baú marcado com o id dela (`prop.rope`). Um disco girando na estaca corta a corda e o baú cai no próprio tile, com
-// a mesma sequência do baú do encontro; fica fechado para abrir com interagir. O corte sobrevive à morte da dupla.
+// Cordas com baú (interativo `chestRope`) de qualquer sala do Editor 2.0. A estaca guarda o ponto de queda
+// (`drop:{col,row}`, escolhido no editor; sem ele, cai na própria estaca). Um disco girando na estaca corta a corda
+// e um baú gerado pelo sistema cai nesse tile, fechado, para abrir com interagir (moedas no padrão). O corte
+// sobrevive à morte da dupla.
 export class RopeChests {
     constructor({ api, rng = Math.random, cfg = ROPE_CHEST }) {
         Object.assign(this, { api, rng, cfg });
         this.art = new StakeRopeArt(cfg, () => api.assets);
         this._pulse = 0;
-        const props = api.authored.props || [];
         this.ropes = (api.authored.interactives || []).filter(o => o.type === "chestRope").map(o => {
-            const chest = props.find(p => ANIMATED_PROPS[p.type]?.opens && p.rope && p.rope === o.id) || null;
-            const at = chest ? api.tileCenter(chest.col, chest.row) : null;
+            const dropCell = this._dropCell(o);
+            const at = api.tileCenter(dropCell.col, dropCell.row);
+            // Baú gerado (não autorado): entra na lista viva da sala, fica escondido até pousar.
+            const chest = { type: "chest", col: dropCell.col, row: dropCell.row, generated: true, ropeChest: o.id };
             const rope = {
                 id: o.id, col: o.col, row: o.row, ...api.tileCenter(o.col, o.row),
-                chest, chestX: at?.x, chestY: at?.y, cut: false, cutT: 0, flash: 0, drop: null
+                chest, dropCell, chestX: at.x, chestY: at.y, cut: false, cutT: 0, flash: 0, drop: null
             };
+            api.addProp?.(chest);
+            // Corte já salvo (sobreviveu à morte): o baú já está no chão, visível.
             if (api.isCompleted(this._key(rope))) { rope.cut = true; rope.cutT = 1; }
-            else if (chest) api.chests?.setHidden(api.room.key, chest, true);
+            else api.chests?.setHidden(api.room.key, chest, true);
             return rope;
         });
+    }
+
+    // Tile onde o baú cai: `drop` autorado, senão a própria estaca.
+    _dropCell(o) {
+        const d = o.drop;
+        return d && Number.isInteger(d.col) && Number.isInteger(d.row) ? { col: d.col, row: d.row } : { col: o.col, row: o.row };
     }
 
     get valid() {
@@ -59,9 +69,7 @@ export class RopeChests {
         this.api.hitStop?.(c.hitStop);
         this.api.particleSystem?.triggerSparkBurst?.(s.x, s.y, 14, c.sparks, 1.1);
         this.api.particleSystem?.triggerFlash?.(s.x, s.y, 8, 0.9);
-        if (r.chest) {
-            r.drop = { t: -this.cfg.chest.delay, phase: "wait", x: r.chestX, ground: r.chestY + this.cfg.chestGround, col: r.chest.col, row: r.chest.row };
-        }
+        r.drop = { t: -this.cfg.chest.delay, phase: "wait", x: r.chestX, ground: r.chestY + this.cfg.chestGround, col: r.chest.col, row: r.chest.row };
     }
 
     _updateDrop(r) {
@@ -114,10 +122,12 @@ export class RopeChests {
     }
 
     drawFloor(ctx) {
+        // O anel "passe a serra aqui" só aparece quando a dupla já tem a serra.
+        const hasSaw = !!this.api.chain?.hasSaw;
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         for (const r of this.ropes) {
-            if (!r.cut) this.art.ring(ctx, r, this._near(r), this._pulse);
+            if (!r.cut && hasSaw) this.art.ring(ctx, r, this._near(r), this._pulse);
             const d = r.drop;
             if (d && (d.phase === "warn" || d.phase === "fall")) {
                 this.art.shadow(ctx, d.x, d.ground, this.art.fallK(d, this.cfg.chest.warnSteps, this.cfg.chest.fallSteps));
@@ -126,10 +136,9 @@ export class RopeChests {
         ctx.restore();
     }
 
-    // Alto da corda: acima do baú (sem baú, reto para cima).
+    // Alto da corda: acima do ponto de queda.
     _top(r) {
         const knot = this.art.knot(r);
-        if (!r.chest) return { x: r.x, y: knot.y - this.cfg.ropeUp };
         return { x: r.chestX, y: Math.min(knot.y, r.chestY) - this.cfg.ropeUp };
     }
 

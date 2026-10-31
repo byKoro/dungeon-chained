@@ -62,7 +62,8 @@ Domain language of Dungeon Chained. Code identifiers are English; pt-BR terms ap
 | Zone | zona | Named rectangle of a room (`room.zones`); "enter the zone" means both players inside |
 | Encounter / wave | encontro / leva | Named list of waves (`room.encounters`); the room script decides when each wave drops |
 | Bars | grade | Bar tiles at a zone's accesses; closed (solid) while an encounter runs |
-| Cage / rope / stake | gaiola / corda / estaca | The Salão set piece: vertical ropes tied to stakes, each holding a hidden cage above; cutting a rope drops its cage, which shatters and releases a wave |
+| Cage / rope / stake | gaiola / corda / estaca | Vertical ropes tied to stakes (`rope` interactive), each holding a hidden cage above; cutting a rope drops its cage, which shatters and releases that stake's wave. One encounter per zone containing stakes, in any room of any map. Enemies are chosen per stake in the editor (`rope.drops`) |
+| Chest rope | corda com baú | `chestRope` interactive: a stake whose rope holds a chest; cutting it drops a system-generated chest on the stake's authored drop tile (`rope.drop`), no coins defined (default scrap) |
 | Run death | morte da run | On maps with an anvil: respawn at the start with full lives, scrap lost, items and finished events kept (ADR 0012) |
 | Saw cinematic | cinemática da serra | Craft cutscene after buying the Serra (`SawForgeCinematic`) |
 | i18n key | chave de idioma | String id looked up with `t('chave')` in `js/i18n/*` (pt-BR default) |

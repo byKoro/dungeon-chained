@@ -43,7 +43,6 @@ export class MapEditorApp {
         this.propFlip = false;
         this.propScrap = SCRAP.chestDefault;
         this.propEncounter = "";
-        this.propRope = "";
         this.propRecipes = [...FORGE.defaultRecipes];
         this.showKinds = true;
         this.showGrid = true;
@@ -525,7 +524,6 @@ export class MapEditorApp {
         if (!ANIMATED_PROPS[this.propType]?.opens) return null;
         const extra = { scrap: this.propScrap };
         if (this.propEncounter) extra.encounter = this.propEncounter;
-        if (this.propRope) extra.rope = this.propRope;
         return extra;
     }
 
@@ -558,7 +556,7 @@ export class MapEditorApp {
             }
             this.propType = prop.type;
             this.propFlip = !!prop.flip;
-            if (ANIMATED_PROPS[prop.type]?.opens) { this.propScrap = chestScrapAmount(prop); this.propEncounter = prop.encounter || ""; this.propRope = prop.rope || ""; }
+            if (ANIMATED_PROPS[prop.type]?.opens) { this.propScrap = chestScrapAmount(prop); this.propEncounter = prop.encounter || ""; }
             if (prop.type === "anvil") this.propRecipes = [...anvilRecipes(prop)];
             this._setTool("prop");
             return;
@@ -822,7 +820,6 @@ export class MapEditorApp {
         $("show-kinds").addEventListener("change", (e) => { this.showKinds = e.target.checked; });
         $("prop-flip").addEventListener("change", (e) => { this.propFlip = e.target.checked; });
         $("prop-encounter").addEventListener("change", (e) => { this.propEncounter = e.target.value.trim(); });
-        $("prop-rope").addEventListener("change", (e) => { this.propRope = e.target.value.trim(); });
         $("prop-scrap").addEventListener("change", (e) => {
             this.propScrap = chestScrapAmount({ scrap: Math.round(Number(e.target.value)) });
             e.target.value = this.propScrap;
@@ -972,8 +969,6 @@ export class MapEditorApp {
         $("prop-scrap-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
         $("prop-encounter-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
         this._setVal("prop-encounter", this.propEncounter);
-        $("prop-rope-field").hidden = !ANIMATED_PROPS[this.propType]?.opens;
-        this._setVal("prop-rope", this.propRope);
         this._setVal("prop-scrap", this.propScrap);
         $("prop-recipes-field").hidden = this.propType !== "anvil";
         for (const input of document.querySelectorAll("#prop-recipes [data-recipe]")) input.checked = this.propRecipes.includes(input.dataset.recipe);

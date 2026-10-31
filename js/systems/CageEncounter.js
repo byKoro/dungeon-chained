@@ -12,8 +12,13 @@ export class CageEncounter {
     constructor({ api, zoneId, encounterId, rng = Math.random, cfg = CAGE }) {
         Object.assign(this, { api, zoneId, encounterId, rng, cfg });
         this.art = new StakeRopeArt(cfg, () => api.assets);
-        const objs = api.authored.interactives || [];
-        this.ropeDefs = objs.filter(o => o.type === "rope").map(o => ({ col: o.col, row: o.row, ...api.tileCenter(o.col, o.row), auto: !!o.auto }));
+        // Estacas da gaiola desta zona (uma sala pode ter vários encontros). Sem zona, pega todas (compatível com salas de um encontro só).
+        const zone = (api.authored.zones || []).find(z => z.id === zoneId) || null;
+        const inZone = o => !zone || (o.col >= zone.col && o.row >= zone.row && o.col < zone.col + zone.w && o.row < zone.row + zone.h);
+        // Ordem autorada das estacas desta zona = ordem das levas do encontro (cada estaca solta a leva de mesmo índice).
+        const objs = (api.authored.interactives || []).filter(o => o.type === "rope" && inZone(o));
+        // `drops` da estaca (editor visual) = a leva que ela solta; sem isso, cai para `encounter.waves[index]` (mapas antigos).
+        this.ropeDefs = objs.map(o => ({ col: o.col, row: o.row, ...api.tileCenter(o.col, o.row), auto: !!o.auto, drops: Array.isArray(o.drops) ? o.drops : null }));
         if (this.ropeDefs.length && !this.ropeDefs.some(r => r.auto)) this.ropeDefs[0].auto = true;
         // Baú do encontro: prop com `encounter` igual ao id; fica escondido até o fim.
         this.chest = (api.authored.props || []).find(p => ANIMATED_PROPS[p.type]?.opens && p.encounter === encounterId) || null;
@@ -23,12 +28,14 @@ export class CageEncounter {
     }
 
     get valid() {
-        return this.ropeDefs.length > 0 && !!this.api.encounter(this.encounterId);
+        // Vale se há estacas e alguma fonte de leva: `drops` numa estaca (editor novo) ou um encontro autorado (mapas antigos).
+        return this.ropeDefs.length > 0 && (this.ropeDefs.some(r => r.drops) || !!this.api.encounter(this.encounterId));
     }
 
     _restore() {
         this.phase = "idle";
-        this.ropes = this.ropeDefs.map(r => ({ ...r, cut: false, cutT: 0, flash: 0, cage: null, wave: -1 }));
+        // `index` (ordem estável da estaca) = a leva do encontro; `drops` (se houver) tem prioridade. Editável por estaca no editor.
+        this.ropes = this.ropeDefs.map((r, i) => ({ ...r, index: i, cut: false, cutT: 0, flash: 0, cage: null, wave: -1 }));
         this.cuts = 0;
         this.spawned = [];
         this.jumpers = [];
@@ -115,7 +122,7 @@ export class CageEncounter {
         rope.cutT = 0;
         rope.flash = c.stakeFlashSteps;
         this.cuts++;
-        rope.wave = this.cuts - 1;
+        rope.wave = rope.index;
         rope.cage = { t: 0, phase: "warn", landed: false, debrisT: 0, spin: (this.rng() - 0.5) * this.cfg.fallSpin };
         this.lastRope = rope;
         this.api.audio?.play("sawSnap", { rateMultiplier: snapped ? 0.8 : 1.15 });
@@ -197,7 +204,8 @@ export class CageEncounter {
     }
 
     _launchWave(index, rope) {
-        const wave = this.api.encounter(this.encounterId)?.waves?.[index];
+        // Inimigos da estaca (editor visual) ou, em mapas antigos, a leva de mesmo índice do encontro.
+        const wave = rope.drops ?? this.api.encounter(this.encounterId)?.waves?.[index];
         if (!wave) return;
         const list = wave.flatMap(g => Array.from({ length: g.count }, () => g.type));
         const cells = this._landingCells(rope, list.length);
@@ -329,7 +337,7 @@ export class CageEncounter {
                 ctx.drawImage(broken, Math.round(g.x - w / 2), Math.round(g.y - h + 8), w, h);
                 ctx.globalAlpha = 1;
             }
-            if (!r.cut && this.phase !== "idle") this.art.ring(ctx, r, this._near(r), this._pulse);
+            if (!r.cut && this.phase !== "idle" && this.api.chain?.hasSaw) this.art.ring(ctx, r, this._near(r), this._pulse);
         }
         for (const k of this.jumpers) {
             if (k.t < 0 || k.landed) continue;

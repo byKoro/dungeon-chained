@@ -8,7 +8,7 @@ import { occupiedCells } from '../rooms/MapOccupancy.js';
 import { torchPlacement, isMirroredTorch } from '../rooms/TorchLayout.js';
 import { arrowFireDir, arrowMountOffset, fitSpikeRow, wallSideForTile, SPIKE_ROW_WAVE } from '../rooms/HazardLayout.js';
 import { HAZARDS, TILE } from '../config/GameConfig.js';
-import { parseWaves, formatWaves, zoneFromCorners, setZone, setEncounter, toggleBar } from '../rooms/RoomEventsData.js';
+import { zoneFromCorners, setZone, toggleBar } from '../rooms/RoomEventsData.js';
 
 const $ = id => document.getElementById(id);
 
@@ -41,7 +41,10 @@ export class ContentTools {
         this.enemyType = editorEnemyTypes()[0]?.key;
         this.torchType = TORCHES[0][0];
         this.interactiveType = Object.keys(INTERACTIVES)[0];
+        this.selectedRopeId = null;
+        this.dropRopeId = null;
         this.thumbs = [];
+        this.cageThumbs = [];
         this._build();
         this._drawThumbs();
         this.assets.whenReady().then(() => this._drawThumbs());
@@ -73,7 +76,7 @@ export class ContentTools {
     }
 
     _drawThumbs() {
-        for (const { ctx, draw } of this.thumbs) {
+        for (const { ctx, draw } of [...this.thumbs, ...(this.cageThumbs || [])]) {
             ctx.clearRect(0, 0, 32, 32);
             ctx.imageSmoothingEnabled = false;
             draw(ctx);
@@ -300,19 +303,35 @@ export class ContentTools {
                 else this._toggle(r, 'torches', { col: mount.col, row: mount.row, type: torch, side: mount.side });
             } else if (onFloor) this._toggle(r, 'torches', { ...cell, type: torch, side: 'F' });
         } else if (type === 'hazard') this._applyHazard(r, cell, onFloor);
-        else if (type === 'interactive') {
+        else if (type === 'dropPoint') {
+            // Ponto de queda do baú: clique num tile de chão depois de selecionar uma estaca "Corda com baú".
+            const rope = (r.interactives || []).find(o => o.type === 'chestRope' && o.id === this.dropRopeId);
+            if (!rope) { this._hint('Selecione primeiro uma estaca "Corda com baú" (ferramenta Interativos).'); return true; }
+            if (!onFloor) { this._hint('O baú precisa cair num tile de chão.'); return true; }
+            rope.drop = { col, row };
+            this._hint(`Baú de "${rope.id}" cai em (${col},${row}).`);
+        } else if (type === 'interactive') {
             const hit = (r.interactives || []).find(o => o.col === col && o.row === row);
             if (hit?.type === 'lever') { this.bridgeId = hit.id; $('content-hint').textContent = 'Alavanca selecionada. Use “Marcar ponte”.'; return true; }
+            // Clicar numa estaca já existente a seleciona (não remove): gaiola abre o painel de inimigos; corda com baú entra no modo "ponto de queda".
+            if (hit?.type === 'rope') { this.selectedRopeId = hit.id; this.dropRopeId = null; this._hint('Estaca da gaiola selecionada: escolha os inimigos no painel "Inimigos desta gaiola".'); return true; }
+            if (hit?.type === 'chestRope') { this.dropRopeId = hit.id; this.selectedRopeId = null; this.select('dropPoint'); this._hint(`Estaca "${hit.id}" selecionada: clique num tile de chão para o ba\u00fa cair.`); return true; }
             if (!onFloor) return true;
             const object = { ...cell, type: this.interactiveType, id: `object_${Date.now()}_${col}_${row}` };
             if (object.type === 'lever') { object.tiles = []; this.bridgeId = object.id; }
-            if (object.type === 'rope' && $('content-rope-auto').checked) object.auto = true;
-            if (object.type === 'chestRope' && !hit) {
+            if (object.type === 'rope') {
+                if ($('content-rope-auto').checked) object.auto = true;
+                object.drops = [];
+                this.selectedRopeId = object.id;
+                this._hint('Estaca da gaiola colocada: escolha os inimigos no painel "Inimigos desta gaiola".');
+            }
+            if (object.type === 'chestRope') {
                 const used = new Set((r.interactives || []).map(o => o.id));
                 let n = 1;
                 while (used.has(`corda${n}`)) n++;
                 object.id = `corda${n}`;
-                this._hint(`Corda com baú “${object.id}”: num baú, preencha “Corda com baú” com ${object.id}.`);
+                this.dropRopeId = object.id;
+                this._hint(`Corda com baú "${object.id}" colocada: clique num tile de chão para marcar onde o baú cai.`);
             }
             this._toggle(r, 'interactives', object);
         } else if (type === 'bridge') {
@@ -341,42 +360,112 @@ export class ContentTools {
             <div id="content-zones"></div>
             <button class="btn" data-content="bars">Grade (clique nos tiles do acesso)</button>
             <label><input type="checkbox" id="content-rope-auto"> Corda arrebenta sozinha</label>
-            <div class="panel-title">Encontros</div>
-            <label class="field">Id do encontro<input id="content-encounter-id" value="encontro"></label>
-            <label class="field">Levas (uma por linha, tipo:quantidade)<textarea id="content-encounter-waves" rows="4" placeholder="demon:3&#10;bloodMonster:1, demon:3"></textarea></label>
-            <button class="btn" id="content-encounter-save">Salvar encontro</button>
-            <div id="content-encounters"></div>
-            <p class="hint">O script da sala usa os ids. Tipos: demon, bloodMonster, blackKnightB…</p>
+            <div class="panel-title">Inimigos desta gaiola</div>
+            <p class="hint" id="cage-hint">Coloque uma "Corda com gaiola" e clique nela para escolher os inimigos que ela solta.</p>
+            <div id="cage-enemies" class="choice-grid" role="group" aria-label="Inimigo da gaiola"></div>
+            <div id="cage-drops"></div>
         </div></div>`;
         panel.after(events);
-        $('content-encounter-save').onclick = () => {
-            const id = $('content-encounter-id').value.trim();
-            if (!id || !this.app.room) return;
-            this.app._commit(() => setEncounter(this.app.room, { id, waves: parseWaves($('content-encounter-waves').value) }));
-        };
+        this._buildCageEnemies();
+    }
+
+    // Grade de miniaturas para montar a leva da estaca selecionada; clicar adiciona +1 do inimigo.
+    _buildCageEnemies() {
+        const grid = $('cage-enemies');
+        grid.replaceChildren();
+        this.cageThumbs = [];
+        for (const item of this._enemyItems()) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn choice-btn';
+            button.title = `Adicionar ${item.label}`;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 32;
+            canvas.setAttribute('aria-hidden', 'true');
+            const text = document.createElement('span');
+            text.textContent = item.label;
+            button.append(canvas, text);
+            button.onclick = () => this._addCageEnemy(item.key);
+            grid.append(button);
+            this.cageThumbs.push({ ctx: canvas.getContext('2d'), draw: item.draw });
+            const img = item.img?.();
+            if (img && !(img.complete && img.naturalWidth)) img.addEventListener('load', () => this._drawThumbs(), { once: true });
+        }
+    }
+
+    // Estaca de gaiola selecionada (se ainda existe na sala).
+    _selectedRope() {
+        const room = this.app.room;
+        if (!room || !this.selectedRopeId) return null;
+        return (room.interactives || []).find(o => o.type === 'rope' && o.id === this.selectedRopeId) || null;
+    }
+
+    _addCageEnemy(type) {
+        const rope = this._selectedRope();
+        if (!rope) { this._hint('Clique numa estaca de gaiola primeiro.'); return; }
+        this.app._commit(() => {
+            rope.drops ||= [];
+            const g = rope.drops.find(d => d.type === type);
+            if (g) g.count++; else rope.drops.push({ type, count: 1 });
+        });
+    }
+
+    _setCageEnemyCount(type, count) {
+        const rope = this._selectedRope();
+        if (!rope) return;
+        this.app._commit(() => {
+            rope.drops ||= [];
+            const i = rope.drops.findIndex(d => d.type === type);
+            if (i < 0) return;
+            if (count <= 0) rope.drops.splice(i, 1);
+            else rope.drops[i].count = Math.min(20, count);
+        });
     }
 
     _syncEvents() {
         const room = this.app.room;
-        const zones = $('content-zones'), encounters = $('content-encounters');
-        zones.replaceChildren(); encounters.replaceChildren();
-        if (!room) return;
+        const zones = $('content-zones');
+        zones.replaceChildren();
+        if (!room) { this._syncCagePanel(); return; }
         for (const z of room.zones || []) {
             const b = document.createElement('button'); b.className = 'btn connection-entry';
             b.textContent = `Zona ${z.id} (${z.col},${z.row} ${z.w}×${z.h}) ×`;
             b.title = 'Remover zona'; b.onclick = () => this.app._commit(() => { room.zones = room.zones.filter(o => o !== z); });
             zones.append(b);
         }
-        for (const e of room.encounters || []) {
-            const row = document.createElement('div'); row.className = 'content-actions';
-            const edit = document.createElement('button'); edit.className = 'btn';
-            edit.textContent = `${e.id}: ${e.waves.length} leva(s)`;
-            edit.onclick = () => { $('content-encounter-id').value = e.id; $('content-encounter-waves').value = formatWaves(e.waves); };
-            const del = document.createElement('button'); del.className = 'btn btn-danger'; del.textContent = '×'; del.title = 'Remover encontro';
-            del.onclick = () => this.app._commit(() => { room.encounters = room.encounters.filter(o => o !== e); });
-            row.append(edit, del); encounters.append(row);
-        }
+        this._syncCagePanel();
         if (this.zoneStart) this._hint('Agora clique no canto oposto da zona.');
+    }
+
+    // Painel de inimigos da estaca de gaiola selecionada: lista com contador por inimigo.
+    _syncCagePanel() {
+        const hint = $('cage-hint'), box = $('cage-drops');
+        if (!hint || !box) return;
+        box.replaceChildren();
+        const rope = this._selectedRope();
+        if (!rope) {
+            hint.textContent = 'Coloque uma "Corda com gaiola" e clique nela para escolher os inimigos que ela solta.';
+            return;
+        }
+        hint.textContent = `Gaiola selecionada em (${rope.col},${rope.row}). Clique num inimigo acima para somar.`;
+        const drops = rope.drops || [];
+        if (!drops.length) {
+            const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Nenhum inimigo ainda.';
+            box.append(p);
+            return;
+        }
+        for (const d of drops) {
+            const label = editorEnemyTypes().find(t => t.key === d.type)?.label || d.type;
+            const row = document.createElement('div'); row.className = 'content-actions';
+            const minus = document.createElement('button'); minus.className = 'btn'; minus.textContent = '−'; minus.title = 'Menos um';
+            minus.onclick = () => this._setCageEnemyCount(d.type, d.count - 1);
+            const name = document.createElement('span'); name.textContent = `${label} × ${d.count}`; name.style.cssText = 'flex:1; align-self:center;';
+            const plus = document.createElement('button'); plus.className = 'btn'; plus.textContent = '+'; plus.title = 'Mais um';
+            plus.onclick = () => this._setCageEnemyCount(d.type, d.count + 1);
+            const del = document.createElement('button'); del.className = 'btn btn-danger'; del.textContent = '×'; del.title = 'Remover';
+            del.onclick = () => this._setCageEnemyCount(d.type, 0);
+            row.append(minus, name, plus, del); box.append(row);
+        }
     }
 
     // Armadilhas: flecha só em parede (encaixa na mais próxima se o clique foi no chão), espinhos só no chão.
@@ -530,16 +619,25 @@ export class ContentTools {
         for (const o of room.interactives || []) if (o.type === 'rope' && o.auto) {
             ctx.strokeStyle = '#ff5c5c'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2);
         }
-        // Corda com baú: id embaixo da estaca e linha até o baú ligado a ela.
+        // Corda com baú: linha tracejada da estaca até o ponto de queda, com um alvo no tile onde o baú cai.
         for (const o of room.interactives || []) if (o.type === 'chestRope') {
             const cx = ox + (o.col + 0.5) * tile, cy = oy + (o.row + 0.5) * tile;
-            for (const p of room.props || []) if (p.rope && p.rope === o.id) {
-                ctx.strokeStyle = INTERACTIVES.chestRope.color; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
-                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ox + (p.col + 0.5) * tile, oy + (p.row + 0.5) * tile); ctx.stroke();
+            const sel = this.dropRopeId === o.id;
+            const d = o.drop && Number.isInteger(o.drop.col) ? o.drop : null;
+            if (d) {
+                const dx = ox + (d.col + 0.5) * tile, dy = oy + (d.row + 0.5) * tile;
+                ctx.strokeStyle = INTERACTIVES.chestRope.color; ctx.lineWidth = sel ? 3 : 2; ctx.setLineDash([4, 3]);
+                ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(dx, dy); ctx.stroke();
                 ctx.setLineDash([]);
+                ctx.strokeRect(ox + d.col * tile + 3, oy + d.row * tile + 3, tile - 6, tile - 6);
+                ctx.fillStyle = INTERACTIVES.chestRope.color; ctx.font = `bold ${tile * 0.3}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('B', dx, dy);
             }
-            ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(9, tile * 0.25)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-            ctx.fillText(o.id, cx, oy + (o.row + 1) * tile);
+            if (sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2); }
+        }
+        // Gaiola selecionada: destaque na estaca.
+        if (this.selectedRopeId) for (const o of room.interactives || []) if (o.type === 'rope' && o.id === this.selectedRopeId) {
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(ox + o.col * tile + 1, oy + o.row * tile + 1, tile - 2, tile - 2);
         }
         for (const z of room.zones || []) {
             ctx.strokeStyle = 'rgba(127, 219, 255, 0.9)'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);

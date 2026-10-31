@@ -3,6 +3,7 @@ import { TILE, LIGHT_PIXEL_SCALE } from '../config/GameConfig.js';
 import { findSafeFloorCell } from '../rooms/SafeSpawn.js';
 import { InicialRoomScript } from './roomScripts/InicialRoomScript.js';
 import { RopeChests } from './RopeChests.js';
+import { CageEncounter } from './CageEncounter.js';
 
 // Script por sala, escolhido pelo nome da sala do Editor 2.0. Cada script recebe uma API pequena (zonas, encontros,
 // inimigos, grades, baús, falas) e guarda o próprio estado; os eventos concluídos sobrevivem à morte da dupla.
@@ -19,6 +20,7 @@ export class RoomEvents {
         this.completed = new Set();
         this._scripts = new Map();
         this._ropes = new Map();
+        this._cages = new Map();
         this._bars = new Map();
     }
 
@@ -40,9 +42,24 @@ export class RoomEvents {
         return value;
     }
 
+    // Gaiolas da sala: uma por zona que contém estacas `rope` (a zona dispara e delimita o encontro). Vale em qualquer sala.
+    _cageList(room) {
+        if (this._cages.has(room.key)) return this._cages.get(room.key);
+        const api = this._api(room);
+        const authored = room.cell.authored || {};
+        const ropes = (authored.interactives || []).filter(o => o.type === "rope");
+        const inZone = (z, o) => o.col >= z.col && o.row >= z.row && o.col < z.col + z.w && o.row < z.row + z.h;
+        // Zonas com estaca de gaiola; mais os ids de encontro autorado que também são zonas (compatível com mapas antigos).
+        const zoneIds = new Set((authored.zones || []).filter(z => ropes.some(o => inZone(z, o))).map(z => z.id));
+        for (const e of authored.encounters || []) if ((authored.zones || []).some(z => z.id === e.id)) zoneIds.add(e.id);
+        const list = [...zoneIds].map(id => new CageEncounter({ api, zoneId: id, encounterId: id })).filter(c => c.valid);
+        this._cages.set(room.key, list);
+        return list;
+    }
+
     _handlers(room = this.rooms.current) {
         if (!room) return [];
-        return [this._script(room), this._ropeChests(room)].filter(Boolean);
+        return [this._script(room), ...this._cageList(room), this._ropeChests(room)].filter(Boolean);
     }
 
     _api(room) {
@@ -112,6 +129,12 @@ export class RoomEvents {
             moveProp(prop, col, row) {
                 if (prop.col === col && prop.row === row) return;
                 prop.col = col; prop.row = row;
+                self.hooks.propsChanged?.(room);
+            },
+            // Prop gerado em runtime (ex.: baú da corda com baú): entra na lista viva da sala, não no documento autorado.
+            addProp(prop) {
+                const list = room.tiles.props || (room.tiles.props = []);
+                if (!list.includes(prop)) list.push(prop);
                 self.hooks.propsChanged?.(room);
             },
             drawPropFrame: (ctx, type, frame, dx, dy, sx, sy) => self.hooks.drawPropFrame?.(ctx, type, frame, dx, dy, sx, sy)
@@ -227,7 +250,8 @@ export class RoomEvents {
 
     // Morte da dupla: encontros interrompidos voltam ao começo; concluídos ficam.
     onDeath() {
-        for (const script of [...this._scripts.values(), ...this._ropes.values()]) script?.onDeath?.();
+        const cages = [...this._cages.values()].flat();
+        for (const h of [...this._scripts.values(), ...cages, ...this._ropes.values()]) h?.onDeath?.();
         for (const [key, bars] of this._bars) {
             if (!bars.down) continue;
             bars.down = false;

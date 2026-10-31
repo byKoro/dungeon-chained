@@ -49,7 +49,8 @@ export class Room {
         this.frontWalls = this.tiles.walls.filter(w => solidWall(w) && walkable(w.col, w.row - 1));
 
         if (Array.isArray(cell.customTorches)) this.tiles.torches = cell.customTorches;
-        if (Array.isArray(cell.customProps)) this.tiles.props = cell.customProps;
+        // Cópia rasa: sistemas em runtime (ex.: baú gerado pela corda) podem inserir/remover props sem sujar o documento autorado.
+        if (Array.isArray(cell.customProps)) this.tiles.props = [...cell.customProps];
     }
 
     get isCombatRoom() {
