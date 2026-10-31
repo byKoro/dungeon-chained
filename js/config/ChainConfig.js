@@ -10,6 +10,7 @@ export const CHAIN = Object.freeze({
     reconnectDistance: 110,
     pickupRadius: 60,
     snapImpulse: 12,
+    reconnectDelay: 20,
     playerSafeZone: PLAYER_SAFE_ZONE
 });
 

@@ -1,4 +1,4 @@
-import { FORGE, anvilRecipes } from '../config/ForgeConfig.js';
+import { FORGE, SAW_DRAG, anvilRecipes } from '../config/ForgeConfig.js';
 
 // O que a dupla já forjou nesta partida: nível de cada receita (item = 0 ou 1).
 export class ForgeState {
@@ -59,20 +59,38 @@ export function mapOffersRecipe(map, id) {
 
 // Converte os níveis comprados em parâmetros do cabo e da serra (valores-base em `base`).
 export function applySawUpgrades(forge, chain, weapon, base, recipes = FORGE.recipes) {
-    const elastic = 1 + recipes.elasticity.perLevel * forge.level("elasticity");
-    chain.strainDistance = base.strainDistance * elastic;
-    chain.breakDistance = base.breakDistance * elastic;
+    chain.strainDistance = base.strainDistance;
+    chain.breakDistance = base.breakDistance;
+    const link = forge.level("quickLink");
+    const scale = link > 0 ? recipes.quickLink.pickupScale[link - 1] : 1;
+    chain.pickupRadius = base.pickupRadius * scale;
+    chain.reconnectDistance = base.reconnectDistance * scale;
+    chain.reconnectDelay = link > 0 ? recipes.quickLink.delaySteps[link - 1] : (base.reconnectDelay ?? 20);
     if (!weapon) return;
     weapon.sizeScale = 1 + recipes.size.perLevel * forge.level("size");
-    weapon.doubleSaw = forge.has("doubleSaw");
-    weapon.splitAt = recipes.doubleSaw.splitAt;
-    weapon.mergeAt = recipes.doubleSaw.mergeAt;
-    weapon.splitSteps = recipes.doubleSaw.splitSteps;
+    weapon.doubleSaw = false;
+    const inertia = forge.level("inertia");
+    weapon.inertiaSteps = inertia > 0 ? Math.round(recipes.inertia.seconds[inertia - 1] * 60) : 0;
 }
 
-// Arrasto com o nível atual de Peso: distância máxima (px) e escala de velocidade de quem arrasta.
-export function sawDragStats(forge, tile, recipes = FORGE.recipes) {
-    const r = recipes.weight;
-    const lvl = Math.min(forge.level("weight"), r.dragTiles.length - 1);
-    return { limit: r.dragTiles[lvl] * tile, speedScale: r.dragSpeed[lvl] };
+// Raio da onda do Estalo no nível atual (0 = sem a melhoria).
+export function snapWaveRadius(forge, recipes = FORGE.recipes) {
+    const lvl = forge.level("snapWave");
+    return lvl > 0 ? recipes.snapWave.radius[lvl - 1] : 0;
+}
+
+// Corações comprados: sobe o máximo dos dois e enche o que foi ganho; voltando ao nível 0, corta o excesso.
+export function applyHeartUpgrades(forge, players, base = 3, recipes = FORGE.recipes) {
+    const max = base + recipes.hearts.perLevel * forge.level("hearts");
+    for (const p of players) {
+        if (!p) continue;
+        const gained = max - (p.maxLives ?? base);
+        p.maxLives = max;
+        p.lives = Math.max(0, Math.min(max, p.lives + Math.max(0, gained)));
+    }
+}
+
+// Arrasto da serra largada: distância máxima (px) e escala de velocidade de quem arrasta.
+export function sawDragStats(tile, cfg = SAW_DRAG) {
+    return { limit: cfg.dragTiles * tile, speedScale: cfg.dragSpeed };
 }

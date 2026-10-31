@@ -2,6 +2,7 @@ import { FloorDebris } from './FloorDebris.js';
 import { DustPuff } from './DustPuff.js';
 import { SparkParticle } from './SparkParticle.js';
 import { FlashParticle } from './FlashParticle.js';
+import { ShockRing } from './ShockRing.js';
 import { FlameParticle } from './FlameParticle.js';
 import { DamageNumber } from './DamageNumber.js';
 import { DamageCombo } from './DamageCombo.js';
@@ -185,6 +186,11 @@ export class ParticleSystem {
         for (let i = 0; i < amount; i++) {
             this.flames.push(new FlameParticle(x, y, baseColor, flameOpts));
         }
+    }
+
+    // Onda circular (Estalo). Vai no pool dos flashes: mesmo passe aditivo, mesmo ciclo de vida.
+    triggerShockRing(x, y, radius, opts = {}) {
+        this.flashes.push(new ShockRing(x, y, radius, opts));
     }
 
     triggerFlash(x, y, amount = 14, power = 1) {

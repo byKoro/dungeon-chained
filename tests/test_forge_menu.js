@@ -57,7 +57,7 @@ assert(!fs.open && fs.promptTargets[0]?.blocked === true, "com inimigos vivos n�
 enemiesAlive = false;
 
 tap(fs, "shiftright");
-assert(fs.open && fs.recipes.join() === "saw,size,elasticity,weight,doubleSaw", "P2 perto abre com as receitas padrão");
+assert(fs.open && fs.recipes.join() === "saw,size,inertia,snapWave,quickLink,hearts", "P2 perto abre com as receitas padrão");
 assert(sounds.includes("uiOpen"), "som de abrir");
 fs.handleInput();
 assert(fs.open, "a tecla que abriu não fecha no frame seguinte");
@@ -75,10 +75,11 @@ fs.handleInput({ up: true });
 fs.handleInput({});
 assert(fs.cursor === 0, "D-pad sobe o cursor");
 fs.handleInput({ up: true });
-assert(fs.cursor === 4, "o cursor dá a volta");
-fs.handleInput({ down: true }); fs.handleInput({ down: true });
+assert(fs.cursor === 5, "o cursor dá a volta");
+fs.handleInput({});
+fs.handleInput({ down: true }); fs.handleInput({}); fs.handleInput({ down: true }); fs.handleInput({});
 fs.handleInput({ a: true });
-assert(bought[1] === "size" && scrap.amount === 12, "A do controle compra Tamanho (8)");
+assert(bought[1] === "size" && scrap.amount === 5, "A do controle compra Tamanho (15)");
 
 tap(fs, "e", true);
 assert(!fs.open && sounds.includes("uiClose"), "interagir fecha");
@@ -96,6 +97,12 @@ assert(fs.open && fs.recipes.join() === "size", "bigorna com receitas autoradas"
 fs.handleInput();
 held.add("escape"); fs.handleInput(); held.clear();
 assert(!fs.open, "Esc fecha");
+fs.update();
+
+anvil.recipes = ["size", "elasticity", "weight", "doubleSaw"];
+tap(fs, "shiftright");
+assert(fs.open && fs.recipes.join() === "size", "receitas removidas gravadas num mapa antigo não aparecem");
+held.add("escape"); fs.handleInput(); held.clear();
 
 // Bordas por tecla e navegação só pelo teclado real.
 {
@@ -104,12 +111,12 @@ assert(!fs.open, "Esc fecha");
     const forge2 = new ForgeState();
     forge2.reset({ items: ["saw"] });
     const sys = new ForgeSystem({ rooms, getPlayers: () => [p1, p2], input: input2, forge: forge2, scrap: new ScrapSystem() });
-    anvil.recipes = ["size", "elasticity", "doubleSaw"];
+    anvil.recipes = ["saw", "size"];
     sys.openAt({ prop: anvil, roomKey: "1,1", x: ax, y: ay });
     kb.add("arrowup"); sys.handleInput();
     const afterHold = sys.cursor;
     kb.add("w"); sys.handleInput();
-    assert(sys.cursor === (afterHold + 2) % 3, "P1 aperta W enquanto P2 segura a seta: o cursor anda");
+    assert(sys.cursor === (afterHold + 1) % 2, "P1 aperta W enquanto P2 segura a seta: o cursor anda");
     kb.clear(); sys.handleInput();
     const c0 = sys.cursor;
     all.add("s"); sys.handleInput(); all.delete("s"); sys.handleInput();

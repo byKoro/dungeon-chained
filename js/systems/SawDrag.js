@@ -73,6 +73,7 @@ export class SawDrag {
                 this.traveled = 0;
                 this.justGrabbed = true;
                 w.dropSpin = 0;
+                w.inertiaLeft = 0;
                 this.audio?.play("sawLand", { rateMultiplier: 1.4, volumeMultiplier: 0.6 });
             });
             return;

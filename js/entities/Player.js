@@ -10,6 +10,8 @@ export class Player extends Entity {
         this.name = name;
         this.speed = 4.2;
         this.lives = 3;
+        // Corações comprados na bigorna sobem o máximo (Game aplica a melhoria).
+        this.maxLives = 3;
         // Só para testes: acertos e quedas continuam acontecendo, mas não descontam vida.
         this.infiniteLives = false;
         // Contador de acertos aceitos (sobe mesmo com vida infinita) para o Game dar feedback.

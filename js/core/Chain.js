@@ -44,7 +44,7 @@ export class Chain {
         this.connected = false;
         this.strain = 0;
         this.reconnectCooldown = 0;
-        this.weapon.drop?.(x, y);
+        this.weapon.drop?.(x, y, { inertia: false });
     }
 
     get weapon() {

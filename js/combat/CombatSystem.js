@@ -173,6 +173,41 @@ export class CombatSystem {
         return info;
     }
 
+    // Serra solta girando por inércia: só o disco corta, no ponto onde ela está no chão.
+    resolveLooseSawHits(weapon, enemies, onKill = null, onHit = null) {
+        if (!weapon.spinningLoose) return 0;
+        return this._hitArea(weapon, enemies, weapon.dropX, weapon.dropY, weapon.discRadius ?? 0, onKill, onHit);
+    }
+
+    // Estalo: o cabo arrebentando solta uma onda em volta da serra; acerta uma vez cada inimigo no raio.
+    resolveSnapWave(weapon, enemies, x, y, radius, onKill = null, onHit = null) {
+        return this._hitArea(weapon, enemies, x, y, radius, onKill, onHit);
+    }
+
+    // Golpe do disco em todo inimigo cujo corpo encosta no círculo (x, y, radius). Devolve quantos acertou.
+    _hitArea(weapon, enemies, x, y, radius, onKill, onHit) {
+        let hits = 0, heavy = false;
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const enemy = enemies[i];
+            if (enemy.state === "dying" || enemy.isHidden || enemy.airborne) continue;
+            if (Math.hypot(enemy.x - x, enemy.y - y) >= radius + enemy.hitRadius) continue;
+            const impact = this._impact(enemy, { x, y, radius, kind: "disc" });
+            let result = true;
+            if (enemy.takeHit) {
+                result = enemy.takeHit(ENEMY_HIT.sawDamage, impact);
+                if (!result) continue;
+            } else enemy.startDying();
+            const info = this._hitInfo(enemy, result, impact);
+            weapon.onHit?.({ blood: enemy.effectMaterial !== 'lavaStone' });
+            if (enemy.effectMaterial !== 'lavaStone') hits++;
+            heavy = heavy || info.poiseBroken;
+            if (this.hitFeedback) this._hitFeedback(enemy, info);
+            onHit?.(enemy, info);
+            if (info.killed) onKill?.(enemy);
+        }
+        if (hits > 0) this._playSawHit(hits, heavy);
+    }
+
     _hitInfo(enemy, result, impact) {
         const r = typeof result === "object" ? result : {};
         const killed = r.killed ?? (enemy.state === "dying");
@@ -257,7 +292,7 @@ export class CombatSystem {
 
     canDropHeart(room, players) {
         const missing = players.reduce(
-            (sum, p) => sum + Math.max(0, HEART_DROP.maxLives - (p?.lives ?? HEART_DROP.maxLives)), 0
+            (sum, p) => sum + Math.max(0, (p?.maxLives ?? HEART_DROP.maxLives) - (p?.lives ?? HEART_DROP.maxLives)), 0
         );
         return missing > (room.hearts?.length ?? 0);
     }

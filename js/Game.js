@@ -11,7 +11,7 @@ import { DialogueSystem } from './systems/DialogueSystem.js';
 import { SCRIPT_LINES } from './config/DialogueConfig.js';
 import { SCRAP } from './config/ScrapConfig.js';
 import { CHAIN } from './config/ChainConfig.js';
-import { ForgeState, mapOffersRecipe, applySawUpgrades, sawDragStats } from './systems/ForgeState.js';
+import { ForgeState, mapOffersRecipe, applySawUpgrades, applyHeartUpgrades, sawDragStats, snapWaveRadius } from './systems/ForgeState.js';
 import { SawDrag } from './systems/SawDrag.js';
 import { DashTether, dashUnlocked } from './systems/DashTether.js';
 import { DroppedSawPush } from './systems/DroppedSawPush.js';
@@ -270,7 +270,7 @@ export class Game {
         this.forgeMenu = this.forgeSystem ? new ForgeMenu({ forgeSystem: this.forgeSystem, getAmount: () => this.scrap.amount, coin: scrapFrames[0] }) : null;
         this.sawDrag = this.mapData ? new SawDrag({
             chain: this.chain, getPlayers: () => [this.p1, this.p2], input: this.input,
-            getStats: () => sawDragStats(this.forge, TILE),
+            getStats: () => sawDragStats(TILE),
             isBlocked: (x, y) => this._sawDragBlocked(x, y),
             getBounds: () => this.arenaBounds,
             canDrag: () => !this._sawOnAnvil && !this.forgeSystem?.open && !this.sawCinematic?.active,
@@ -654,8 +654,23 @@ export class Game {
         return !mapOffersRecipe(this.mapData.map, "saw");
     }
 
+    // Melhoria Estalo: onda em volta da serra quando o cabo arrebenta (não na queda nem no corte forçado).
+    _snapWave(x, y, enemies) {
+        const radius = snapWaveRadius(this.forge);
+        if (radius <= 0) return;
+        const fx = FORGE.snapWave;
+        this.particleSystem.triggerShockRing(x, y, radius, { life: fx.ringLife, color: fx.ringColor });
+        this.particleSystem.triggerSparkBurst(x, y, radius * 0.5, fx.sparks, 1.4);
+        this.renderer.triggerShake(fx.shake);
+        this.audio.play(fx.sound.cue, { rateMultiplier: fx.sound.rate, volumeMultiplier: fx.sound.volume });
+        this.combat.resolveSnapWave(this.chain.weapon, enemies, x, y, radius,
+            () => this.triggerHitSlowmo(),
+            (enemy, info) => enemy.freezeOnHit?.(info.hitStop));
+    }
+
     _applySawUpgrades() {
         applySawUpgrades(this.forge, this.chain, this.chain.weapon, CHAIN);
+        applyHeartUpgrades(this.forge, [this.p1, this.p2]);
     }
 
     _onForgeBuy(id, anvil) {
@@ -696,7 +711,7 @@ export class Game {
         this.arenaBounds = this.rooms.currentBounds;
         const spawns = this.rooms.dungeon.spawnPositions();
         for (const [p, s] of [[this.p1, spawns.p1], [this.p2, spawns.p2]]) {
-            p.lives = 3;
+            p.lives = p.maxLives;
             p.respawnAt(s.x, s.y, RUN_DEATH.invulnSteps);
             p._livesSeen = p.lives;
             p._fallSeen = false;
@@ -1113,6 +1128,7 @@ export class Game {
                 const r = this.chain.weapon?.discRadius ?? 24;
                 this.particleSystem.triggerSparkBurst(fx, fy, r, 12, 1.2);
                 this.particleSystem.triggerFlash(fx, fy, 12, 1);
+                this._snapWave(fx, fy, room.enemies);
             },
             onReconnect: () => this._onSawReconnect(),
             holdStrain: this.dashTether.holdsStrain(p1, p2),
@@ -1243,6 +1259,12 @@ export class Game {
                 if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
             }
         );
+        if (!this.chain.isConnected) this.combat.resolveLooseSawHits(this.chain.weapon, enemies,
+            () => this.triggerHitSlowmo(),
+            (enemy, info) => {
+                enemy.freezeOnHit?.(info.hitStop);
+                if (!this.arautoEffects.owns(enemy)) this.sawMotor?.onHit();
+            });
         this.combat.resolveDeaths(room, this.gibs, enemy => {
             if (!this.arautoEffects.owns(enemy)) this.screenGore.trigger();
             this.scrap?.dropFromEnemy(enemy);
@@ -1334,10 +1356,10 @@ export class Game {
             const heart = hearts[i];
             heart.update();
             const collector = [p1, p2].find(player =>
-                player.lives < 3 && Math.hypot(player.x - heart.x, player.y - heart.y) <= heart.radius + player.hitRadius
+                player.lives < player.maxLives && Math.hypot(player.x - heart.x, player.y - heart.y) <= heart.radius + player.hitRadius
             );
             if (collector) {
-                collector.lives = Math.min(3, collector.lives + 1);
+                collector.lives = Math.min(collector.maxLives, collector.lives + 1);
                 this._playHeartPickup();
 
                 this.particleSystem.triggerFlash(heart.x, heart.y, 6, 0.6);

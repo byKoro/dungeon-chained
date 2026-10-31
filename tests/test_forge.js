@@ -58,13 +58,13 @@ const player = (x, y) => ({ x, y, vx: 0, vy: 0, speed: 4.2, speedMag: 0, hitRadi
     const wallet = new ScrapWallet(9);
     assert(forge.status("size", wallet.amount) === "locked", "melhoria apagada sem a serra");
     assert(forge.status("saw", wallet.amount) === "poor" && !forge.buy("saw", wallet).ok && wallet.amount === 9, "falta sucata: não compra nem gasta");
-    wallet.add(41);
-    assert(forge.buy("saw", wallet).ok && forge.has("saw") && wallet.amount === 40, "compra a serra por 10");
+    wallet.add(76);
+    assert(forge.buy("saw", wallet).ok && forge.has("saw") && wallet.amount === 75, "compra a serra por 10");
     assert(forge.status("saw", wallet.amount) === "maxed", "serra comprada fica no máximo");
-    assert(forge.nextCost("size") === 8 && forge.buy("size", wallet).ok && forge.nextCost("size") === 14, "Tamanho sobe de nível e o preço muda");
+    assert(forge.nextCost("size") === 15 && forge.buy("size", wallet).ok && forge.nextCost("size") === 30, "Tamanho sobe de nível e o preço muda");
     forge.buy("size", wallet);
-    assert(forge.level("size") === 2 && wallet.amount === 18, "dois níveis de Tamanho: 8 + 14");
-    assert(forge.status("size", wallet.amount) === "poor", "nível 3 (22) falta sucata");
+    assert(forge.level("size") === 2 && wallet.amount === 30, "dois níveis de Tamanho: 15 + 30");
+    assert(forge.status("size", wallet.amount) === "poor", "nível 3 (50) faltam moedas");
     wallet.add(100);
     forge.buy("size", wallet);
     assert(forge.status("size", wallet.amount) === "maxed" && !forge.buy("size", wallet).ok, "Tamanho para no nível 3");
