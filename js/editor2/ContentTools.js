@@ -12,6 +12,10 @@ import { parseWaves, formatWaves, zoneFromCorners, setZone, setEncounter, toggle
 
 const $ = id => document.getElementById(id);
 
+const TEST_OPTIONS_KEY = 'dungeonChained.editor2.testOptions';
+const TEST_OPTION_IDS = ['test-dash', 'test-saw', 'test-key', 'test-infinite-lives', 'test-arauto-intro',
+    'test-sawstart', 'test-camera', 'test-saw-tackle'];
+
 const TRAPS = [
     ['spike', 'Espinhos', 'assets/peaks/peaks_3.png'], ['spikeRow', 'Fileira', 'assets/peaks/peaks_2.png'],
     ['arrow', 'Flechas', 'assets/arrow/arrow_1.png'], ['button', 'Botão co-op', 'assets/buttom/buttom_16.png']
@@ -196,6 +200,8 @@ export class ContentTools {
             <p class="hint">No jogo: P1 E / P2 Shift direito / controle X interagem. F6 alterna as câmeras e F7 liga/desliga a vida infinita durante o teste.</p>
         </div></div>`;
         connections.after(tests);
+        this._restoreTestOptions();
+        for (const id of TEST_OPTION_IDS) $(id).addEventListener('change', () => this._saveTestOptions());
         $('content-test-map').onclick = () => this.playtest(false);
         $('content-main').onclick = () => this.setMain();
     }
@@ -588,7 +594,30 @@ export class ContentTools {
         ctx.restore();
     }
 
+    // Opções do card "Teste e demo" sobrevivem a "Voltar ao Editor 2.0" e a recarregar a página.
+    _saveTestOptions() {
+        const values = {};
+        for (const id of TEST_OPTION_IDS) {
+            const el = $(id);
+            if (el) values[id] = el.type === 'checkbox' ? el.checked : el.value;
+        }
+        try { localStorage.setItem(TEST_OPTIONS_KEY, JSON.stringify(values)); } catch { /* storage indisponível */ }
+    }
+
+    _restoreTestOptions() {
+        let values = null;
+        try { values = JSON.parse(localStorage.getItem(TEST_OPTIONS_KEY) || 'null'); } catch { values = null; }
+        if (!values) return;
+        for (const id of TEST_OPTION_IDS) {
+            const el = $(id);
+            if (!el || !(id in values)) continue;
+            if (el.type === 'checkbox') el.checked = !!values[id];
+            else if ([...(el.options || [])].some(o => o.value === values[id])) el.value = values[id];
+        }
+    }
+
     playtest(isolated = true) {
+        this._saveTestOptions();
         const a = this.app;
         const map = structuredClone(a.map);
         if (isolated) { if (!a.editingKey) return; map.start = a.editingKey; }
