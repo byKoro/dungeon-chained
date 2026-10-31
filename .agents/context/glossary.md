@@ -92,3 +92,10 @@ neutro = neutral · assustado = scared · espantado = startled · raiva = anger 
 | Slam | slam | Salto do chefe que aterrissa numa marca fixa e causa dano radial com empurrão |
 | Escombros | `room.corpses` | Corpo decorativo no último quadro da animação de morte, sem gibs |
 | Vida infinita | `infiniteLives` | Opção de teste: acertos e quedas continuam, a vida não desce |
+
+
+## Chain presentation
+| Term | pt-BR | Meaning |
+|---|---|---|
+| Chain effort | esforço da corrente | Smoothed physical load, including subtle anticipation before damage accumulation; drives local vibration, metallic creak and shared player faces |
+| Rupture risk | risco de ruptura | Current distance/time danger, respecting dash protection and double-saw paused accumulation; drives critical urgency |

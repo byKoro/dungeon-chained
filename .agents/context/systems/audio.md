@@ -112,3 +112,7 @@ ArautoAudio tests all actual getSawPositions discs for rockcontact, supporting t
 
 ## Apresentação do Arauto (2026-10-29)
 `arautoAssemble` (provisório): reusa `arauto-ground-0x` com `volume` 0.32 e `rate` 1.45, tocado pela `ArautoIntroScene` a cada quadro da remontagem. O impacto da cena usa `ArautoAudio.groundHit(true)` (`arautoSlam` + duck). Sem vozes dos jogadores. Os WAVs `assets/audio/arauto-intro-*` da cena antiga do Codex ficaram sem uso (não removidos).
+
+
+## Tensão da corrente (2026-10-31)
+ChainTensionFeedback lazily creates one chainTension LoopVoice and reuses it across pulls/reconnections. tensionAudioTargets maps effort/risk to dB gain, rate and low-pass; tuning lives in ChainTensionConfig and cue gain in AudioConfig. After user feedback, gain was raised to -24..-3dB plus up to2dB of critical gain, rate0.78..1.32, cutoff1400..8500Hz. Updates once in Game._render. Pause, game over, menus, intros, transitions and cinematics silence it; rupture silences immediately through onSnap and reuses sawSnap. Reset disposes the voice. Source/build: scripts/build-chain-tension-audio.mjs and assets/audio/chain-tension-sources.md. Revised Game recording with motor/ambience/impacts: peak0.3603,0 saturated samples,0 console errors; human listening/feel assessment remains pending.

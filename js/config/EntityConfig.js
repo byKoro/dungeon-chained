@@ -52,6 +52,14 @@ export const ENEMY_TYPES = [
 
 export const ENEMY_TYPE_BY_KEY = Object.fromEntries(ENEMY_TYPES.map(t => [t.key, t]));
 
+function playerExpressions(assets, dir) {
+    const prefix = `${dir}_expr_`;
+    return Object.fromEntries(Object.entries(assets.images ?? {}).filter(([key]) => key.startsWith(prefix))
+        .map(([key, img]) => [key.slice(prefix.length), {
+            img, frameCount: 8, cellSize: 100, cropX: 41, cropY: 37, cropW: 17, cropH: 23
+        }]));
+}
+
 export function playerConfigs(assets) {
     return [
         {
@@ -62,6 +70,7 @@ export function playerConfigs(assets) {
             sprite: {
                 animated: true, frameCount: 8, cellSize: 100,
                 cropX: 41, cropY: 37, cropW: 17, cropH: 23, drawHeight: 73,
+                expressions: playerExpressions(assets, 'player_01'),
                 hurt: { img: assets.p1Hurt, frameCount: 5, hurtFrame: 2, cellSize: 100, cropX: 42, cropY: 38, cropW: 16, cropH: 22 },
                 scared: { img: assets.p1Scared, frameCount: 8, cellSize: 100, cropX: 41, cropY: 37, cropW: 17, cropH: 23 }
             }
@@ -74,6 +83,7 @@ export function playerConfigs(assets) {
             sprite: {
                 animated: true, frameCount: 8, cellSize: 100,
                 cropX: 41, cropY: 37, cropW: 17, cropH: 23, drawHeight: 73,
+                expressions: playerExpressions(assets, 'player_02'),
                 hurt: { img: assets.p2Hurt, frameCount: 5, hurtFrame: 2, cellSize: 100, cropX: 41, cropY: 37, cropW: 17, cropH: 23 },
                 scared: { img: assets.p2Scared, frameCount: 8, cellSize: 100, cropX: 41, cropY: 37, cropW: 17, cropH: 23 }
             }

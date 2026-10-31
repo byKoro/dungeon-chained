@@ -93,8 +93,8 @@ class Portrait {
         this.push.kick(-this.towardCenter * 40);
         this.blinking = 0;
         this._play([
-            { expr: 'assustado', dur: 1.0 },
-            { expr: 'preocupado', dur: 0.9 }
+            { expr: 'assustado', dur: 1.0, priority: true },
+            { expr: 'preocupado', dur: 0.9, priority: true }
         ]);
     }
 
@@ -105,8 +105,8 @@ class Portrait {
             this.squash.set(1.12);
             this.lean.kick(this.towardCenter * 3);
             this._play([
-                { expr: 'espantado', dur: 0.45, lean: this.towardCenter },
-                { look: this.towardCenter, dur: 0.7 }
+                { expr: 'espantado', dur: 0.45, lean: this.towardCenter, priority: true },
+                { look: this.towardCenter, dur: 0.7, priority: true }
             ]);
         });
     }
@@ -171,6 +171,7 @@ class Portrait {
     }
 
     update(dt, player) {
+        this.tensionExpression = player?.tensionExpression ?? null;
         this.t += dt;
         const lives = player ? player.lives : MAX_LIVES;
         this.dead = lives <= 0;
@@ -244,6 +245,7 @@ class Portrait {
         let name = this.base;
 
         if (this.paused && !this.dead) name = 'olhando_cima';
+        else if (!this.dead && this.tensionExpression && !step?.priority) name = this.tensionExpression;
         else if (step) {
             if (step.expr) name = step.expr;
             else if (step.look === 'up') name = 'olhando_cima';
@@ -253,7 +255,8 @@ class Portrait {
                 name = imgDir < 0 ? 'olhando_esquerda' : 'olhando_direita';
             }
         }
-        const noBlink = name === 'espantado' || name === 'assustado' || name === 'olhos_fechados';
+        const noBlink = name === 'espantado' || name === 'assustado' || name === 'olhos_fechados'
+            || name === this.tensionExpression;
         if (this.blinking > 0 && !noBlink) name = 'olhos_fechados';
         return name;
     }

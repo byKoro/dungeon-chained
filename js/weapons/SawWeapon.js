@@ -1,5 +1,6 @@
 import { Weapon } from './Weapon.js';
 import { SAW_CONTACT } from '../config/SawWeaponConfig.js';
+import { CHAIN_TENSION } from '../config/ChainTensionConfig.js';
 
 const SAW_FRAME = { size: 16, cols: 4 };
 const ROW_INERTIA_CLEAN = 0;
@@ -290,19 +291,32 @@ export class SawWeapon extends Weapon {
         );
     }
 
+    visualCablePoint(p1, p2, t) {
+        const point = this.cablePoint(p1, p2, t);
+        const s = this.tensionFeedback;
+        if (!s) return point;
+        const m = CHAIN_TENSION.motion;
+        const length = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+        const settle = s.settle / CHAIN_TENSION.settleSeconds;
+        const amplitude = (Math.pow(s.effort, m.effortPower) * m.amplitude + settle * m.settleAmplitude) * s.motionScale;
+        const wave = Math.sin(s.phase + t * Math.PI * 2 * m.waveCycles) * Math.sin(t * Math.PI);
+        const offset = Math.round(amplitude * wave / m.pixel) * m.pixel;
+        return { x: point.x - (p2.y - p1.y) / length * offset,
+            y: point.y + (p2.x - p1.x) / length * offset };
+    }
+
     drawChain(ctx, p1, p2) {
         const cable = this.cableSprite;
-        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
 
         if (!cable || !cable.complete || !cable.naturalWidth) {
             ctx.save();
             ctx.strokeStyle = "#1a1a1e";
             ctx.lineWidth = 4;
             ctx.beginPath();
-            const start = this.cablePoint(p1, p2, 0);
+            const start = this.visualCablePoint(p1, p2, 0);
             ctx.moveTo(start.x, start.y);
             for (let i = 1; i <= 16; i++) {
-                const q = this.cablePoint(p1, p2, i / 16);
+                const q = this.visualCablePoint(p1, p2, i / 16);
                 ctx.lineTo(q.x, q.y);
             }
             ctx.stroke();
@@ -316,14 +330,13 @@ export class SawWeapon extends Weapon {
         const tileW = cable.naturalWidth * scale;
 
         const SUB = 48;
-        const drawW = (Math.hypot(p2.x - p1.x, p2.y - p1.y) + Math.hypot(this.dragX, this.dragY) * 2) / SUB + 1;
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        let prev = this.cablePoint(p1, p2, 0);
+        let prev = this.visualCablePoint(p1, p2, 0);
         let u = this.textureOffset % tileW;
         for (let i = 1; i <= SUB; i++) {
-            const cur = this.cablePoint(p1, p2, i / SUB);
+            const cur = this.visualCablePoint(p1, p2, i / SUB);
             const segLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
             const mx = (prev.x + cur.x) / 2;
             const my = (prev.y + cur.y) / 2;
@@ -375,13 +388,14 @@ export class SawWeapon extends Weapon {
         const spinning = this.spin > BLEND_LO;
         const transPulse = blend * (1 - blend) * 4;
 
-        const strainShake = this.strain * this.strain * 3.5;
+        const strain = this.tensionFeedback?.risk ?? this.strain;
+        const strainShake = strain * strain * 3.5;
         const shake = (spinning ? SHAKE_SPIN : 0) + SHAKE_TRANSITION * transPulse + strainShake;
 
         let flash = 0;
-        if (this.strain > 0.02) {
+        if (strain > 0.02) {
             const osc = 0.5 + 0.5 * Math.sin(this.flashPhase);
-            const env = this.strain * this.strain;
+            const env = strain * strain;
 
             flash = Math.min(1, osc * env * 1.4 + env * env * 0.6);
         }

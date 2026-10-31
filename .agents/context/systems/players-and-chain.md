@@ -130,3 +130,7 @@ Game owns `chainObstacles` (`ChainObstacleSystem`), applying grounded immovable 
 
 ### Softer tether contact (2026-10-29)
 Golem cable resistance now permits8px compression with a2px shared soft correction budget per step, 3% friction and25% inward velocity reduction once per contact. Hard correction still enforces the compression boundary. Allowed compression does not trigger safe drop; infeasible wall pinches still do. Motor sustain belongs to SawWeapon (weapons.md), not physical collision.
+
+
+## Feedback de tensão (2026-10-31)
+Game owns ChainTensionFeedback, updated once before rendering all views. It reads current rest/strain/break limits and accumulated strain without changing Chain physics. Anticipation starts between rest and strainDistance; effort and real rupture risk share smoothed presentation state. Dash keeps physical effort but clears critical warnings immediately; an open double saw excludes paused temporal strain while keeping distance risk. Inactive game states clear faces/motion and silence the loop. newDungeon resets/disposes the voice. Player.tensionExpression is separate from explicit/cinematic Player.expression; damage/scared sprites retain priority.

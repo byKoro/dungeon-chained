@@ -258,3 +258,11 @@ Na branch `feat/tackle-serra`, Editor 2.0 permite comparar retorno à origem e v
 Regressões e integração em Electron passaram (seleção das duas versões e pouso gradual); sensação em co-op ainda depende de playtest manual. Histórico em `.agents/tasks/2026-10-31-saw-tackle-flight-variants/`, `2026-10-31-saw-tackle-smooth-landing/`, `2026-10-31-boss-launches-loose-saw/` e `2026-10-31-saw-safe-landing-route/`.
 
 Check permanece bloqueado pelas falhas de Arauto (`test_arauto_effects`, asserts chase/windup intermitentes), Curva SE e peça `corridor_vertical_ns_1.json` não listada. Arte experimental sem carregamento e ferramentas temporárias ficam em `_local/tackle-unused/` (ignorado pelo Git); não fazem parte da implementação atual.
+
+
+## Tensão da corrente — 2026-10-31 (feat/chain-tension-juice)
+Feedback compartilhado de carga/risco com antecipação, brilho vermelho gradual acima da iluminação, vibração do cabo, rangido crescente, alívio rápido e recuo na ruptura. Reutiliza raiva/furia originais no personagem/avatar; preserva dano/cinemáticas e as proteções de dash/serra dupla. Artes geradas foram rejeitadas e removidas com as ferramentas temporárias.
+
+11/11 testes focados e Game real no Electron passaram; capturas conferidas, console sem erros, gravação com motor/ambiente/impactos com pico0.3603 e nenhuma amostra saturada. Escuta humana/co-op pendentes. Task:2026-10-31-chain-tension-juice.
+
+Gate da implementação:54/56. ArautoEffects/Curva SE e mapa não listado são falhas da base; chase/windup em test_arauto_das_brasas e test_flame_golem também se reproduzem de forma intermitente em main41aace2. Doctor encontra Python indisponível e graphify fora do PATH.

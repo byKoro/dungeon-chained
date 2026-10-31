@@ -117,3 +117,7 @@ Depth-sorted entity drawing calls ArautoEffects.drawTrail before the boss sprite
 
 ## Faixas de cinemática depois do HUD (2026-10-29)
 `Game._renderOverlays`: `hud.draw` → `scrapCounter` → `sawCinematic.drawOverlay` → `arautoScene.drawOverlay` → (apresentação do Arauto) `drawLetterbox` + `introSkip.draw` → `forgeMenu` → barra de chefe. A cena da fase 2 deixou de desenhar antes do HUD. Detalhes em `ui.md`.
+
+
+## Chain effort sheets (2026-10-31)
+Player expression sheets are wired by playerConfigs through Player.resolveSprite. Tension reuses original raiva/furia sheets for world/HUD; no new sprite art is shipped. Generated drafts were rejected and removed during cleanup. Cable vibration is presentation-only through SawWeapon.visualCablePoint. ChainTensionFeedback draws a three-layer red glow and attachment pulses in the unlit overlay world pass. The glow follows the visual cable, skips saw discs and progresses from dark crimson to hot red; it remains visible throughout its breathing cycle.

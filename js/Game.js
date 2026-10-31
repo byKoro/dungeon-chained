@@ -32,6 +32,7 @@ import { MenuPad } from './core/MenuPad.js';
 import { Physics } from './core/Physics.js';
 import { Chain } from './core/Chain.js';
 import { ChainObstacleSystem } from './systems/ChainObstacleSystem.js';
+import { ChainTensionFeedback } from './systems/ChainTensionFeedback.js';
 import { ArautoEffects } from './systems/ArautoEffects.js';
 import { ArautoPhaseScene } from './systems/ArautoPhaseScene.js';
 import { ArautoAudio } from './systems/ArautoAudio.js';
@@ -164,6 +165,8 @@ export class Game {
 
         this.chainObstacles = new ChainObstacleSystem();
         this.chain = new Chain([new SawWeapon(this.assets.saw, this.assets.cable)], CHAIN);
+        this.chainTension = new ChainTensionFeedback({ audio: this.audio,
+            reducedMotion: globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false });
         this.dashTether = new DashTether({ chain: this.chain });
         this.forge = new ForgeState();
 
@@ -542,6 +545,7 @@ export class Game {
     }
 
     newDungeon() {
+        this.chainTension.reset([this.p1, this.p2]);
         this.arautoAudio.reset();
         this.arautoScene.reset();
         this.arautoIntro.reset();
@@ -1092,6 +1096,7 @@ export class Game {
         this.thrownSaw.aimFrom([p1, p2]);
         this.chain.update(p1, p2, {
             onSnap: () => {
+                this.chainTension.onSnap();
                 if (this.mapData && this.demoProgress.state.sawThrow) this.thrownSaw.launch();
                 this.renderer.triggerShake(14);
 
@@ -1388,6 +1393,11 @@ export class Game {
 
     _render() {
         const cinematic = this.arautoScene.active || this.arautoIntro.active;
+        this.chainTension.update(this.chain, [this.p1, this.p2], {
+            active: this._started && !this.gameOver && !this.transition && !this.roomIntro
+                && !cinematic && !this.gameLoop.paused && !this.forgeSystem?.open && !this.sawCinematic?.active,
+            protected: this.dashTether.holdsStrain(this.p1, this.p2)
+        });
         if (this.mapData && this.demoCamera.mode === 'split' && !cinematic) this.demoCamera.renderSplit(() => this._renderView());
         else this._renderView();
         this.arautoEffects.drawCamera(this.ctx, this.canvas);
@@ -1543,8 +1553,7 @@ export class Game {
             corpses: this.rooms.current?.corpses ?? []
         });
 
-        const strain = (this.chain.isConnected && this.chain.weapon)
-            ? (this.chain.weapon.strain ?? 0) : 0;
+        const strain = this.chainTension.state.risk;
         this.postProcessor.setVignetteBreath(strain);
 
         this.ghostfire.renderLights(rooms.current, renderer, this.postProcessor);
@@ -1553,9 +1562,11 @@ export class Game {
         this.postProcessor.draw();
 
         const hearts = rooms.current.hearts;
-        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length) {
+        if (hearts.length || this.particleSystem.hasDamageNumbers || this.scrap?.pickups.length
+            || this.chainTension.state.effort > 0 || this.chainTension.snapTime > 0) {
             renderer.beginOverlayWorld();
 
+            this.chainTension.draw(ctx, this.p1, this.p2, this.chain.isConnected, this.chain.weapon);
             this.scrap?.drawOverlay(ctx);
             hearts.forEach(h => h.drawOverlay(ctx));
             this.particleSystem.drawDamageNumbers(ctx);

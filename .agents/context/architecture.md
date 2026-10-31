@@ -182,3 +182,7 @@ Game owns ArautoEffects and ArautoPhaseScene. _step dispatches phase scene after
 
 ### ArautoAudio ownership (2026-10-29)
 Game constructs ArautoAudio with AudioManager, injects it into CombatSystem for impact events and updates its continuous contact/dash voices beside SawMotorAudio on each frame start. Activity gates include pause, room intro/transition, game over and ArautoPhaseScene. New dungeon resets/disposes its voices. Audio cues and curves remain config-owned.
+
+
+### ChainTensionFeedback ownership (2026-10-31)
+Game constructs ChainTensionFeedback with AudioManager and reduced-motion preference. Game._render updates it once after simulation, before any split views/world/HUD drawing. Shared state drives the continuous loop, Player.tensionExpression, draw-only cable vibration, existing saw strain effects and vignette. Attachment pulses/recoil draw in each view's unlit overlay world pass. Actual Chain.onSnap calls feedback.onSnap; newDungeon resets/disposes state/voice. Physics and chain thresholds are unchanged; tuning is config-owned in ChainTensionConfig.js.

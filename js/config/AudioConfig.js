@@ -5,6 +5,11 @@ export const AUDIO_CONFIG = {
     muted: false,
 
     cues: {
+        chainTension: {
+            description: 'Cabo metálico sob carga: rangido contínuo que cresce com a tensão',
+            files: ['assets/audio/chain-tension-loop.wav'],
+            volume: 0.65, loop: true, enabled: true
+        },
         arautoSawStone: {
             description: 'Estalos secos de pedra no contato da serra, repetidos conforme o giro',
             files: ['assets/audio/arauto-saw-stone-loop.wav'],

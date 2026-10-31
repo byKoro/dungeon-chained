@@ -21,6 +21,7 @@ export class Player extends Entity {
         this.scaredDuration = 120;
 
         this.expression = null;
+        this.tensionExpression = null;
 
         this.sprite = spriteConfig || { animated: false, drawSize: 46 };
         this.walkFrame = 0;
@@ -240,6 +241,9 @@ export class Player extends Entity {
         if (this.scaredTimer > 0 && hasSheet(s.scared)) {
             return build(s.scared.img, s.scared, walkFrameIndex());
         }
+
+        const tension = s.expressions?.[this.tensionExpression];
+        if (hasSheet(tension)) return build(tension.img, tension, walkFrameIndex());
 
         return build(this.img, s, walkFrameIndex());
     }
